@@ -13,8 +13,8 @@ class RoleSeeder extends Seeder
         $roles = [
             // System & Administrative
             ['name' => 'super_admin', 'description' => 'Full system access and control'],
-            /*['name' => 'admin', 'description' => 'Manage users, settings, and system operations'],
-            ['name' => 'manager', 'description' => 'Oversees business or department-level operations'],
+            ['name' => 'admin', 'description' => 'Manage users, settings, and system operations'],
+            /*['name' => 'manager', 'description' => 'Oversees business or department-level operations'],
             ['name' => 'team_lead', 'description' => 'Leads a functional team or unit'],
             ['name' => 'employee', 'description' => 'General staff member with basic access'],*/
 
