@@ -1,0 +1,80 @@
+deployment:
+  tasks:
+    # Paths
+    - export COMPOSER_BIN=/home/quickerf/composer.phar
+    # - export REPOPATH=/home/quickerf/laravel_suites_repo/suites.quickerfaster.com
+    # - export DEPLOYPATH=/home/quickerf/public_html/suites.quickerfaster.com
+
+    - export REPOPATH=/home/quickerf/laravel_suites_repo/quickerfaster.com
+    - export DEPLOYPATH=/home/quickerf/laravel_app
+
+    - export LOGDIR=/home/quickerf/deploy_logs
+    - mkdir -p $LOGDIR
+    - export LOGFILE=$LOGDIR/deploy_$(date +"%Y-%m-%d_%H-%M-%S").log
+
+    # Start log
+    - /bin/echo "===== Deployment started at $(date) =====" >> $LOGFILE
+
+    # Pull latest changes from GitHub
+    - /bin/echo "Pulling latest changes from GitHub..." >> $LOGFILE
+    - cd $REPOPATH && /usr/bin/git pull origin main >> $LOGFILE 2>&1
+
+    # Clean destination folder but preserve .env, .cpanel.yml, storage, bootstrap/cache
+    - /bin/echo "Cleaning destination folder..." >> $LOGFILE
+    - /bin/sh -c 'for f in $(/bin/ls -A "$DEPLOYPATH"); do
+        [ "$f" = ".env" ] || [ "$f" = ".cpanel.yml" ] || [ "$f" = "storage" ] || [ "$f" = "bootstrap/cache" ] || /bin/rm -rf "$DEPLOYPATH/$f";
+      done' >> $LOGFILE 2>&1
+
+    # Copy repository files to deployment path
+    - /bin/echo "Copying files to deployment path..." >> $LOGFILE
+    - /bin/sh -c 'cd "$REPOPATH" && /bin/cp -a $(/bin/ls -A | grep -vE "^(\.git|\.env|\.cpanel\.yml)$") "$DEPLOYPATH"' >> $LOGFILE 2>&1
+
+    # Ensure Laravel storage and cache directories exist and are writable
+    - /bin/echo "Ensuring Laravel storage and cache folders exist..." >> $LOGFILE
+    - /bin/sh -c '/bin/mkdir -p $DEPLOYPATH/storage/framework/cache/data \
+                   $DEPLOYPATH/storage/framework/sessions \
+                   $DEPLOYPATH/storage/framework/views \
+                   $DEPLOYPATH/bootstrap/cache \
+                   $DEPLOYPATH/storage/logs' >> $LOGFILE 2>&1
+
+    # Install Composer locally if missing
+    - /bin/echo "Checking Composer..." >> $LOGFILE
+    - /bin/sh -c 'if [ ! -f "$COMPOSER_BIN" ]; then
+        /bin/echo "Downloading Composer..." >> $LOGFILE &&
+        cd /home/quickerf &&
+        /usr/bin/curl -sS https://getcomposer.org/installer -o composer-setup.php &&
+        ea-php84 composer-setup.php --quiet &&
+        rm composer-setup.php &&
+        /bin/echo "Composer installed successfully" >> $LOGFILE;
+      fi'
+
+    # Install PHP dependencies without running scripts (prevents cache errors)
+    - /bin/echo "Installing PHP dependencies..." >> $LOGFILE
+    - /bin/sh -c 'cd "$DEPLOYPATH" && ea-php84 "$COMPOSER_BIN" install --no-dev --no-scripts --optimize-autoloader >> "$LOGFILE" 2>&1'
+
+    # Run Artisan post-deploy tasks manually
+    # Artisan tasks with graceful route caching
+    - /bin/echo "Running Artisan post-deploy tasks..." >> $LOGFILE
+    - /bin/sh -c 'cd "$DEPLOYPATH" && ea-php84 artisan config:clear >> "$LOGFILE" 2>&1'
+    - /bin/sh -c 'cd "$DEPLOYPATH" && ea-php84 artisan cache:clear >> "$LOGFILE" 2>&1'
+    - /bin/sh -c 'cd "$DEPLOYPATH" && ea-php84 artisan package:discover >> "$LOGFILE" 2>&1'
+    # - /bin/sh -c 'cd "$DEPLOYPATH" && ea-php84 artisan config:cache >> "$LOGFILE" 2>&1'
+
+    # Graceful route caching - try but don't fail
+    - /bin/echo "Attempting route cache..." >> $LOGFILE
+    # - /bin/sh -c 'cd "$DEPLOYPATH" && ea-php84 artisan route:cache >> "$LOGFILE" 2>&1' || /bin/echo "Route caching skipped (normal for multi-tenant)" >> $LOGFILE
+
+    # - /bin/sh -c 'cd "$DEPLOYPATH" && ea-php84 artisan view:cache >> "$LOGFILE" 2>&1'
+
+
+
+    # Final cache cleanup
+    - /bin/echo "Clearing caches..." >> $LOGFILE
+    - /bin/sh -c 'ea-php84 "$DEPLOYPATH/artisan" optimize:clear >> "$LOGFILE" 2>&1'
+
+    # End log
+    - /bin/echo "===== Deployment finished at $(date) =====" >> $LOGFILE
+
+    # Rotate logs - keep only last 5
+    - /bin/ls -1t $LOGDIR/deploy_*.log | /usr/bin/tail -n +6 | /bin/xargs -r /bin/rm --
+

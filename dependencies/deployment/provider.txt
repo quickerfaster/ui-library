@@ -1,0 +1,4 @@
+        QuickerFaster\UILibrary\Providers\UILibraryServiceProvider::class,
+        QuickerFaster\UILibrary\Providers\ModuleServiceProvider::class,
+        
+        QuickerFaster\UILibrary\Providers\FortifyServiceProvider::class

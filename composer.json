@@ -1,0 +1,29 @@
+{
+    "name": "quicker-faster/ui-library",
+    "description": "A Laravel livewier ui components",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "QuickerFaster\\UILibrary\\": "src/"
+        }
+    },
+    "require": {
+        "livewire/livewire": "^3",
+        "barryvdh/laravel-dompdf": "^3.0",
+        "maatwebsite/excel": "^3.1",
+
+        "laravel/fortify": "^1.0",
+        "laravel/socialite": "^5.0",
+
+        "spatie/laravel-permission": "^6.21",
+        "spatie/laravel-onboard": "^2.6"
+
+    },
+
+
+    "minimum-stability": "dev",
+    "prefer-stable": true
+
+
+}
