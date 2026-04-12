@@ -70,6 +70,7 @@ class DataTable extends Component
         array $pageQueryFilters = [],
         array $customColumns = []  // <-- NEW
     ) {
+        
         $this->configKey = $configKey;
         $this->hiddenFields = $hiddenFields;
         $this->queryFilters = $queryFilters;

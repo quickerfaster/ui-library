@@ -46,7 +46,12 @@ public function renderForm($value = null): string
 
     public function renderDetail($value): string
     {
-        return e($value);
+        // To be addressed later
+        if (is_array($value))
+            return e(json_encode($value));
+        else
+            return e($value);
+
     }
 
     public function getValidationRules(): array
