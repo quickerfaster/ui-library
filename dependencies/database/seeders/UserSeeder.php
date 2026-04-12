@@ -28,7 +28,7 @@ class UserSeeder extends Seeder
         $dmin = User::create([
             'id' => 2,
             'name' => 'super admin',
-            'email' => 'testing@agriwatts.ng',
+            'email' => 'gmadmin@agriwatts.ng',
             'password' => Hash::make('Test@12345'),
         ]);
 

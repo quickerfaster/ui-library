@@ -13,16 +13,16 @@ class RoleSeeder extends Seeder
         $roles = [
             // System & Administrative
             ['name' => 'super_admin', 'description' => 'Full system access and control'],
-            ['name' => 'admin', 'description' => 'Manage users, settings, and system operations'],
+            /*['name' => 'admin', 'description' => 'Manage users, settings, and system operations'],
             ['name' => 'manager', 'description' => 'Oversees business or department-level operations'],
             ['name' => 'team_lead', 'description' => 'Leads a functional team or unit'],
-            ['name' => 'employee', 'description' => 'General staff member with basic access'],
+            ['name' => 'employee', 'description' => 'General staff member with basic access'],*/
 
             // HR
-            ['name' => 'hr_manager', 'description' => 'Manages HR policies, hiring, and employee welfare'],
+            /*['name' => 'hr_manager', 'description' => 'Manages HR policies, hiring, and employee welfare'],
             ['name' => 'hr_assistant', 'description' => 'Supports HR documentation and coordination'],
             ['name' => 'hr_admin', 'description' => 'Supports HR administration activities'],
-            ['name' => 'hr_recruiter', 'description' => 'Manages candidate sourcing and interviews'],
+            ['name' => 'hr_recruiter', 'description' => 'Manages candidate sourcing and interviews'],*/
 
             // Finance
             /*['name' => 'finance_manager', 'description' => 'Manages budgeting, forecasting, and compliance'],
