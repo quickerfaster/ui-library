@@ -136,9 +136,11 @@ class ModuleServiceProvider extends ServiceProvider
             return;
         }
 
-        // Load routes FIRST so the named route exists
-        $this->loadRoutesFrom(__DIR__ . '/../Routes/web.php');
-
+        // Load library's routes FIRST so the named route exists
+        if (File::exists(__DIR__ . '/../Routes/web.php'))
+            $this->loadRoutesFrom(__DIR__ . '/../Routes/web.php');
+        if (File::exists(__DIR__ . '/../Routes/api.php'))
+            $this->loadRoutesFrom(__DIR__ . '/../Routes/api.php');
 
         // Find all config files: app/Modules/{ModuleName}/Config/{file}.php
         // $configFiles = glob($modulePath . '/*/Routes/*.php'); web.php and api.php
@@ -151,9 +153,27 @@ class ModuleServiceProvider extends ServiceProvider
             $moduleName = strtolower(basename(dirname(dirname($path))));
             if ($moduleName != 'system') {
                 //$this->loadRoutesFrom($path);
-                \Route::middleware('web')->group($path);
+                if (File::exists($path))
+                    \Route::middleware('web')->group($path);
             }
         }
+
+
+// Load module's api routes 
+$apiFiles = glob($modulePath . '/*/Routes/api.php');
+foreach ($apiFiles as $path) {
+    // Get module name correctly
+    $moduleName = strtolower(basename(dirname(dirname($path))));
+    
+    if ($moduleName !== 'system') {
+        if (File::exists($path)) {
+            // It is standard practice to add the 'api' prefix here too
+            \Route::prefix('api')->middleware('api')->group($path);
+        }
+    }
+}
+
+
 
 
         // Now loade the 'system' module's routes
