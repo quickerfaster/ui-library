@@ -247,7 +247,7 @@ public function dispatchCompletionEvent(string $eventName, array $params): void
 
     /**
      * Convert a model class to a config key that ConfigResolver understands.
-     * Assumes models are in App\Modules\{Module}\Models and config keys are like "hr_employee".
+     * Assumes models are in App\Modules\{Module}\Models and config keys are like "hr.employee".
      */
     protected function getModelConfigKey(string $modelClass): string
     {
@@ -256,7 +256,7 @@ public function dispatchCompletionEvent(string $eventName, array $params): void
         $moduleIndex = array_search('Modules', $parts) + 1;
         $module = strtolower($parts[$moduleIndex] ?? '');
         $modelName = Str::snake(class_basename($modelClass));
-        return $module . '_' . $modelName;
+        return $module . '.' . $modelName;
     }
 
     protected function saveToSession(): void

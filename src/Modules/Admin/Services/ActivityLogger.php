@@ -47,6 +47,8 @@ class ActivityLogger
             $log->subject()->associate($subject);
         }
 
+        $log->created_at = now();
+        $log->updated_at = now();
         $log->save();
 
         return $log;

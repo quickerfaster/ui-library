@@ -187,10 +187,10 @@ public function getAvailableSources(): array
     public function getDefaultConfigKey()
     {
         if ($this->module) {
-            // Assuming config key is module name + '_employee'
+            // Assuming config key is module name + '.employee'
             return $this->module . '_employee';
         }
-        return null; // or a default like 'hr_employee'
+        return null; // or a default like 'hr.employee'
     }
 
 

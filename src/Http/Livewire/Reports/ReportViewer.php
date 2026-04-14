@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 class ReportViewer extends Component
 {
     public ?string $configKey = null;      // optional, can be derived from report config
-    public ?string $reportKey = null;      // the config key of the report (e.g., 'hr_employee_directory')
+    public ?string $reportKey = null;      // the config key of the report (e.g., 'hr.employee_directory')
     public ?int $savedReportId = null;     // for user-saved reports
 
     public array $reportConfig = [];

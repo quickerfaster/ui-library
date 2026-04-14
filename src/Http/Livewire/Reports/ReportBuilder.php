@@ -10,8 +10,8 @@ use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
 
 class ReportBuilder extends Component
 {
-    public string $mainConfigKey;      // e.g., 'hr_employee'
-    public string $reportConfigKey;    // e.g., 'hr_employee_directory' (system report template)
+    public string $mainConfigKey;      // e.g., 'hr.employee'
+    public string $reportConfigKey;    // e.g., 'hr.employee_directory' (system report template)
     public ?int $reportId = null;      // for editing existing user reports
 
     public array $allFields = [];

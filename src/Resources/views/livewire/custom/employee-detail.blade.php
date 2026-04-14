@@ -79,7 +79,7 @@
 
 @if ($activeTab == 'overview')
     @livewire('qf.dashboard', [
-        'configKey' => 'hr_dashboard_employee_overview',
+        'configKey' => 'hr.dashboards.dashboard_employee_overview',
         'parameters' => [
             'employee_number' => $employee->employee_number,
             'employee_email' => $employee->email,
@@ -125,11 +125,11 @@
                             <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                                 <h5 class="fw-bold text-primary mb-0">Contact Information</h5>
                                 @if($profile)
-                                    <button onclick="Livewire.dispatch('openEditModal', ['hr_employee_profile', {{ $profile->id }}])" class="btn btn-sm btn-outline-primary">
+                                    <button onclick="Livewire.dispatch('openEditModal', ['hr.employee_profile', {{ $profile->id }}])" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
                                 @else
-                                    <button onclick="Livewire.dispatch('openAddModal', ['hr_employee_profile', { employee_id: '{{ $employee->employee_number }}' }])" class="btn btn-sm btn-outline-primary">
+                                    <button onclick="Livewire.dispatch('openAddModal', ['hr.employee_profile', { employee_id: '{{ $employee->employee_number }}' }])" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-plus"></i> Add
                                     </button>
                                 @endif
@@ -189,11 +189,11 @@
                             <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                                 <h5 class="fw-bold text-primary mb-0">Job Details</h5>
                                 @if($position)
-                                    <button onclick="Livewire.dispatch('openEditModal', ['hr_employee_position', {{ $position->id }}])" class="btn btn-sm btn-outline-primary">
+                                    <button onclick="Livewire.dispatch('openEditModal', ['hr.employee_position', {{ $position->id }}])" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
                                 @else
-                                    <button onclick="Livewire.dispatch('openAddModal', ['hr_employee_position', { employee_id: '{{ $employee->employee_number }}' }])" class="btn btn-sm btn-outline-primary">
+                                    <button onclick="Livewire.dispatch('openAddModal', ['hr.employee_position', { employee_id: '{{ $employee->employee_number }}' }])" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-plus"></i> Add
                                     </button>
                                 @endif
@@ -234,11 +234,11 @@
                             <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                                 <h5 class="fw-bold text-primary mb-0">Bank Information</h5>
                                 @if($payrollProfile)
-                                    <button onclick="Livewire.dispatch('openEditModal', ['hr_employee_payroll_profile', {{ $payrollProfile->id }}])" class="btn btn-sm btn-outline-primary">
+                                    <button onclick="Livewire.dispatch('openEditModal', ['hr.employee_payroll_profile', {{ $payrollProfile->id }}])" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
                                 @else
-                                    <button onclick="Livewire.dispatch('openAddModal', 'hr_employee_payroll_profile')" class="btn btn-sm btn-outline-primary">
+                                    <button onclick="Livewire.dispatch('openAddModal', 'hr.employee_payroll_profile')" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-plus"></i> Add
                                     </button>
                                 @endif
@@ -276,7 +276,7 @@
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                         <h5 class="fw-bold text-primary mb-0">Work Patterns</h5>
-                        <button onclick="Livewire.dispatch('openAddModal', 'hr_employee_work_pattern')" class="btn btn-sm btn-outline-primary">
+                        <button onclick="Livewire.dispatch('openAddModal', 'hr.employee_work_pattern')" class="btn btn-sm btn-outline-primary">
                             <i class="fas fa-plus"></i> Add Pattern
                         </button>
                     </div>
@@ -294,7 +294,7 @@
                                                 <td>{{ $pattern->start_date->format('M d, Y') }}</td>
                                                 <td>{{ $pattern->end_date ? $pattern->end_date->format('M d, Y') : 'Ongoing' }}</td>
                                                 <td>
-                                                    <button onclick="Livewire.dispatch('openEditModal', ['hr_employee_work_pattern', {{ $pattern->id }}])" class="btn btn-sm btn-outline-secondary">
+                                                    <button onclick="Livewire.dispatch('openEditModal', ['hr.employee_work_pattern', {{ $pattern->id }}])" class="btn btn-sm btn-outline-secondary">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
                                                 </td>
@@ -313,7 +313,7 @@
             {{-- Attendance Tab --}}
             @if ($activeTab === 'attendance')
                 @livewire('qf.data-table', [
-                    'configKey' => 'hr_attendance',
+                    'configKey' => 'hr.attendance',
                     'queryFilters' => [['employee_number', '=', $employee->employee_number]],
                     'hiddenFields' => ['onTable' => ['employee_id', 'employee_number']],
                 ], key('attendance-' . $recordId))
@@ -322,7 +322,7 @@
             {{-- Time Off Tab --}}
             @if ($activeTab === 'timeoff')
                 @livewire('qf.data-table', [
-                    'configKey' => 'hr_leave_request',
+                    'configKey' => 'hr.leave_request',
                     'queryFilters' => [['employee_id', '=', $employee->employee_number]],
                     'hiddenFields' => ['onTable' => ['employee_id']],
                 ], key('timeoff-' . $recordId))
@@ -331,12 +331,12 @@
             {{-- Documents Tab --}}
             @if ($activeTab === 'documents')
                 <div class="mb-3 d-flex justify-content-end">
-                    <button onclick="Livewire.dispatch('openAddModal', ['hr_document', { name: 'test name',   employee_id: '{{ $employee->id }}' }])" class="btn btn-sm btn-primary">
+                    <button onclick="Livewire.dispatch('openAddModal', ['hr.document', { name: 'test name',   employee_id: '{{ $employee->id }}' }])" class="btn btn-sm btn-primary">
                         <i class="fas fa-upload"></i> Upload Document
                     </button>
                 </div>
                 @livewire('qf.data-table', [
-                    'configKey' => 'hr_document',
+                    'configKey' => 'hr.document',
                     'queryFilters' => [['employee_number', '=', $employee->employee_number]],
                     'hiddenFields' => ['onTable' => ['employee_number']],
                 ], key('documents-' . $recordId))
@@ -345,7 +345,7 @@
             {{-- Clock Events Tab --}}
             @if ($activeTab == 'clockevents')
                 @livewire('qf.data-table', [
-                    'configKey' => 'hr_clock_event',
+                    'configKey' => 'hr.clock_event',
                     'queryFilters' => [['employee_number', '=', $employee->employee_number]],
                     'sort' => ['field' => 'timestamp', 'direction' => 'desc'],
                     'hiddenFields' => ['onTable' => ['employee_number']],

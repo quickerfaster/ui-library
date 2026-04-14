@@ -51,11 +51,11 @@
 
     {{-- - --<x-qf.navigation-layout :moduleName="$moduleName" :pageComponent="$pageComponent" :pageParams="$pageParams" />--}}
     {{ $slot }}
-    <livewire:qf.alert-modal configKey="hr_attendance" />
-    <livewire:qf.detail-modal configKey="hr_attendance" />
-    <livewire:qf.form-modal configKey="hr_attendance" />
-    <livewire:qf.import-modal configKey="hr_attendance" />
-    <livewire:qf.export-modal configKey="hr_attendance" />
+    <livewire:qf.alert-modal configKey="hr.attendance" />
+    <livewire:qf.detail-modal configKey="hr.attendance" />
+    <livewire:qf.form-modal configKey="hr.attendance" />
+    <livewire:qf.import-modal configKey="hr.attendance" />
+    <livewire:qf.export-modal configKey="hr.attendance" />
 
     {{-- <x-qf::onboarding.app-onboarding-tasks />
     <x-qf::onboarding.app-onboarding-tour /> --}}

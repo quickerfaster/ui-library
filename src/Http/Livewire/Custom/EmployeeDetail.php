@@ -204,15 +204,15 @@ protected function loadTabData(string $tab): void
         $this->fieldDefinitions = $resolver->getFieldDefinitions();
 
         // Profile fields – adjust configKey to match your actual file structure
-        $profileResolver = app(ConfigResolver::class, ['configKey' => 'hr_employee_profile']); // or 'hr.employee_profile'
+        $profileResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_profile']); // or 'hr.employee_profile'
         $this->profileFieldDefs = $profileResolver->getFieldDefinitions();
 
         // Position fields
-        $positionResolver = app(ConfigResolver::class, ['configKey' => 'hr_employee_position']); // or 'hr.employee_position'
+        $positionResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_position']); // or 'hr.employee_position'
         $this->positionFieldDefs = $positionResolver->getFieldDefinitions();
 
         // Payroll fields
-        $payrollResolver = app(ConfigResolver::class, ['configKey' => 'hr_employee_payroll_profile']); // or 'hr.employee_payroll_profile'
+        $payrollResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_payroll_profile']); // or 'hr.employee_payroll_profile'
         $this->payrollFieldDefs = $payrollResolver->getFieldDefinitions();
     }
 
