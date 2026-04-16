@@ -2,18 +2,6 @@
 
     {{-- <livewire:qf.filter-panel :configKey="$configKey" wire:key="filters-{{ $configKey }}" /> --}}
 
-
-
-
-
-
-
-
-
-
-
-
-
     @php
         $fieldDefinitions = $this->getConfigResolver()->getFieldDefinitions();
         $activeFilters = $this->activeFilters ?? [];
@@ -94,6 +82,19 @@
                         <i class="fas fa-print"></i> <span>Print</span>
                     </button>
                 @endif
+
+
+                <!-- Filter button -->
+                <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0"
+                    wire:click="openFilterDrawer">
+                    <i class="fas fa-filter"></i> Filter
+                    @if (count($activeFilters) > 0)
+                        <span class="badge bg-primary ms-1">{{ count($activeFilters) }}</span>
+                    @endif
+                </button>
+
+
+
             </div>
 
             <!-- Search and PerPage -->
@@ -118,6 +119,8 @@
                 @endif
             </div>
 
+
+
         </div>
 
         <!-- Right Side: Create & View Switches -->
@@ -130,7 +133,7 @@
 
             @if (count($switchViews ?? []) >= 2)
                 <button wire:click="toggleViewMode"
-                    class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2">
+                    class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0">
                     @if ($viewMode === 'table')
                         <i class="fas fa-list"></i> <span>List</span>
                     @elseif($viewMode === 'list')
@@ -144,7 +147,7 @@
             @if ($this->showHideColumnsEnabled())
                 <div class="dropdown me-4" wire:key="column-dropdown-{{ $configKey }}">
                     <button type="button"
-                        class="btn dropdown-toggle btn-sm btn-outline-secondary d-flex align-items-center gap-2"
+                        class="btn dropdown-togglebtn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0 gap-2"
                         wire:click="toggleColumnDropdown">
                         <i class="fas fa-columns"></i> Columns
                     </button>
@@ -185,15 +188,16 @@
 
 
 
-@if($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
-    <div class="d-flex align-items-center">
-        <select wire:model.live="trashedFilter" class="form-select form-select-sm w-auto" style="height: 31px;">
-            <option value="without">Active</option>
-            <option value="with">With Trashed</option>
-            <option value="only">Trashed Only</option>
-        </select>
-    </div>
-@endif
+            @if ($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
+                <div class="d-flex align-items-center">
+                    <select wire:model.live="trashedFilter" class="form-select form-select-sm w-auto"
+                        style="height: 31px;">
+                        <option value="without">Active</option>
+                        <option value="with">With Trashed</option>
+                        <option value="only">Trashed Only</option>
+                    </select>
+                </div>
+            @endif
 
 
         </div>
@@ -244,7 +248,8 @@
                         @if (!empty($controls['bulkActions']))
                             <th class="ps-2">
                                 <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" wire:model.live="bulkSelection.all">
+                                    <input type="checkbox" class="form-check-input"
+                                        wire:model.live="bulkSelection.all">
                                 </div>
                             </th>
                         @endif
@@ -312,7 +317,8 @@
                                     $def = $columns[$name];
                                     $field = $this->getField($name, $def);
                                 @endphp
-                                <td @if($isTrashed) class="text-muted bg-light text-decoration-line-through" style="opacity: 0.4;" @endif>
+                                <td
+                                    @if ($isTrashed) class="text-muted bg-light text-decoration-line-through" style="opacity: 0.4;" @endif>
                                     {!! $field->renderTable($record->$name, $record) !!}
                                 </td>
                             @endforeach

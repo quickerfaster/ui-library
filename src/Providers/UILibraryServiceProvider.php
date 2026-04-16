@@ -18,6 +18,7 @@ use QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTableDetail;
 use QuickerFaster\UILibrary\Http\Livewire\DataTables\ImportForm;
 
 use QuickerFaster\UILibrary\Http\Livewire\DocumentPreview;
+use QuickerFaster\UILibrary\Http\Livewire\Drawer;
 use QuickerFaster\UILibrary\Http\Livewire\Modals\ExportProgress;
 use QuickerFaster\UILibrary\Http\Livewire\Modals\FormModal;
 use QuickerFaster\UILibrary\Http\Livewire\Modals\DetailModal;
@@ -243,6 +244,8 @@ class UILibraryServiceProvider extends ServiceProvider
         // Settings 
         Livewire::component('qf.settings-panel', SettingsPanel::class);
 
+        // Drawer
+        Livewire::component('qf.drawer', Drawer::class);
 
 
 

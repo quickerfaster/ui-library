@@ -15,25 +15,35 @@ class FilterPanel extends Component
     public array $activeFilters = [];
     public array $savedFilters = [];
 
+    public $filterName = '';
+    public $filterIsGlobal = false;
 
-public $filterName = '';
-public $filterIsGlobal = false;
+    // NEW: Edit mode properties
+    public ?int $editingFilterId = null;
+    public string $modalTitle = 'Save Filter Set';
+    public string $saveButtonLabel = 'Save';
 
+    // Accept initial filters from the parent (DataTable)
+    public array $initialFilters = [];
 
     protected ?ConfigResolver $configResolver = null;
 
-    public function mount(string $configKey): void
+    protected $listeners = [
+        'confirmClearFilters' => 'confirmClearFilters',
+        'confirmDeleteSavedFilter' => 'deleteSavedFilter'
+    ];
+
+    public function mount(string $configKey, array $initialFilters = []): void
     {
         $this->configKey = $configKey;
+        $this->initialFilters = $initialFilters;
         $this->loadConfig();
         $this->normalizeFilterConfig();
         $this->initializeFilters();
         $this->loadSavedFilters();
 
-        // Remove any filter indices that no longer exist in the config
         $this->activeFilters = array_intersect_key($this->activeFilters, $this->filtersConfig);
 
-        // Re‑initialize each remaining filter to ensure operator and value are valid
         foreach ($this->activeFilters as $index => $filter) {
             $config = $this->filtersConfig[$index] ?? null;
             if (!$config) continue;
@@ -48,27 +58,109 @@ public $filterIsGlobal = false;
         }
     }
 
+    protected function initializeFilters(): void
+    {
+        if (!empty($this->initialFilters)) {
+            foreach ($this->filtersConfig as $index => $config) {
+                $found = false;
+                foreach ($this->initialFilters as $filter) {
+                    if ($filter['field'] === $config['field']) {
+                        $this->activeFilters[$index] = [
+                            'operator' => $filter['operator'],
+                            'value' => $filter['value'],
+                        ];
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    $defaultOperator = $config['defaultOperator'];
+                    $this->activeFilters[$index] = [
+                        'operator' => $defaultOperator,
+                        'value' => $this->getDefaultValueForType($config['type'], $defaultOperator, $config['multi'] ?? false),
+                    ];
+                }
+            }
+        } else {
+            foreach ($this->filtersConfig as $index => $filter) {
+                $defaultOperator = $filter['defaultOperator'];
+                $this->activeFilters[$index] = [
+                    'operator' => $defaultOperator,
+                    'value' => $this->getDefaultValueForType($filter['type'], $defaultOperator, $filter['multi'] ?? false),
+                ];
+            }
+        }
+    }
 
+    // ========== SAVED FILTERS – EDIT MODE ==========
+    public function showSaveFilterModal(?int $filterId = null): void
+    {
+        if ($filterId) {
+            $filter = SavedFilter::where('id', $filterId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
+            $this->filterName = $filter->name;
+            $this->filterIsGlobal = $filter->is_global;
+            $this->editingFilterId = $filterId;
+            $this->modalTitle = 'Rename Filter';
+            $this->saveButtonLabel = 'Update';
+        } else {
+            $this->filterName = '';
+            $this->filterIsGlobal = false;
+            $this->editingFilterId = null;
+            $this->modalTitle = 'Save Filter Set';
+            $this->saveButtonLabel = 'Save';
+        }
+        $this->dispatch('openSaveFilterModal');
+    }
 
+    public function saveFilter(): void
+    {
+        $this->validate(['filterName' => 'required|string|max:255']);
 
+        if ($this->editingFilterId) {
+            $filter = SavedFilter::where('id', $this->editingFilterId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
+            $filter->update([
+                'name' => $this->filterName,
+                'is_global' => $this->filterIsGlobal,
+                // Optionally overwrite filters – uncomment next line if you want to update filter conditions too
+                // 'filters' => $this->activeFilters,
+            ]);
+            $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Filter renamed']);
+        } else {
+            $this->saveCurrentFilters($this->filterName, $this->filterIsGlobal);
+        }
 
-public function showSaveFilterModal()
-{
-    $this->filterName = '';
-    $this->filterIsGlobal = false;
-    $this->dispatch('openSaveFilterModal');
-}
+        $this->dispatch('closeSaveFilterModal');
+        $this->reset(['filterName', 'filterIsGlobal', 'editingFilterId']);
+        $this->loadSavedFilters();
+    }
 
-public function saveFilter()
-{
-    $this->validate(['filterName' => 'required|string|max:255']);
-    $this->saveCurrentFilters($this->filterName, $this->filterIsGlobal);
-    $this->dispatch('closeSaveFilterModal');
-    $this->filterName = '';
-    $this->filterIsGlobal = false;
-}
+    // ========== DELETE WITH CONFIRMATION ==========
+    public function confirmDeleteSavedFilter(int $id): void
+    {
+        $this->dispatch('showAlert', [
+            'type' => 'confirm',
+            'title' => 'Delete Filter',
+            'message' => 'Are you sure you want to delete this saved filter?',
+            'confirmEvent' => 'confirmDeleteSavedFilter',
+            'confirmParams' => ['id' => $id],
+        ]);
+    }
 
+    public function deleteSavedFilter(array $params): void
+    {
+        $id = $params['id'] ?? null;
+        if ($id) {
+            SavedFilter::where('id', $id)->where('user_id', Auth::id())->delete();
+            $this->loadSavedFilters();
+            $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Filter set deleted']);
+        }
+    }
 
+    // ========== EXISTING METHODS (unchanged except where noted) ==========
     protected function queryString()
     {
         return [
@@ -134,7 +226,7 @@ public function saveFilter()
     {
         return match ($fieldType) {
             'string', 'textarea', 'text' => 'string',
-            'number', 'integer', 'float'  => 'number',
+            'number', 'integer', 'float' => 'number',
             'datepicker', 'datetimepicker' => 'date',
             'checkbox', 'boolcheckbox', 'radio' => 'boolean',
             'select' => 'select',
@@ -146,47 +238,47 @@ public function saveFilter()
     {
         return match ($type) {
             'string' => [
-                'equals'       => 'Equals',
-                'contains'     => 'Contains',
-                'starts_with'  => 'Starts with',
-                'ends_with'    => 'Ends with',
+                'equals' => 'Equals',
+                'contains' => 'Contains',
+                'starts_with' => 'Starts with',
+                'ends_with' => 'Ends with',
             ],
             'number' => [
-                'equals'                  => 'Equals',
-                'not_equals'              => 'Not equals',
-                'greater_than'            => 'Greater than',
-                'less_than'               => 'Less than',
-                'greater_than_or_equals'  => '≥',
-                'less_than_or_equals'     => '≤',
-                'between'                 => 'Between',
+                'equals' => 'Equals',
+                'not_equals' => 'Not equals',
+                'greater_than' => 'Greater than',
+                'less_than' => 'Less than',
+                'greater_than_or_equals' => '≥',
+                'less_than_or_equals' => '≤',
+                'between' => 'Between',
             ],
             'date' => [
-                'equals'        => 'Equals',
-                'not_equals'    => 'Not equals',
-                'greater_than'  => 'After',
-                'less_than'     => 'Before',
-                'between'       => 'Between',
-                'today'         => 'Today',
-                'this_week'     => 'This week',
-                'this_month'    => 'This month',
-                'this_year'     => 'This year',
-                'last_week'     => 'Last week',
-                'last_month'    => 'Last month',
-                'last_year'     => 'Last year',
-                'last_7_days'   => 'Last 7 days',
-                'next_30_days'  => 'Next 30 days',
-                'this_quarter'  => 'This quarter',
-                'last_quarter'  => 'Last quarter',
+                'equals' => 'Equals',
+                'not_equals' => 'Not equals',
+                'greater_than' => 'After',
+                'less_than' => 'Before',
+                'between' => 'Between',
+                'today' => 'Today',
+                'this_week' => 'This week',
+                'this_month' => 'This month',
+                'this_year' => 'This year',
+                'last_week' => 'Last week',
+                'last_month' => 'Last month',
+                'last_year' => 'Last year',
+                'last_7_days' => 'Last 7 days',
+                'next_30_days' => 'Next 30 days',
+                'this_quarter' => 'This quarter',
+                'last_quarter' => 'Last quarter',
             ],
             'boolean' => [
                 'equals' => 'Is',
             ],
             'select' => [
                 'equals' => 'Is',
-                'in'     => 'Is one of',
+                'in' => 'Is one of',
             ],
             default => [
-                'equals'   => 'Equals',
+                'equals' => 'Equals',
                 'contains' => 'Contains',
             ],
         };
@@ -238,20 +330,8 @@ public function saveFilter()
                 $filter['options'] = $this->getOptionsForField($filter['field'], $fieldDef);
             }
 
-            // Multi-select support
             $fieldDef = $this->fieldDefinitions[$filter['field']] ?? [];
             $filter['multi'] = $filter['multi'] ?? ($fieldDef['multiSelect'] ?? false);
-        }
-    }
-
-    protected function initializeFilters(): void
-    {
-        foreach ($this->filtersConfig as $index => $filter) {
-            $defaultOperator = $filter['defaultOperator'];
-            $this->activeFilters[$index] = [
-                'operator' => $defaultOperator,
-                'value'    => $this->getDefaultValueForType($filter['type'], $defaultOperator, $filter['multi'] ?? false),
-            ];
         }
     }
 
@@ -280,11 +360,11 @@ public function saveFilter()
                 continue;
             }
             $filters[] = [
-                'field'    => $config['field'],
-                'type'     => $config['type'],
+                'field' => $config['field'],
+                'type' => $config['type'],
                 'operator' => $active['operator'],
-                'value'    => $active['value'],
-                'multi'    => $config['multi'] ?? false,
+                'value' => $active['value'],
+                'multi' => $config['multi'] ?? false,
             ];
         }
         $this->dispatch('filtersUpdated', filters: $filters);
@@ -298,8 +378,9 @@ public function saveFilter()
         $multi = $filterConfig['multi'] ?? false;
 
         if ($type === 'date' && in_array($operator, [
-            'today','this_week','this_month','this_year','last_week','last_month','last_year',
-            'last_7_days','next_30_days','this_quarter','last_quarter'
+            'today', 'this_week', 'this_month', 'this_year',
+            'last_week', 'last_month', 'last_year', 'last_7_days',
+            'next_30_days', 'this_quarter', 'last_quarter'
         ])) {
             return false;
         }
@@ -315,11 +396,27 @@ public function saveFilter()
 
     public function clearFilters(): void
     {
-        $this->initializeFilters();
+        $this->dispatch('showAlert', [
+            'type' => 'confirm',
+            'title' => 'Clear All Filters',
+            'message' => 'Are you sure you want to clear all active filters?',
+            'confirmEvent' => 'confirmClearFilters',
+        ]);
+    }
+
+    public function confirmClearFilters(): void
+    {
+        foreach ($this->filtersConfig as $index => $config) {
+            $defaultOperator = $config['defaultOperator'];
+            $this->activeFilters[$index] = [
+                'operator' => $defaultOperator,
+                'value' => $this->getDefaultValueForType($config['type'], $defaultOperator, $config['multi'] ?? false),
+            ];
+        }
         $this->emitFilters();
     }
 
-    // ---------- Saved Filters ----------
+    // ---------- Saved Filters (non‑edit) ----------
     protected function loadSavedFilters(): void
     {
         $this->savedFilters = SavedFilter::where('user_id', Auth::id())
@@ -332,11 +429,11 @@ public function saveFilter()
     public function saveCurrentFilters(string $name, bool $global = false): void
     {
         SavedFilter::create([
-            'user_id'    => Auth::id(),
+            'user_id' => Auth::id(),
             'config_key' => $this->configKey,
-            'name'       => $name,
-            'filters'    => $this->activeFilters,
-            'is_global'  => $global,
+            'name' => $name,
+            'filters' => $this->activeFilters,
+            'is_global' => $global,
         ]);
         $this->loadSavedFilters();
         $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Filter set saved']);
@@ -356,19 +453,12 @@ public function saveFilter()
         $this->dispatch('showAlert', ['type' => 'success', 'message' => "Filter '{$saved->name}' applied"]);
     }
 
-    public function deleteSavedFilter(int $id): void
-    {
-        SavedFilter::where('id', $id)->where('user_id', Auth::id())->delete();
-        $this->loadSavedFilters();
-        $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Filter set deleted']);
-    }
-
     public function render()
     {
         return view('qf::livewire.filter-panel', [
             'filtersConfig' => $this->filtersConfig,
             'activeFilters' => $this->activeFilters,
-            'savedFilters'  => $this->savedFilters,
+            'savedFilters' => $this->savedFilters,
         ]);
     }
 }

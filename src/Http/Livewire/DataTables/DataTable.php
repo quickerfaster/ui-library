@@ -70,7 +70,7 @@ class DataTable extends Component
         array $pageQueryFilters = [],
         array $customColumns = []  // <-- NEW
     ) {
-        
+
         $this->configKey = $configKey;
         $this->hiddenFields = $hiddenFields;
         $this->queryFilters = $queryFilters;
@@ -104,6 +104,22 @@ class DataTable extends Component
         // $this->sort = $settings->get('default_sort', ['field' => 'id', 'direction' => 'asc']);
 
     }
+
+
+
+
+
+
+
+
+    public function openFilterDrawer(): void
+    {
+        $this->dispatch('openDrawer', drawerKey: 'filter_drawer', configKey: $this->configKey, additionalParams: [
+            'initialFilters' => $this->activeFilters,
+        ]);
+    }
+
+
 
 
 
@@ -530,11 +546,11 @@ class DataTable extends Component
     }
 
 
-protected function usesSoftDeletes(): bool
-{
-    $modelClass = $this->getConfigResolver()->getModel();
-    return in_array('Illuminate\Database\Eloquent\SoftDeletes', class_uses($modelClass));
-}
+    protected function usesSoftDeletes(): bool
+    {
+        $modelClass = $this->getConfigResolver()->getModel();
+        return in_array('Illuminate\Database\Eloquent\SoftDeletes', class_uses($modelClass));
+    }
 
 
     // Single record restore
@@ -861,10 +877,10 @@ protected function usesSoftDeletes(): bool
 
     public function executeRowAction($params): void
     {
-        if (empty($params) || !is_array($params) )
+        if (empty($params) || !is_array($params))
             return;
 
-        if (!isset($params["actionIndex"]) || !isset($params["actionIndex"]) )
+        if (!isset($params["actionIndex"]) || !isset($params["actionIndex"]))
             return;
 
 
@@ -884,9 +900,9 @@ protected function usesSoftDeletes(): bool
         }
 
         // Soft deleted [Restore]  or permanent [forceDelete] 
-        $permission = $action["requiredPermission"]?? '';
-        $condition = $action["condition"]?? '';
-        $act = $action["action"]?? '';
+        $permission = $action["requiredPermission"] ?? '';
+        $condition = $action["condition"] ?? '';
+        $act = $action["action"] ?? '';
 
         // Restore the soft deleted
         if ($act && $act == "restore") {
@@ -957,7 +973,7 @@ protected function usesSoftDeletes(): bool
         if (empty($action['condition']) || !is_array($action['condition']))
             return true;
 
-        
+
         foreach ($action['condition'] as $field => $expected) {
             if ($record->$field != $expected)
                 return false;
@@ -1059,50 +1075,50 @@ protected function usesSoftDeletes(): bool
     }
 
 
-protected function performBulkRestore(array $ids): void
-{
-    $modelClass = $this->getConfigResolver()->getModel();
-    $count = $modelClass::onlyTrashed()->whereIn('id', $ids)->restore();
-    ActivityLogger::log($this->configKey, 'bulk_restored', null, [], ['ids' => $ids], $count . ' records restored');
-    $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records restored.', 'autoClose' => true]);
-}
-
-protected function performBulkForceDelete(array $ids): void
-{
-    $modelClass = $this->getConfigResolver()->getModel();
-    $records = $modelClass::withTrashed()->whereIn('id', $ids)->get();
-    $count = $records->count();
-    foreach ($records as $record) {
-        ActivityLogger::deleted($this->configKey, $record, $record->toArray(), true);
-        $record->forceDelete();
+    protected function performBulkRestore(array $ids): void
+    {
+        $modelClass = $this->getConfigResolver()->getModel();
+        $count = $modelClass::onlyTrashed()->whereIn('id', $ids)->restore();
+        ActivityLogger::log($this->configKey, 'bulk_restored', null, [], ['ids' => $ids], $count . ' records restored');
+        $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records restored.', 'autoClose' => true]);
     }
-    $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records permanently deleted.', 'autoClose' => true]);
-}
 
-
-
-
-
-protected function performBulkDelete(array $ids): void
-{
-    $modelClass = $this->getConfigResolver()->getModel();
-    $controls = $this->getConfigResolver()->getControls();
-    $softDelete = $controls['softDelete'] ?? false;
-    
-    if ($softDelete) {
-        $modelClass::whereIn('id', $ids)->delete(); // soft delete
-        ActivityLogger::log($this->configKey, 'bulk_soft_deleted', null, [], ['ids' => $ids], count($ids) . ' records moved to trash');
-        $this->dispatch('showAlert', ['type' => 'success', 'message' => count($ids) . ' records moved to trash.', 'autoClose' => true]);
-    } else {
-        $modelClass::whereIn('id', $ids)->delete(); // hard delete
-        $this->dispatch('showAlert', ['type' => 'success', 'message' => count($ids) . ' records deleted.', 'autoClose' => true]);
+    protected function performBulkForceDelete(array $ids): void
+    {
+        $modelClass = $this->getConfigResolver()->getModel();
+        $records = $modelClass::withTrashed()->whereIn('id', $ids)->get();
+        $count = $records->count();
+        foreach ($records as $record) {
+            ActivityLogger::deleted($this->configKey, $record, $record->toArray(), true);
+            $record->forceDelete();
+        }
+        $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records permanently deleted.', 'autoClose' => true]);
     }
-}
 
-public function isTrashed($record): bool
-{
-    return method_exists($record, 'trashed') && $record->trashed();
-}
+
+
+
+
+    protected function performBulkDelete(array $ids): void
+    {
+        $modelClass = $this->getConfigResolver()->getModel();
+        $controls = $this->getConfigResolver()->getControls();
+        $softDelete = $controls['softDelete'] ?? false;
+
+        if ($softDelete) {
+            $modelClass::whereIn('id', $ids)->delete(); // soft delete
+            ActivityLogger::log($this->configKey, 'bulk_soft_deleted', null, [], ['ids' => $ids], count($ids) . ' records moved to trash');
+            $this->dispatch('showAlert', ['type' => 'success', 'message' => count($ids) . ' records moved to trash.', 'autoClose' => true]);
+        } else {
+            $modelClass::whereIn('id', $ids)->delete(); // hard delete
+            $this->dispatch('showAlert', ['type' => 'success', 'message' => count($ids) . ' records deleted.', 'autoClose' => true]);
+        }
+    }
+
+    public function isTrashed($record): bool
+    {
+        return method_exists($record, 'trashed') && $record->trashed();
+    }
 
 
 

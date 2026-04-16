@@ -23,7 +23,7 @@
 
 
     <link id="pagestyle" href="{{ asset('bootstrap/assets/css/soft-ui-dashboard.css?v=1.0.3') }}" rel="stylesheet" />
-    {{-- - --<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous"> --}}
+    {{--  }}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">--}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
         integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -66,12 +66,28 @@
         .sidebar-icon {
             width: 60px;
         }
+
+
+
+
     </style>
+
+
+<style>
+    /* Fix offcanvas for Soft UI */
+    .offcanvas { position: fixed; bottom: 0; flex-direction: column; max-width: 100%; visibility: hidden; background-color: #fff; background-clip: padding-box; outline: 0; transition: transform .3s ease-in-out, visibility .3s ease-in-out; }
+    .offcanvas.show { visibility: visible; }
+    .offcanvas-end { top: 0; right: 0; width: 400px; transform: translateX(100%); border-left: 1px solid rgba(0,0,0,.2); }
+    .offcanvas-end.show { transform: translateX(0); }
+    .offcanvas-backdrop { position: fixed; top: 0; left: 0; z-index: 1040; width: 100vw; height: 100vh; background-color: #000; }
+    .offcanvas-backdrop.show { opacity: 0.2; }
+</style>
 </head>
 
 <body>
 
     <body>
+
 
         
         
@@ -144,6 +160,9 @@
         <livewire:qf.document-preview-modal />
         <livewire:qf.crop-image-modal />
 
+        {{-- <livewire:qf:drawer :configKey="$configKey" /> --}}
+        <livewire:qf.drawer  />
+
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
         </script>
@@ -174,6 +193,25 @@
                 window.location.reload();
             });
         </script>
+
+
+        {{--   Filter Panel Saving modal  ----}}
+        @push('scripts')
+            <script>
+                document.addEventListener('livewire:initialized', () => {
+
+                    Livewire.on('openSaveFilterModal', () => {
+                        var modal = new bootstrap.Modal(document.getElementById('saveFilterModal'));
+                        modal.show();
+                    });
+                    Livewire.on('closeSaveFilterModal', () => {
+                        var modal = bootstrap.Modal.getInstance(document.getElementById('saveFilterModal'));
+                        if (modal) modal.hide();
+                    });
+                });
+            </script>
+        @endpush
+
         @stack('scripts')
 
 

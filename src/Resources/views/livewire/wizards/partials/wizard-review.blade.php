@@ -44,8 +44,9 @@
                                                 if (isset($def['relationship'])) {
                                                     $rel = $def['relationship'];
                                                     $dynamicProp = $rel['dynamic_property'] ?? $fieldName;
-                                                    if ($record->relationLoaded($dynamicProp)) {
+                                                    //if ($record->relationLoaded($dynamicProp)) {
                                                         $related = $record->$dynamicProp;
+                                                        
                                                         if ($related) {
                                                             if ($related instanceof \Illuminate\Database\Eloquent\Collection) {
                                                                 $displayField = $rel['display_field'] ?? 'name';
@@ -57,7 +58,7 @@
                                                         } else {
                                                             $value = '';
                                                         }
-                                                    }
+                                                   // }
                                                 } elseif (isset($def['options']) && is_array($def['options'])) {
                                                     $value = $def['options'][$value] ?? $value;
                                                 }

@@ -3,35 +3,42 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Filters</h5>
             @if (!empty($filtersConfig))
-                <div class="btn-group">
-                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
-                        data-bs-toggle="dropdown">
-                        <i class="fas fa-save"></i> Saved Filters
-                    </button>
-                    <ul class="dropdown-menu">
-                        @foreach ($savedFilters as $saved)
-                            <li>
-                                <a class="dropdown-item d-flex justify-content-between align-items-center" href="#"
-                                    wire:click.prevent="loadSavedFilter({{ $saved['id'] }})">
-                                    {{ $saved['name'] }}
-                                    @if ($saved['is_global'] ?? false)
-                                        <span class="badge bg-info ms-2">Global</span>
-                                    @endif
-                                </a>
-                            </li>
-                        @endforeach
-                        @if (count($savedFilters) > 0)
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
+
+            <div class="btn-group">
+    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="fas fa-save"></i> Saved Filters
+    </button>
+    <ul class="dropdown-menu">
+        @foreach ($savedFilters as $saved)
+            <li>
+                <div class="dropdown-item d-flex justify-content-between align-items-center">
+                    <span wire:click.prevent="loadSavedFilter({{ $saved['id'] }})" style="cursor: pointer; flex-grow: 1;">
+                        {{ $saved['name'] }}
+                        @if ($saved['is_global'] ?? false)
+                            <span class="badge bg-info ms-2">Global</span>
                         @endif
-                        <li>
-                            <a class="dropdown-item" href="#" wire:click.prevent="showSaveFilterModal">
-                                <i class="fas fa-plus"></i> Save current filters...
-                            </a>
-                        </li>
-                    </ul>
+                    </span>
+                    <div>
+                        <button wire:click.prevent="showSaveFilterModal({{ $saved['id'] }})" class="btn btn-sm btn-link" title="Rename">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button wire:click.prevent="confirmDeleteSavedFilter({{ $saved['id'] }})" class="btn btn-sm btn-link text-danger" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
+            </li>
+        @endforeach
+        @if (count($savedFilters) > 0)
+            <li><hr class="dropdown-divider"></li>
+        @endif
+        <li>
+            <a class="dropdown-item" href="#" wire:click.prevent="showSaveFilterModal">
+                <i class="fas fa-plus"></i> Save current filters...
+            </a>
+        </li>
+    </ul>
+</div>
             @endif
         </div>
 
@@ -187,19 +194,6 @@
         </div>
     </div>
 
-    @push('scripts')
-        <script>
-            document.addEventListener('livewire:initialized', () => {
-                Livewire.on('openSaveFilterModal', () => {
-                    var modal = new bootstrap.Modal(document.getElementById('saveFilterModal'));
-                    modal.show();
-                });
-                Livewire.on('closeSaveFilterModal', () => {
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('saveFilterModal'));
-                    if (modal) modal.hide();
-                });
-            });
-        </script>
-    @endpush
+
 
 </div>
