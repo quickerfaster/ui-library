@@ -12,6 +12,7 @@ use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 use App\Modules\Hr\Http\Livewire\AdjustAttendanceMvp;
+use App\Modules\Hr\Http\Controllers\EmployeePrintController;
 
 
 
@@ -26,11 +27,11 @@ Route::middleware([
 
 
 
-// In your web.php or hr module routes
+    // In your web.php or hr module routes
 
-/*Route::get('/hr/attendance/{attendanceId}/adjust', function ($attendanceId) {
-    return view('hr::adjust-attendance', ['attendanceId' => $attendanceId]);
-} )->name('attendance.adjust');*/
+    /*Route::get('/hr/attendance/{attendanceId}/adjust', function ($attendanceId) {
+        return view('hr::adjust-attendance', ['attendanceId' => $attendanceId]);
+    } )->name('attendance.adjust');*/
 
 
 
@@ -76,6 +77,16 @@ Route::middleware([
 
     // Route::post('/payroll-runs/{payrollRun}/generate-payslips', [PayrollRunController::class, 'generatePayslips']);
     // Route::post('/payroll-runs/{payrollRun}/mark-as-paid', [PayrollRunController::class, 'markAsPaid']);
+
+
+
+
+
+    Route::get('/employees/{employee}/print', [EmployeePrintController::class, 'show'])
+        ->name('hr.employees.print')
+        //->middleware(['auth', 'can:view,employee']);
+        ->middleware(['auth']);
+
 
 
 });

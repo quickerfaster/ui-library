@@ -56,20 +56,36 @@ class ModelConfigRepository
      */
     public function flush(): void
     {
-        // In a real app you'd use a tagged cache or pattern matching.
-        // For simplicity, we'll just clear all keys with our prefix.
-        // This is acceptable if you don't have many other cache keys.
-        $cacheStore = Cache::store();
-        // Not all drivers support flush, so we rely on key prefix.
-        // Alternative: store keys in a set and flush them.
+        // 1. Get the list of keys we've ever cached
+        $keys = Cache::get($this->cachePrefix . 'index', []);
+
+        // 2. Forget each individual key
+        foreach ($keys as $cacheKey) {
+            Cache::forget($cacheKey);
+        }
+
+        // 3. Clear the index itself
+        Cache::forget($this->cachePrefix . 'index');
     }
 
     protected function getCacheKey(string $configKey): string
     {
-        return $this->cachePrefix . str_replace('.', '_', $configKey);
+        $cacheKey = $this->cachePrefix . str_replace('.', '_', $configKey);
+
+        // Track this key in an index so we can flush it later
+        $keys = Cache::get($this->cachePrefix . 'index', []);
+        if (!in_array($cacheKey, $keys)) {
+            $keys[] = $cacheKey;
+            Cache::forever($this->cachePrefix . 'index', $keys);
+        }
+
+        return $cacheKey;
     }
 
-   /**
+
+
+
+    /**
      * Load the config file from disk based on the dotted key.
      * Examples:
      *   'hr.employee'                 → Modules/Hr/Data/employee.php

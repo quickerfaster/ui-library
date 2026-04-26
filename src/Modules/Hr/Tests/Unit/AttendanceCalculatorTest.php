@@ -9,17 +9,18 @@ use App\Modules\Hr\Models\{
     Employee,
     EmployeePosition,
     EmployeeWorkPattern,
-    Shift,
     WorkPattern,
     AttendancePolicy,
     PolicyAssignment,
     ClockEvent,
     Attendance,
     AttendanceSession,
-    Location,
     ShiftSchedule
 };
 use App\Modules\Hr\Services\AttendanceCalculator;
+use App\Modules\Admin\Models\Shift;
+use App\Modules\Admin\Models\Location;
+
 
 class AttendanceCalculatorTest extends TestCase
 {
@@ -90,7 +91,7 @@ class AttendanceCalculatorTest extends TestCase
             'attendance_policy_id' => null, // employee-specific policy override (none)
             'pay_type' => 'hourly',
             'hourly_rate' => 20.00,
-            'start_date' => '2026-01-01',
+            // 'start_date' => '2026-01-01',
         ]);
 
         // Assign the default work pattern to the employee via EmployeeWorkPattern
@@ -553,7 +554,7 @@ public function it_falls_back_to_system_default_policy()
             'attendance_policy_id' => null,
             'pay_type' => 'hourly',
             'hourly_rate' => 20.00,
-            'start_date' => '2026-01-01',
+            // 'start_date' => '2026-01-01',
         ]);
 
         // No EmployeeWorkPattern for this employee, so falls back to system default work pattern
@@ -655,7 +656,7 @@ public function it_falls_back_to_system_default_policy()
             'attendance_policy_id' => null,
             'pay_type' => 'hourly',
             'hourly_rate' => 20.00,
-            'start_date' => '2026-01-01',
+            // 'start_date' => '2026-01-01',
         ]);
 
         $date = Carbon::parse('2026-02-16');

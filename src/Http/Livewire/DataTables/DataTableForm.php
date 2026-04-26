@@ -590,6 +590,11 @@ class DataTableForm extends Component
             $this->dispatch('formSaved', $this->recordId, $this->isEditMode);
             $this->dispatch('refreshDataTable');
 
+            // Refresh record globally
+            $refreshEventName = "refresh".\Str::plural($this->getConfigResolver()->getModelName());
+            $this->dispatch($refreshEventName);
+
+
             if (!$this->inline) {
                 $this->dispatch('closeModal', $this->modalId);
             } else {

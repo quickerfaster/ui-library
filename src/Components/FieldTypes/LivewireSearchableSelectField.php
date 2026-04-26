@@ -79,7 +79,7 @@ public function renderTable($value, $record): string
     return $this->getLabelForValue($value);
 }
 
-public function renderDetail($value): string
+public function renderDetail($value, $record): string
 {
     // For detail view, we may not have the record, so we always fetch the label.
     return $this->getLabelForValue($value);

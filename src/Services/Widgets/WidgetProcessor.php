@@ -15,6 +15,7 @@ use QuickerFaster\UILibrary\Widgets\ListWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\MetricWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\OfferAcceptanceRateWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\OnboardingWidgetProcessor;
+use QuickerFaster\UILibrary\Widgets\ProfileHeaderWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\ProgressWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\TrainingCompletionRateWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\TrendWidgetProcessor;
@@ -32,6 +33,7 @@ class WidgetProcessor
         'onboarding'  => OnboardingWidgetProcessor::class,
         'action_card' => ActionCardWidgetProcessor::class,
         'activity_log' => ActivityLogWidgetProcessor::class,
+        'profile_header' => ProfileHeaderWidgetProcessor::class,
 
 
 

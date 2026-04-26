@@ -29,7 +29,7 @@ class TurnoverRateWidgetProcessor
 
         // Calculate average headcount over the period
         $avgHeadcount = DB::table('employees')
-            ->where('status', 'Active')
+            // ->where('status', 'Active')
             ->where('hire_date', '<=', $endDate)
             ->count(); // Simplified; more accurate would be monthly average
 

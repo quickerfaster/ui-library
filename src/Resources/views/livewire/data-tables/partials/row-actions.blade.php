@@ -1,119 +1,62 @@
-<div class="d-flex align-items-center gap-1 stop-propagation"> {{-- Added stop-propagation for our row-click feature --}}
-
+<div class="d-flex align-items-center gap-1 stop-propagation">
     @if (!empty($simpleActions) && !$this->isTrashed($record))
         @php
             $routePrefix = Str::plural(Str::kebab($modelName));
-            // Shared class for all ghost buttons
-            $btnClass = 'btn btn-sm btn-ghost p-1 text-muted transition-all hover-scale';
+            // Refined class: simplified transitions and layout
+            $btnClass = 'btn btn-action-icon d-inline-flex align-items-center justify-content-center transition-base';
         @endphp
 
-        {{-- Show Action --}}
         @if (in_array('show', $simpleActions))
-            @php
-                $queryParams = [
-                    'page' => $this->getPage(),
-                    'perPage' => $this->perPage,
-                    'search' => $this->search,
-                    'sort' => json_encode($this->sort),
-                    'activeFilters' => json_encode($this->activeFilters ?? []),
-                ];
-            @endphp
-            <a href="{{ ($viewType ?? '') === 'pages' ? route($routePrefix . '.show', array_merge(['id' => $record->id], $queryParams)) : 'javascript:void(0)' }}"
+            <a href="{{ ($viewType ?? '') === 'pages' ? route($routePrefix . '.show', ['id' => $record->id] + ($queryParams ?? [])) : 'javascript:void(0)' }}"
                 @if (($viewType ?? '') !== 'pages') wire:click="show({{ $record->id }})" @endif
-                class="{{ $btnClass }} hover-text-info" title="View Detail">
+                class="{{ $btnClass }} text-info-hover" title="View Detail">
                 <i class="fas fa-eye"></i>
             </a>
         @endif
 
-        {{-- Edit Action --}}
         @if (in_array('edit', $simpleActions))
-            <a href="{{ ($viewType ?? '') === 'pages' ? route($routePrefix . '.edit', array_merge(['id' => $record->id], ['page' => $this->getPage(), 'perPage' => $this->perPage, 'search' => $this->search, 'activeFilters' => $this->activeFilters ?? []])) : 'javascript:void(0)' }}"
+            <a href="{{ ($viewType ?? '') === 'pages' ? route($routePrefix . '.edit', ['id' => $record->id] + ($queryParams ?? [])) : 'javascript:void(0)' }}"
                 @if (($viewType ?? '') !== 'pages') wire:click="edit({{ $record->id }})" @endif
-                class="{{ $btnClass }} hover-text-primary" title="Edit Record">
-                <i class="fas fa-edit"></i>
+                class="{{ $btnClass }} text-primary-hover" title="Edit Record">
+                <i class="fas fa-pencil-alt"></i> {{-- Swapped for a cleaner edit icon --}}
             </a>
         @endif
 
-        {{-- Delete Action --}}
         @if (in_array('delete', $simpleActions))
-            <button wire:click="confirmDelete({{ $record->id }})" class="{{ $btnClass }} hover-text-danger"
+            <button wire:click="confirmDelete({{ $record->id }})" class="{{ $btnClass }} text-danger-hover"
                 title="Delete">
                 <i class="fas fa-trash-alt"></i>
             </button>
         @endif
     @else
-        <span class="badge bg-secondary me-2">Deleted</span>
+        <span class="badge rounded-pill bg-light text-secondary border fw-medium px-2">Deleted</span>
     @endif
 
     {{-- More Actions Dropdown --}}
-    @if (!empty($moreActions) && $trashedFilter == "only")
-        <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown"
-                aria-expanded="false">
-                <i class="fas fa-ellipsis-h"></i>
+    @if (!empty($moreActions))
+        <div class="dropdown table-dropdown">
+            <button class="btn btn-action-icon no-caret" type="button" data-bs-toggle="dropdown"
+                data-bs-auto-close="true">
+                <i class="fas fa-ellipsis-v"></i> {{-- Vertical dots look more modern --}}
             </button>
-            <ul class="dropdown-menu dropdown-menu-end">
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
                 @foreach ($moreActions as $index => $action)
                     <li>
-                        <a class="dropdown-item" href="#"
+                        <a class="dropdown-item d-flex align-items-center py-2" href="#"
                             wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
                             @if (!empty($action['icon']))
-                                <i class="{{ $action['icon'] }} me-2"></i>
+                                <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
                             @endif
-                            {{ $action['title'] }}
+                            <span class="small">{{ $action['title'] }}</span>
                         </a>
                     </li>
                     @if (!empty($action['appendSeparator']))
                         <li>
-                            <hr class="dropdown-divider">
+                            <hr class="dropdown-divider opacity-50">
                         </li>
                     @endif
                 @endforeach
             </ul>
         </div>
     @endif
-
-
-
-
-
-
-
 </div>
-
-<style>
-    /* Premium Hover Styles */
-    .btn-ghost {
-        background: transparent;
-        border: none;
-    }
-
-    .btn-ghost:hover {
-        background-color: rgba(0, 0, 0, 0.05);
-    }
-
-    .hover-text-info:hover {
-        color: #0dcaf0 !important;
-    }
-
-    .hover-text-primary:hover {
-        color: #0d6efd !important;
-    }
-
-    .hover-text-danger:hover {
-        color: #dc3545 !important;
-    }
-
-    .hover-scale {
-        transition: transform 0.1s ease;
-    }
-
-    .hover-scale:hover {
-        transform: scale(1.15);
-    }
-
-    /* Remove Bootstrap default caret from the ellipsis button */
-    .no-caret::after {
-        display: none;
-    }
-</style>

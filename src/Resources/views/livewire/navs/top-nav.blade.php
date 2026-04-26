@@ -239,9 +239,11 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2 mt-2">
                         <li>
-                            <a class="dropdown-item border-radius-md mb-1" href="/settings/profile">
+                            @auth
+                            <a class="dropdown-item border-radius-md mb-1" href="/hr/my-profile">
                                 <i class="fas fa-user-cog me-2 opacity-6 text-sm"></i> My Profile
                             </a>
+                            @endauth
                         </li>
 
                         {{-- Responsive "Take Tour" Link: Hidden on mobile, visible on desktop --}}

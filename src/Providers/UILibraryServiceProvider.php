@@ -53,8 +53,14 @@ use QuickerFaster\UILibrary\Http\Livewire\Settings\SettingsPanel;
 
 
 use Illuminate\Support\Facades\Blade;
+use QuickerFaster\UILibrary\Http\Livewire\Custom\SearchableEmployeeDropdown;
 use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
+
+
+use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments;
+use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview;
+use App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard;
 
 
 class UILibraryServiceProvider extends ServiceProvider
@@ -224,6 +230,7 @@ class UILibraryServiceProvider extends ServiceProvider
 
         //Custom
         Livewire::component('qf.employee-detail', EmployeeDetail::class);
+        Livewire::component('qf.searchable-employee-dropdown', SearchableEmployeeDropdown::class);
 
         Livewire::component('qf.employee-detail', EmployeeDetail::class);
         Livewire::component('qf.menu-renderer', MenuRenderer::class);
@@ -249,7 +256,29 @@ class UILibraryServiceProvider extends ServiceProvider
 
 
 
+        // Local modules's livewire components register
+        if (class_exists(PayrollWizardAdjustments::class)) {
+            Livewire::component('qf.payroll-wizard-adjustments', PayrollWizardAdjustments::class);
+        }
+
+        if (class_exists(PayrollWizardPreview::class)) {
+            Livewire::component('qf.payroll-wizard-preview', PayrollWizardPreview::class);
+        }
+
+        if (class_exists(PayrollRunWizard::class)) {
+            Livewire::component('qf.payroll-run-wizard', PayrollRunWizard::class);
+        }
+
+        if (class_exists(\App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class)) {
+            Livewire::component('qf.payroll-run-detail', \App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class);
+        }
+
+
     }
+
+
+
+
 
 
 

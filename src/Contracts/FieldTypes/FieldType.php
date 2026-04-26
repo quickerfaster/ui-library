@@ -19,7 +19,7 @@ interface FieldType
     /**
      * Render the field value for a detail view
      */
-    public function renderDetail($value): string;
+    public function renderDetail($value, $record): string;
 
     /**
      * Get validation rules for this field

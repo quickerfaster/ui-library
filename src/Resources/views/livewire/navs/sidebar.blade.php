@@ -15,16 +15,16 @@
     </ul>
 
     <div class="mt-auto p-2 border-top d-flex justify-content-between align-items-center">
-        <button wire:click="toggleState" class="btn btn-sm btn-outline-secondary" title="Toggle sidebar width">
+        <button wire:click="toggleState" class="btn btn-sm btn-outline-secondary px-3 me-2" title="Toggle sidebar width">
             <i
                 class="fa fa-chevron-left toggle-icon @if ($state === 'full') rotated-left @else rotated-right @endif"></i>
         </button>
         @if ($allowTypeSwitch)
-            <button wire:click="switchToHorizontal" class="btn btn-sm btn-outline-secondary"
+            <button wire:click="switchToHorizontal" class="btn btn-sm btn-outline-secondary px-3 ms-2"
                 title="Switch to horizontal menu">
-                <i class="fa fa-arrows-alt-h"></i>
+                <i class="fa fa-arrows-alt-v"></i>
                 @if ($state === 'full')
-                    {{--<span>Horizontal</span> --}}
+                    <span>Horizontal</span>
                 @endif
             </button>
         @endif

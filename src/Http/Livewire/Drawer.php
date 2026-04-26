@@ -12,15 +12,16 @@ class Drawer extends Component
     public array $drawerConfig = [];
     public ?string $configKey = null;
 
-protected $listeners = [
-    'openDrawer' => 'open',
-    'closeDrawer' => 'close',
-];
+    protected $listeners = [
+        'openDrawer' => 'open',
+        'closeDrawer' => 'close',
+    ];
     /**
      * Open a drawer by its configuration key.
      */
     public function open(string $drawerKey, string $configKey, array $additionalParams = []): void
     {
+
         $this->configKey = $configKey;
 
         $resolver = app(ConfigResolver::class, ['configKey' => $this->configKey]);

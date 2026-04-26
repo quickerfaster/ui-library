@@ -7,67 +7,69 @@ use App\Modules\Hr\Models\{
     Attendance,
     AttendancePolicy,
     WorkPattern,
-    Shift,
     ShiftSchedule,
     Employee,
     EmployeePosition,
     AttendanceSession,
     PolicyAssignment
 };
+use App\Modules\Admin\Models\Shift;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Modules\Hr\Traits\HandlesAttendanceRecord;
 
 class AttendanceCalculator
 {
+
+
+    use HandlesAttendanceRecord;
+
+
     /**
      * Calculate attendance for a specific employee and date
      * Creates/updates attendance record AND attendance sessions
      */
     public function calculateForDay(string $employeeNumber, Carbon $date): array
     {
+
         return DB::transaction(function () use ($employeeNumber, $date) {
-            // 1. Get employee and position
-            $employee = Employee::where('employee_number', $employeeNumber)->first();
-            if (!$employee) {
-                throw new \Exception("Employee not found: {$employeeNumber}");
+            // 1. Get employee with all required relations for the attendance record
+            $employee = Employee::with(['employeePosition.department.company'])
+                ->where('employee_number', $employeeNumber)
+                ->first();
+
+            if (!$employee || !$employee->employeePosition) {
+                throw new \Exception("Employee or Position not found: {$employeeNumber}");
             }
 
             $position = $employee->employeePosition;
-            if (!$position) {
-                throw new \Exception("Employee position not found for: {$employeeNumber}");
-            }
 
-
-
-            // 2. Get expected schedule and pattern using
-            $pattern = $this->getApplicableWorkPattern($position, $date); // we already improved this
+            // 2. Schedule & Policy logic (Already improved)
+            $pattern = $this->getApplicableWorkPattern($position, $date);
             $schedule = $this->getExpectedSchedule($employee, $position, $pattern, $date);
             $shift = $schedule['shift'] ?? null;
-
-            // 3. Get policy with shift fallback
             $policy = $this->getApplicablePolicy($position, $date, $shift);
 
-
-
-
-
-            // 4. Get clock events
-            $events = ClockEvent::where('employee_id', $employeeNumber)
+            // 3. Get clock events - Ensure the column name matches the value (ID vs Number)
+            $events = ClockEvent::where('employee_id', $employeeNumber) // Changed to number based on your variable
                 ->whereDate('timestamp', $date)
                 ->orderBy('timestamp')
                 ->get();
 
-            // 5. Process events into sessions
+            // 4. Process events
             $sessionData = $this->processClockEvents($events);
             $sessions = $sessionData['sessions'];
             $totalHours = $sessionData['total_hours'];
             $firstClockIn = $sessionData['first_clock_in'];
             $lastClockOut = $sessionData['last_clock_out'];
 
-            // 6. Get or create attendance record
+
+
+            // 5. Get or create attendance record
             $attendance = $this->getOrCreateAttendanceRecord($employee, $date, $schedule, $policy);
+
 
             // 7. DELETE existing sessions for this attendance (fresh calculation)
             AttendanceSession::where('attendance_id', $attendance->id)->delete();
@@ -375,117 +377,83 @@ class AttendanceCalculator
     }
 
 
-    /**
-     * Get or create attendance record
-     */
-    protected function getOrCreateAttendanceRecord(Employee $employee, Carbon $date, $schedule = null, $policy = null): Attendance
+
+
+
+    public function getApplicablePolicy(EmployeePosition $position, Carbon $date, ?\App\Modules\Admin\Models\Shift $shift = null): ?AttendancePolicy
     {
-        $attendance = Attendance::where('employee_number', $employee->employee_number)
-            ->whereDate('date', $date)
+        // Priority 1: Employee-specific policy (direct override)
+        if ($position->attendance_policy_id) {
+            $policy = AttendancePolicy::find($position->attendance_policy_id);
+            if ($policy && $this->isPolicyActive($policy, $date)) {
+                return $policy;
+            }
+        }
+
+        // Priority 2: Shift-specific policy (only via PolicyAssignment)
+        if ($shift) {
+            $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Shift::class, $shift->id, $date);
+            if ($policy)
+                return $policy;
+        }
+
+        // Priority 3: Department policy
+        if ($position->department) {
+            $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Department::class, $position->department->id, $date);
+            if ($policy)
+                return $policy;
+        }
+
+        // Priority 4: Location policy
+        if ($position->location) {
+            $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Location::class, $position->location->id, $date);
+            if ($policy)
+                return $policy;
+        }
+
+        // Priority 5: Company policy
+        if ($position->department && $position->department->company) {
+            $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Company::class, $position->department->company->id, $date);
+            if ($policy)
+                return $policy;
+        }
+
+        // Priority 6: System-wide default policy
+        return AttendancePolicy::where('is_default', true)
+            ->where('is_active', true)
+            ->whereDate('effective_date', '<=', $date)
+            ->where(function ($q) use ($date) {
+                $q->whereNull('expiration_date')->orWhereDate('expiration_date', '>=', $date);
+            })
             ->first();
-
-        $shiftId = null;
-        if ($schedule && $schedule['shift'])
-            $shiftId = $schedule['shift']->id;
-
-        if (!$attendance) {
-            $attendance = Attendance::create([
-                'employee_id' => $employee->id,
-                'shift_id' => $shiftId,
-                'attendance_policy_id' => $policy?->id,
-                'employee_number' => $employee->employee_number,
-                'company' => $employee->department->company->name ?? 'N/A',
-                'department' => $employee->department->name ?? 'N/A',
-                'date' => $date,
-                'status' => 'pending',
-                'is_approved' => false,
-                'net_hours' => 0.00,
-            ]);
-        }
-
-        return $attendance;
     }
 
 
 
+    /**
+     * Fetch a policy assigned to a specific entity (company, location, department, shift).
+     *
+     * @param string $modelClass Fully qualified model class (e.g., 'App\Modules\Admin\Models\Company')
+     * @param int $id
+     * @param Carbon $date
+     * @return AttendancePolicy|null
+     */
+    protected function getPolicyForEntity(string $modelClass, int $id, Carbon $date): ?AttendancePolicy
+    {
+        $cacheKey = "policy_for_{$modelClass}_{$id}";
+        return \Cache::remember($cacheKey, 3600, function () use ($modelClass, $id, $date) {
+            $assignment = PolicyAssignment::where('assignable_type', $modelClass)
+                ->where('assignable_id', $id)
+                ->with('attendancePolicy')
+                ->first();
 
+            if ($assignment && $this->isPolicyActive($assignment->attendancePolicy, $date)) {
+                return $assignment->attendancePolicy;
+            }
 
-
-
-
-
-
-
-public function getApplicablePolicy(EmployeePosition $position, Carbon $date, ?\App\Modules\Hr\Models\Shift $shift = null): ?AttendancePolicy
-{
-    // Priority 1: Employee-specific policy (direct override)
-    if ($position->attendance_policy_id) {
-        $policy = AttendancePolicy::find($position->attendance_policy_id);
-        if ($policy && $this->isPolicyActive($policy, $date)) {
-            return $policy;
-        }
+            return null;
+        });
     }
-
-    // Priority 2: Shift-specific policy (only via PolicyAssignment)
-    if ($shift) {
-        $policy = $this->getPolicyForEntity(\App\Modules\Hr\Models\Shift::class, $shift->id, $date);
-        if ($policy) return $policy;
-    }
-
-    // Priority 3: Department policy
-    if ($position->department) {
-        $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Department::class, $position->department->id, $date);
-        if ($policy) return $policy;
-    }
-
-    // Priority 4: Location policy
-    if ($position->location) {
-        $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Location::class, $position->location->id, $date);
-        if ($policy) return $policy;
-    }
-
-    // Priority 5: Company policy
-    if ($position->department && $position->department->company) {
-        $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Company::class, $position->department->company->id, $date);
-        if ($policy) return $policy;
-    }
-
-    // Priority 6: System-wide default policy
-    return AttendancePolicy::where('is_default', true)
-        ->where('is_active', true)
-        ->whereDate('effective_date', '<=', $date)
-        ->where(function ($q) use ($date) {
-            $q->whereNull('expiration_date')->orWhereDate('expiration_date', '>=', $date);
-        })
-        ->first();
-}
-
-    
-
-/**
- * Fetch a policy assigned to a specific entity (company, location, department, shift).
- *
- * @param string $modelClass Fully qualified model class (e.g., 'App\Modules\Admin\Models\Company')
- * @param int $id
- * @param Carbon $date
- * @return AttendancePolicy|null
- */
-protected function getPolicyForEntity(string $modelClass, int $id, Carbon $date): ?AttendancePolicy
-{
-    $cacheKey = "policy_for_{$modelClass}_{$id}";
-    return \Cache::remember($cacheKey, 3600, function () use ($modelClass, $id, $date) {
-        $assignment = PolicyAssignment::where('assignable_type', $modelClass)
-            ->where('assignable_id', $id)
-            ->with('attendancePolicy')
-            ->first();
-
-        if ($assignment && $this->isPolicyActive($assignment->attendancePolicy, $date)) {
-            return $assignment->attendancePolicy;
-        }
-
-        return null;
-    });
-}
 
     /**
      * Check if a policy is active on the given date.

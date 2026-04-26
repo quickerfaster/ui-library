@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
 use App\Modules\Admin\Models\Company;
-use App\Modules\Hr\Models\Shift;
+use App\Modules\Admin\Models\Shift;
 use App\Modules\Hr\Models\WorkPattern;
 use App\Modules\Hr\Models\AttendancePolicy;
 use App\Modules\Admin\Models\Location;

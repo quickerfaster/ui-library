@@ -53,9 +53,9 @@ class RadioField implements FieldType
     }
 
 
-    public function renderDetail($value): string
+    public function renderDetail($value, $record): string
     {
-        return $this->renderTable($value, null);
+        return $this->renderTable($value, $record);
     }
 
     public function getValidationRules(): array

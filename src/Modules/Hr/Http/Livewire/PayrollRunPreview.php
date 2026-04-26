@@ -40,7 +40,7 @@ dd($params);
 
     public function openPayrollPreviewModal($params)
     {
-
+dd("here");
         $payrollRunId = $params["payroll_run_id"]?? null;
         if (!isset($payrollRunId))
             throw new \Exception("PayrollPreview data cannot be loaded [payroll_run_id] not provided");

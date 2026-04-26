@@ -37,10 +37,10 @@ class QuickerFasterInstallUI extends Command
             $this->overrideTheDependencyFiles();
 
             // 2. Run migrations
-            $this->runMigrations();
+            // $this->runMigrations();
 
             // 3. Run seeders
-            $this->runSeeders();
+            // $this->runSeeders();
 
             // 4. Create symbolic link
             $this->createStorageLink();

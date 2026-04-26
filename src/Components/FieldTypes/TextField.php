@@ -44,7 +44,7 @@ public function renderForm($value = null): string
         return e($value);
     }
 
-    public function renderDetail($value): string
+    public function renderDetail($value, $record): string
     {
         // To be addressed later
         if (is_array($value))

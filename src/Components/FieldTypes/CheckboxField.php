@@ -45,45 +45,45 @@ class CheckboxField implements FieldType
         }
     }
 
-public function renderTable($value, $record): string
-{
-    $multiple = $this->definition['multiSelect'] ?? false;
+    public function renderTable($value, $record): string
+    {
+        $multiple = $this->definition['multiSelect'] ?? false;
 
-    // If it's a relationship and the record has it loaded, use that.
-    if ($this->isRelationship() && $record && $record->relationLoaded($this->name)) {
-        $related = $record->{$this->name};
-        $displayField = $this->definition['relationship']['display_field'] ?? 'name';
+        // If it's a relationship and the record has it loaded, use that.
+        if ($this->isRelationship() && $record && $record->relationLoaded($this->name)) {
+            $related = $record->{$this->name};
+            $displayField = $this->definition['relationship']['display_field'] ?? 'name';
 
-        if ($multiple) {
-            // For belongsToMany/hasMany, $related is a collection
-            return $related->pluck($displayField)->implode(', ');
-        } else {
-            // For belongsTo, $related is a single model
-            return $related->$displayField ?? '';
+            if ($multiple) {
+                // For belongsToMany/hasMany, $related is a collection
+                return $related->pluck($displayField)->implode(', ');
+            } else {
+                // For belongsTo, $related is a single model
+                return $related->$displayField ?? '';
+            }
         }
+
+        // Fallback to using options
+        if ($multiple) {
+            $options = $this->getOptions();
+            $selectedKeys = is_string($value) ? explode(',', $value) : (array) $value;
+            $labels = array_intersect_key($options, array_flip($selectedKeys));
+            return implode(', ', $labels);
+        }
+
+
+        // Green badge for truthy values, Red for falsy
+        $class = $value ? 'bg-success' : 'bg-danger';
+        $label = $value ? 'Yes' : 'No';
+
+        return "<span class=\"badge {$class}\">{$label}</span>";
+
     }
 
-    // Fallback to using options
-    if ($multiple) {
-        $options = $this->getOptions();
-        $selectedKeys = is_string($value) ? explode(',', $value) : (array) $value;
-        $labels = array_intersect_key($options, array_flip($selectedKeys));
-        return implode(', ', $labels);
+    public function renderDetail($value, $record): string
+    {
+        return $this->renderTable($value, $record);
     }
-
-
-    // Green badge for truthy values, Red for falsy
-    $class = $value ? 'bg-success' : 'bg-danger';
-    $label = $value ? 'Yes' : 'No';
-
-    return "<span class=\"badge {$class}\">{$label}</span>";
-
-}
-
-public function renderDetail($value): string
-{
-    return $this->renderTable($value, null);
-}
 
     public function getValidationRules(): array
     {

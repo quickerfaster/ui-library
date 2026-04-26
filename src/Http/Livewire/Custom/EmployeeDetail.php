@@ -15,7 +15,8 @@ class EmployeeDetail extends Component
 
     public $employee;
     public $profile;
-    public $position;
+    public $currentPosition;        // now directly from employee->employeePosition (hasOne)
+    public $jobHistory;             // renamed from $positionHistory – collection of EmployeeJobHistory
     public $payrollProfile;
     public $workPatterns;
     public string $modelName;
@@ -23,26 +24,23 @@ class EmployeeDetail extends Component
 
     public $fieldDefinitions = [];
     public $profileFieldDefs = [];
-    public $positionFieldDefs = [];
+    public $employeePositionFieldDefs = [];
     public $payrollFieldDefs = [];
 
-    public ?array $recordIds = null; // Ids of all the records of row on a page of datateble
+    public ?array $recordIds = null;
     public ?int $currentIndex = null;
     public bool $inline = false;
     public ?array $returnParams = [];
     public string $activeTab = 'overview';
 
     protected ?FieldFactory $fieldFactory = null;
+    public $selfServiceConfig = [];
+    public $isSelfServiceMode = false;
 
-
-public function refreshEmployee(): void
-{
-    $this->loadData();
-    $this->loadFieldDefinitions();
-}
-
-
-
+    protected $listeners = [
+        'employeeSelected' => 'jumpToEmployee',
+        'refreshEmployeeWorkPatterns' => 'loadWorkPatterns'
+    ];
 
     public function mount(
         string $configKey,
@@ -59,162 +57,234 @@ public function refreshEmployee(): void
         $this->inline = $inline;
         $this->returnParams = $returnParams;
 
-        // Load data and field definitions
+        $this->loadSelfServiceConfig();
         $this->loadData();
         $this->loadFieldDefinitions();
 
-        // If no recordIds were passed (i.e., we're in page mode) and we have returnParams,
-        // try to load the IDs from the filtered list
         if ($this->recordIds === null && !empty($this->returnParams)) {
             $this->loadPageIds();
         }
     }
 
-
-
-    
-
-    /*protected function loadData(): void
+    protected function loadSelfServiceConfig(): void
     {
+        $this->selfServiceConfig = [
+            'enabled' => true,
+            'allowedTabs' => ['overview', 'personal', 'employment', 'history', 'payroll', 'workpatterns', 'attendance', 'timeoff', 'documents', 'clockevents'],
+            'hideEditButtons' => true,
+        ];
+
+        $isConfigEnabled = $this->selfServiceConfig['enabled'] ?? false;
+        $isProfilePage = request()->is('hr/my-profile');
+        $this->isSelfServiceMode = $isConfigEnabled && $isProfilePage;
+    }
+
+    public function canEdit(): bool
+    {
+        return !$this->isSelfServiceMode;
+    }
+
+    public function getAllowedTabs(): array
+    {
+        if ($this->isSelfServiceMode) {
+            $allowed = $this->selfServiceConfig['allowedTabs'] ?? [];
+            return array_intersect($this->getAllPossibleTabs(), $allowed);
+        }
+        return $this->getAllPossibleTabs();
+    }
+
+    protected function getAllPossibleTabs(): array
+    {
+        return ['overview', 'personal', 'contact', 'employment', 'history', 'payroll', 'workpatterns', 'attendance', 'timeoff', 'documents', 'clockevents'];
+    }
+
+    public function jumpToEmployee(int $id): void
+    {
+        $this->changeEmployee($id);
+    }
+
+    public function loadWorkPatterns(): void
+    {
+        $this->employee->load('employeeWorkPatterns.workPattern');
+        $this->workPatterns = $this->employee->employeeWorkPatterns;
+    }
+
+    public function refreshEmployee(): void
+    {
+        $this->loadData();
+        $this->loadFieldDefinitions();
+    }
+
+    protected function loadData(): void
+    {
+        if ($this->isSelfServiceMode) {
+            $userEmployeeId = \App\Modules\Hr\Models\Employee::where('user_id', auth()->id())->value('id');
+            if ($this->recordId != $userEmployeeId) {
+                abort(403, 'You can only view your own profile.');
+            }
+        }
+
         $resolver = app(ConfigResolver::class, ['configKey' => $this->configKey]);
         $modelClass = $resolver->getModel();
-        $this->modelName = $resolver->getModelName();
-        $this->moduleName = $resolver->getModuleName();
 
+        // Load employee with the correct relations:
+        // - position (hasOne) for current job data
+        // - jobHistory (hasMany) for audit trail
+        // - profile, workPatterns, etc.
         $this->employee = $modelClass::with([
-            'department',
             'employeeProfile',
-            'employeePosition.jobTitle',
+            'employeePosition.jobTitle',           // current position
             'employeePosition.department',
             'employeePosition.manager',
             'employeePosition.reportsTo',
             'employeePosition.location',
             'employeePosition.shift',
             'employeePosition.attendancePolicy',
+            'jobHistory',                  // history records (sorted by effective_date desc)
             'employeeWorkPatterns.workPattern',
         ])->findOrFail($this->recordId);
 
+        $this->modelName = $resolver->getModelName();
+        $this->moduleName = $resolver->getModuleName();
+
         $this->profile = $this->employee->employeeProfile;
-        $this->position = $this->employee->employeePosition;
+        $this->currentPosition = $this->employee->employeePosition;          // simple hasOne
+        $this->jobHistory = $this->employee->jobHistory;             // collection of EmployeeJobHistory
         $this->workPatterns = $this->employee->employeeWorkPatterns;
 
-        // Payroll profile – separate query because no relation is defined
+        // Payroll profile (separate query)
         $payrollModel = 'App\Modules\Hr\Models\EmployeePayrollProfile';
         $this->payrollProfile = $payrollModel::where('employee_id', $this->recordId)->first();
-    }*/
 
-
-
-
-        
-
-protected function loadData(): void
-{
-    $resolver = app(ConfigResolver::class, ['configKey' => $this->configKey]);
-    $modelClass = $resolver->getModel();
-    
-    // Core data only (always needed)
-    $this->employee = $modelClass::with(['department'])->findOrFail($this->recordId);
-    $this->modelName = $resolver->getModelName();
-    $this->moduleName = $resolver->getModuleName();
-
-    // Load data for the active tab (if any)
-    if ($this->activeTab !== '') {
-        $this->loadTabData($this->activeTab);
+        if ($this->activeTab !== '') {
+            $this->loadTabData($this->activeTab);
+        }
     }
-}
 
-
-public function updatedActiveTab($newTab, $oldTab)
-{
-    // Only load if we haven't loaded this tab's data yet (optional)
-    if ($newTab === 'personal' && $this->profile === null) {
-        $this->loadTabData($newTab);
-    } elseif ($newTab === 'employment' && $this->position === null) {
-        $this->loadTabData($newTab);
-    } elseif ($newTab === 'payroll' && $this->payrollProfile === null) {
-        $this->loadTabData($newTab);
-        //$this->confirmPayrollAccess();
-    } elseif ($newTab === 'workpatterns' && $this->workPatterns === null) {
-        $this->loadTabData($newTab);
+    /**
+     * No longer needed – current position is simply $this->employee->employeePosition.
+     * Kept for compatibility with existing view code.
+     */
+    protected function getCurrentPosition()
+    {
+        return $this->employee->employeePosition;
     }
-}
 
-
-
-public function confirmPayrollAccess()
-{
-    $this->dispatch('showAlert', [
-        'type' => 'confirm',
-        'title' => 'Confirm Access',
-        'message' => 'Viewing payroll information requires your password. Continue?',
-        'confirmEvent' => 'loadPayroll',
-        'cancelEvent' => 'resetActiveTab'
-    ]);
-}
-
-public function loadPayroll()
-{
-    $this->loadTabData('payroll');
-}
-
-public function resetActiveTab()
-{
-    $this->activeTab = 'personal'; // fallback
-}
-
-
-protected function loadTabData(string $tab): void
-{
-    switch ($tab) {
-        case 'personal':
-            $this->employee->load('employeeProfile');
-            $this->profile = $this->employee->employeeProfile;
-            break;
-        case 'employment':
-            $this->employee->load([
-                'employeePosition.jobTitle',
-                'employeePosition.department',
-                'employeePosition.manager',
-                'employeePosition.reportsTo',
-                'employeePosition.location',
-                'employeePosition.shift',
-                'employeePosition.attendancePolicy'
-            ]);
-            $this->position = $this->employee->employeePosition;
-            break;
-        case 'payroll':
-            $payrollModel = 'App\Modules\Hr\Models\EmployeePayrollProfile';
-            $this->payrollProfile = $payrollModel::where('employee_id', $this->employee->employeePayrollProfile?->employee_id)->first();
-            
-            break;
-        case 'workpatterns':
-            $this->employee->load('employeeWorkPatterns.workPattern');
-            $this->workPatterns = $this->employee->employeeWorkPatterns;
-            break;
+    public function updatedActiveTab($newTab, $oldTab)
+    {
+        if ($newTab === 'personal' && $this->profile === null) {
+            $this->loadTabData($newTab);
+        } elseif ($newTab === 'employment' && $this->currentPosition === null) {
+            $this->loadTabData($newTab);
+        } elseif ($newTab === 'history') {
+            $this->loadTabData($newTab);
+        } elseif ($newTab === 'payroll' && $this->payrollProfile === null) {
+            $this->loadTabData($newTab);
+        } elseif ($newTab === 'workpatterns' && $this->workPatterns === null) {
+            $this->loadTabData($newTab);
+        }
     }
-}
+
+    public function confirmPayrollAccess()
+    {
+        $this->dispatch('showAlert', [
+            'type' => 'confirm',
+            'title' => 'Confirm Access',
+            'message' => 'Viewing payroll information requires your password. Continue?',
+            'confirmEvent' => 'loadPayroll',
+            'cancelEvent' => 'resetActiveTab'
+        ]);
+    }
+
+    public function loadPayroll()
+    {
+        $this->loadTabData('payroll');
+    }
+
+    public function resetActiveTab()
+    {
+        $this->activeTab = 'personal';
+    }
+
+    protected function loadTabData(string $tab): void
+    {
+        switch ($tab) {
+            case 'personal':
+                $this->employee->load('employeeProfile');
+                $this->profile = $this->employee->employeeProfile;
+                break;
+            case 'employment':
+                // Refresh current position with all its relations
+                $this->employee->load([
+                    'employeePosition.jobTitle',
+                    'employeePosition.department',
+                    'employeePosition.manager',
+                    'employeePosition.reportsTo',
+                    'employeePosition.location',
+                    'employeePosition.shift',
+                    'employeePosition.attendancePolicy'
+                ]);
+                $this->currentPosition = $this->employee->employeePosition;
+                break;
+            case 'history':
+                // Load the audit trail (EmployeeJobHistory) – already loaded in loadData, but refresh if needed
+                $this->employee->load('jobHistory');
+                $this->jobHistory = $this->employee->jobHistory;
+                break;
+            case 'payroll':
+                $payrollModel = 'App\Modules\Hr\Models\EmployeePayrollProfile';
+                $this->payrollProfile = $payrollModel::where('employee_id', $this->employee->id)->first();
+                break;
+            case 'workpatterns':
+                $this->employee->load('employeeWorkPatterns.workPattern');
+                $this->workPatterns = $this->employee->employeeWorkPatterns;
+                break;
+            case 'contact':
+                $this->employee->load('employeeProfile');
+                $this->profile = $this->employee->employeeProfile;
+                break;
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
     protected function loadFieldDefinitions(): void
     {
-        // Main employee fields
         $resolver = app(ConfigResolver::class, ['configKey' => $this->configKey]);
         $this->fieldDefinitions = $resolver->getFieldDefinitions();
 
-        // Profile fields – adjust configKey to match your actual file structure
-        $profileResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_profile']); // or 'hr.employee_profile'
+        $profileResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_profile']);
         $this->profileFieldDefs = $profileResolver->getFieldDefinitions();
 
-        // Position fields
-        $positionResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_position']); // or 'hr.employee_position'
-        $this->positionFieldDefs = $positionResolver->getFieldDefinitions();
+        $positionResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_position']);
+        $this->employeePositionFieldDefs = $positionResolver->getFieldDefinitions();
 
-        // Payroll fields
-        $payrollResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_payroll_profile']); // or 'hr.employee_payroll_profile'
+        $payrollResolver = app(ConfigResolver::class, ['configKey' => 'hr.employee_payroll_profile']);
         $this->payrollFieldDefs = $payrollResolver->getFieldDefinitions();
     }
+
+
 
     protected function getFieldFactory(): FieldFactory
     {
@@ -229,7 +299,7 @@ protected function loadTabData(string $tab): void
         $defs = match ($modelKey) {
             'employee' => $this->fieldDefinitions,
             'profile' => $this->profileFieldDefs,
-            'position' => $this->positionFieldDefs,
+            'position' => $this->employeePositionFieldDefs,
             'payroll' => $this->payrollFieldDefs,
             default => [],
         };
@@ -239,10 +309,10 @@ protected function loadTabData(string $tab): void
         }
 
         $field = $this->getFieldFactory()->make($fieldName, $defs[$fieldName]);
-        return $field->renderDetail($value);
+        return $field->renderDetail($value, null);
     }
 
-    // Computed properties (access via $this->fullName, etc.)
+    // Computed properties
     public function getFullNameProperty(): string
     {
         return trim(($this->employee->first_name ?? '') . ' ' . ($this->employee->last_name ?? ''));
@@ -250,17 +320,17 @@ protected function loadTabData(string $tab): void
 
     public function getJobTitleProperty(): string
     {
-        return $this->position?->jobTitle?->title ?? '';
+        return $this->currentPosition?->jobTitle?->title ?? '';
     }
 
     public function getDepartmentNameProperty(): string
     {
-        return $this->position?->department?->name ?? $this->employee->department?->name ?? '';
+        return $this->currentPosition?->department?->name ?? '';
     }
 
     public function getStatusProperty(): string
     {
-        return $this->position?->employment_status ?? $this->employee->status ?? 'Active';
+        return $this->currentPosition?->employment_status ?? 'Active';
     }
 
     public function getPhotoUrlProperty(): ?string
@@ -283,10 +353,8 @@ protected function loadTabData(string $tab): void
         $modelClass = $resolver->getModel();
         $query = $modelClass::query();
 
-        // Apply search (if present)
         $search = $this->returnParams['search'] ?? null;
         if ($search) {
-            // Determine searchable fields from config (or use a default set)
             $searchableFields = $this->getSearchableFields();
             if (!empty($searchableFields)) {
                 $query->where(function ($q) use ($searchableFields, $search) {
@@ -297,14 +365,12 @@ protected function loadTabData(string $tab): void
             }
         }
 
-        // Apply filters (if any)
         $filters = $this->returnParams['activeFilters'] ?? null;
         if ($filters && is_string($filters)) {
             $filters = json_decode($filters, true);
             $this->applyActiveFilters($query, $filters);
         }
 
-        // Apply sort (if present)
         $sort = $this->returnParams['sort'] ?? null;
         if ($sort && is_string($sort)) {
             $sort = json_decode($sort, true);
@@ -313,7 +379,6 @@ protected function loadTabData(string $tab): void
             }
         }
 
-        // Apply pagination
         $perPage = $this->returnParams['perPage'] ?? 15;
         $page = $this->returnParams['page'] ?? 1;
 
@@ -324,8 +389,6 @@ protected function loadTabData(string $tab): void
 
     protected function getSearchableFields(): array
     {
-        // This should replicate the logic from DataTable's searchable fields.
-        // For simplicity, we'll use the same approach: fields that are not hidden on table and have no relationship.
         $hiddenOnTable = $this->fieldDefinitions['hiddenFields']['onTable'] ?? [];
         $searchable = [];
         foreach ($this->fieldDefinitions as $field => $def) {
@@ -338,12 +401,12 @@ protected function loadTabData(string $tab): void
 
     protected function applyActiveFilters($query, array $filters): void
     {
-        // Simplified version – you may want to copy the full logic from DataTable
         foreach ($filters as $filter) {
             $field = $filter['field'] ?? null;
             $operator = $filter['operator'] ?? null;
             $value = $filter['value'] ?? null;
-            if (!$field || !$operator) continue;
+            if (!$field || !$operator)
+                continue;
 
             switch ($filter['type'] ?? 'string') {
                 case 'string':
@@ -364,40 +427,63 @@ protected function loadTabData(string $tab): void
         }
     }
 
-    // These helper methods are simplified; you can copy them from DataTable for full functionality
     protected function applyStringFilter($query, $field, $operator, $value)
     {
         switch ($operator) {
-            case 'equals': $query->where($field, $value); break;
-            case 'contains': $query->where($field, 'like', "%{$value}%"); break;
-            case 'starts_with': $query->where($field, 'like', "{$value}%"); break;
-            case 'ends_with': $query->where($field, 'like', "%{$value}"); break;
-            default: $query->where($field, $value);
+            case 'equals':
+                $query->where($field, $value);
+                break;
+            case 'contains':
+                $query->where($field, 'like', "%{$value}%");
+                break;
+            case 'starts_with':
+                $query->where($field, 'like', "{$value}%");
+                break;
+            case 'ends_with':
+                $query->where($field, 'like', "%{$value}");
+                break;
+            default:
+                $query->where($field, $value);
         }
     }
 
     protected function applyNumberFilter($query, $field, $operator, $value)
     {
         switch ($operator) {
-            case 'equals': $query->where($field, $value); break;
-            case 'not_equals': $query->where($field, '!=', $value); break;
-            case 'greater_than': $query->where($field, '>', $value); break;
-            case 'less_than': $query->where($field, '<', $value); break;
-            case 'greater_than_or_equals': $query->where($field, '>=', $value); break;
-            case 'less_than_or_equals': $query->where($field, '<=', $value); break;
+            case 'equals':
+                $query->where($field, $value);
+                break;
+            case 'not_equals':
+                $query->where($field, '!=', $value);
+                break;
+            case 'greater_than':
+                $query->where($field, '>', $value);
+                break;
+            case 'less_than':
+                $query->where($field, '<', $value);
+                break;
+            case 'greater_than_or_equals':
+                $query->where($field, '>=', $value);
+                break;
+            case 'less_than_or_equals':
+                $query->where($field, '<=', $value);
+                break;
             case 'between':
-                if (!empty($value['min'])) $query->where($field, '>=', $value['min']);
-                if (!empty($value['max'])) $query->where($field, '<=', $value['max']);
+                if (!empty($value['min']))
+                    $query->where($field, '>=', $value['min']);
+                if (!empty($value['max']))
+                    $query->where($field, '<=', $value['max']);
                 break;
         }
     }
 
     protected function applyDateFilter($query, $field, $operator, $value)
     {
-        // Simplified – you can expand with presets like 'today', 'this_week' etc.
         if ($operator === 'between' && is_array($value)) {
-            if (!empty($value['start'])) $query->whereDate($field, '>=', $value['start']);
-            if (!empty($value['end'])) $query->whereDate($field, '<=', $value['end']);
+            if (!empty($value['start']))
+                $query->whereDate($field, '>=', $value['start']);
+            if (!empty($value['end']))
+                $query->whereDate($field, '<=', $value['end']);
         } else {
             $query->whereDate($field, $operator, $value);
         }
@@ -410,80 +496,82 @@ protected function loadTabData(string $tab): void
         }
     }
 
-public function previous(): void
-{
-    if ($this->recordIds === null && !empty($this->returnParams)) {
-        $this->loadPageIds();
-    }
-    if ($this->currentIndex > 0 && !empty($this->recordIds)) {
-        $newIndex = $this->currentIndex - 1;
-        if (!$this->inline) {
-            $this->redirectToEmployee($this->recordIds[$newIndex]);
-        } else {
-            $this->currentIndex = $newIndex;
-            $this->recordId = $this->recordIds[$newIndex];
-            $this->loadData();
-            $this->loadFieldDefinitions();
+    public function previous(): void
+    {
+        if ($this->currentIndex > 0 && !empty($this->recordIds)) {
+            $newId = $this->recordIds[$this->currentIndex - 1];
+            $this->changeEmployee($newId);
         }
     }
-}
 
-public function next(): void
-{
-    if ($this->recordIds === null && !empty($this->returnParams)) {
-        $this->loadPageIds();
-    }
-    if ($this->currentIndex < count($this->recordIds) - 1 && !empty($this->recordIds)) {
-        $newIndex = $this->currentIndex + 1;
-        if (!$this->inline) {
-            $this->redirectToEmployee($this->recordIds[$newIndex]);
-        } else {
-            $this->currentIndex = $newIndex;
-            $this->recordId = $this->recordIds[$newIndex];
-            $this->loadData();
-            $this->loadFieldDefinitions();
+    public function next(): void
+    {
+        if ($this->currentIndex < count($this->recordIds) - 1 && !empty($this->recordIds)) {
+            $newId = $this->recordIds[$this->currentIndex + 1];
+            $this->changeEmployee($newId);
         }
     }
-}
 
+    public function changeEmployee(int $newId): void
+    {
+        if ($newId === $this->recordId)
+            return;
 
+        $this->recordId = $newId;
+        $this->loadData();
+        $this->loadFieldDefinitions();
 
-protected function getDaysUntilAnniversary(): int
-{
-    if (!$this->employee->hire_date) {
-        return 0;
+        if (!empty($this->recordIds)) {
+            $this->currentIndex = array_search($newId, $this->recordIds);
+            if ($this->currentIndex === false) {
+                $this->loadPageIds();
+            }
+        }
+
+        $this->dispatch('updateUrl', url: $this->getCurrentUrl($newId));
     }
-    $nextAnniversary = $this->employee->hire_date->copy()->addYears(now()->diffInYears($this->employee->hire_date) + 1);
-    return now()->diffInDays($nextAnniversary);
-}
 
+    protected function getCurrentUrl(int $employeeId): string
+    {
+        $module = strtolower($this->moduleName);
+        $modelPlural = \Str::plural(\Str::kebab($this->modelName));
+        $url = url("/{$module}/{$modelPlural}/{$employeeId}");
 
-
-
-
-
-
-
-
-
-protected function redirectToEmployee($newId): void
-{
-    $routePrefix = Str::plural(Str::kebab($this->modelName));
-    $url = url("/{$this->moduleName}/{$routePrefix}/{$newId}");
-    $queryParams = $this->returnParams;
-    unset($queryParams['id']);
-    if (!empty($queryParams)) {
-        $url .= '?' . http_build_query($queryParams);
+        if (!empty($this->returnParams)) {
+            $url .= '?' . http_build_query($this->returnParams);
+        }
+        return $url;
     }
-    $this->redirect($url);
-}
+
+    protected function getDaysUntilAnniversary(): int
+    {
+        if (!$this->employee->hire_date)
+            return 0;
+        $nextAnniversary = $this->employee->hire_date->copy()->addYears(now()->diffInYears($this->employee->hire_date) + 1);
+        return now()->diffInDays($nextAnniversary);
+    }
 
     public function render()
     {
+        $widgetParams = [
+            'full_name' => $this->fullName,
+            'photo_url' => $this->photoUrl,
+            'title' => $this->jobTitle,
+            'fields' => [
+                ['label' => 'Department', 'value' => $this->departmentName],
+                ['label' => 'Status', 'value' => $this->status],
+                ['label' => 'Hire Date', 'value' => $this->hireDate ?? '—'],
+                ['label' => 'Manager', 'value' => $this->currentPosition?->manager?->name ?? '—'],
+                ['label' => 'Work Email', 'value' => $this->employee->email ?? '—'],
+            ],
+            'actions' => [],
+        ];
+
         return view('qf::livewire.custom.employee-detail', [
             'employee' => $this->employee,
             'profile' => $this->profile,
-            'position' => $this->position,
+            'currentPosition' => $this->currentPosition,
+            'jobHistory' => $this->jobHistory,      // renamed from $positionHistory
             'payrollProfile' => $this->payrollProfile,
             'workPatterns' => $this->workPatterns,
             'fullName' => $this->fullName,
@@ -495,6 +583,7 @@ protected function redirectToEmployee($newId): void
             'recordIds' => $this->recordIds,
             'currentIndex' => $this->currentIndex,
             'activeTab' => $this->activeTab,
+            'widgetParams' => $widgetParams,
         ]);
     }
 }

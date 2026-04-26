@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Hr\Database\Factories;
+namespace App\Modules\Admin\Database\Factories;
 
 use App\Modules\Admin\Models\Department;
 use App\Modules\Admin\Models\Company;

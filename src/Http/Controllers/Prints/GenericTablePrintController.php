@@ -7,7 +7,7 @@ use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Services\Exports\DataTableExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Routing\Controller;
-class PrintController extends Controller
+class GenericTablePrintController extends Controller
 {
 
 

@@ -15,7 +15,8 @@ class AbsenteeismRateWidgetProcessor
 
         // Total scheduled work days in period (simplified: assume 22 working days per month)
         $workDaysPerMonth = 22;
-        $totalScheduledDays = $months * $workDaysPerMonth * DB::table('employees')->where('status', 'Active')->count();
+        // $totalScheduledDays = $months * $workDaysPerMonth * DB::table('employees')->where('status', 'Active')->count();
+        $totalScheduledDays = $months * $workDaysPerMonth * DB::table('employees')->count();
 
         // Actual unplanned absence days
         $absentDays = DB::table('leave_requests')

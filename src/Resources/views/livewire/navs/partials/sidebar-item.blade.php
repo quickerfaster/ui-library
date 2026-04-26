@@ -28,7 +28,7 @@
 @endphp
 
 <li class="nav-item text-nowrap" wire:key="sidebar-item-{{ $item['key'] ?? $item['label'] }}">
-    <a href="{{ $item['route'] ?? '#' }}" wire:navigate
+    <a href="{{ $item['route'] ?? '#' }}" 
        class="nav-link d-flex align-items-center {{ $isActive ? 'active fw-bold text-primary' : 'text-dark' }}"
        data-bs-toggle="tooltip"
        data-bs-placement="right"

@@ -15,7 +15,7 @@ class DataTableDetail extends Component
     protected array $fieldDefinitions = [];
     protected array $fieldGroups = [];
     protected array $hiddenFields = [];
-public array $returnParams = [];
+    public array $returnParams = [];
     public bool $inline = false;          // If true, no modal footer
 
     protected ?ConfigResolver $configResolver = null;
@@ -25,7 +25,7 @@ public array $returnParams = [];
     {
         $this->configKey = $configKey;
         $this->recordId = $recordId;
-        $this->returnParams = $returnParams; 
+        $this->returnParams = $returnParams;
         $this->inline = $inline;
 
         $this->loadConfiguration();
@@ -67,6 +67,8 @@ public array $returnParams = [];
     {
         return $this->getFieldFactory()->make($name, $this->fieldDefinitions[$name]);
     }
+
+
 
     public function render()
     {

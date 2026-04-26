@@ -1,103 +1,93 @@
-                @if ($layoutConfig['titleRow']['enabled'] ?? true)
+@if ($layoutConfig['titleRow']['enabled'] ?? true)
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-3">
+        <div>
+            @if ($layoutConfig['title']['enabled'] ?? true)
+                <h1 class="h3 mb-0">{{ $pageTitle }}</h1>
+            @endif
+        </div>
 
-                    <div class="d-flex justify-content-between align-items-center mb-4 mt-3">
-                        <div>
-                            @if ($layoutConfig['title']['enabled'] ?? true)
-                                <h1 class="h3 mb-0">{{ $pageTitle }}</h1>
-                            @endif
-                        </div>
+        @php
+            $primaryAction = null;
+            $secondaryActions = collect();
+            $addButton = $configResolver->getControls()['addButton'] ?? null;
 
-                        @php
+            // Capture current list state
+            $stateParams = request()->only(['page', 'perPage', 'search', 'sort', 'activeFilters']);
+            $queryString = http_build_query($stateParams);
 
-                            $primaryAction = null;
-                            //dd($configResolver->getControls());
-                            $addButton = $controls = $configResolver->getControls()['addButton'];
-                            if (is_array($addButton)) {
-                                $primaryAction =
-                                    collect($controls)->firstWhere('primary', true) ?: $controls[0] ?? null;
-                            }
+            /**
+             * Helper to resolve URL and inject state
+             */
+            $resolveUrl = function($control) use ($queryString, $configResolver) {
+                if (!$control) return '#';
+                
+                // 1. Resolve Base
+                if (!empty($control['url'])) {
+                    $base = $control['url'];
+                } elseif (!empty($control['route'])) {
+                    $base = route($control['route']);
+                } else {
+                    $modelPlural = \Str::plural(\Str::kebab($configResolver->getModelName()));
+                    $base = "/{$modelPlural}/create";
+                }
 
-                            // Generate the dynamic "Pages" URL
-                            $modelPlural = \Str::plural(\Str::kebab($configResolver->getModelName()));
-                            $createUrl = "/{$modelPlural}/create";
+                // 2. Inject State
+                if (empty($queryString)) return $base;
+                return $base . (str_contains($base, '?') ? '&' : '?') . $queryString;
+            };
 
-                            // Capture current list state to pass to the create page
-                            $returnState = http_build_query(
-                                request()->only(['page', 'perPage', 'search', 'sort', 'activeFilters']),
-                            );
-                            $finalCreateUrl = $createUrl . ($returnState ? '?' . $returnState : '');
-                        @endphp
+            if (is_array($addButton)) {
+                $controlsCollection = collect($addButton);
+                $primaryAction = $controlsCollection->firstWhere('primary', true) ?: $controlsCollection->first();
+                
+                $secondaryActions = $controlsCollection->filter(function($control) use ($primaryAction) {
+                    return $control !== $primaryAction && !($control['primary'] ?? false);
+                });
+            }
 
-                        @if ($addButton)
-                            <div class="btn-group">
+            $finalCreateUrl = $resolveUrl($primaryAction);
+        @endphp
 
-                                @if ($viewType === 'pages')
-                                    {{-- CASE 1: Standard Link for Page-based Navigation --}}
-                                    <a href="{{ $finalCreateUrl }}" wire:navigate
-                                        class="btn btn-sm btn-primary bg-gradient-primary d-inline-flex align-items-center">
-                                        @if ($primaryAction)
-                                            <i class="{{ $primaryAction['icon'] }}  me-1"></i>
-                                            {{ $primaryAction['label'] }}
-                                        @else
-                                            <i class="fas fa-plus-circle me-1"></i>
-                                            New {{ $configResolver->getModelName() }}
-                                        @endif
-                                    </a>
-                                @else
-                                    {{-- CASE 2: Button for Livewire Modal Dispatch --}}
-                                    <button type="button" class="btn btn-sm btn-primary bg-gradient-primary"
-                                        onclick="Livewire.dispatch('openAddModal', { configKey: '{{ $configKey }}' })">
-                                        @if ($primaryAction)
-                                            <i class="{{ $primaryAction['icon'] }}  me-1"></i>
-                                            {{ $primaryAction['label'] }}
-                                        @else
-                                            <i class="fas fa-plus-circle  me-1"></i>
-                                            New {{ $configResolver->getModelName() }}
-                                        @endif
-                                    </button>
-                                @endif
-
-                                @if ($primaryAction)
-                                    <!-- Dropdown for secondary controls -->
-                                    <button type="button"
-                                        class="btn btn-sm btn-primary bg-gradient-primary dropdown-toggle dropdown-toggle-split"
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                        <span class="visually-hidden">Toggle Dropdown</span>
-                                    </button>
-
-                                    <ul class="dropdown-menu dropdown-menu-end shadow">
-                                        @foreach ($controls as $control)
-                                            @if (!($control['primary'] ?? false))
-                                                <li>
-                                                    <a class="dropdown-item d-flex align-items-center"
-                                                        href="{{ $control['url'] ?? '#' }}">
-                                                        <i class="{{ $control['icon'] }} me-2 text-muted"></i>
-                                                        {{ $control['label'] }}
-                                                    </a>
-                                                </li>
-                                            @endif
-                                        @endforeach
-                                    </ul>
-                                @endif
-
-                            </div>
-                        @endif
-
-
-
-
-
-
-
-
-
-
-
-                    </div>
-
+        @if ($addButton)
+            <div class="btn-group">
+                @if ($viewType === 'pages')
+                    <a href="{{ $finalCreateUrl }}" wire:navigate
+                        class="btn btn-sm btn-primary bg-gradient-primary d-inline-flex align-items-center">
+                        <i class="{{ $primaryAction['icon'] ?? 'fas fa-plus-circle' }} me-1"></i>
+                        {{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}
+                    </a>
+                @else
+                    <button type="button" class="btn btn-sm btn-primary bg-gradient-primary"
+                        onclick="Livewire.dispatch('openAddModal', { configKey: '{{ $configKey }}' })">
+                        <i class="{{ $primaryAction['icon'] ?? 'fas fa-plus-circle' }} me-1"></i>
+                        {{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}
+                    </button>
                 @endif
 
+                @if ($secondaryActions->isNotEmpty())
+                    <button type="button"
+                        class="btn btn-sm btn-primary bg-gradient-primary dropdown-toggle dropdown-toggle-split"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">Toggle Dropdown</span>
+                    </button>
 
-                @if ($layoutConfig['breadcrumb']['enabled'] ?? true)
-                    <x-breadcrumb :items="$breadcrumbItems" />
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        @foreach ($secondaryActions as $control)
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center" 
+                                   href="{{ $resolveUrl($control) }}">
+                                    <i class="{{ $control['icon'] ?? 'fas fa-link' }} me-2 text-muted"></i>
+                                    {{ $control['label'] }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
                 @endif
+            </div>
+        @endif
+    </div>
+@endif
+
+@if ($layoutConfig['breadcrumb']['enabled'] ?? true)
+    <x-breadcrumb :items="$breadcrumbItems" />
+@endif

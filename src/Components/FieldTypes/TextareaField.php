@@ -36,7 +36,7 @@ class TextareaField implements FieldType
         return e(\Str::limit($value, 50));
     }
 
-    public function renderDetail($value): string
+    public function renderDetail($value, $record): string
     {
         return nl2br(e($value));
     }

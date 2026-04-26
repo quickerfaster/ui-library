@@ -2,10 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use QuickerFaster\UILibrary\Http\Controllers\Exports\ExportController;
-use QuickerFaster\UILibrary\Http\Controllers\Prints\PrintController;
+use QuickerFaster\UILibrary\Http\Controllers\Prints\GenericTablePrintController;
 use QuickerFaster\UILibrary\Http\Controllers\SocialiteController;
 use QuickerFaster\UILibrary\Http\Livewire\Wizards\SetupWizard;
 use Illuminate\Http\Request;
+use QuickerFaster\UILibrary\Http\Controllers\Prints\GenericDetailPagePrintController;
 
 
 
@@ -49,7 +50,7 @@ Route::group(['middleware' => 'web'], function () {
 
     Route::get('/export/data', [ExportController::class, 'export'])->name('export.data');
     Route::get('/export/all', [ExportController::class, 'exportAll'])->name('export.all');
-    Route::get('/print/data', [PrintController::class, 'print'])->name('print.data');
+    Route::get('/print/data', [GenericTablePrintController::class, 'print'])->name('print.data');
 
     Route::post('/export/queue', [ExportController::class, 'queueExport'])->name('export.queue');
     Route::get('/export/status/{id}', [ExportController::class, 'exportStatus'])->name('export.status');
@@ -73,6 +74,27 @@ Route::group(['middleware' => 'web'], function () {
         $request->user()->update(['has_seen_tour' => false]);
         return redirect()->to('/hr/dashboard'); // Redirect to where the tour lives
     })->middleware('auth')->name('tour.restart');
+
+
+
+
+
+    Route::get('/print/{configKey}/{id}', [GenericDetailPagePrintController::class, 'show'])
+        ->name('generic.print');
+
+
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/my-profile', [\App\Modules\Hr\Http\Controllers\EmployeeProfileController::class, 'show'])
+            ->name('hr.employee.profile');
+    });
+
+
+
+
+
+
+
+
 
 
 

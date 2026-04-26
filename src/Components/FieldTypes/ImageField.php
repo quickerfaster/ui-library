@@ -67,7 +67,7 @@ public function renderTable($value, $record): string
     /**
      * Render detail view – show a larger image (optional).
      */
-public function renderDetail($value): string
+public function renderDetail($value, $record): string
 {
     if (!$value) {
         return '';

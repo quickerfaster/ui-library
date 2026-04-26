@@ -61,6 +61,8 @@ class ReportBuilder extends Component
     // Load all fields from the main model config
     $resolver = new ConfigResolver($this->mainConfigKey);
     $this->allFields = $resolver->getFieldDefinitions();
+
+    
 }
 
     public function updateFilters($filters)

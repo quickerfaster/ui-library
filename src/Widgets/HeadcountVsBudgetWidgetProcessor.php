@@ -8,7 +8,8 @@ class HeadcountVsBudgetWidgetProcessor
 {
     public function process(array $definition): array
     {
-        $actualHeadcount = DB::table('employees')->where('status', 'Active')->count();
+        // $actualHeadcount = DB::table('employees')->where('status', 'Active')->count();
+        $actualHeadcount = DB::table('employees')->count();
         $budgetedHeadcount = $definition['budgeted_headcount'] ?? DB::table('budgets')->where('year', date('Y'))->value('headcount');
 
         $variance = $actualHeadcount - $budgetedHeadcount;

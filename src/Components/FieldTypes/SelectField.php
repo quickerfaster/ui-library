@@ -43,7 +43,7 @@ class SelectField implements FieldType
         return $options[$value] ?? e($value);
     }
 
-    public function renderDetail($value): string
+    public function renderDetail($value, $record): string
     {
         $options = $this->getOptions();
         return $options[$value] ?? e($value);
@@ -62,18 +62,59 @@ class SelectField implements FieldType
 
 
         // If relationship is defined, load options from related model.
-        if (isset($this->definition['relationship'])) {
+        /*if (isset($this->definition['relationship'])) {
             $rel = $this->definition['relationship'];
-           
             if (isset($rel['model']) && isset($rel['display_field'])) {
                 $model = $rel['model'];
                 $displayField = $rel['display_field'];
+
                 if (class_exists($model)) {
-                    // If there's a hintField, we could combine, but for options we use pluck.
+                    // Support dot notation like 'jobTitle.title'
+                    if (str_contains($displayField, '.')) {
+                        [$relation, $column] = explode('.', $displayField, 2);
+                        return $model::with($relation)
+                            ->get()
+                            ->pluck($relation . '.' . $column, 'id')
+                            ->toArray();
+                    }
                     return $model::pluck($displayField, 'id')->toArray();
                 }
             }
+        }*/
+
+
+if (isset($this->definition['options']['model'])) {
+    $opt = $this->definition['options'];
+    $model = $opt['model'];
+    $column = $opt['column'] ?? 'name';
+    $hintField = $opt['hintField'] ?? null;
+
+    if (class_exists($model)) {
+        // Fetch only necessary columns for performance
+        $query = $model::select('id', $column);
+        if ($hintField) {
+            $query->addSelect($hintField);
         }
+
+        return $query->get()->mapWithKeys(function ($item) use ($column, $hintField) {
+            $label = $item->{$column};
+            
+            // If hintField exists, format as "email (Name)" or "Name (email)"
+            if ($hintField && $item->{$hintField}) {
+                $label .= " ({$item->{$hintField}})";
+            }
+
+            return [$item->id => $label];
+        })->toArray();
+    }
+}
+
+
+
+
+
+
+
 
 
 

@@ -1,7 +1,7 @@
 <?php
-namespace App\Modules\Hr\Database\Factories;
+namespace App\Modules\Admin\Database\Factories;
 
-use App\Modules\Hr\Models\Shift;
+use App\Modules\Admin\Models\Shift;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ShiftFactory extends Factory

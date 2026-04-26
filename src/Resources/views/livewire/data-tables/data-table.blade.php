@@ -40,10 +40,9 @@
 
 
     <!-- Toolbar -->
-    <div class="d-flex justify-content-between align-items-center mb-3 gap-3">
-
+    <div class="d-flex flex-wrap align-items-center mb-3 gap-3 data-table-toolbar">
         <!-- Left Side: Actions & Search -->
-        <div class="d-flex align-items-center gap-2 flex-grow-1">
+        <div class="d-flex flex-wrap align-items-center gap-2">
 
             <!-- Action Buttons Group -->
             <div class="d-flex align-items-center gap-2">
@@ -124,7 +123,7 @@
         </div>
 
         <!-- Right Side: Create & View Switches -->
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
             @if (in_array('create', $simpleActions))
                 <button wire:click="add" class="btn btn-sm btn-primary d-flex align-items-center gap-2">
                     <i class="fas fa-plus"></i> Add
@@ -217,31 +216,42 @@
                 </span>
             </div>
 
-            <div class="btn-group">
-                <button type="button" class="btn btn-sm btn-white mb-0 dropdown-toggle d-flex align-items-center"
-                    data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-bolt me-2"></i> Bulk Actions
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-lg">
-                    @foreach ($bulkActions as $key => $action)
-                        <li>
-                            <a class="dropdown-item d-flex align-items-center" href="#"
-                                wire:click.prevent="handleBulkAction('{{ $key }}')">
-                                @if (!empty($action['icon']))
-                                    <i class="{{ $action['icon'] }} me-2 opacity-6"></i>
-                                @endif
-                                {{ $action['label'] }}
-                            </a>
-                        </li>
-                    @endforeach
-                </ul>
+
+
+            <div class="d-flex align-items-center gap-2 me-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" wire:model.live="bulkSelection.all" />
+                    <strong class="text-white me-4">Select All</strong>
+                </div>
+
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-white mb-0 dropdown-toggle d-flex align-items-center"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-bolt me-2"></i> Bulk Actions
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg">
+                        @foreach ($bulkActions as $key => $action)
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center" href="#"
+                                    wire:click.prevent="handleBulkAction('{{ $key }}')">
+                                    @if (!empty($action['icon']))
+                                        <i class="{{ $action['icon'] }} me-2 opacity-6"></i>
+                                    @endif
+                                    {{ $action['label'] }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
             </div>
+
+
         </div>
     @endif
 
     {{-- Table View --}}
     @if ($viewMode === 'table')
-        <div class="table-responsive">
+        <div class="table-responsive" style="min-height: 500px">
             <table class="table align-items-center mb-0 table-striped">
                 <thead>
                     <tr>
@@ -301,45 +311,106 @@
                 </thead>
                 <tbody>
                     @forelse($records as $record)
-                        @php $isTrashed = $this->usesSoftDeletes() && $this->isTrashed($record); @endphp
+                        @php
+                            $isTrashed = $this->usesSoftDeletes() && $this->isTrashed($record);
+                        @endphp
 
-                        <tr wire:key="row-{{ $record->id }}">
+                        <tr wire:key="row-{{ $record->id }}-{{ $loop->index }}"
+                            class="align-middle transition-base {{ $isTrashed ? 'bg-light opacity-75' : 'hover-bg-subtle' }}">
+
                             @if (!empty($controls['bulkActions']))
-                                <td>
+                                <td class="ps-3" style="width: 40px;">
                                     <div class="form-check">
-                                        <input type="checkbox" class="form-check-input"
+                                        <input type="checkbox" class="form-check-input shadow-none"
                                             wire:model.live="bulkSelection.ids" value="{{ $record->id }}">
                                     </div>
                                 </td>
                             @endif
+
                             @foreach ($visibleColumns as $name)
                                 @php
                                     $def = $columns[$name];
                                     $field = $this->getField($name, $def);
                                 @endphp
-                                <td
-                                    @if ($isTrashed) class="text-muted bg-light text-decoration-line-through" style="opacity: 0.4;" @endif>
-                                    {!! $field->renderTable($record->$name, $record) !!}
+                                <td class="{{ $isTrashed ? 'text-decoration-line-through text-muted' : '' }}">
+                                    <div class="py-1">
+                                        {!! $field->renderTable($record->$name, $record) !!}
+                                    </div>
                                 </td>
                             @endforeach
-                            <td class="text-nowrap">
-                                @include('qf::livewire.data-tables.partials.row-actions', [
-                                    'record' => $record,
-                                    'simpleActions' => $simpleActions,
-                                    'moreActions' => $moreActions,
-                                    'controls' => $controls,
-                                    'bulkSelection' => $bulkSelection,
-                                    'viewType' => $viewType,
-                                    'configKey' => $configKey,
-                                    'modelName' => $modelName,
-                                ])
+
+                            <td class="text-end pe-3">
+                                <div class="d-flex justify-content-end align-items-center gap-1 stop-propagation">
+                                    @if (!$isTrashed)
+                                        @php $btnClass = 'btn btn-action-icon transition-base'; @endphp
+
+                                        @if (in_array('show', $simpleActions))
+                                            <button wire:click="show({{ $record->id }})"
+                                                class="{{ $btnClass }} text-info-hover" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        @endif
+
+                                        @if (in_array('edit', $simpleActions))
+                                            <button wire:click="edit({{ $record->id }})"
+                                                class="{{ $btnClass }} text-primary-hover" title="Edit">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </button>
+                                        @endif
+
+                                        @if (in_array('delete', $simpleActions))
+                                            <button wire:click="confirmDelete({{ $record->id }})"
+                                                class="{{ $btnClass }} text-danger-hover" title="Delete">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        @endif
+                                    @else
+                                        <span
+                                            class="badge rounded-pill bg-white text-secondary border fw-medium px-2 small">Deleted</span>
+                                    @endif
+
+                                    @if (!empty($moreActions))
+                                        <div class="dropdown">
+                                            <button class="btn btn-action-icon no-caret" type="button"
+                                                data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
+                                                @foreach ($moreActions as $index => $action)
+                                                    <li>
+                                                        <a class="dropdown-item d-flex align-items-center py-2"
+                                                            href="#"
+                                                            wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
+                                                            @if (!empty($action['icon']))
+                                                                <i class="{{ $action['icon'] }} opacity-50 me-2"
+                                                                    style="width: 1.25rem;"></i>
+                                                            @endif
+                                                            <span class="small">{{ $action['title'] }}</span>
+                                                        </a>
+                                                    </li>
+                                                    @if (!empty($action['appendSeparator']))
+                                                        <li>
+                                                            <hr class="dropdown-divider opacity-50">
+                                                        </li>
+                                                    @endif
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="100%">No records found.</td>
+                            <td colspan="100%" class="py-5 text-center">
+                                <div class="text-muted opacity-50 mb-2">
+                                    <i class="fas fa-inbox fa-3x"></i>
+                                </div>
+                                <h6 class="text-muted fw-normal">No records found matching your criteria.</h6>
+                            </td>
                         </tr>
                     @endforelse
+
                 </tbody>
             </table>
         </div>
@@ -381,18 +452,103 @@
         }
     </style>
 
+
+
+
+    <style>
+        /* Professional Row Hover */
+        .hover-bg-subtle:hover {
+            background-color: rgba(0, 0, 0, 0.015) !important;
+        }
+
+        /* Fixed-size Action Buttons */
+        .btn-action-icon {
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: #adb5bd;
+            border-radius: 6px;
+        }
+
+        /* Hover States with soft backgrounds */
+        .text-info-hover:hover {
+            color: #0dcaf0 !important;
+            background-color: rgba(13, 202, 240, 0.1);
+        }
+
+        .text-primary-hover:hover {
+            color: #0d6efd !important;
+            background-color: rgba(13, 110, 253, 0.1);
+        }
+
+        .text-danger-hover:hover {
+            color: #dc3545 !important;
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+
+        .btn-action-icon:hover:not([class*='hover']) {
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+
+        /* Clean Dropdown */
+        .dropdown-menu {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+            border-radius: 8px;
+            padding: 0.5rem;
+        }
+
+        .dropdown-item {
+            border-radius: 4px;
+            transition: all 0.1s ease;
+        }
+
+        .no-caret::after {
+            display: none;
+        }
+
+        .transition-base {
+            transition: all 0.15s ease-in-out;
+        }
+
+        /* Clean Checkboxes */
+        .form-check-input:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+    </style>
+
+    <style>
+
+
+
+
+
+
+
+
+
+
+
+        /* Make dropdowns visible in list and card views */
+        .list-view,
+        .card {
+            overflow: visible !important;
+        }
+
+        /* Also ensure the card's image area doesn't break (optional) */
+        .card .card-img-top {
+            border-radius: 12px 12px 0 0;
+        }
+    </style>
+
+
+
+
+
 </div>
-
-
-
-
-
-
-
-@push('scripts')
-    <script>
-        window.addEventListener('open-url-new-tab', event => {
-            window.open(event.detail[0], '_blank');
-        });
-    </script>
-@endpush

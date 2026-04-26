@@ -12,8 +12,12 @@ use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+use App\Modules\Hr\Traits\HandlesAttendanceRecord;
+
+
 class AttendanceAggregator
 {
+    use HandlesAttendanceRecord;
     protected AttendanceCalculator $calculator;
 
     public function __construct(AttendanceCalculator $calculator)
@@ -27,6 +31,8 @@ class AttendanceAggregator
      */
     public function recalculateForDay(string $employeeNumber, string $date): void
     {
+
+
         DB::transaction(function () use ($employeeNumber, $date) {
             $dateObj = Carbon::parse($date);
             $dateOnly = $dateObj->toDateString();
@@ -350,30 +356,6 @@ class AttendanceAggregator
 
 
 
-    /**
-     * Get or create attendance record helper
-     */
-    private function getOrCreateAttendanceRecord(Employee $employee, Carbon $date): Attendance
-    {
-        $attendance = Attendance::where('employee_number', $employee->employee_number)
-            ->whereDate('date', $date)
-            ->first();
-
-        if (!$attendance) {
-            $attendance = Attendance::create([
-                'employee_id' => $employee->id,
-                'employee_number' => $employee->employee_number,
-                'company' => $employee->department->company->name ?? 'N/A',
-                'department' => $employee->department->name ?? 'N/A',
-                'date' => $date,
-                'status' => 'pending',
-                'is_approved' => false,
-                'net_hours' => 0.00,
-            ]);
-        }
-
-        return $attendance;
-    }
 
     /**
      * Check if date is a company holiday

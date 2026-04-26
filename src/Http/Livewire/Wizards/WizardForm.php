@@ -78,8 +78,8 @@ public function handleSaveStepForm($stepIndex): void
 
     protected function loadRecord(): void
     {
+        
         $record = $this->modelClass::with(array_keys($this->relations))->find($this->recordId);
-
         if (!$record) {
             abort(404, 'Record not found');
         }

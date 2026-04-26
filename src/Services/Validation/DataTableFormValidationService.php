@@ -20,6 +20,8 @@ class DataTableFormValidationService
             $fieldObj = $fieldFactory->make($field, $definition);
             // Get the validation rules
             $fieldRules = $fieldObj->getValidationRules();
+
+            
             // Get the validation messages
             if (method_exists($fieldObj, 'getValidationMessages')) {
                 $allMessages = array_merge($allMessages, $fieldObj->getValidationMessages());

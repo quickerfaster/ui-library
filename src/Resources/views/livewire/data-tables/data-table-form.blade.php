@@ -14,17 +14,21 @@
             $queryString = !empty($params) ? '?' . http_build_query($params) : '';
             $backUrl = url("/{$module}/{$modelPlural}" . $queryString);
 
-            
+            $viewType = $this->getConfigResolver()->getConfig()['viewType'] ?? 'modal';
+
         @endphp
 
         {{-- 1. HEADER SECTION --}}
         <div class="container-xl mb-4" style="max-width: 900px; margin: 0 auto;">
             <div class="py-4">
-                {{-- Back Link --}}
-                <a href="{{ $backUrl }}"
-                    class="text-decoration-none text-muted small fw-bold mb-2 d-inline-flex align-items-center">
-                    <i class="fas fa-arrow-left me-2"></i> Back to {{ \Str::plural($displayModelName) }}
-                </a>
+                {{-- Back link (only on full-page, not in modal) --}}
+                @if ($viewType == 'pages')
+                    {{-- - inline implies that the viewType is pages not modal - --}}
+                    <a href="{{ $backUrl }}"
+                        class="text-decoration-none text-muted small fw-bold mb-2 d-inline-flex align-items-center">
+                        <i class="fas fa-arrow-left me-2"></i> Back to {{ \Str::plural($displayModelName) }}
+                    </a>
+                @endif
 
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
