@@ -3,63 +3,66 @@
 namespace QuickerFaster\UILibrary\Http\Livewire;
 
 use Livewire\Component;
-use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 
 class Drawer extends Component
 {
     public bool $isOpen = false;
-    public ?string $currentDrawerKey = null;
-    public array $drawerConfig = [];
-    public ?string $configKey = null;
+    public ?string $component = null;
+    public array $componentParams = [];
+    public string $title = '';
 
     protected $listeners = [
         'openDrawer' => 'open',
         'closeDrawer' => 'close',
+        'formSaved' => 'close',          // optional: auto‑close after save
     ];
+
     /**
-     * Open a drawer by its configuration key.
+     * Open the drawer with a specific Livewire component.
+     *
+     * @param string $component  e.g. 'qf.data-table-form', 'qf.dashboard', 'custom-component'
+     * @param array  $params     Parameters for the component (configKey, recordId, inline, etc.)
+     * @param string $title      Drawer header title (optional)
      */
-    public function open(string $drawerKey, string $configKey, array $additionalParams = []): void
+
+    
+    public function open(string $component, array $params = [], string $title = ''): void
     {
-
-        $this->configKey = $configKey;
-
-        $resolver = app(ConfigResolver::class, ['configKey' => $this->configKey]);
-        $drawers = $resolver->getConfig()['drawers'] ?? [];
-        $config = $drawers[$drawerKey] ?? null;
-
-        if (!$config) {
-            \Log::error("Drawer config not found: {$drawerKey} for configKey {$this->configKey}");
+        if ($this->isOpen && $this->component === $component) {
+            // Already open with same component – just refresh?
             return;
         }
 
-        $this->currentDrawerKey = $drawerKey;
-        $this->drawerConfig = $config;
 
-        // Merge additional params and replace placeholders
-        $params = $config['params'] ?? [];
-        foreach ($additionalParams as $key => $value) {
-            $params[$key] = $value;
-        }
-        array_walk_recursive($params, function (&$item) {
-            if (is_string($item) && str_contains($item, '{configKey}')) {
-                $item = str_replace('{configKey}', $this->configKey, $item);
-            }
-        });
-        $this->drawerConfig['params'] = $params;
-
+        $this->component = $component;
+        $this->componentParams = $params;
+        $this->title = $title ?: $this->extractTitleFromComponent($component);
         $this->isOpen = true;
 
-        // Emit an event to tell JavaScript to show the offcanvas
-        $this->dispatch('drawerOpened');
+        $this->dispatch('drawerOpened');  // triggers JS to show offcanvas
     }
 
     public function close(): void
     {
         $this->isOpen = false;
-        $this->currentDrawerKey = null;
-        $this->drawerConfig = [];
-        // No need to emit anything; the offcanvas hidden event will call this
+        $this->component = null;
+        $this->componentParams = [];
+        $this->title = '';
+        $this->dispatch('drawerClosed');
+    }
+
+    /**
+     * Fallback title generation (can be overridden by passed title).
+     */
+    protected function extractTitleFromComponent(string $component): string
+    {
+        // Simple mapping for known components
+        return match ($component) {
+            'qf.data-table-form' => 'Add / Edit Record',
+            'qf.data-table-detail' => 'Record Details',
+            'qf.dashboard' => 'Dashboard',
+            default => ucfirst(str_replace('_', ' ', class_basename($component))),
+        };
     }
 
     public function render()

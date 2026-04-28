@@ -75,6 +75,14 @@ class FileField implements FieldType
 
 
 
+
+    public function renderInlineEditor($value, $record, array $extra = []): string
+    {
+        return $this->renderComplexFallback($record, $extra, 'Upload file');
+    }
+
+
+
     public function renderDetail($value, $record): string
     {
         return $this->renderTable($value, $record);

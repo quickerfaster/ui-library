@@ -29,6 +29,20 @@ class DatetimepickerField implements FieldType
         ]);
     }
 
+
+
+    public function renderInlineEditor($value, $record, array $extra = []): string
+    {
+        $wireModel = $extra['wire:model'] ?? 'editedData.' . $extra['rowId'] . '.' . $this->name;
+        return $this->renderBlade('qf::components.fields.inline-editor.datetime', [
+            'name' => $this->name,
+            'wireModel' => $wireModel,
+            'value' => $value,
+        ]);
+    }
+
+
+
     public function renderTable($value, $record): string
     {
         if ($value instanceof \Carbon\Carbon) {

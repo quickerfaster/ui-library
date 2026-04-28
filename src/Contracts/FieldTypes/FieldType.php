@@ -52,4 +52,15 @@ interface FieldType
      * Get the field's name
      */
     public function getName(): string;
+
+        /**
+     * Render an inline editor for use inside a table cell.
+     * Should output only the input/select/etc. element, no label, no form-group div.
+     *
+     * @param mixed $value Current value
+     * @param mixed $record Record object (useful for relationships)
+     * @param array $extra Extra parameters (e.g., 'wire:model.live' binding)
+     * @return string
+     */
+    public function renderInlineEditor($value, $record, array $extra = []): string;
 }

@@ -36,6 +36,28 @@ class SelectField implements FieldType
         ]);
     }
 
+
+
+    public function renderInlineEditor($value, $record, array $extra = []): string
+    {
+        $multiple = $this->definition['multiSelect'] ?? false;
+        if ($multiple) {
+            // Multi‑select is too complex for inline – fallback to drawer
+            return $this->renderComplexFallback($record, $extra, 'Select values');
+        }
+
+        $wireModel = $extra['wire:model'] ?? 'editedData.' . $extra['rowId'] . '.' . $this->name;
+        return $this->renderBlade('qf::components.fields.inline-editor.select', [
+            'name' => $this->name,
+            'wireModel' => $wireModel,
+            'value' => $value,
+            'options' => $this->getOptions(),
+            'placeholder' => $this->definition['placeholder'] ?? null,
+        ]);
+    }
+
+
+
     public function renderTable($value, $record): string
     {
         // For a select, we usually want to show the label, not the raw value.
@@ -83,31 +105,31 @@ class SelectField implements FieldType
         }*/
 
 
-if (isset($this->definition['options']['model'])) {
-    $opt = $this->definition['options'];
-    $model = $opt['model'];
-    $column = $opt['column'] ?? 'name';
-    $hintField = $opt['hintField'] ?? null;
+        if (isset($this->definition['options']['model'])) {
+            $opt = $this->definition['options'];
+            $model = $opt['model'];
+            $column = $opt['column'] ?? 'name';
+            $hintField = $opt['hintField'] ?? null;
 
-    if (class_exists($model)) {
-        // Fetch only necessary columns for performance
-        $query = $model::select('id', $column);
-        if ($hintField) {
-            $query->addSelect($hintField);
-        }
+            if (class_exists($model)) {
+                // Fetch only necessary columns for performance
+                $query = $model::select('id', $column);
+                if ($hintField) {
+                    $query->addSelect($hintField);
+                }
 
-        return $query->get()->mapWithKeys(function ($item) use ($column, $hintField) {
-            $label = $item->{$column};
-            
-            // If hintField exists, format as "email (Name)" or "Name (email)"
-            if ($hintField && $item->{$hintField}) {
-                $label .= " ({$item->{$hintField}})";
+                return $query->get()->mapWithKeys(function ($item) use ($column, $hintField) {
+                    $label = $item->{$column};
+
+                    // If hintField exists, format as "email (Name)" or "Name (email)"
+                    if ($hintField && $item->{$hintField}) {
+                        $label .= " ({$item->{$hintField} })";
+                    }
+
+                    return [$item->id => $label];
+                })->toArray();
             }
-
-            return [$item->id => $label];
-        })->toArray();
-    }
-}
+        }
 
 
 

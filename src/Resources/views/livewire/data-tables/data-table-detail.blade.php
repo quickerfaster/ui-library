@@ -12,15 +12,15 @@
               $queryString = !empty($params) ? '?' . http_build_query($params) : '';
               $backUrl = url("/{$module}/{$modelPlural}" . $queryString);
 
-              $viewType = $this->getConfigResolver()->getConfig()['viewType'] ?? 'modal';
+              $crudType = $this->getConfigResolver()->getConfig()['crudType'] ?? 'modal';
 
           @endphp
 
           <div class="d-flex justify-content-between align-items-center my-4 d-print-none">
               <div class="d-flex flex-column">
                   {{-- Back link (only on full-page, not in modal) --}}
-                  @if ($viewType == 'pages')
-                      {{-- - inline implies that the viewType is pages not modal - --}}
+                  @if ($crudType == 'pages')
+                      {{-- - inline implies that the crudType is pages not modal - --}}
                       <a href="{{ $backUrl }}"
                           class="text-decoration-none text-muted small fw-bold mb-2 d-inline-flex align-items-center hover-primary">
                           <i class="fas fa-arrow-left me-2"></i> Back to {{ \Str::plural($displayModelName) }}
@@ -37,7 +37,7 @@
                       target="_blank" class="btn btn-outline-secondary shadow-sm px-3">
                       <i class="fas fa-print me-1"></i> Print
                   </a>
-                  @if ($viewType == 'pages')
+                  @if ($crudType == 'pages')
                       @php
                           $editUrl = url("/{$modelPlural}/{$record->id}/edit" . $queryString);
                       @endphp

@@ -14,7 +14,7 @@
             $queryString = !empty($params) ? '?' . http_build_query($params) : '';
             $backUrl = url("/{$module}/{$modelPlural}" . $queryString);
 
-            $viewType = $this->getConfigResolver()->getConfig()['viewType'] ?? 'modal';
+            $crudType = $this->getConfigResolver()->getConfig()['crudType'] ?? 'modal';
 
         @endphp
 
@@ -22,8 +22,8 @@
         <div class="container-xl mb-4" style="max-width: 900px; margin: 0 auto;">
             <div class="py-4">
                 {{-- Back link (only on full-page, not in modal) --}}
-                @if ($viewType == 'pages')
-                    {{-- - inline implies that the viewType is pages not modal - --}}
+                @if ($crudType == 'pages')
+                    {{-- - inline implies that the crudType is pages not modal - --}}
                     <a href="{{ $backUrl }}"
                         class="text-decoration-none text-muted small fw-bold mb-2 d-inline-flex align-items-center">
                         <i class="fas fa-arrow-left me-2"></i> Back to {{ \Str::plural($displayModelName) }}

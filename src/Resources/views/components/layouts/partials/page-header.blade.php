@@ -6,10 +6,11 @@
             @endif
         </div>
 
+
         @php
             $primaryAction = null;
             $secondaryActions = collect();
-            $addButton = $configResolver->getControls()['addButton'] ?? null;
+            $addButtonConfig = $configResolver->getControls()['addButton'] ?? null;
 
             // Capture current list state
             $stateParams = request()->only(['page', 'perPage', 'search', 'sort', 'activeFilters']);
@@ -18,9 +19,11 @@
             /**
              * Helper to resolve URL and inject state
              */
-            $resolveUrl = function($control) use ($queryString, $configResolver) {
-                if (!$control) return '#';
-                
+            $resolveUrl = function ($control) use ($queryString, $configResolver) {
+                if (!$control) {
+                    return '#';
+                }
+
                 // 1. Resolve Base
                 if (!empty($control['url'])) {
                     $base = $control['url'];
@@ -32,15 +35,25 @@
                 }
 
                 // 2. Inject State
-                if (empty($queryString)) return $base;
+                if (empty($queryString)) {
+                    return $base;
+                }
                 return $base . (str_contains($base, '?') ? '&' : '?') . $queryString;
             };
 
-            if (is_array($addButton)) {
-                $controlsCollection = collect($addButton);
+            // Normalize addButton configuration
+            if ($addButtonConfig === true) {
+                // Simple boolean true → create a default primary action
+                $primaryAction = [
+                    'label' => 'New ' . $configResolver->getModelName(),
+                    'icon' => 'fas fa-plus-circle',
+                    'primary' => true,
+                ];
+                $secondaryActions = collect();
+            } elseif (is_array($addButtonConfig)) {
+                $controlsCollection = collect($addButtonConfig);
                 $primaryAction = $controlsCollection->firstWhere('primary', true) ?: $controlsCollection->first();
-                
-                $secondaryActions = $controlsCollection->filter(function($control) use ($primaryAction) {
+                $secondaryActions = $controlsCollection->filter(function ($control) use ($primaryAction) {
                     return $control !== $primaryAction && !($control['primary'] ?? false);
                 });
             }
@@ -48,14 +61,30 @@
             $finalCreateUrl = $resolveUrl($primaryAction);
         @endphp
 
-        @if ($addButton)
+
+
+        @if ($addButtonConfig)
             <div class="btn-group">
-                @if ($viewType === 'pages')
+                @if ($crudType === 'pages')
                     <a href="{{ $finalCreateUrl }}" wire:navigate
                         class="btn btn-sm btn-primary bg-gradient-primary d-inline-flex align-items-center">
                         <i class="{{ $primaryAction['icon'] ?? 'fas fa-plus-circle' }} me-1"></i>
                         {{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}
                     </a>
+                @elseif ($crudType === 'drawers')
+                    <button type="button" class="btn btn-sm btn-primary bg-gradient-primary"
+                        onclick="Livewire.dispatch('openDrawer', {
+                        component: 'qf.data-table-form',
+                        params: {
+                            configKey: '{{ $configKey }}',
+                            inline: true,
+                            prefilledData: {{ json_encode(request()->except(['page', 'perPage', 'search', 'sort', 'activeFilters'])) }}
+                        },
+                        title: '{{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}'
+                    })">
+                        <i class="{{ $primaryAction['icon'] ?? 'fas fa-plus-circle' }} me-1"></i>
+                        {{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}
+                    </button>
                 @else
                     <button type="button" class="btn btn-sm btn-primary bg-gradient-primary"
                         onclick="Livewire.dispatch('openAddModal', { configKey: '{{ $configKey }}' })">
@@ -74,8 +103,7 @@
                     <ul class="dropdown-menu dropdown-menu-end shadow">
                         @foreach ($secondaryActions as $control)
                             <li>
-                                <a class="dropdown-item d-flex align-items-center" 
-                                   href="{{ $resolveUrl($control) }}">
+                                <a class="dropdown-item d-flex align-items-center" href="{{ $resolveUrl($control) }}">
                                     <i class="{{ $control['icon'] ?? 'fas fa-link' }} me-2 text-muted"></i>
                                     {{ $control['label'] }}
                                 </a>

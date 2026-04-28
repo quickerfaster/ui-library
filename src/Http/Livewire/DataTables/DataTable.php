@@ -55,6 +55,16 @@ class DataTable extends Component
 
     public bool $columnDropdownOpen = false;
 
+
+
+    public bool $editable = false;              // master switch
+    public array $editMode = [];                // ['rowId' => ['field' => true]]
+    public array $editedData = [];              // temporary changes before save
+
+    public array $fieldErrors = []; // format: [rowKey => [field => 'error message']]
+
+
+
     protected $listeners = [
         'performDelete' => 'performDelete',
         'refreshDataTable' => '$refresh',
@@ -106,6 +116,127 @@ class DataTable extends Component
     }
 
 
+
+
+
+
+
+
+
+    /**
+ * Start editing a specific cell
+ */
+public function startEditingCell($rowId, $field = null)
+{
+    $rowKey = 'row_' . $rowId;
+
+    // Always fetch fresh values from database (ignore any previous editedData)
+    $this->editedData[$rowKey] = $this->getRowOriginalValues($rowId);
+    
+    // Reset edit mode for this row
+    $this->editMode[$rowKey] = [];
+    
+    // Clear any previous errors for this row
+    unset($this->fieldErrors[$rowKey]);
+
+    if ($field) {
+        $this->editMode[$rowKey][$field] = true;
+    }
+
+    $this->dispatch('$refresh');
+}
+
+/**
+ * Get original values for all editable fields of a record
+ */
+protected function getRowOriginalValues($rowId): array
+{
+    $modelClass = $this->getConfigResolver()->getModel();
+    $record = $modelClass::find($rowId);
+    if (!$record) return [];
+    
+    $values = [];
+    foreach ($this->columns as $field => $def) {
+        if (($def['editable'] ?? false)) {
+            $values[$field] = $record->$field;
+        }
+    }
+    return $values;
+}
+
+/**
+ * Save a single cell value
+ */
+
+public function saveCell($rowId, $field)
+{
+    $rowKey = 'row_' . $rowId;
+    $value = $this->editedData[$rowKey][$field] ?? null;
+
+    // Validation (same as before)
+    $modelClass = $this->getConfigResolver()->getModel();
+    $record = $modelClass::find($rowId);
+    if (!$record) return;
+
+    $def = $this->getConfigResolver()->getFieldDefinitions()[$field];
+    $fieldObj = $this->getField($field, $def);
+    $rules = $fieldObj->getValidationRules();
+    $validator = \Validator::make([$field => $value], $rules);
+
+    if ($validator->fails()) {
+        $this->fieldErrors[$rowKey][$field] = $validator->errors()->first($field);
+        return;
+    }
+
+    // Save to database
+    $oldValue = $record->$field;
+    $record->$field = $value;
+    $record->save();
+
+    // Log activity
+    ActivityLogger::updated($this->configKey, $record, [$field => $oldValue], [$field => $value]);
+
+    // Clear all temporary data for this row
+    unset($this->editMode[$rowKey]);
+    unset($this->editedData[$rowKey]);
+    unset($this->fieldErrors[$rowKey]);
+
+    $this->dispatch('refreshDataTable');
+}
+
+/**
+ * Cancel editing a specific cell
+ */
+public function cancelEditingCell($rowId, $field)
+{
+    $rowKey = 'row_' . $rowId;
+    // Just exit edit mode without saving
+    unset($this->editMode[$rowKey][$field]);
+    // Optionally keep editedData for other fields still being edited
+    // But you may also want to clear the entire row if you prefer a clean state
+}
+
+
+/**
+ * Helper to get original value from record (cached)
+ */
+protected function getOriginalValue($rowId, $field)
+{
+    $modelClass = $this->getConfigResolver()->getModel();
+    return $modelClass::find($rowId)->$field ?? null;
+}
+
+/**
+ * Enable/disable editing globally
+ */
+public function toggleEditing()
+{
+    $this->editable = !$this->editable;
+    $this->editMode = [];
+    $this->editedData = [];
+
+    //dd($this->editable);
+}
 
 
 
@@ -976,7 +1107,7 @@ class DataTable extends Component
 
     public function executeRowAction($params): void
     {
-       
+
         if (empty($params) || !is_array($params))
             return;
 
@@ -996,7 +1127,7 @@ class DataTable extends Component
         if ($this->usesSoftDeletes()) {
             $query->withTrashed();
         }
-        
+
         $record = $query->find($recordId);
         if (!$record) {
             $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Record not found.']);
@@ -1075,7 +1206,7 @@ class DataTable extends Component
     protected function checkConditions(array $action, $record): bool
     {
 
-    
+
         // For now, return true for testing purpose
         return true;
 
@@ -1102,7 +1233,7 @@ class DataTable extends Component
     {
         if (!is_string($value))
             return $value;
-        
+
         return preg_replace_callback('/\{([^}]+)\}/', function ($matches) use ($record) {
             return data_get($record, $matches[1], '');
         }, $value);
@@ -1424,7 +1555,7 @@ class DataTable extends Component
 
         $controls = $resolver->getControls();
         $simpleActions = $resolver->getConfig()['simpleActions'] ?? [];
-        $viewType = $resolver->getConfig()['viewType'] ?? false;
+        $crudType = $resolver->getConfig()['crudType'] ?? false;
 
         return view('qf::livewire.data-tables.data-table', [
             'records' => $this->records,
@@ -1433,7 +1564,7 @@ class DataTable extends Component
             'viewConfig' => $viewConfig,
             'switchViews' => $switchViews,
             'viewMode' => $this->viewMode,
-            'viewType' => $viewType,
+            'crudType' => $crudType,
             'controls' => $controls,
             'simpleActions' => $simpleActions,
             'bulkActions' => $this->bulkActions,

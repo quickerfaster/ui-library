@@ -60,6 +60,13 @@ class MorphToSelectField implements FieldType
         return '';
     }
 
+
+    public function renderInlineEditor($value, $record, array $extra = []): string
+    {
+        return $this->renderComplexFallback($record, $extra, 'Select');
+    }
+
+
     public function renderDetail($value, $record): string
     {
         return $this->renderTable($value, $record);

@@ -251,7 +251,7 @@ class NavigationLayout extends Component
 
             'layoutConfig' => $this->layoutConfig,
             'configResolver' => $this->configResolver,
-            'viewType' => $this->configResolver?->getConfig()['viewType'] ?? 'modal',
+            'crudType' => $this->configResolver?->getConfig()['crudType'] ?? 'modal',
             'currentModelName' => $this->currentModelName,  
 
 

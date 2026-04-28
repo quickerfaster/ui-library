@@ -21,20 +21,37 @@ class TextField implements FieldType
         $this->definition = $definition;
     }
 
-public function renderForm($value = null): string
-{
-    $view = ($this->definition['autoGenerate'] ?? false) 
-        ? 'qf::components.fields.text-with-generate' 
-        : 'qf::components.fields.text';
+    public function renderForm($value = null): string
+    {
+        $view = ($this->definition['autoGenerate'] ?? false)
+            ? 'qf::components.fields.text-with-generate'
+            : 'qf::components.fields.text';
 
-    return $this->renderBlade($view, [
-        'field' => $this,
-        'value' => $value,
+        return $this->renderBlade($view, [
+            'field' => $this,
+            'value' => $value,
+            'name' => $this->name,
+            'label' => $this->definition['label'] ?? ucfirst($this->name),
+            'customAttributes' => $this->definition['attributes'] ?? [],
+        ]);
+    }
+
+
+public function renderInlineEditor($value, $record, array $extra = []): string
+{
+    $wireModel = $extra['wire:model'] ?? 'editedData.' . $extra['rowId'] . '.' . $this->name;
+    return $this->renderBlade('qf::components.fields.inline-editor.text', [
         'name' => $this->name,
-        'label' => $this->definition['label'] ?? ucfirst($this->name),
+        'wireModel' => $wireModel,
+        'value' => $value,
         'customAttributes' => $this->definition['attributes'] ?? [],
+        'rowId' => $extra['rowId'] ?? null,     // for error key
+        'fieldName' => $this->name,             // for error key
     ]);
 }
+
+
+
 
 
 

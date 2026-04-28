@@ -141,8 +141,8 @@
 
                 {{-- Horizontal mode: menu above content --}}
                 @if ($showContextMenu)
-                    <livewire:qf.horizontal-context-menu :currentModelName="$currentModelName" :items="$contextItems[$activeContext] ?? []" :position="$contextMenuPosition" :allowTypeSwitch="$allowMenuTypeSwitch"
-                        wire:key="horizontal-menu-{{ $moduleName }}-{{ $activeContext }}" />
+                    <livewire:qf.horizontal-context-menu :currentModelName="$currentModelName" :items="$contextItems[$activeContext] ?? []" :position="$contextMenuPosition"
+                        :allowTypeSwitch="$allowMenuTypeSwitch" wire:key="horizontal-menu-{{ $moduleName }}-{{ $activeContext }}" />
                 @endif
 
                 <main class="px-4" style="min-width: 0;">
@@ -228,7 +228,7 @@
 
 
 
-        
+
         <script>
             window.addEventListener('open-url-new-tab', event => {
                 window.open(event.detail[0], '_blank');
@@ -251,51 +251,80 @@
 
 
 
-<script>
-    function initDrawer() {
-        const drawerElement = document.getElementById('globalDrawer');
-        if (!drawerElement) {
-            console.warn('Drawer element not found, will retry on next navigation');
-            return;
-        }
 
-        let bsDrawer = null;
 
-        function getDrawer() {
-            if (bsDrawer) {
-                try { bsDrawer.dispose(); } catch(e) {}
+
+
+
+        <script>
+            function initDrawer() {
+                const drawerElement = document.getElementById('globalDrawer');
+                if (!drawerElement) {
+                    console.warn('Drawer element not found, will retry on next navigation');
+                    return;
+                }
+
+                // Create a single Offcanvas instance and keep it
+                let bsDrawer = new bootstrap.Offcanvas(drawerElement, {
+                    backdrop: true,
+                    keyboard: true,
+                    scroll: false
+                });
+
+                // When the offcanvas is fully hidden (after close animation)
+                drawerElement.addEventListener('hidden.bs.offcanvas', function() {
+                    // Tell Livewire that the drawer is closed (sync state)
+                    Livewire.dispatch('closeDrawer');
+                });
+
+                // When the offcanvas is shown, do nothing special – just ensure Livewire knows it's open
+                drawerElement.addEventListener('shown.bs.offcanvas', function() {
+                    // Optionally dispatch an event if needed
+                    Livewire.dispatch('drawerOpened');
+                });
+
+                // Listen for Livewire events to show/hide the drawer
+                Livewire.on('drawerOpened', () => {
+                    bsDrawer.show();
+                });
+
+                // Also listen for a custom close event in case Livewire calls closeDrawer
+                Livewire.on('closeDrawer', () => {
+                    bsDrawer.hide();
+                });
             }
-            bsDrawer = new bootstrap.Offcanvas(drawerElement, {
-                backdrop: true,
-                keyboard: true,
-                scroll: false
+
+            // Initialize on page load
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initDrawer);
+            } else {
+                initDrawer();
+            }
+
+            // Re-initialize after Livewire navigations (in case the drawer element is replaced)
+            document.addEventListener('livewire:navigated', function() {
+                // Wait a tick for DOM to settle
+                setTimeout(() => {
+                    // Destroy old instance if exists? Actually we just re-run initDrawer, but we must avoid duplicates.
+                    // Better: remove existing listener and re-init. For simplicity, we re-run initDrawer but check if already initialized.
+                    // We'll add a guard: if a global flag exists, skip.
+                    if (!window.drawerInitialized) {
+                        window.drawerInitialized = true;
+                        initDrawer();
+                    } else {
+                        // Re-attach Livewire listeners (they persist, but offcanvas instance might be stale)
+                        // Force re-create the Offcanvas instance
+                        const drawerEl = document.getElementById('globalDrawer');
+                        if (drawerEl) {
+                            let existing = bootstrap.Offcanvas.getInstance(drawerEl);
+                            if (existing) existing.dispose();
+                            window.drawerInitialized = false;
+                            initDrawer();
+                        }
+                    }
+                }, 100);
             });
-            return bsDrawer;
-        }
-
-        // Remove old listener to avoid duplicates
-        drawerElement.removeEventListener('hidden.bs.offcanvas', handleHidden);
-        drawerElement.addEventListener('hidden.bs.offcanvas', handleHidden);
-        function handleHidden() {
-            Livewire.dispatch('closeDrawer');
-        }
-
-        // Listen for drawerOpened event
-        Livewire.on('drawerOpened', () => {
-            console.log('drawerOpened received, showing offcanvas');
-            getDrawer().show();
-        });
-    }
-
-    // Initialize on page load
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initDrawer);
-    } else {
-        initDrawer();
-    }
-    // Re-initialize after Livewire navigations
-    document.addEventListener('livewire:navigated', initDrawer);
-</script>
+        </script>
 
 
 

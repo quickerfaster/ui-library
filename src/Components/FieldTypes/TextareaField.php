@@ -28,8 +28,20 @@ class TextareaField implements FieldType
             'rows' => $this->definition['rows'] ?? 3,
             'customAttributes' => $this->definition['attributes'] ?? [],
         ]);
-        
+
     }
+
+    public function renderInlineEditor($value, $record, array $extra = []): string
+    {
+        $wireModel = $extra['wire:model'] ?? 'editedData.' . $extra['rowId'] . '.' . $this->name;
+        return $this->renderBlade('qf::components.fields.inline-editor.textarea', [
+            'name' => $this->name,
+            'wireModel' => $wireModel,
+            'value' => $value,
+            'attributes' => $this->definition['attributes'] ?? [],
+        ]);
+    }
+
 
     public function renderTable($value, $record): string
     {

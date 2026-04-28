@@ -10,7 +10,7 @@
 
          {{-- Back link (only on full-page, not in modal) --}}
          @if ($inline && !$this->isSelfServiceMode)
-             {{-- - inline implies that the viewType is pages not modal - --}}
+             {{-- - inline implies that the crudType is pages not modal - --}}
              <div class="my-3">
                  <a wire:navigate href="{{ $backUrl }}"
                      class="text-decoration-none text-muted small fw-bold d-inline-flex align-items-center hover-primary">

@@ -93,6 +93,13 @@
                 </button>
 
 
+@if ($controls['editable'] ?? false)
+    <button wire:click="toggleEditing" class="btn btn-sm {{ $this->editable ? 'btn-primary' : 'btn-outline-secondary' }}">
+        <i class="fas fa-pen"></i> {{ $this->editable ? 'Exit Edit Mode' : 'Enable Edit Mode' }}
+    </button>
+@endif
+
+
 
             </div>
 
@@ -124,7 +131,7 @@
 
         <!-- Right Side: Create & View Switches -->
         <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
-            @if (in_array('create', $simpleActions))
+            @if (in_array('create', $simpleActions) == false) {{-- This needs to be adjusted later --}}
                 <button wire:click="add" class="btn btn-sm btn-primary d-flex align-items-center gap-2">
                     <i class="fas fa-plus"></i> Add
                 </button>
@@ -327,79 +334,65 @@
                                 </td>
                             @endif
 
+
                             @foreach ($visibleColumns as $name)
-                                @php
-                                    $def = $columns[$name];
-                                    $field = $this->getField($name, $def);
-                                @endphp
-                                <td class="{{ $isTrashed ? 'text-decoration-line-through text-muted' : '' }}">
-                                    <div class="py-1">
-                                        {!! $field->renderTable($record->$name, $record) !!}
-                                    </div>
-                                </td>
+
+
+@php
+    $def = $columns[$name];
+    $rowKey = 'row_' . $record->id;
+    $isEditable = $this->editable && ($def['editable'] ?? false);
+    $isEditing = isset($this->editMode[$rowKey][$name]);
+    $cellValue = $this->editedData[$rowKey][$name] ?? $record->$name;
+@endphp
+<td class="{{ $isTrashed ? 'text-decoration-line-through text-muted' : '' }};">
+    @if($isEditable && $isEditing)
+        <div class="d-flex align-items-center gap-1" >
+                <!-- We are in edit mode -->
+
+{!! $this->getField($name, $def)->renderInlineEditor($cellValue, $record, [
+    'rowId' => $record->id,
+    'wire:model' => "editedData.{$rowKey}.{$name}",
+    'configKey' => $this->configKey,
+    'fieldName' => $name,       // pass field name
+]) !!}
+            <button wire:click="saveCell({{ $record->id }}, '{{ $name }}', $event.target.value)" class="btn btn-sm btn-success  px-2" title="Save">
+                <i class="fas fa-check"></i>
+            </button>
+            <button wire:click="cancelEditingCell({{ $record->id }}, '{{ $name }}')" class="btn btn-sm btn-secondary  px-2" title="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    @else
+            <div @if($isEditable) 
+                    wire:dblclick="startEditingCell({{ $record->id }}, '{{ $name }}')" 
+                    style="cursor: pointer;" 
+                @endif>
+                {!! $this->getField($name, $def)->renderTable($record->$name, $record) !!} 
+            </div>
+
+    @endif
+</td>
+
+
+
                             @endforeach
 
+                            {{-- Add Row Actions --}}
                             <td class="text-end pe-3">
-                                <div class="d-flex justify-content-end align-items-center gap-1 stop-propagation">
-                                    @if (!$isTrashed)
-                                        @php $btnClass = 'btn btn-action-icon transition-base'; @endphp
-
-                                        @if (in_array('show', $simpleActions))
-                                            <button wire:click="show({{ $record->id }})"
-                                                class="{{ $btnClass }} text-info-hover" title="View">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                        @endif
-
-                                        @if (in_array('edit', $simpleActions))
-                                            <button wire:click="edit({{ $record->id }})"
-                                                class="{{ $btnClass }} text-primary-hover" title="Edit">
-                                                <i class="fas fa-pencil-alt"></i>
-                                            </button>
-                                        @endif
-
-                                        @if (in_array('delete', $simpleActions))
-                                            <button wire:click="confirmDelete({{ $record->id }})"
-                                                class="{{ $btnClass }} text-danger-hover" title="Delete">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </button>
-                                        @endif
-                                    @else
-                                        <span
-                                            class="badge rounded-pill bg-white text-secondary border fw-medium px-2 small">Deleted</span>
-                                    @endif
-
-                                    @if (!empty($moreActions))
-                                        <div class="dropdown">
-                                            <button class="btn btn-action-icon no-caret" type="button"
-                                                data-bs-toggle="dropdown">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
-                                                @foreach ($moreActions as $index => $action)
-                                                    <li>
-                                                        <a class="dropdown-item d-flex align-items-center py-2"
-                                                            href="#"
-                                                            wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
-                                                            @if (!empty($action['icon']))
-                                                                <i class="{{ $action['icon'] }} opacity-50 me-2"
-                                                                    style="width: 1.25rem;"></i>
-                                                            @endif
-                                                            <span class="small">{{ $action['title'] }}</span>
-                                                        </a>
-                                                    </li>
-                                                    @if (!empty($action['appendSeparator']))
-                                                        <li>
-                                                            <hr class="dropdown-divider opacity-50">
-                                                        </li>
-                                                    @endif
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    @endif
-                                </div>
+                                @include('qf::livewire.data-tables.partials.row-actions')
                             </td>
                         </tr>
+
+                        @if (in_array('expand', $simpleActions) || is_array($simpleActions['expand'] ?? false))
+                            <tr wire:key="expand-row-{{ $record->id }}" class="expandable-row">
+                                <td
+                                    colspan="{{ count($visibleColumns) + (empty($controls['bulkActions']) ? 0 : 1) + (!empty($simpleActions) || !empty($moreActions) ? 1 : 0) }}">
+                                    @livewire('qf.collapsible', ['collapsibleId' => 'expand-' . $record->id], key('expand-' . $record->id))
+                                </td>
+                            </tr>
+                        @endif
+
                     @empty
                         <tr>
                             <td colspan="100%" class="py-5 text-center">
@@ -524,17 +517,6 @@
     </style>
 
     <style>
-
-
-
-
-
-
-
-
-
-
-
         /* Make dropdowns visible in list and card views */
         .list-view,
         .card {

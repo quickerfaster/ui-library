@@ -45,6 +45,25 @@ class CheckboxField implements FieldType
         }
     }
 
+
+
+    public function renderInlineEditor($value, $record, array $extra = []): string
+    {
+        $multiple = $this->definition['multiSelect'] ?? false;
+        if ($multiple) {
+            return $this->renderComplexFallback($record, $extra, 'Select options');
+        }
+
+        $wireModel = $extra['wire:model'] ?? 'editedData.' . $extra['rowId'] . '.' . $this->name;
+        return $this->renderBlade('qf::components.fields.inline-editor.checkbox', [
+            'name' => $this->name,
+            'wireModel' => $wireModel,
+            'value' => $value,
+        ]);
+    }
+
+
+
     public function renderTable($value, $record): string
     {
         $multiple = $this->definition['multiSelect'] ?? false;

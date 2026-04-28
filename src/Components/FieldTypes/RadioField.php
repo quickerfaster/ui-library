@@ -37,6 +37,19 @@ class RadioField implements FieldType
     }
 
 
+    public function renderInlineEditor($value, $record, array $extra = []): string
+    {
+        $wireModel = $extra['wire:model'] ?? 'editedData.' . $extra['rowId'] . '.' . $this->name;
+        return $this->renderBlade('qf::components.fields.inline-editor.radio', [
+            'name' => $this->name,
+            'wireModel' => $wireModel,
+            'value' => $value,
+            'options' => $this->getOptions(),
+        ]);
+    }
+
+
+
     public function renderTable($value, $record): string
     {
         $options = $this->getOptions();

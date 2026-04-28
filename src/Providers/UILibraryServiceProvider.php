@@ -61,7 +61,7 @@ use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard;
-
+use QuickerFaster\UILibrary\Http\Livewire\Collapsible;
 
 class UILibraryServiceProvider extends ServiceProvider
 {
@@ -253,6 +253,8 @@ class UILibraryServiceProvider extends ServiceProvider
 
         // Drawer
         Livewire::component('qf.drawer', Drawer::class);
+
+        Livewire::component('qf.collapsible', Collapsible::class);
 
 
 

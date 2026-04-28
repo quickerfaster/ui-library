@@ -150,6 +150,8 @@ public function getSettingsOverrideFieldDefinition(string $field): array
             'showHideColumns' => true,
             'filterColumns' => true,
             'addButton' => true,
+            'editable' => true,
+
 
         ];
     }
