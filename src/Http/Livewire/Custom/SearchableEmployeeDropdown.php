@@ -4,6 +4,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Custom;
 
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
+use  QuickerFaster\UILibrary\Services\Search\SearchEngine;
 
 class SearchableEmployeeDropdown extends Component
 {
@@ -38,15 +39,13 @@ class SearchableEmployeeDropdown extends Component
             return;
         }
         
-        $query = $modelClass::query();
-        $query->where(function ($q) use ($searchableFields) {
-            foreach ($searchableFields as $field) {
-                $q->orWhere($field, 'like', '%' . $this->search . '%');
-            }
-        });
-        
-        // Limit to 20 results for performance
-        $records = $query->limit(20)->get();
+
+$records = SearchEngine::get(
+    $modelClass,
+    $this->search,
+    array_slice($searchableFields, 0, 2),
+    20
+);
         
         $this->results = [];
         foreach ($records as $record) {

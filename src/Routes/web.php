@@ -50,11 +50,22 @@ Route::group(['middleware' => 'web'], function () {
 
     Route::get('/export/data', [ExportController::class, 'export'])->name('export.data');
     Route::get('/export/all', [ExportController::class, 'exportAll'])->name('export.all');
-    Route::get('/print/data', [GenericTablePrintController::class, 'print'])->name('print.data');
-
     Route::post('/export/queue', [ExportController::class, 'queueExport'])->name('export.queue');
     Route::get('/export/status/{id}', [ExportController::class, 'exportStatus'])->name('export.status');
     Route::get('/export/download/{id}', [ExportController::class, 'download'])->name('export.download');
+
+Route::get('/export/debug/{id}', function ($id) {
+    $export = \QuickerFaster\UILibrary\Models\Export::find($id);
+    return [
+        'id' => $export->id,
+        'status' => $export->status,
+        'file_path' => $export->file_path,
+        'exists' => $export->file_path ? Storage::disk('local')->exists($export->file_path) : false,
+    ];
+});
+
+
+    Route::get('/print/data', [GenericTablePrintController::class, 'print'])->name('print.data');
 
 
 

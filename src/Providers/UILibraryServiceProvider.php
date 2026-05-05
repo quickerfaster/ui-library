@@ -62,6 +62,7 @@ use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard;
 use QuickerFaster\UILibrary\Http\Livewire\Collapsible;
+use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
 
 class UILibraryServiceProvider extends ServiceProvider
 {
@@ -197,7 +198,6 @@ class UILibraryServiceProvider extends ServiceProvider
         // Files Import
         Livewire::component('qf.import-modal', ImportModal::class);
         Livewire::component('qf.import-form', ImportForm::class);
-        Livewire::component('qf.filter-panel', FilterPanel::class);
 
         // File Export
         Livewire::component('qf.export-modal', ExportModal::class);
@@ -254,6 +254,11 @@ class UILibraryServiceProvider extends ServiceProvider
         // Drawer
         Livewire::component('qf.drawer', Drawer::class);
 
+        // Search & Filters
+        Livewire::component('qf.filter-panel', FilterPanel::class);
+        Livewire::component('qf.search-panel', SearchPanel::class);
+
+
         Livewire::component('qf.collapsible', Collapsible::class);
 
 
@@ -274,6 +279,12 @@ class UILibraryServiceProvider extends ServiceProvider
         if (class_exists(\App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class)) {
             Livewire::component('qf.payroll-run-detail', \App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class);
         }
+
+
+        if (class_exists(\App\Modules\Hr\Http\Livewire\Payroll\PayslipItems::class)) {
+            Livewire::component('qf.payslip-items', \App\Modules\Hr\Http\Livewire\Payroll\PayslipItems::class);
+        }
+
 
 
     }

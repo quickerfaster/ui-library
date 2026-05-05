@@ -16,17 +16,22 @@ class DataTableExport implements FromCollection, WithHeadings
     {
         $this->configKey = $configKey;
         $this->records = $records;
-        $this->columns = $columns;
+        // Remove empty strings and trim each column name
+        $this->columns = array_filter(array_map('trim', $columns), fn($col) => $col !== '');
     }
 
     public function collection()
     {
+        // Convert Eloquent models to arrays to avoid serialization issues
+        $records = $this->records;
+
         if (empty($this->columns)) {
-            return $this->records;
+            return $records->map(function ($item) {
+                return $item instanceof \Illuminate\Database\Eloquent\Model ? $item->toArray() : $item;
+            });
         }
 
-        // Map each record to only the selected columns
-        return $this->records->map(function ($record) {
+        return $records->map(function ($record) {
             $data = [];
             foreach ($this->columns as $field) {
                 $data[$field] = data_get($record, $field);

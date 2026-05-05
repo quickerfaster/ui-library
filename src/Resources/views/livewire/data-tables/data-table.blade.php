@@ -30,93 +30,123 @@
     @endif
 
 
+    {{-- Active Search Info --}}
+    <x-qf::active-search :searchTerm="$this->search" :columns="$this->selectedSearchColumns" :exactMatch="$this->exactMatch" :columnsLabels="$this->searchColumnsLabels" />
 
-    @if (count($quickFilterValues))
+
+
+    {{-- @if (count($quickFilterValues))
         <button wire:click="clearAllQuickFilters" class="btn btn-sm btn-outline-secondary">
             <i class="fas fa-filter-slash"></i> Clear Quick Filters
         </button>
     @endif
+    --}}
 
 
 
     <!-- Toolbar -->
-    <div class="d-flex flex-wrap align-items-center mb-3 gap-3 data-table-toolbar">
+    <div class="d-flex flex-wrap align-items-center justify-content-between data-table-toolbar">
         <!-- Left Side: Actions & Search -->
-        <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="d-flex flex-wrap align-items-center">
 
-            <!-- Action Buttons Group -->
-            <div class="d-flex align-items-center gap-2">
-                @if (!empty($filesActions['export']))
+            {{-- Action Buttons Group --}}
+            <div class="d-flex align-items-center">
+                {{-- FILE DROPDOWN (Export, Import, Print) --}}
+                @if (!empty($filesActions['export']) || !empty($filesActions['import']) || ($filesActions['print'] ?? false))
                     <div class="dropdown d-flex align-items-center">
                         <button type="button"
-                            class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 m-0"
+                            class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-download"></i> <span>Export</span>
+                            <i class="fas fa-file-alt"></i> <span>File</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-start">
-                            @foreach ($filesActions['export'] as $format)
+                            {{-- Export sub-items (multiple formats) --}}
+                            @if (!empty($filesActions['export']))
+                                @foreach ($filesActions['export'] as $format)
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center" href="#"
+                                            wire:click.prevent="exportAll('{{ $format }}')">
+                                            <i
+                                                class="fas fa-file-{{ $format === 'pdf' ? 'pdf' : ($format === 'csv' ? 'csv' : 'excel') }} me-2"></i>
+                                            Export as {{ strtoupper($format) }}
+                                        </a>
+                                    </li>
+                                @endforeach
+                            @endif
+
+                            {{-- Separator if both export and import/print exist --}}
+                            @if (!empty($filesActions['export']) && (!empty($filesActions['import']) || ($filesActions['print'] ?? false)))
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                            @endif
+
+                            {{-- Import --}}
+                            @if (!empty($filesActions['import']))
                                 <li>
                                     <a class="dropdown-item d-flex align-items-center" href="#"
-                                        wire:click.prevent="exportAll('{{ $format }}')">
-                                        <i
-                                            class="fas fa-file-{{ $format === 'pdf' ? 'pdf' : ($format === 'csv' ? 'csv' : 'excel') }} me-2"></i>
-                                        {{ strtoupper($format) }}
+                                        wire:click.prevent="import">
+                                        <i class="fas fa-upload me-2"></i> Import
                                     </a>
                                 </li>
-                            @endforeach
+                            @endif
+
+                            {{-- Print --}}
+                            @if (!empty($filesActions['print']) && $filesActions['print'] === true)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center" href="#"
+                                        wire:click.prevent="print">
+                                        <i class="fas fa-print me-2"></i> Print
+                                    </a>
+                                </li>
+                            @endif
                         </ul>
                     </div>
                 @endif
 
-                @if (!empty($filesActions['import']))
-                    <button wire:click="import"
-                        class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0">
-                        <i class="fas fa-upload"></i> <span>Import</span>
+                {{-- Edit mode toggle (optional) --}}
+                @if ($controls['editable'] ?? false)
+                    <button wire:click="toggleEditing"
+                        class="btn btn-sm {{ $this->editable ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        <i class="fas {{ $this->editable ? 'fa-save' : 'fa-pen' }}"></i>
+                        {{ $this->editable ? 'Done' : 'Edit' }}
                     </button>
                 @endif
-
-                @if (!empty($filesActions['print']) && $filesActions['print'] === true)
-                    <button wire:click="print"
-                        class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0">
-                        <i class="fas fa-print"></i> <span>Print</span>
-                    </button>
-                @endif
-
-
-                <!-- Filter button -->
-                <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0"
-                    wire:click="openFilterDrawer">
-                    <i class="fas fa-filter"></i> Filter
-                    @if (count($activeFilters) > 0)
-                        <span class="badge bg-primary ms-1">{{ count($activeFilters) }}</span>
-                    @endif
-                </button>
-
-
-@if ($controls['editable'] ?? false)
-    <button wire:click="toggleEditing" class="btn btn-sm {{ $this->editable ? 'btn-primary' : 'btn-outline-secondary' }}">
-        <i class="fas fa-pen"></i> {{ $this->editable ? 'Exit Edit Mode' : 'Enable Edit Mode' }}
-    </button>
-@endif
-
-
 
             </div>
 
             <!-- Search and PerPage -->
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center">
                 @if ($controls['search'] ?? false)
                     <div class="d-flex align-items-center">
-                        <input type="text" wire:model.live.debounce.300ms="search"
-                            class="form-control form-control-sm m-0" placeholder="Search..."
-                            style="min-width: 200px; height: 31px;">
+                        {{-- Combined search input + advanced search button --}}
+                        <div class="input-group input-group-sm" style="min-width: 150px;">
+                            <input type="text" wire:model.live.debounce.300ms="search" class="form-control input-sm"
+                                placeholder="Search..." />
+
+                            {{-- Advanced search drawer trigger --}}
+                            <button class="btn btn-outline-secondary position-relative" type="button"
+                                wire:click="openSearchDrawer" title="Advanced search (columns, exact match)">
+                                <i class="fas fa-sliders-h"></i>
+                                @if (!empty($this->search) || $this->exactMatch)
+                                    <span class="badge bg-info"> ●</span>
+                                @endif
+                            </button>
+
+                            <button class="btn btn-outline-secondary" type="button" wire:click="openFilterDrawer"
+                                title="Filter">
+                                <i class="fas fa-filter"></i>
+                                @if (count($activeFilters) > 0)
+                                    <span class="badge bg-primary">{{ count($activeFilters) }}</span>
+                                @endif
+                            </button>
+                        </div>
                     </div>
                 @endif
 
                 @if (($controls['perPage'] ?? false) && count($controls['perPage']) > 1)
                     <div class="d-flex align-items-center">
-                        <select wire:model.live="perPage" class="form-select form-select-sm w-auto m-0"
-                            style="height: 31px;">
+                        <select wire:model.live="perPage" class="form-select form-select-sm">
                             @foreach ($controls['perPage'] as $value)
                                 <option value="{{ $value }}">{{ $value }}</option>
                             @endforeach
@@ -124,22 +154,19 @@
                     </div>
                 @endif
             </div>
-
-
-
         </div>
 
         <!-- Right Side: Create & View Switches -->
-        <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
-            @if (in_array('create', $simpleActions) == false) {{-- This needs to be adjusted later --}}
-                <button wire:click="add" class="btn btn-sm btn-primary d-flex align-items-center gap-2">
+        <div class="d-flex flex-wrap align-items-center">
+            @if (in_array('create', $simpleActions) == false)
+                {{-- This needs to be adjusted later --}}
+                <button wire:click="add" class="btn btn-sm btn-primary d-flex align-items-center">
                     <i class="fas fa-plus"></i> Add
                 </button>
             @endif
 
             @if (count($switchViews ?? []) >= 2)
-                <button wire:click="toggleViewMode"
-                    class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0">
+                <button wire:click="toggleViewMode" class="btn btn-sm btn-outline-secondary d-flex align-items-center">
                     @if ($viewMode === 'table')
                         <i class="fas fa-list"></i> <span>List</span>
                     @elseif($viewMode === 'list')
@@ -153,7 +180,7 @@
             @if ($this->showHideColumnsEnabled())
                 <div class="dropdown me-4" wire:key="column-dropdown-{{ $configKey }}">
                     <button type="button"
-                        class="btn dropdown-togglebtn btn-sm btn-outline-secondary d-flex align-items-center gap-2 m-0 gap-2"
+                        class="btn dropdown-togglebtn btn-sm btn-outline-secondary d-flex align-items-center"
                         wire:click="toggleColumnDropdown">
                         <i class="fas fa-columns"></i> Columns
                     </button>
@@ -175,7 +202,7 @@
                                 </li>
                             @endforeach
 
-                            @if (count($allColumns) > count($visibleColumns))
+                            @if ($this->isResetVisible())
                                 <li>
                                     <hr class="dropdown-divider">
                                 </li>
@@ -186,6 +213,7 @@
                                     </button>
                                 </li>
                             @endif
+
                         </ul>
                     @endif
                 </div>
@@ -196,8 +224,7 @@
 
             @if ($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
                 <div class="d-flex align-items-center">
-                    <select wire:model.live="trashedFilter" class="form-select form-select-sm w-auto"
-                        style="height: 31px;">
+                    <select wire:model.live="trashedFilter" class="form-select form-select-sm">
                         <option value="without">Active</option>
                         <option value="with">With Trashed</option>
                         <option value="only">Trashed Only</option>
@@ -225,7 +252,7 @@
 
 
 
-            <div class="d-flex align-items-center gap-2 me-3">
+            <div class="d-flex align-items-center">
                 <div class="form-check">
                     <input type="checkbox" class="form-check-input" wire:model.live="bulkSelection.all" />
                     <strong class="text-white me-4">Select All</strong>
@@ -336,46 +363,43 @@
 
 
                             @foreach ($visibleColumns as $name)
+                                @php
+                                    $def = $columns[$name];
+                                    $rowKey = 'row_' . $record->id;
+                                    $isEditable = $this->editable && ($def['editable'] ?? false);
+                                    $isEditing = isset($this->editMode[$rowKey][$name]);
+                                    $cellValue = $this->editedData[$rowKey][$name] ?? $record->$name;
+                                @endphp
+                                <td class="{{ $isTrashed ? 'text-decoration-line-through text-muted' : '' }};">
+                                    @if ($isEditable && $isEditing)
+                                        <div class="d-flex align-items-center">
+                                            <!-- We are in edit mode -->
 
-
-@php
-    $def = $columns[$name];
-    $rowKey = 'row_' . $record->id;
-    $isEditable = $this->editable && ($def['editable'] ?? false);
-    $isEditing = isset($this->editMode[$rowKey][$name]);
-    $cellValue = $this->editedData[$rowKey][$name] ?? $record->$name;
-@endphp
-<td class="{{ $isTrashed ? 'text-decoration-line-through text-muted' : '' }};">
-    @if($isEditable && $isEditing)
-        <div class="d-flex align-items-center gap-1" >
-                <!-- We are in edit mode -->
-
-{!! $this->getField($name, $def)->renderInlineEditor($cellValue, $record, [
-    'rowId' => $record->id,
-    'wire:model' => "editedData.{$rowKey}.{$name}",
-    'configKey' => $this->configKey,
-    'fieldName' => $name,       // pass field name
-]) !!}
-            <button wire:click="saveCell({{ $record->id }}, '{{ $name }}', $event.target.value)" class="btn btn-sm btn-success  px-2" title="Save">
-                <i class="fas fa-check"></i>
-            </button>
-            <button wire:click="cancelEditingCell({{ $record->id }}, '{{ $name }}')" class="btn btn-sm btn-secondary  px-2" title="Cancel">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    @else
-            <div @if($isEditable) 
-                    wire:dblclick="startEditingCell({{ $record->id }}, '{{ $name }}')" 
-                    style="cursor: pointer;" 
-                @endif>
-                {!! $this->getField($name, $def)->renderTable($record->$name, $record) !!} 
-            </div>
-
-    @endif
-</td>
-
-
-
+                                            {!! $this->getField($name, $def)->renderInlineEditor($cellValue, $record, [
+                                                'rowId' => $record->id,
+                                                'wire:model' => "editedData.{$rowKey}.{$name}",
+                                                'configKey' => $this->configKey,
+                                                'fieldName' => $name, // pass field name
+                                            ]) !!}
+                                            <button
+                                                wire:click="saveCell({{ $record->id }}, '{{ $name }}', $event.target.value)"
+                                                class="btn btn-sm btn-success  px-2" title="Save">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button
+                                                wire:click="cancelEditingCell({{ $record->id }}, '{{ $name }}')"
+                                                class="btn btn-sm btn-secondary  px-2" title="Cancel">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    @else
+                                        <div
+                                            @if ($isEditable) wire:dblclick="startEditingCell({{ $record->id }}, '{{ $name }}')" 
+                    style="cursor: pointer;" @endif>
+                                            {!! $this->getField($name, $def)->renderTable($record->$name, $record) !!}
+                                        </div>
+                                    @endif
+                                </td>
                             @endforeach
 
                             {{-- Add Row Actions --}}
@@ -435,7 +459,9 @@
 
     <!-- Pagination -->
     <div class="mt-3">
-        {{ $records->links() }}
+        @if (method_exists($records, 'links'))
+            {{ $records->links() }}
+        @endif
     </div>
 
     <style>
@@ -526,6 +552,31 @@
         /* Also ensure the card's image area doesn't break (optional) */
         .card .card-img-top {
             border-radius: 12px 12px 0 0;
+        }
+
+
+        .btn-sm {
+            padding: 0.5em 1em;
+        }
+
+        .btn-sm,
+        .input-group-sm,
+        .form-select-sm {
+            margin: 0em 0.3em;
+        }
+
+        .input-group-sm input,
+        .input-group-sm button {
+            height: 2.6em;
+            padding: 0.2em;
+        }
+
+        .input-group-sm {
+            margin-top: 1em;
+        }
+
+        .btn-sm i {
+            margin-right: 0.5em;
         }
     </style>
 

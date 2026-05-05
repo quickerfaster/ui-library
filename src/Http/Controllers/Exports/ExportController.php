@@ -18,15 +18,15 @@ class ExportController extends Controller
     {
         $request->validate([
             'configKey' => 'required|string',
-            'ids'       => 'required|string',
-            'format'    => 'required|in:csv,xls,pdf',
-            'columns'   => 'nullable|string',
+            'ids' => 'required|string',
+            'format' => 'required|in:csv,xls,pdf',
+            'columns' => 'nullable|string',
         ]);
 
         $configKey = $request->configKey;
         $ids = explode(',', $request->ids);
         $format = $request->format;
-        $columns = $request->has('columns') ? explode(',', $request->columns) : [];
+        $columns = $request->filled('columns') ? explode(',', $request->columns) : [];
 
         $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
         $modelClass = $resolver->getModel();
@@ -45,17 +45,17 @@ class ExportController extends Controller
     {
         $request->validate([
             'configKey' => 'required|string',
-            'format'    => 'required|in:csv,xls,pdf',
-            'columns'   => 'nullable|string',
-            'search'    => 'nullable|string',
-            'sort'      => 'nullable|string',
+            'format' => 'required|in:csv,xls,pdf',
+            'columns' => 'nullable|string',
+            'search' => 'nullable|string',
+            'sort' => 'nullable|string',
             'direction' => 'nullable|string|in:asc,desc',
-            'filters'   => 'nullable|json',
+            'filters' => 'nullable|json',
         ]);
 
         $configKey = $request->configKey;
         $format = $request->format;
-        $columns = $request->has('columns') ? explode(',', $request->columns) : [];
+        $columns = $request->filled('columns') ? explode(',', $request->columns) : [];
 
         $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
         $modelClass = $resolver->getModel();
@@ -100,14 +100,24 @@ class ExportController extends Controller
             return $this->generatePdf($configKey, $records, $columns);
         }
 
+        $records = $query->get();
         $export = new DataTableExport($configKey, $records, $columns);
-        $fileName = 'export_all_' . now()->format('Ymd_His') . '.' . $format;
-        return Excel::download($export, $fileName);
+        return Excel::download($export, 'export_all_' . now()->format('Ymd_His') . '.' . $format);
     }
 
     protected function generatePdf(string $configKey, $records, array $columns)
     {
+        
         $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
+        $title = $resolver->getConfig()['pageTitle'] ?? null;
+        $subtitle = $resolver->getConfig()['subtitle'] ?? 'Data Export';
+
+        if (!$title) {
+            // Fallback: model name formatted
+            $modelName = class_basename($resolver->getModel());
+            $title = ucwords(str_replace('_', ' ', \Str::snake($modelName)));
+        }
+
         $definitions = $resolver->getFieldDefinitions();
 
         // Determine which columns to use
@@ -126,34 +136,34 @@ class ExportController extends Controller
         $pdfView = $controls['files']['export_pdf_view'] ?? 'qf::exports.default-pdf';
 
         $pdf = Pdf::loadView($pdfView, [
-            'records'   => $records,
-            'columns'   => $columns,
-            'headings'  => $headings,
-            'configKey' => $configKey,
+            'records' => $records,
+            'columns' => $columns,
+            'headings' => $headings,
+            'title' => $title,
+            'subtitle' => $subtitle,
         ]);
 
         return $pdf->download('export_' . now()->format('Ymd_His') . '.pdf');
     }
 
-    // New methods for queued exports
     public function queueExport(Request $request)
     {
         $request->validate([
             'configKey' => 'required|string',
-            'format'    => 'required|in:csv,xls,pdf',
-            'columns'   => 'nullable|string',
-            'filters'   => 'nullable|json',
-            'options'   => 'nullable|json',
+            'format' => 'required|in:csv,xls,pdf',
+            'columns' => 'nullable|string',
+            'filters' => 'nullable|json',
+            'options' => 'nullable|json',
         ]);
 
         $export = Export::create([
-            'user_id'     => auth()->id(),
-            'config_key'  => $request->configKey,
-            'filters'     => json_decode($request->filters ?? '[]', true),
-            'columns'     => $request->has('columns') ? explode(',', $request->columns) : [],
-            'format'      => $request->format,
-            'options'     => $request->options ? json_decode($request->options, true) : [],
-            'status'      => 'pending',
+            'user_id' => auth()->id(),
+            'config_key' => $request->configKey,
+            'filters' => json_decode($request->filters ?? '[]', true),
+            'columns' => $request->has('columns') ? array_values(array_filter(explode(',', $request->columns), fn($c) => trim($c) !== '')) : [],
+            'format' => $request->format,
+            'options' => $request->options ? json_decode($request->options, true) : [],
+            'status' => 'pending',
         ]);
 
         GenerateExport::dispatch($export->id);
@@ -164,29 +174,61 @@ class ExportController extends Controller
         ]);
     }
 
-public function exportStatus($id)
-{
-    
-    $export = Export::findOrFail($id);
-    return response()->json([
-        'id'         => $export->id,
-        'status'     => $export->status,
-        'file_url'   => $export->status === 'completed' 
-            ? secure_url(route('export.download', $export->id, false))  // route('export.download', $export->id) none securs https://
-            : null,
-        'error'      => $export->error_message,
-        'completed_at' => $export->completed_at,
-    ]);
-}
+    public function exportStatus($id)
+    {
+        $export = Export::findOrFail($id);
+        return response()->json([
+            'status' => $export->status,
+            'file_url' => $export->status === 'completed' ? route('export.download', $export->id) : null,
+            'error' => $export->error_message,
+            'completed_at' => $export->completed_at,
+        ]);
+    }
 
     public function download($id)
     {
         $export = Export::findOrFail($id);
-        if ($export->status !== 'completed' || !$export->file_path) {
-            abort(404);
+
+        // Check status
+        if ($export->status !== 'completed') {
+            abort(400, 'Export not ready yet.');
         }
 
-        return Storage::disk('local')->download($export->file_path, 'export.' . $export->format);
+        if (empty($export->file_path)) {
+            abort(404, 'File path missing.');
+        }
+
+        // Try to locate the file
+        $disk = Storage::disk('local');
+        $path = $export->file_path;
+
+        // If the stored path is absolute (e.g., full system path), convert to relative
+        if (str_starts_with($path, storage_path())) {
+            $relative = str_replace(storage_path() . '/app/', '', $path);
+            if ($disk->exists($relative)) {
+                $path = $relative;
+            } else {
+                // Fallback: try the original relative path
+                $originalRelative = str_replace(storage_path() . '/', '', $export->file_path);
+                if ($disk->exists($originalRelative)) {
+                    $path = $originalRelative;
+                }
+            }
+        }
+
+        // Final check
+        if (!$disk->exists($path)) {
+            // Log the failure for debugging
+            \Log::error('Export file not found', [
+                'export_id' => $export->id,
+                'stored_path' => $export->file_path,
+                'tried_path' => $path,
+                'disk_root' => $disk->path(''),
+            ]);
+            abort(404, 'File not found on server.');
+        }
+
+        return $disk->download($path, 'export.' . $export->format);
     }
 
     // Filter methods (will be replaced by AppliesFilters trait later)
@@ -229,26 +271,49 @@ public function exportStatus($id)
     protected function applyStringFilter($query, $field, $operator, $value)
     {
         switch ($operator) {
-            case 'equals': $query->where($field, $value); break;
-            case 'contains': $query->where($field, 'like', '%' . $value . '%'); break;
-            case 'starts_with': $query->where($field, 'like', $value . '%'); break;
-            case 'ends_with': $query->where($field, 'like', '%' . $value); break;
-            default: $query->where($field, $value);
+            case 'equals':
+                $query->where($field, $value);
+                break;
+            case 'contains':
+                $query->where($field, 'like', '%' . $value . '%');
+                break;
+            case 'starts_with':
+                $query->where($field, 'like', $value . '%');
+                break;
+            case 'ends_with':
+                $query->where($field, 'like', '%' . $value);
+                break;
+            default:
+                $query->where($field, $value);
         }
     }
 
     protected function applyNumberFilter($query, $field, $operator, $value)
     {
         switch ($operator) {
-            case 'equals': $query->where($field, $value); break;
-            case 'not_equals': $query->where($field, '!=', $value); break;
-            case 'greater_than': $query->where($field, '>', $value); break;
-            case 'less_than': $query->where($field, '<', $value); break;
-            case 'greater_than_or_equals': $query->where($field, '>=', $value); break;
-            case 'less_than_or_equals': $query->where($field, '<=', $value); break;
+            case 'equals':
+                $query->where($field, $value);
+                break;
+            case 'not_equals':
+                $query->where($field, '!=', $value);
+                break;
+            case 'greater_than':
+                $query->where($field, '>', $value);
+                break;
+            case 'less_than':
+                $query->where($field, '<', $value);
+                break;
+            case 'greater_than_or_equals':
+                $query->where($field, '>=', $value);
+                break;
+            case 'less_than_or_equals':
+                $query->where($field, '<=', $value);
+                break;
             case 'between':
-                if (!empty($value['min'])) $query->where($field, '>=', $value['min']);
-                if (!empty($value['max'])) $query->where($field, '<=', $value['max']);
+                if (!empty($value['min']))
+                    $query->where($field, '>=', $value['min']);
+                if (!empty($value['max']))
+                    $query->where($field, '<=', $value['max']);
                 break;
         }
     }
@@ -257,15 +322,27 @@ public function exportStatus($id)
     {
         $now = now();
         switch ($operator) {
-            case 'equals': $query->whereDate($field, $value); break;
-            case 'not_equals': $query->whereDate($field, '!=', $value); break;
-            case 'greater_than': $query->whereDate($field, '>', $value); break;
-            case 'less_than': $query->whereDate($field, '<', $value); break;
-            case 'between':
-                if (!empty($value['start'])) $query->whereDate($field, '>=', $value['start']);
-                if (!empty($value['end'])) $query->whereDate($field, '<=', $value['end']);
+            case 'equals':
+                $query->whereDate($field, $value);
                 break;
-            case 'today': $query->whereDate($field, $now->toDateString()); break;
+            case 'not_equals':
+                $query->whereDate($field, '!=', $value);
+                break;
+            case 'greater_than':
+                $query->whereDate($field, '>', $value);
+                break;
+            case 'less_than':
+                $query->whereDate($field, '<', $value);
+                break;
+            case 'between':
+                if (!empty($value['start']))
+                    $query->whereDate($field, '>=', $value['start']);
+                if (!empty($value['end']))
+                    $query->whereDate($field, '<=', $value['end']);
+                break;
+            case 'today':
+                $query->whereDate($field, $now->toDateString());
+                break;
             case 'this_week':
                 $query->whereBetween($field, [
                     $now->copy()->startOfWeek()->toDateString(),

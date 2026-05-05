@@ -1,10 +1,11 @@
 @props(['filters' => []])
 
 @if(count($filters))
-    <div class="active-filters mb-3 d-flex flex-wrap gap-2">
+    <div class="active-filters mb-3 d-flex flex-wrap gap-2 align-items-center">
         @foreach($filters as $filter)
-            <span class="badge bg-secondary d-inline-flex align-items-center gap-1">
-                {{ $filter['label'] }}: 
+            <span class="badge bg-primary d-inline-flex align-items-center gap-1">
+                <i class="fas fa-filter me-1"></i>
+                {{ $filter['label'] }}:
                 @if(is_array($filter['displayValue']))
                     {{ implode(', ', $filter['displayValue']) }}
                 @else
@@ -13,6 +14,8 @@
                 <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6rem;" wire:click="removeFilter('{{ $filter['field'] }}')"></button>
             </span>
         @endforeach
-        <button wire:click="clearAllFilters" class="btn btn-sm btn-link">Clear all</button>
+        <button wire:click="clearAllFilters" class="btn btn-sm btn-link text-decoration-none">
+            <i class="fas fa-times me-1"></i>Clear all filters
+        </button>
     </div>
 @endif

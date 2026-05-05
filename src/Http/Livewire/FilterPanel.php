@@ -228,6 +228,7 @@ class FilterPanel extends Component
             'string', 'textarea', 'text' => 'string',
             'number', 'integer', 'float' => 'number',
             'datepicker', 'datetimepicker' => 'date',
+            'timepicker', 'time' => 'time',
             'checkbox', 'boolcheckbox', 'radio' => 'boolean',
             'select' => 'select',
             default => 'string',

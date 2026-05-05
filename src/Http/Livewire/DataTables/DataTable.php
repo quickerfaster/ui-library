@@ -8,6 +8,7 @@ use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Traits\DataTables\HasColumnPreferences;
 use App\Modules\Admin\Services\ActivityLogger;
+use  QuickerFaster\UILibrary\Services\Search\SearchEngine;
 
 
 
@@ -55,6 +56,7 @@ class DataTable extends Component
 
     public bool $columnDropdownOpen = false;
 
+    public bool $enforceFilters = false;
 
 
     public bool $editable = false;              // master switch
@@ -63,7 +65,9 @@ class DataTable extends Component
 
     public array $fieldErrors = []; // format: [rowKey => [field => 'error message']]
 
-
+    public array $searchableRelations = [];
+public array $selectedSearchColumns = [];   // columns to search in
+public bool $exactMatch = false;
 
     protected $listeners = [
         'performDelete' => 'performDelete',
@@ -71,6 +75,9 @@ class DataTable extends Component
         'executeBulkAction' => 'executeBulkAction',
         'filtersUpdated' => 'updateFilters',
         'executeRowAction' => 'executeRowAction',
+            'searchApplied' => 'applySearchPanel',
+            
+
     ];
 
     public function mount(
@@ -101,11 +108,17 @@ class DataTable extends Component
 
         $this->validateSortField();
 
+        // Determine default visible columns from config (or fallback)
+        $defaultColumns = $this->getDefaultVisibleColumns();
+
         if ($this->showHideColumnsEnabled()) {
-            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, $this->allColumns);
+            // Load from session; if none, use $defaultColumns
+            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, $defaultColumns);
         } else {
             $this->visibleColumns = $this->allColumns;
         }
+        // Final safety: ensure only valid columns are kept
+        $this->visibleColumns = array_values(array_intersect($this->visibleColumns, array_keys($this->columns)));
 
         $this->perPage = (int) request()->query('perPage', 5);
         // Altenatively, use the saved settings from the SettingsManager
@@ -118,137 +131,188 @@ class DataTable extends Component
 
 
 
+public function applySearchPanel($search, $columns, $exactMatch): void
+{
+    $this->search = $search;
+    $this->selectedSearchColumns = $columns;
+    $this->exactMatch = $exactMatch;
+    $this->resetPage();
+    $this->dispatch('refreshDataTable');
+}
 
+public function openSearchDrawer(): void
+{
+    $this->dispatch('openDrawer', 'qf.search-panel', [
+        'configKey' => $this->configKey,
+        'initialSearch' => $this->search,
+        'initialColumns' => $this->selectedSearchColumns,
+        'initialExactMatch' => $this->exactMatch,
+    ], 'Search');
+}
 
 
 
 
     /**
- * Start editing a specific cell
- */
-public function startEditingCell($rowId, $field = null)
-{
-    $rowKey = 'row_' . $rowId;
+     * Start editing a specific cell
+     */
+    public function startEditingCell($rowId, $field = null)
+    {
+        $rowKey = 'row_' . $rowId;
 
-    // Always fetch fresh values from database (ignore any previous editedData)
-    $this->editedData[$rowKey] = $this->getRowOriginalValues($rowId);
-    
-    // Reset edit mode for this row
-    $this->editMode[$rowKey] = [];
-    
-    // Clear any previous errors for this row
-    unset($this->fieldErrors[$rowKey]);
+        // Always fetch fresh values from database (ignore any previous editedData)
+        $this->editedData[$rowKey] = $this->getRowOriginalValues($rowId);
 
-    if ($field) {
-        $this->editMode[$rowKey][$field] = true;
-    }
+        // Reset edit mode for this row
+        $this->editMode[$rowKey] = [];
 
-    $this->dispatch('$refresh');
-}
+        // Clear any previous errors for this row
+        unset($this->fieldErrors[$rowKey]);
 
-/**
- * Get original values for all editable fields of a record
- */
-protected function getRowOriginalValues($rowId): array
-{
-    $modelClass = $this->getConfigResolver()->getModel();
-    $record = $modelClass::find($rowId);
-    if (!$record) return [];
-    
-    $values = [];
-    foreach ($this->columns as $field => $def) {
-        if (($def['editable'] ?? false)) {
-            $values[$field] = $record->$field;
+        if ($field) {
+            $this->editMode[$rowKey][$field] = true;
         }
+
+        $this->dispatch('$refresh');
     }
-    return $values;
-}
 
-/**
- * Save a single cell value
- */
+    /**
+     * Get original values for all editable fields of a record
+     */
+    protected function getRowOriginalValues($rowId): array
+    {
+        $modelClass = $this->getConfigResolver()->getModel();
+        $record = $modelClass::find($rowId);
+        if (!$record)
+            return [];
 
-public function saveCell($rowId, $field)
+        $values = [];
+        foreach ($this->columns as $field => $def) {
+            if (($def['editable'] ?? false)) {
+                $values[$field] = $record->$field;
+            }
+        }
+        return $values;
+    }
+
+    /**
+     * Save a single cell value
+     */
+
+    public function saveCell($rowId, $field)
+    {
+        $rowKey = 'row_' . $rowId;
+        $value = $this->editedData[$rowKey][$field] ?? null;
+
+        // Validation (same as before)
+        $modelClass = $this->getConfigResolver()->getModel();
+        $record = $modelClass::find($rowId);
+        if (!$record)
+            return;
+
+        $def = $this->getConfigResolver()->getFieldDefinitions()[$field];
+        $fieldObj = $this->getField($field, $def);
+        $rules = $fieldObj->getValidationRules();
+        $validator = \Validator::make([$field => $value], $rules);
+
+        if ($validator->fails()) {
+            $this->fieldErrors[$rowKey][$field] = $validator->errors()->first($field);
+            return;
+        }
+
+        // Save to database
+        $oldValue = $record->$field;
+        $record->$field = $value;
+        $record->save();
+
+        // Log activity
+        ActivityLogger::updated($this->configKey, $record, [$field => $oldValue], [$field => $value]);
+
+        // Clear all temporary data for this row
+        unset($this->editMode[$rowKey]);
+        unset($this->editedData[$rowKey]);
+        unset($this->fieldErrors[$rowKey]);
+
+        $this->dispatch('refreshDataTable');
+    }
+
+    /**
+     * Cancel editing a specific cell
+     */
+    public function cancelEditingCell($rowId, $field)
+    {
+        $rowKey = 'row_' . $rowId;
+        // Just exit edit mode without saving
+        unset($this->editMode[$rowKey][$field]);
+        // Optionally keep editedData for other fields still being edited
+        // But you may also want to clear the entire row if you prefer a clean state
+    }
+
+
+    /**
+     * Helper to get original value from record (cached)
+     */
+    protected function getOriginalValue($rowId, $field)
+    {
+        $modelClass = $this->getConfigResolver()->getModel();
+        return $modelClass::find($rowId)->$field ?? null;
+    }
+
+    /**
+     * Enable/disable editing globally
+     */
+    public function toggleEditing()
+    {
+        $this->editable = !$this->editable;
+        $this->editMode = [];
+        $this->editedData = [];
+
+        //dd($this->editable);
+    }
+
+
+public function clearSearch(): void
 {
-    $rowKey = 'row_' . $rowId;
-    $value = $this->editedData[$rowKey][$field] ?? null;
-
-    // Validation (same as before)
-    $modelClass = $this->getConfigResolver()->getModel();
-    $record = $modelClass::find($rowId);
-    if (!$record) return;
-
-    $def = $this->getConfigResolver()->getFieldDefinitions()[$field];
-    $fieldObj = $this->getField($field, $def);
-    $rules = $fieldObj->getValidationRules();
-    $validator = \Validator::make([$field => $value], $rules);
-
-    if ($validator->fails()) {
-        $this->fieldErrors[$rowKey][$field] = $validator->errors()->first($field);
-        return;
-    }
-
-    // Save to database
-    $oldValue = $record->$field;
-    $record->$field = $value;
-    $record->save();
-
-    // Log activity
-    ActivityLogger::updated($this->configKey, $record, [$field => $oldValue], [$field => $value]);
-
-    // Clear all temporary data for this row
-    unset($this->editMode[$rowKey]);
-    unset($this->editedData[$rowKey]);
-    unset($this->fieldErrors[$rowKey]);
-
+    $this->search = '';
+    $this->selectedSearchColumns = [];
+    $this->exactMatch = false;
+    
+    session()->forget("search_columns.{$this->configKey}");
+    session()->forget("search_term.{$this->configKey}");
+    session()->forget("search_exactmatch.{$this->configKey}");
+    
+    $this->resetPage();
     $this->dispatch('refreshDataTable');
 }
 
-/**
- * Cancel editing a specific cell
- */
-public function cancelEditingCell($rowId, $field)
+
+
+public function getSearchColumnsLabelsProperty(): array
 {
-    $rowKey = 'row_' . $rowId;
-    // Just exit edit mode without saving
-    unset($this->editMode[$rowKey][$field]);
-    // Optionally keep editedData for other fields still being edited
-    // But you may also want to clear the entire row if you prefer a clean state
+    $labels = [];
+    foreach ($this->selectedSearchColumns as $field) {
+        $labels[$field] = $this->columns[$field]['label'] ?? ucfirst($field);
+    }
+    return $labels;
 }
-
-
-/**
- * Helper to get original value from record (cached)
- */
-protected function getOriginalValue($rowId, $field)
-{
-    $modelClass = $this->getConfigResolver()->getModel();
-    return $modelClass::find($rowId)->$field ?? null;
-}
-
-/**
- * Enable/disable editing globally
- */
-public function toggleEditing()
-{
-    $this->editable = !$this->editable;
-    $this->editMode = [];
-    $this->editedData = [];
-
-    //dd($this->editable);
-}
-
-
-
 
 
 
     public function openFilterDrawer(): void
     {
-        $this->dispatch('openDrawer', drawerKey: 'filter_drawer', configKey: $this->configKey, additionalParams: [
-            'initialFilters' => $this->activeFilters,
-        ]);
+        $this->dispatch(
+            'openDrawer',
+
+            'qf.filter-panel',
+            [
+                'configKey' => $this->configKey,
+                'initialFilters' => $this->activeFilters,
+            ],
+            'Filter Options'
+
+        );
     }
+
 
 
 
@@ -412,11 +476,25 @@ public function toggleEditing()
         $this->allColumns = array_keys($this->columns);
         $this->validateSortField();
 
+
+
+
+
+        // Determine default visible columns from config (or fallback)
+        $defaultColumns = $this->getDefaultVisibleColumns();
+
         if ($this->showHideColumnsEnabled()) {
-            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, $this->allColumns);
+            // Load from session; if none, use $defaultColumns
+            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, $defaultColumns);
         } else {
             $this->visibleColumns = $this->allColumns;
         }
+        // Final safety: ensure only valid columns are kept
+        $this->visibleColumns = array_values(array_intersect($this->visibleColumns, array_keys($this->columns)));
+
+
+
+
     }
 
     public function updatedConfigKey($value)
@@ -500,14 +578,26 @@ public function toggleEditing()
         $this->resetPage();
     }
 
-    public function resetColumns(): void
-    {
-        $this->visibleColumns = $this->allColumns;
-        if ($this->showHideColumnsEnabled()) {
-            $this->saveVisibleColumns($this->configKey, $this->visibleColumns);
-        }
-        $this->resetPage();
+/**
+ * Reset visible columns to the default set defined by config (or fallback).
+ */
+public function resetColumns(): void
+{
+    // Get the default visible columns from config (or fallback first 6)
+    $defaultColumns = $this->getDefaultVisibleColumns();
+
+    // Apply the default set
+    $this->visibleColumns = $defaultColumns;
+
+    // If column preferences are stored, save the reset state
+    if ($this->showHideColumnsEnabled()) {
+        $this->saveVisibleColumns($this->configKey, $this->visibleColumns);
     }
+
+    // Reset pagination to avoid inconsistencies
+    $this->resetPage();
+}
+
 
 
 
@@ -515,37 +605,29 @@ public function toggleEditing()
     {
         $resolver = $this->getConfigResolver();
 
-        // NEW: If custom columns are provided, use them instead of config field definitions
+        // Custom columns support (unchanged)
         if (!empty($this->customColumns)) {
-            // Build a temporary field definitions array from customColumns
-            // customColumns format: ['field_name' => ['label' => '...', 'field_type' => '...', ...]]
-            // We need to ensure each definition has at least the minimal required keys.
             $this->columns = [];
             $this->searchableFields = [];
+            $this->searchableRelations = [];
 
             foreach ($this->customColumns as $field => $definition) {
-                // Ensure a field_type (default to 'string' if missing)
                 if (!isset($definition['field_type'])) {
                     $definition['field_type'] = 'string';
                 }
-                // Ensure label
                 if (!isset($definition['label'])) {
                     $definition['label'] = ucfirst(str_replace('_', ' ', $field));
                 }
                 $this->columns[$field] = $definition;
 
-                // If searchable is not explicitly false, add to searchable fields
                 if (($definition['searchable'] ?? true) !== false) {
                     $this->searchableFields[] = $field;
                 }
             }
-
-            // For custom columns, we cannot rely on config hidden fields – ignore them.
-            // Also, we should not apply perPage override from config.
             return;
         }
 
-        // --- Existing logic (when no custom columns) ---
+        // --- Existing logic for building columns & searchable fields ---
         $configHidden = $resolver->getHiddenFields();
         foreach ($this->hiddenFields as $key => $fields) {
             if (isset($configHidden[$key])) {
@@ -556,18 +638,60 @@ public function toggleEditing()
         }
 
         $hiddenOnTable = $configHidden['onTable'] ?? [];
-        $this->searchableFields = collect($resolver->getFieldDefinitions())
-            ->reject(fn($def, $field) => in_array($field, $hiddenOnTable))
-            ->filter(fn($def) => ($def['searchable'] ?? true) !== false)
-            ->reject(fn($def) => isset($def['relationship']))
-            ->keys()
-            ->toArray();
+        $fieldDefs = $resolver->getFieldDefinitions();
+        $this->searchableFields = [];
+        $this->searchableRelations = [];
 
-        $this->columns = array_diff_key(
-            $resolver->getFieldDefinitions(),
-            array_flip($hiddenOnTable)
-        );
+        foreach ($fieldDefs as $field => $def) {
+            if (in_array($field, $hiddenOnTable)) {
+                continue;
+            }
+            if (!($def['searchable'] ?? false)) {
+                continue;
+            }
 
+            if (isset($def['relationship'])) {
+                $relationMethod = $this->getRelationMethodFromField($field, $def);
+                if ($relationMethod) {
+                    $displayColumn = $this->getRelationDisplayColumn($def);
+                    if ($displayColumn) {
+                        $this->searchableRelations[] = [
+                            'field' => $field,
+                            'relation' => $relationMethod,
+                            'column' => $displayColumn,
+                        ];
+                    }
+                }
+            } else {
+                $this->searchableFields[] = $field;
+            }
+        }
+
+        // Columns = all non-hidden fields (existing behavior)
+        $this->columns = array_diff_key($fieldDefs, array_flip($hiddenOnTable));
+
+
+// In initializeFromConfig() or mount(), after columns are defined
+if (empty($this->selectedSearchColumns)) {
+    $savedColumns = session()->get("search_columns.{$this->configKey}");
+    if (!empty($savedColumns)) {
+        // Ensure saved columns still exist in current columns
+        $this->selectedSearchColumns = array_values(array_intersect(
+            $savedColumns,
+            array_keys($this->columns)
+        ));
+    }
+    
+    // Also restore search term if any
+    $savedSearch = session()->get("search_term.{$this->configKey}");
+    if ($savedSearch && empty($this->search)) {
+        $this->search = $savedSearch;
+    }
+}
+
+
+
+        // Existing code for perPage, viewMode, actions, etc. (keep as is)
         $perPageOptions = $resolver->getControls()['perPage'] ?? null;
         if ($perPageOptions && !empty($perPageOptions)) {
             $this->perPage = $perPageOptions[0];
@@ -584,11 +708,133 @@ public function toggleEditing()
 
 
 
-    public function updateFilters($filters)
-    {
-        $this->activeFilters = $this->sanitizeActiveFilters($filters);
-        $this->resetPage();
+/**
+ * For a select field with options, find matching keys based on search term.
+ * Returns an array of keys where display label contains the search term (case-insensitive),
+ * or the key itself contains the search term. If no matches, returns empty array.
+ *
+ * @param string $field
+ * @param string $searchTerm
+ * @return array
+ */
+protected function getSearchKeysForSelectField(string $field, string $searchTerm): array
+{
+    $fieldDef = $this->columns[$field] ?? [];
+    $options = $fieldDef['options'] ?? [];
+
+    if (empty($options) || !is_array($options)) {
+        return [];
     }
+
+    $lowerTerm = strtolower($searchTerm);
+    $matchedKeys = [];
+
+    foreach ($options as $key => $label) {
+        $lowerKey = strtolower($key);
+        $lowerLabel = strtolower($label);
+
+        if (str_contains($lowerKey, $lowerTerm) || str_contains($lowerLabel, $lowerTerm)) {
+            $matchedKeys[] = $key;
+        }
+    }
+
+    return array_unique($matchedKeys);
+}
+
+
+
+
+
+    /**
+     * Returns the default visible columns based on config or fallback.
+     * Does not consider session – pure config default.
+     *
+     * @return array
+     */
+    protected function getDefaultVisibleColumns(): array
+    {
+        $resolver = $this->getConfigResolver();
+        $allColumns = array_keys($this->columns);
+
+        // 1. Check for tableDefaultFields in config
+        $tableDefaultFields = $resolver->getConfig()['tableDefaultFields'] ?? [];
+
+        if (!empty($tableDefaultFields)) {
+            // Intersect with actually existing columns (safety)
+            $default = array_values(array_intersect($tableDefaultFields, $allColumns));
+            if (!empty($default)) {
+                return $default;
+            }
+        }
+
+        // 2. Fallback: first 6 columns (performance-safe)
+        return array_slice($allColumns, 0, 6);
+    }
+
+
+
+    /**
+ * Determines if the "Reset Columns" button should be shown.
+ * Returns true only when column management is enabled and the current visible
+ * columns differ from the default set (config or fallback).
+ */
+public function isResetVisible(): bool
+{
+    if (!$this->showHideColumnsEnabled()) {
+        return false;
+    }
+
+    $defaultColumns = $this->getDefaultVisibleColumns();
+    return $this->visibleColumns != $defaultColumns;
+}
+
+
+
+
+
+
+
+    protected function getRelationMethodFromField(string $field, array $def): ?string
+    {
+        if (!empty($def['relationship']['dynamic_property'])) {
+            return $def['relationship']['dynamic_property'];
+        }
+        if (str_ends_with($field, '_id')) {
+            $base = substr($field, 0, -3);
+            // Optional: verify that the relation exists on the model
+            $modelClass = $this->getConfigResolver()->getModel();
+            if (method_exists($modelClass, $base)) {
+                return $base;
+            }
+            return $base;
+        }
+        return null;
+    }
+
+    protected function getRelationDisplayColumn(array $def): ?string
+    {
+        if (!empty($def['relationship']['display_field'])) {
+            return $def['relationship']['display_field'];
+        }
+        if (!empty($def['options']['column'])) {
+            return $def['options']['column'];
+        }
+        return 'name';
+    }
+
+
+
+
+
+
+public function updateFilters($filters)
+{
+    $this->activeFilters = $this->sanitizeActiveFilters($filters);
+    $this->resetPage();
+}
+
+
+    
 
     protected function parseBulkActions(array $bulkActionsConfig): array
     {
@@ -717,58 +963,118 @@ public function toggleEditing()
         $this->resetPage();
     }
 
+
+
+
+
     public function getRecordsProperty()
     {
         $resolver = $this->getConfigResolver();
         $modelClass = $resolver->getModel();
+
         $query = $modelClass::query();
 
-        $relations = array_keys($resolver->getRelations());
-        if (!empty($relations)) {
-            $query->with($relations);
+        // ✅ 1. SELECT ONLY VISIBLE COLUMNS
+        $columnsToSelect = $this->visibleColumns ?? array_keys($this->columns);
+
+        if (!in_array('id', $columnsToSelect)) {
+            $columnsToSelect[] = 'id';
         }
 
-        if ($this->search !== '' && !empty($this->searchableFields)) {
-            $query->where(function ($q) {
-                foreach ($this->searchableFields as $field) {
-                    $q->orWhere($field, 'like', '%' . $this->search . '%');
+        $query->select($columnsToSelect);
+
+        // ✅ 2. CONDITIONAL RELATION LOADING
+        $allowedRelations = [];
+
+        foreach ($this->columns as $field => $def) {
+            if (
+                isset($def['relationship']) &&
+                in_array($field, $this->visibleColumns)
+            ) {
+                $allowedRelations[] = $this->getRelationMethodFromField($field, $def);
+            }
+        }
+
+        if (!empty($allowedRelations)) {
+            $query->with(array_unique($allowedRelations));
+        }
+
+        // ✅ 3. SAFE SEARCH
+if (!empty($this->search)) {
+    $query->where(function ($q) {
+        $columns = !empty($this->selectedSearchColumns)
+            ? $this->selectedSearchColumns
+            : array_slice($this->searchableFields, 0, 2);
+
+        foreach ($columns as $field) {
+            $fieldDef = $this->columns[$field] ?? [];
+
+            // Handle select fields with options (fuzzy match on label/key)
+            if (isset($fieldDef['options']) && is_array($fieldDef['options'])) {
+                $keys = $this->getSearchKeysForSelectField($field, $this->search);
+                if (!empty($keys)) {
+                    $q->orWhereIn($field, $keys);
                 }
-            });
-        }
+                continue; // Exact match toggle does not apply to select fields
+            }
 
+            // Regular field
+            if ($this->exactMatch) {
+                $q->orWhere($field, '=', $this->search);
+            } else {
+                $q->orWhere($field, 'like', $this->search . '%');
+            }
+        }
+    });
+}
+
+        // ✅ 4. APPLY FILTERS
         $this->applyFilters($query, $this->queryFilters);
         $this->applyFilters($query, $this->pageQueryFilters, true);
         $this->applyActiveFilters($query);
-        // Apply trashed filter only if model uses SoftDeletes
+
+        // ✅ 5. SOFT DELETE
         if ($this->usesSoftDeletes()) {
-            if ($this->trashedFilter === 'only') {
-                $query->onlyTrashed();
-            } elseif ($this->trashedFilter === 'with') {
-                $query->withTrashed();
-            } else {
-                $query->withoutTrashed();
-            }
+            match ($this->trashedFilter) {
+                'only' => $query->onlyTrashed(),
+                'with' => $query->withTrashed(),
+                default => $query->withoutTrashed(),
+            };
         }
 
-
-
-        // Auto‑eager‑load avatar relation if needed and not already loaded
-        if (empty($this->viewConfig['avatarField']) && !empty($this->viewConfig['autoAvatar'])) {
-            $model = new $modelClass;
-            foreach (['employeeProfile', 'profile', 'avatar'] as $relation) {
-                if (method_exists($model, $relation)) {
-                    $query->with($relation);
-                    break;
-                }
-            }
+        // ✅ 6. SORT
+        if (!array_key_exists($this->sort['field'], $this->columns)) {
+            $this->sort = ['field' => 'id', 'direction' => 'asc'];
         }
-
-
-
 
         $query->orderBy($this->sort['field'], $this->sort['direction']);
-        return $query->paginate($this->perPage)->withQueryString();
+
+        // ✅ 7. FILTER CONTROL (FINAL POSITION)
+        $hasFilters = !empty(array_filter($this->activeFilters ?? []));
+        $hasSearch = !empty($this->search);
+
+        if (!$hasFilters && !$hasSearch && $this->enforceFilters) {
+            return $modelClass::query()
+                ->whereRaw('1 = 0')
+                //->cursorPaginate($this->perPage);
+                ->paginate($this->perPage);
+        }
+
+        // ✅ 8. ALWAYS RETURN RESULT
+        // return $query->cursorPaginate($this->perPage);
+        return $query->paginate($this->perPage);
     }
+
+
+
+
+
+
+
+
+
+
+
 
 
     protected function usesSoftDeletes(): bool
@@ -812,58 +1118,57 @@ public function toggleEditing()
 
 
 
-
-
-
-
     protected function applyActiveFilters($query): void
-    {
-        if (!isset($this->activeFilters))
-            return;
-
-        $fieldDefinitions = $this->getConfigResolver()->getFieldDefinitions();
-
-        foreach ($this->activeFilters as $filter) {
-            if (!isset($fieldDefinitions[$filter['field']])) {
-                continue;
-            }
-            if (isset($fieldDefinitions[$filter['field']]['relationship'])) {
-                continue;
-            }
-
-            $fieldDef = $fieldDefinitions[$filter['field']];
-            $expectedType = $this->mapFieldTypeToFilterType($fieldDef['field_type'] ?? 'string');
-            if ($filter['type'] !== $expectedType) {
-                continue;
-            }
-
-            $field = $filter['field'];
-            $type = $filter['type'];
-            $operator = $filter['operator'];
-            $value = $filter['value'];
-
-            switch ($type) {
-                case 'string':
-                    $this->applyStringFilter($query, $field, $operator, $value);
-                    break;
-                case 'number':
-                    $this->applyNumberFilter($query, $field, $operator, $value);
-                    break;
-                case 'date':
-                    $this->applyDateFilter($query, $field, $operator, $value);
-                    break;
-                case 'boolean':
-                    $this->applyBooleanFilter($query, $field, $operator, $value);
-                    break;
-                case 'select':
-                    $this->applySelectFilter($query, $field, $operator, $value);
-                    break;
-                default:
-                    $query->where($field, $value);
-            }
+{
+    foreach ($this->activeFilters as $filter) {
+        if (empty($filter['field']) || !isset($filter['value'])) {
+            continue;
         }
 
+
+        $field = $filter['field'];
+        $operator = $filter['operator'] ?? '=';
+        $value = $filter['value'];
+
+        // Skip empty values (but allow 0 and '0')
+        if ($value === '' || $value === null || (is_array($value) && empty($value))) {
+            continue;
+        }
+
+        // Get field definition to determine type
+        $fieldDef = $this->columns[$field] ?? [];
+        $fieldType = $fieldDef['field_type'] ?? 'string';
+
+        // Route to type-specific handler
+        $type = $this->mapFieldTypeToFilterType($fieldType);
+
+        switch ($type) {
+            case 'string':
+                $this->applyStringFilter($query, $field, $operator, $value);
+                break;
+            case 'number':
+                $this->applyNumberFilter($query, $field, $operator, $value);
+                break;
+            case 'date':
+                $this->applyDateFilter($query, $field, $operator, $value);
+                break;
+            case 'boolean':
+                $this->applyBooleanFilter($query, $field, $operator, $value);
+                break;
+            case 'select':
+                $this->applySelectFilter($query, $field, $operator, $value);
+                break;
+            default:
+                $query->where($field, $operator, $value);
+        }
     }
+}
+
+
+
+    
+
+    
 
     // To Address the browser forward/backward error   
     public function fill($values)
@@ -1474,11 +1779,11 @@ public function toggleEditing()
         }
 
         if ($this->search !== '' && !empty($this->searchableFields)) {
-            $query->where(function ($q) {
-                foreach ($this->searchableFields as $field) {
-                    $q->orWhere($field, 'like', '%' . $this->search . '%');
-                }
-            });
+$query = SearchEngine::apply(
+    $query,
+    $this->search,
+    array_slice($this->searchableFields, 0, 2)
+);
         }
 
         $this->applyFilters($query, $this->queryFilters);
@@ -1486,8 +1791,9 @@ public function toggleEditing()
         $this->applyActiveFilters($query);
         $query->orderBy($this->sort['field'], $this->sort['direction']);
 
-        $paginator = $query->paginate($this->perPage);
-        return $paginator->pluck('id')->toArray();
+        // $paginator = $query->paginate($this->perPage);
+        // return $paginator->pluck('id')->toArray();
+        return $this->records->pluck('id')->toArray();
     }
 
     // ==================== BULK SELECTION ====================
@@ -1529,17 +1835,22 @@ public function toggleEditing()
         $this->dispatch('openImportModal', $this->configKey);
     }
 
-    public function print(): void
-    {
-        $url = route('print.data', [
-            'configKey' => $this->configKey,
-            'search' => $this->search,
-            'sort' => $this->sort['field'],
-            'direction' => $this->sort['direction'],
-            'filters' => json_encode($this->queryFilters),
-        ]);
-        $this->dispatch('open-url-new-tab', $url);
-    }
+public function print(): void
+{
+    $url = route('print.data', [
+        'configKey' => $this->configKey,
+        'search' => $this->search,
+        'selectedSearchColumns' => json_encode($this->selectedSearchColumns),
+        'exactMatch' => $this->exactMatch ? '1' : '0',
+        'sort' => $this->sort['field'],
+        'direction' => $this->sort['direction'],
+        'activeFilters' => json_encode($this->activeFilters),
+        'trashedFilter' => $this->trashedFilter,
+        'columns' => json_encode($this->visibleColumns),
+        'perPage' => $this->perPage, // NEW
+    ]);
+    $this->dispatch('open-url-new-tab', $url);
+}
 
     // ==================== RENDER ====================
 
