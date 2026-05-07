@@ -8,7 +8,7 @@ use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Traits\DataTables\HasColumnPreferences;
 use App\Modules\Admin\Services\ActivityLogger;
-use  QuickerFaster\UILibrary\Services\Search\SearchEngine;
+use QuickerFaster\UILibrary\Services\Search\SearchEngine;
 
 
 
@@ -66,8 +66,8 @@ class DataTable extends Component
     public array $fieldErrors = []; // format: [rowKey => [field => 'error message']]
 
     public array $searchableRelations = [];
-public array $selectedSearchColumns = [];   // columns to search in
-public bool $exactMatch = false;
+    public array $selectedSearchColumns = [];   // columns to search in
+    public bool $exactMatch = false;
 
     protected $listeners = [
         'performDelete' => 'performDelete',
@@ -75,8 +75,8 @@ public bool $exactMatch = false;
         'executeBulkAction' => 'executeBulkAction',
         'filtersUpdated' => 'updateFilters',
         'executeRowAction' => 'executeRowAction',
-            'searchApplied' => 'applySearchPanel',
-            
+        'searchApplied' => 'applySearchPanel',
+
 
     ];
 
@@ -131,24 +131,24 @@ public bool $exactMatch = false;
 
 
 
-public function applySearchPanel($search, $columns, $exactMatch): void
-{
-    $this->search = $search;
-    $this->selectedSearchColumns = $columns;
-    $this->exactMatch = $exactMatch;
-    $this->resetPage();
-    $this->dispatch('refreshDataTable');
-}
+    public function applySearchPanel($search, $columns, $exactMatch): void
+    {
+        $this->search = $search;
+        $this->selectedSearchColumns = $columns;
+        $this->exactMatch = $exactMatch;
+        $this->resetPage();
+        $this->dispatch('refreshDataTable');
+    }
 
-public function openSearchDrawer(): void
-{
-    $this->dispatch('openDrawer', 'qf.search-panel', [
-        'configKey' => $this->configKey,
-        'initialSearch' => $this->search,
-        'initialColumns' => $this->selectedSearchColumns,
-        'initialExactMatch' => $this->exactMatch,
-    ], 'Search');
-}
+    public function openSearchDrawer(): void
+    {
+        $this->dispatch('openDrawer', 'qf.search-panel', [
+            'configKey' => $this->configKey,
+            'initialSearch' => $this->search,
+            'initialColumns' => $this->selectedSearchColumns,
+            'initialExactMatch' => $this->exactMatch,
+        ], 'Search');
+    }
 
 
 
@@ -236,6 +236,16 @@ public function openSearchDrawer(): void
         $this->dispatch('refreshDataTable');
     }
 
+
+    /**
+     * Download a blank import template with database field names as headers.
+     */
+    public function exportTemplate(): void
+    {
+        $url = route('export.template', ['configKey' => $this->configKey]);
+        $this->dispatch('open-url-new-tab', $url);
+    }
+
     /**
      * Cancel editing a specific cell
      */
@@ -271,30 +281,30 @@ public function openSearchDrawer(): void
     }
 
 
-public function clearSearch(): void
-{
-    $this->search = '';
-    $this->selectedSearchColumns = [];
-    $this->exactMatch = false;
-    
-    session()->forget("search_columns.{$this->configKey}");
-    session()->forget("search_term.{$this->configKey}");
-    session()->forget("search_exactmatch.{$this->configKey}");
-    
-    $this->resetPage();
-    $this->dispatch('refreshDataTable');
-}
+    public function clearSearch(): void
+    {
+        $this->search = '';
+        $this->selectedSearchColumns = [];
+        $this->exactMatch = false;
 
+        session()->forget("search_columns.{$this->configKey}");
+        session()->forget("search_term.{$this->configKey}");
+        session()->forget("search_exactmatch.{$this->configKey}");
 
-
-public function getSearchColumnsLabelsProperty(): array
-{
-    $labels = [];
-    foreach ($this->selectedSearchColumns as $field) {
-        $labels[$field] = $this->columns[$field]['label'] ?? ucfirst($field);
+        $this->resetPage();
+        $this->dispatch('refreshDataTable');
     }
-    return $labels;
-}
+
+
+
+    public function getSearchColumnsLabelsProperty(): array
+    {
+        $labels = [];
+        foreach ($this->selectedSearchColumns as $field) {
+            $labels[$field] = $this->columns[$field]['label'] ?? ucfirst($field);
+        }
+        return $labels;
+    }
 
 
 
@@ -578,25 +588,25 @@ public function getSearchColumnsLabelsProperty(): array
         $this->resetPage();
     }
 
-/**
- * Reset visible columns to the default set defined by config (or fallback).
- */
-public function resetColumns(): void
-{
-    // Get the default visible columns from config (or fallback first 6)
-    $defaultColumns = $this->getDefaultVisibleColumns();
+    /**
+     * Reset visible columns to the default set defined by config (or fallback).
+     */
+    public function resetColumns(): void
+    {
+        // Get the default visible columns from config (or fallback first 6)
+        $defaultColumns = $this->getDefaultVisibleColumns();
 
-    // Apply the default set
-    $this->visibleColumns = $defaultColumns;
+        // Apply the default set
+        $this->visibleColumns = $defaultColumns;
 
-    // If column preferences are stored, save the reset state
-    if ($this->showHideColumnsEnabled()) {
-        $this->saveVisibleColumns($this->configKey, $this->visibleColumns);
+        // If column preferences are stored, save the reset state
+        if ($this->showHideColumnsEnabled()) {
+            $this->saveVisibleColumns($this->configKey, $this->visibleColumns);
+        }
+
+        // Reset pagination to avoid inconsistencies
+        $this->resetPage();
     }
-
-    // Reset pagination to avoid inconsistencies
-    $this->resetPage();
-}
 
 
 
@@ -671,23 +681,23 @@ public function resetColumns(): void
         $this->columns = array_diff_key($fieldDefs, array_flip($hiddenOnTable));
 
 
-// In initializeFromConfig() or mount(), after columns are defined
-if (empty($this->selectedSearchColumns)) {
-    $savedColumns = session()->get("search_columns.{$this->configKey}");
-    if (!empty($savedColumns)) {
-        // Ensure saved columns still exist in current columns
-        $this->selectedSearchColumns = array_values(array_intersect(
-            $savedColumns,
-            array_keys($this->columns)
-        ));
-    }
-    
-    // Also restore search term if any
-    $savedSearch = session()->get("search_term.{$this->configKey}");
-    if ($savedSearch && empty($this->search)) {
-        $this->search = $savedSearch;
-    }
-}
+        // In initializeFromConfig() or mount(), after columns are defined
+        if (empty($this->selectedSearchColumns)) {
+            $savedColumns = session()->get("search_columns.{$this->configKey}");
+            if (!empty($savedColumns)) {
+                // Ensure saved columns still exist in current columns
+                $this->selectedSearchColumns = array_values(array_intersect(
+                    $savedColumns,
+                    array_keys($this->columns)
+                ));
+            }
+
+            // Also restore search term if any
+            $savedSearch = session()->get("search_term.{$this->configKey}");
+            if ($savedSearch && empty($this->search)) {
+                $this->search = $savedSearch;
+            }
+        }
 
 
 
@@ -708,38 +718,38 @@ if (empty($this->selectedSearchColumns)) {
 
 
 
-/**
- * For a select field with options, find matching keys based on search term.
- * Returns an array of keys where display label contains the search term (case-insensitive),
- * or the key itself contains the search term. If no matches, returns empty array.
- *
- * @param string $field
- * @param string $searchTerm
- * @return array
- */
-protected function getSearchKeysForSelectField(string $field, string $searchTerm): array
-{
-    $fieldDef = $this->columns[$field] ?? [];
-    $options = $fieldDef['options'] ?? [];
+    /**
+     * For a select field with options, find matching keys based on search term.
+     * Returns an array of keys where display label contains the search term (case-insensitive),
+     * or the key itself contains the search term. If no matches, returns empty array.
+     *
+     * @param string $field
+     * @param string $searchTerm
+     * @return array
+     */
+    protected function getSearchKeysForSelectField(string $field, string $searchTerm): array
+    {
+        $fieldDef = $this->columns[$field] ?? [];
+        $options = $fieldDef['options'] ?? [];
 
-    if (empty($options) || !is_array($options)) {
-        return [];
-    }
-
-    $lowerTerm = strtolower($searchTerm);
-    $matchedKeys = [];
-
-    foreach ($options as $key => $label) {
-        $lowerKey = strtolower($key);
-        $lowerLabel = strtolower($label);
-
-        if (str_contains($lowerKey, $lowerTerm) || str_contains($lowerLabel, $lowerTerm)) {
-            $matchedKeys[] = $key;
+        if (empty($options) || !is_array($options)) {
+            return [];
         }
-    }
 
-    return array_unique($matchedKeys);
-}
+        $lowerTerm = strtolower($searchTerm);
+        $matchedKeys = [];
+
+        foreach ($options as $key => $label) {
+            $lowerKey = strtolower($key);
+            $lowerLabel = strtolower($label);
+
+            if (str_contains($lowerKey, $lowerTerm) || str_contains($lowerLabel, $lowerTerm)) {
+                $matchedKeys[] = $key;
+            }
+        }
+
+        return array_unique($matchedKeys);
+    }
 
 
 
@@ -774,19 +784,19 @@ protected function getSearchKeysForSelectField(string $field, string $searchTerm
 
 
     /**
- * Determines if the "Reset Columns" button should be shown.
- * Returns true only when column management is enabled and the current visible
- * columns differ from the default set (config or fallback).
- */
-public function isResetVisible(): bool
-{
-    if (!$this->showHideColumnsEnabled()) {
-        return false;
-    }
+     * Determines if the "Reset Columns" button should be shown.
+     * Returns true only when column management is enabled and the current visible
+     * columns differ from the default set (config or fallback).
+     */
+    public function isResetVisible(): bool
+    {
+        if (!$this->showHideColumnsEnabled()) {
+            return false;
+        }
 
-    $defaultColumns = $this->getDefaultVisibleColumns();
-    return $this->visibleColumns != $defaultColumns;
-}
+        $defaultColumns = $this->getDefaultVisibleColumns();
+        return $this->visibleColumns != $defaultColumns;
+    }
 
 
 
@@ -827,14 +837,14 @@ public function isResetVisible(): bool
 
 
 
-public function updateFilters($filters)
-{
-    $this->activeFilters = $this->sanitizeActiveFilters($filters);
-    $this->resetPage();
-}
+    public function updateFilters($filters)
+    {
+        $this->activeFilters = $this->sanitizeActiveFilters($filters);
+        $this->resetPage();
+    }
 
 
-    
+
 
     protected function parseBulkActions(array $bulkActionsConfig): array
     {
@@ -981,6 +991,11 @@ public function updateFilters($filters)
             $columnsToSelect[] = 'id';
         }
 
+
+        if ($this->usesSoftDeletes() && !in_array('deleted_at', $columnsToSelect)) {
+            $columnsToSelect[] = 'deleted_at';
+        }
+
         $query->select($columnsToSelect);
 
         // ✅ 2. CONDITIONAL RELATION LOADING
@@ -1000,33 +1015,33 @@ public function updateFilters($filters)
         }
 
         // ✅ 3. SAFE SEARCH
-if (!empty($this->search)) {
-    $query->where(function ($q) {
-        $columns = !empty($this->selectedSearchColumns)
-            ? $this->selectedSearchColumns
-            : array_slice($this->searchableFields, 0, 2);
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $columns = !empty($this->selectedSearchColumns)
+                    ? $this->selectedSearchColumns
+                    : array_slice($this->searchableFields, 0, 2);
 
-        foreach ($columns as $field) {
-            $fieldDef = $this->columns[$field] ?? [];
+                foreach ($columns as $field) {
+                    $fieldDef = $this->columns[$field] ?? [];
 
-            // Handle select fields with options (fuzzy match on label/key)
-            if (isset($fieldDef['options']) && is_array($fieldDef['options'])) {
-                $keys = $this->getSearchKeysForSelectField($field, $this->search);
-                if (!empty($keys)) {
-                    $q->orWhereIn($field, $keys);
+                    // Handle select fields with options (fuzzy match on label/key)
+                    if (isset($fieldDef['options']) && is_array($fieldDef['options'])) {
+                        $keys = $this->getSearchKeysForSelectField($field, $this->search);
+                        if (!empty($keys)) {
+                            $q->orWhereIn($field, $keys);
+                        }
+                        continue; // Exact match toggle does not apply to select fields
+                    }
+
+                    // Regular field
+                    if ($this->exactMatch) {
+                        $q->orWhere($field, '=', $this->search);
+                    } else {
+                        $q->orWhere($field, 'like', $this->search . '%');
+                    }
                 }
-                continue; // Exact match toggle does not apply to select fields
-            }
-
-            // Regular field
-            if ($this->exactMatch) {
-                $q->orWhere($field, '=', $this->search);
-            } else {
-                $q->orWhere($field, 'like', $this->search . '%');
-            }
+            });
         }
-    });
-}
 
         // ✅ 4. APPLY FILTERS
         $this->applyFilters($query, $this->queryFilters);
@@ -1119,56 +1134,56 @@ if (!empty($this->search)) {
 
 
     protected function applyActiveFilters($query): void
-{
-    foreach ($this->activeFilters as $filter) {
-        if (empty($filter['field']) || !isset($filter['value'])) {
-            continue;
-        }
+    {
+        foreach ($this->activeFilters as $filter) {
+            if (empty($filter['field']) || !isset($filter['value'])) {
+                continue;
+            }
 
 
-        $field = $filter['field'];
-        $operator = $filter['operator'] ?? '=';
-        $value = $filter['value'];
+            $field = $filter['field'];
+            $operator = $filter['operator'] ?? '=';
+            $value = $filter['value'];
 
-        // Skip empty values (but allow 0 and '0')
-        if ($value === '' || $value === null || (is_array($value) && empty($value))) {
-            continue;
-        }
+            // Skip empty values (but allow 0 and '0')
+            if ($value === '' || $value === null || (is_array($value) && empty($value))) {
+                continue;
+            }
 
-        // Get field definition to determine type
-        $fieldDef = $this->columns[$field] ?? [];
-        $fieldType = $fieldDef['field_type'] ?? 'string';
+            // Get field definition to determine type
+            $fieldDef = $this->columns[$field] ?? [];
+            $fieldType = $fieldDef['field_type'] ?? 'string';
 
-        // Route to type-specific handler
-        $type = $this->mapFieldTypeToFilterType($fieldType);
+            // Route to type-specific handler
+            $type = $this->mapFieldTypeToFilterType($fieldType);
 
-        switch ($type) {
-            case 'string':
-                $this->applyStringFilter($query, $field, $operator, $value);
-                break;
-            case 'number':
-                $this->applyNumberFilter($query, $field, $operator, $value);
-                break;
-            case 'date':
-                $this->applyDateFilter($query, $field, $operator, $value);
-                break;
-            case 'boolean':
-                $this->applyBooleanFilter($query, $field, $operator, $value);
-                break;
-            case 'select':
-                $this->applySelectFilter($query, $field, $operator, $value);
-                break;
-            default:
-                $query->where($field, $operator, $value);
+            switch ($type) {
+                case 'string':
+                    $this->applyStringFilter($query, $field, $operator, $value);
+                    break;
+                case 'number':
+                    $this->applyNumberFilter($query, $field, $operator, $value);
+                    break;
+                case 'date':
+                    $this->applyDateFilter($query, $field, $operator, $value);
+                    break;
+                case 'boolean':
+                    $this->applyBooleanFilter($query, $field, $operator, $value);
+                    break;
+                case 'select':
+                    $this->applySelectFilter($query, $field, $operator, $value);
+                    break;
+                default:
+                    $query->where($field, $operator, $value);
+            }
         }
     }
-}
 
 
 
-    
 
-    
+
+
 
     // To Address the browser forward/backward error   
     public function fill($values)
@@ -1779,11 +1794,11 @@ if (!empty($this->search)) {
         }
 
         if ($this->search !== '' && !empty($this->searchableFields)) {
-$query = SearchEngine::apply(
-    $query,
-    $this->search,
-    array_slice($this->searchableFields, 0, 2)
-);
+            $query = SearchEngine::apply(
+                $query,
+                $this->search,
+                array_slice($this->searchableFields, 0, 2)
+            );
         }
 
         $this->applyFilters($query, $this->queryFilters);
@@ -1835,22 +1850,22 @@ $query = SearchEngine::apply(
         $this->dispatch('openImportModal', $this->configKey);
     }
 
-public function print(): void
-{
-    $url = route('print.data', [
-        'configKey' => $this->configKey,
-        'search' => $this->search,
-        'selectedSearchColumns' => json_encode($this->selectedSearchColumns),
-        'exactMatch' => $this->exactMatch ? '1' : '0',
-        'sort' => $this->sort['field'],
-        'direction' => $this->sort['direction'],
-        'activeFilters' => json_encode($this->activeFilters),
-        'trashedFilter' => $this->trashedFilter,
-        'columns' => json_encode($this->visibleColumns),
-        'perPage' => $this->perPage, // NEW
-    ]);
-    $this->dispatch('open-url-new-tab', $url);
-}
+    public function print(): void
+    {
+        $url = route('print.data', [
+            'configKey' => $this->configKey,
+            'search' => $this->search,
+            'selectedSearchColumns' => json_encode($this->selectedSearchColumns),
+            'exactMatch' => $this->exactMatch ? '1' : '0',
+            'sort' => $this->sort['field'],
+            'direction' => $this->sort['direction'],
+            'activeFilters' => json_encode($this->activeFilters),
+            'trashedFilter' => $this->trashedFilter,
+            'columns' => json_encode($this->visibleColumns),
+            'perPage' => $this->perPage, // NEW
+        ]);
+        $this->dispatch('open-url-new-tab', $url);
+    }
 
     // ==================== RENDER ====================
 

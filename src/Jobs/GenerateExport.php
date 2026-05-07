@@ -15,10 +15,12 @@ use QuickerFaster\UILibrary\Traits\AppliesFilters;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use QuickerFaster\UILibrary\Models\Export;
+use QuickerFaster\UILibrary\Traits\ResolvesExportValues; // <-- Add this
+
 
 class GenerateExport implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, AppliesFilters;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, AppliesFilters, ResolvesExportValues;
 
     protected int $exportId;
 
@@ -31,8 +33,12 @@ class GenerateExport implements ShouldQueue
     public function handle()
     {
         $export = Export::find($this->exportId);
-        if (!$export) {
-            \Log::error('Export job: export not found', ['id' => $this->exportId]);
+        if (!$export)
+            return;
+
+        // Check if cancelled before doing any work
+        if ($export->status === 'cancelled') {
+            \Log::info("Export {$export->id} was cancelled before processing.");
             return;
         }
 
@@ -79,11 +85,22 @@ class GenerateExport implements ShouldQueue
                 throw new \Exception("Generated file is empty: {$fullPath}");
             }
 
+            $fileSize = Storage::disk('local')->size($relativePath);
             $export->update([
                 'status' => 'completed',
                 'file_path' => $relativePath,
+                'file_size' => $fileSize,
+                'download_token' => \Str::random(64),
+                'expires_at' => now()->addHour(),
                 'completed_at' => now(),
             ]);
+
+
+            if ($export->fresh()->status === 'cancelled') {
+                // Clean up and exit
+                Storage::disk('local')->delete($relativePath);
+                return;
+            }
 
 
         } catch (\Exception $e) {
@@ -121,55 +138,69 @@ class GenerateExport implements ShouldQueue
         return $relativePath;
     }
 
-protected function generatePdf(Export $export, $records, array $columns, string $format): string
-{
-    $resolver = app(ConfigResolver::class, ['configKey' => $export->config_key]);
 
-    // Try to get a human‑readable title from config
-    $title = $resolver->getConfig()['pageTitle'] ?? null;
-    if (!$title) {
-        // Fallback: model name formatted
-        $modelName = class_basename($resolver->getModel());
-        $title = ucwords(str_replace('_', ' ', \Str::snake($modelName)));
+    protected function generatePdf(Export $export, $records, array $columns, string $format): string
+    {
+        $resolver = app(ConfigResolver::class, ['configKey' => $export->config_key]);
+        $fieldDefinitions = $resolver->getFieldDefinitions();
+
+        // Title
+        $title = $resolver->getConfig()['pageTitle'] ?? null;
+        if (!$title) {
+            $modelName = class_basename($resolver->getModel());
+            $title = ucwords(str_replace('_', ' ', \Str::snake($modelName)));
+        }
+        $subtitle = $resolver->getConfig()['subtitle'] ?? 'Data Export';
+
+        // Which columns to display
+        if (empty($columns)) {
+            $columns = array_keys($fieldDefinitions);
+        }
+
+        // Headings (labels)
+        $headings = [];
+        foreach ($columns as $field) {
+            $headings[$field] = $fieldDefinitions[$field]['label'] ?? ucfirst($field);
+        }
+
+        // Transform records to resolved values
+        $transformedRecords = [];
+        foreach ($records as $record) {
+            $row = [];
+            foreach ($columns as $field) {
+                $row[$field] = $this->getFieldValueForExport($record, $field, $fieldDefinitions);
+            }
+            $transformedRecords[] = $row;
+        }
+
+        // PDF view
+        $controls = $resolver->getControls();
+        $pdfView = $controls['files']['export_pdf_view'] ?? 'qf::exports.default-pdf';
+        $options = $export->options ?? [];
+
+        $pdf = Pdf::loadView($pdfView, [
+            'records' => $transformedRecords,
+            'columns' => $columns,
+            'headings' => $headings,
+            'title' => $title,
+            'subtitle' => $subtitle,
+        ]);
+
+        if (isset($options['orientation'])) {
+            $pdf->setPaper('a4', $options['orientation']);
+        }
+        if (isset($options['paper'])) {
+            $pdf->setPaper($options['paper'], $options['orientation'] ?? 'portrait');
+        }
+
+        $relativePath = 'exports/' . uniqid() . '.pdf';
+        Storage::disk('local')->put($relativePath, $pdf->output());
+
+        if (!Storage::disk('local')->exists($relativePath)) {
+            throw new \Exception("PDF file not written: {$relativePath}");
+        }
+
+        return $relativePath;
     }
 
-    $definitions = $resolver->getFieldDefinitions();
-
-    if (empty($columns)) {
-        $columns = array_keys($definitions);
-    }
-
-    $headings = [];
-    foreach ($columns as $field) {
-        $headings[$field] = $definitions[$field]['label'] ?? ucfirst($field);
-    }
-
-    $controls = $resolver->getControls();
-    $pdfView = $controls['files']['export_pdf_view'] ?? 'qf::exports.default-pdf';
-    $options = $export->options ?? [];
-
-    $pdf = Pdf::loadView($pdfView, [
-        'records'   => $records,
-        'columns'   => $columns,
-        'headings'  => $headings,
-        'configKey' => $export->config_key,
-        'title'     => $title,
-    ]);
-
-    if (isset($options['orientation'])) {
-        $pdf->setPaper('a4', $options['orientation']);
-    }
-    if (isset($options['paper'])) {
-        $pdf->setPaper($options['paper'], $options['orientation'] ?? 'portrait');
-    }
-
-    $relativePath = 'exports/' . uniqid() . '.pdf';
-    Storage::disk('local')->put($relativePath, $pdf->output());
-
-    if (!Storage::disk('local')->exists($relativePath)) {
-        throw new \Exception("PDF file not written: {$relativePath}");
-    }
-
-    return $relativePath;
-}
 }

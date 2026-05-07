@@ -19,6 +19,7 @@ class Import extends Model
         'errors',
         'status',
         'user_id',
+        'error_file',
     ];
 
     /**

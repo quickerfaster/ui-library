@@ -13,6 +13,7 @@ class ExportProgress extends Component
     public ?string $error = null;
     public ?string $downloadUrl = null;
     public bool $exportStarted = false;
+    public ?int $fileSize = null;
 
     protected $listeners = [
         'startExport' => 'startExport',
@@ -36,6 +37,14 @@ class ExportProgress extends Component
 
         // Just dispatch to JS, no alert
         $this->dispatch('queueExport', $params);
+    }
+
+
+    public function cancelExport()
+    {
+        if ($this->exportId) {
+            $this->dispatch('cancelExport', exportId: $this->exportId);
+        }
     }
 
     public function render()

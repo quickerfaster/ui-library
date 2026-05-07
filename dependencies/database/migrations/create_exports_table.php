@@ -18,9 +18,17 @@ return new class extends Migration
             $table->json('options')->nullable();       // pdf orientation, etc.
             $table->string('status')->default('pending'); // pending, processing, completed, failed
             $table->string('file_path')->nullable();
+
+            $table->unsignedBigInteger('file_size')->nullable();
+            $table->string('download_token', 64)->nullable()->unique();
+            $table->timestamp('expires_at')->nullable();
+
             $table->text('error_message')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
+
+            $table->index(['user_id', 'status', 'created_at']);
+
         });
     }
 

@@ -18,9 +18,17 @@ return new class extends Migration
             $table->integer('successful_rows')->default(0);
             $table->integer('failed_rows')->default(0);
             $table->json('errors')->nullable();
+            $table->string('error_file')->nullable();
+
             $table->string('status')->default('pending'); // pending, processing, completed, failed
+
+
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
+
+
+            $table->index(['user_id', 'status', 'created_at']);
+
         });
     }
 

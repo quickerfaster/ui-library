@@ -34,6 +34,12 @@ class ProcessImport implements ShouldQueue
             return;
         }
 
+        // Check cancellation before starting
+        if ($import->status === 'cancelled') {
+            \Log::info("Import {$import->id} was cancelled before processing.");
+            return;
+        }
+
         $import->update(['status' => 'processing']);
 
         try {
@@ -44,7 +50,16 @@ class ProcessImport implements ShouldQueue
             $result = $processor->process(
                 $import->file_path,
                 $this->columnMapping,
-                $this->hasHeaderRow
+                $this->hasHeaderRow,
+                function ($processedRows) use ($import) {
+                    // Callback after each row (or chunk) to check cancellation
+                    if ($processedRows % 100 === 0) {
+                        $import->refresh();
+                        if ($import->status === 'cancelled') {
+                            throw new \Exception('Import cancelled by user.');
+                        }
+                    }
+                }
             );
 
             $import->update([
@@ -56,10 +71,17 @@ class ProcessImport implements ShouldQueue
             ]);
 
         } catch (\Exception $e) {
-            $import->update([
-                'status' => 'failed',
-                'errors' => json_encode([$e->getMessage()]),
-            ]);
+            if ($e->getMessage() === 'Import cancelled by user.') {
+                $import->update([
+                    'status'     => 'cancelled',
+                    'errors'     => json_encode(['Cancelled by user']),
+                ]);
+            } else {
+                $import->update([
+                    'status' => 'failed',
+                    'errors' => json_encode([$e->getMessage()]),
+                ]);
+            }
         }
     }
 }

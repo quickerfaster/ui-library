@@ -7,6 +7,7 @@ use QuickerFaster\UILibrary\Http\Controllers\SocialiteController;
 use QuickerFaster\UILibrary\Http\Livewire\Wizards\SetupWizard;
 use Illuminate\Http\Request;
 use QuickerFaster\UILibrary\Http\Controllers\Prints\GenericDetailPagePrintController;
+use QuickerFaster\UILibrary\Http\Controllers\Imports\ImportController;
 
 
 
@@ -52,18 +53,11 @@ Route::group(['middleware' => 'web'], function () {
     Route::get('/export/all', [ExportController::class, 'exportAll'])->name('export.all');
     Route::post('/export/queue', [ExportController::class, 'queueExport'])->name('export.queue');
     Route::get('/export/status/{id}', [ExportController::class, 'exportStatus'])->name('export.status');
-    Route::get('/export/download/{id}', [ExportController::class, 'download'])->name('export.download');
+    Route::get('/export/download/{token}', [ExportController::class, 'download'])->name('export.download');
+    Route::post('/export/cancel/{id}', [ExportController::class, 'cancelExport'])->name('export.cancel');
+    Route::get('/export/template/{configKey}', [ExportController::class, 'exportTemplate'])->name('export.template');
 
-Route::get('/export/debug/{id}', function ($id) {
-    $export = \QuickerFaster\UILibrary\Models\Export::find($id);
-    return [
-        'id' => $export->id,
-        'status' => $export->status,
-        'file_path' => $export->file_path,
-        'exists' => $export->file_path ? Storage::disk('local')->exists($export->file_path) : false,
-    ];
-});
-
+    Route::get('/import/download-errors/{import}', [ImportController::class, 'downloadErrors'])->name('import.download-errors');
 
     Route::get('/print/data', [GenericTablePrintController::class, 'print'])->name('print.data');
 

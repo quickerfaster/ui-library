@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>{{ $title }} – Export</title>
@@ -10,42 +11,51 @@
             line-height: 1.4;
             margin: 20px;
         }
+
         .header {
             text-align: center;
             margin-bottom: 20px;
             border-bottom: 2px solid #333;
             padding-bottom: 10px;
         }
+
         .header h1 {
             margin: 0;
             font-size: 24px;
         }
+
         .header .subtitle {
             color: #555;
             font-size: 12px;
             margin-top: 5px;
         }
+
         .meta {
             text-align: right;
             font-size: 10px;
             color: #666;
             margin-bottom: 15px;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
         }
-        th, td {
+
+        th,
+        td {
             border: 1px solid #ccc;
             padding: 8px;
             text-align: left;
             vertical-align: top;
         }
+
         th {
             background-color: #f2f2f2;
             font-weight: bold;
         }
+
         .footer {
             margin-top: 20px;
             font-size: 10px;
@@ -54,11 +64,13 @@
             border-top: 1px solid #ddd;
             padding-top: 8px;
         }
+
         @page {
             margin: 1.5cm;
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>{{ $title }}</h1>
@@ -80,15 +92,16 @@
             @foreach ($records as $record)
                 <tr>
                     @foreach ($columns as $field)
-                        <td>{{ data_get($record, $field) }}</td>
+                        <td>{{ $record[$field] }}</td>
                     @endforeach
                 </tr>
             @endforeach
         </tbody>
-     </table>
+    </table>
 
     <div class="footer">
-        {{--Exported from {{ config('app.name') }} – Page {PAGE_NUM} of {PAGE_COUNT} --}}
+        {{-- Exported from {{ config('app.name') }} – Page {PAGE_NUM} of {PAGE_COUNT} --}}
     </div>
 </body>
+
 </html>

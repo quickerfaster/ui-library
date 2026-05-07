@@ -34,6 +34,9 @@ use QuickerFaster\UILibrary\Http\Livewire\FilterPanel;
 
 use QuickerFaster\UILibrary\Services\Iimpors\ImportProcessor;
 use QuickerFaster\UILibrary\Commands\QuickerFasterInstallUI;
+use QuickerFaster\UILibrary\Commands\CleanExports;
+use QuickerFaster\UILibrary\Commands\CleanImportErrors;
+
 use QuickerFaster\UILibrary\Http\Livewire\Buttons\ToggleButton;
 use QuickerFaster\UILibrary\Http\Livewire\Buttons\ToggleButtonGroup;
 use QuickerFaster\UILibrary\Http\Livewire\Layouts\NavigationLayout;
@@ -62,6 +65,8 @@ use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard;
 use QuickerFaster\UILibrary\Http\Livewire\Collapsible;
+use QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports;
+use QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports;
 use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
 
 class UILibraryServiceProvider extends ServiceProvider
@@ -180,6 +185,8 @@ class UILibraryServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 QuickerFasterInstallUI::class,
+                CleanExports::class,
+                CleanImportErrors::class,
             ]);
         }
     }
@@ -199,9 +206,11 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.import-modal', ImportModal::class);
         Livewire::component('qf.import-form', ImportForm::class);
 
-        // File Export
+        // File Export/Imports
         Livewire::component('qf.export-modal', ExportModal::class);
         Livewire::component('qf.export-progress', ExportProgress::class);
+        Livewire::component('qf.recent-exports', RecentExports::class);
+        Livewire::component('qf.recent-imports', RecentImports::class);
 
         // Wizard
         Livewire::component('qf.wizard', Wizard::class);

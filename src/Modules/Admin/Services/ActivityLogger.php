@@ -68,4 +68,6 @@ class ActivityLogger
     {
         return self::log($logName, 'deleted', $subject, $old, [], $description);
     }
+
+    
 }

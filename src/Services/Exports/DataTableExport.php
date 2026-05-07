@@ -4,56 +4,57 @@ namespace QuickerFaster\UILibrary\Services\Exports;
 
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
+use QuickerFaster\UILibrary\Traits\ResolvesExportValues;
 
-class DataTableExport implements FromCollection, WithHeadings
+class DataTableExport implements FromCollection, WithHeadings, WithMapping
 {
+
+    use ResolvesExportValues;
+
     protected string $configKey;
     protected $records;
-    protected array $columns; // list of field names to export
+    protected array $columns;
+    protected array $fieldDefinitions;
 
     public function __construct(string $configKey, $records, array $columns = [])
     {
         $this->configKey = $configKey;
         $this->records = $records;
-        // Remove empty strings and trim each column name
-        $this->columns = array_filter(array_map('trim', $columns), fn($col) => $col !== '');
+        $this->columns = $columns;
+
+        $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
+        $this->fieldDefinitions = $resolver->getFieldDefinitions();
     }
 
     public function collection()
     {
-        // Convert Eloquent models to arrays to avoid serialization issues
-        $records = $this->records;
-
-        if (empty($this->columns)) {
-            return $records->map(function ($item) {
-                return $item instanceof \Illuminate\Database\Eloquent\Model ? $item->toArray() : $item;
-            });
-        }
-
-        return $records->map(function ($record) {
-            $data = [];
-            foreach ($this->columns as $field) {
-                $data[$field] = data_get($record, $field);
-            }
-            return $data;
-        });
+        return $this->records;
     }
 
     public function headings(): array
     {
-        $resolver = app(ConfigResolver::class, ['configKey' => $this->configKey]);
-        $definitions = $resolver->getFieldDefinitions();
+        $headings = [];
+        $columnsToUse = !empty($this->columns) ? $this->columns : array_keys($this->fieldDefinitions);
 
-        if (!empty($this->columns)) {
-            $headings = [];
-            foreach ($this->columns as $field) {
-                $headings[] = $definitions[$field]['label'] ?? ucfirst($field);
-            }
-            return $headings;
+        foreach ($columnsToUse as $field) {
+            $headings[] = $this->fieldDefinitions[$field]['label'] ?? ucfirst($field);
         }
-
-        // Default: all fields
-        return array_keys($definitions);
+        return $headings;
     }
+
+    public function map($record): array
+    {
+        $columnsToUse = !empty($this->columns) ? $this->columns : array_keys($this->fieldDefinitions);
+        $row = [];
+        foreach ($columnsToUse as $field) {
+            $row[] = $this->getFieldValueForExport($record, $field, $this->fieldDefinitions);
+        }
+        return $row;
+    }
+
+
+
+
 }

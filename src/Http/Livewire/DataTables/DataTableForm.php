@@ -532,6 +532,11 @@ class DataTableForm extends Component
 
             // Automatically cast all checkbox/boolean fields to true/false
             foreach ($this->fieldDefinitions as $fieldName => $definition) {
+                
+                // Skip multiselect
+                if ($definition["multiSelect"] ?? false)
+                    continue;
+
                 if (isset($definition['field_type']) && $definition['field_type'] === 'checkbox') {
                     // If the key exists in $data, cast it; if it's missing (unchecked), set to false
                     if (array_key_exists($fieldName, $data)) {

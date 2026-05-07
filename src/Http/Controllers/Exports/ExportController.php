@@ -11,9 +11,14 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Storage;
 use QuickerFaster\UILibrary\Models\Export; // Ensure this model exists in your main app
+use QuickerFaster\UILibrary\Services\Exports\TemplateExport;
+use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
+use QuickerFaster\UILibrary\Traits\ResolvesExportValues;
 
 class ExportController extends Controller
 {
+    use ResolvesExportValues;
+
     public function export(Request $request)
     {
         $request->validate([
@@ -56,6 +61,18 @@ class ExportController extends Controller
         $configKey = $request->configKey;
         $format = $request->format;
         $columns = $request->filled('columns') ? explode(',', $request->columns) : [];
+
+
+        // Inside exportAll()
+        if ($format === 'pdf') {
+            $recordCount = (clone $query)->count();
+            $maxPdfRows = config('qf.max_pdf_rows', 500);
+            if ($recordCount > $maxPdfRows) {
+                return response()->json(['error' => "PDF export limited to {$maxPdfRows} rows. Use Excel or CSV for larger datasets."], 422);
+            }
+        }
+
+
 
         $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
         $modelClass = $resolver->getModel();
@@ -107,7 +124,7 @@ class ExportController extends Controller
 
     protected function generatePdf(string $configKey, $records, array $columns)
     {
-        
+
         $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
         $title = $resolver->getConfig()['pageTitle'] ?? null;
         $subtitle = $resolver->getConfig()['subtitle'] ?? 'Data Export';
@@ -131,17 +148,35 @@ class ExportController extends Controller
             $headings[$field] = $definitions[$field]['label'] ?? ucfirst($field);
         }
 
-        // Get the PDF view (custom or default)
+        // Transform records to have resolved values for each column
+        $transformedRecords = [];
+        foreach ($records as $record) {
+            $row = [];
+            foreach ($columns as $field) {
+                $row[$field] = $this->getFieldValueForExport($record, $field, $definitions);
+            }
+            $transformedRecords[] = $row;
+        }
+
         $controls = $resolver->getControls();
         $pdfView = $controls['files']['export_pdf_view'] ?? 'qf::exports.default-pdf';
+        $options = $export->options ?? [];
 
         $pdf = Pdf::loadView($pdfView, [
-            'records' => $records,
+            'records' => $transformedRecords,
             'columns' => $columns,
             'headings' => $headings,
             'title' => $title,
             'subtitle' => $subtitle,
         ]);
+
+        // apply orientation, paper size, etc.
+        if (isset($options['orientation'])) {
+            $pdf->setPaper('a4', $options['orientation']);
+        }
+        if (isset($options['paper'])) {
+            $pdf->setPaper($options['paper'], $options['orientation'] ?? 'portrait');
+        }
 
         return $pdf->download('export_' . now()->format('Ymd_His') . '.pdf');
     }
@@ -177,59 +212,56 @@ class ExportController extends Controller
     public function exportStatus($id)
     {
         $export = Export::findOrFail($id);
+        $fileUrl = $export->status === 'completed' && $export->download_token
+            ? route('export.download', ['token' => $export->download_token])
+            : null;
+
         return response()->json([
             'status' => $export->status,
-            'file_url' => $export->status === 'completed' ? route('export.download', $export->id) : null,
+            'file_url' => $fileUrl,
+            'file_size' => $export->file_size,
             'error' => $export->error_message,
             'completed_at' => $export->completed_at,
         ]);
     }
 
-    public function download($id)
+
+    public function download($token)
     {
-        $export = Export::findOrFail($id);
+        $export = Export::where('download_token', $token)->first();
 
-        // Check status
-        if ($export->status !== 'completed') {
-            abort(400, 'Export not ready yet.');
+        if (!$export) {
+            abort(404, 'Export not found.');
         }
 
-        if (empty($export->file_path)) {
-            abort(404, 'File path missing.');
+        if (!$export->isValid()) {
+            // Optional: delete expired record and file
+            if ($export->file_path && Storage::disk('local')->exists($export->file_path)) {
+                Storage::disk('local')->delete($export->file_path);
+            }
+            $export->delete();
+            abort(410, 'This download link has expired.');
         }
 
-        // Try to locate the file
+        if ($export->status !== 'completed' || !$export->file_path) {
+            abort(404, 'File not ready or missing.');
+        }
+
         $disk = Storage::disk('local');
         $path = $export->file_path;
 
-        // If the stored path is absolute (e.g., full system path), convert to relative
-        if (str_starts_with($path, storage_path())) {
-            $relative = str_replace(storage_path() . '/app/', '', $path);
-            if ($disk->exists($relative)) {
-                $path = $relative;
-            } else {
-                // Fallback: try the original relative path
-                $originalRelative = str_replace(storage_path() . '/', '', $export->file_path);
-                if ($disk->exists($originalRelative)) {
-                    $path = $originalRelative;
-                }
-            }
-        }
-
-        // Final check
         if (!$disk->exists($path)) {
-            // Log the failure for debugging
-            \Log::error('Export file not found', [
-                'export_id' => $export->id,
-                'stored_path' => $export->file_path,
-                'tried_path' => $path,
-                'disk_root' => $disk->path(''),
-            ]);
             abort(404, 'File not found on server.');
         }
 
+        // Optional: one‑time use – delete the token after download
+        // $export->update(['download_token' => null, 'expires_at' => null]);
+
         return $disk->download($path, 'export.' . $export->format);
     }
+
+
+
 
     // Filter methods (will be replaced by AppliesFilters trait later)
     protected function applyFilters($query, array $filters, ConfigResolver $resolver)
@@ -390,4 +422,153 @@ class ExportController extends Controller
             }
         }
     }
+
+
+
+
+    public function cancelExport($id)
+    {
+        $export = Export::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
+
+        if (in_array($export->status, ['pending', 'processing'])) {
+            $export->update(['status' => 'cancelled', 'error_message' => 'Cancelled by user']);
+
+            // Optionally delete any partial file if exists
+            if ($export->file_path && Storage::disk('local')->exists($export->file_path)) {
+                Storage::disk('local')->delete($export->file_path);
+                $export->update(['file_path' => null]);
+            }
+
+            return response()->json(['message' => 'Export cancelled']);
+        }
+
+        return response()->json(['message' => 'Cannot cancel export in current status'], 400);
+    }
+
+
+
+
+
+    public function exportTemplate($configKey)
+    {
+        $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
+        $fieldDefinitions = $resolver->getFieldDefinitions();
+
+        $hiddenOnTable = $resolver->getHiddenFields()['onTable'] ?? [];
+        $columns = array_diff_key($fieldDefinitions, array_flip($hiddenOnTable));
+        $fieldNames = array_keys($columns);
+
+        // Build example row with human‑readable values
+        $exampleRow = [];
+        $relationSheets = [];
+
+        foreach ($columns as $field => $def) {
+            // For relationship fields, add lookup sheet data
+            if (isset($def['relationship'])) {
+                $relationModel = $def['relationship']['model'] ?? null;
+                $displayField = $def['relationship']['display_field'] ?? 'name';
+                if ($relationModel && class_exists($relationModel)) {
+                    // Fetch all records for lookup sheet
+                    $records = $relationModel::orderBy($displayField)->get();
+                    $lookupData = [];
+                    foreach ($records as $record) {
+                        $lookupData[] = [$record->id, $record->$displayField];
+                    }
+                    if (!empty($lookupData)) {
+                        // Use display field name as sheet identifier
+                        $sheetName = $def['label'] ?? $field;
+                        $relationSheets[$sheetName] = $lookupData;
+                    }
+                    // Example row: use the first record's display value
+                    $firstRecord = $records->first();
+                    $exampleRow[] = $firstRecord ? $firstRecord->$displayField : 'Example ' . $def['label'];
+                } else {
+                    $exampleRow[] = 'Example ' . $def['label'];
+                }
+            } else {
+                // Non‑relationship fields: use type‑based placeholder
+                $exampleRow[] = $this->getExampleValue($def);
+            }
+        }
+
+        // Collect fields with inline options (no relationship)
+        $optionsReference = [];
+        foreach ($columns as $field => $def) {
+            if (!isset($def['relationship']) && isset($def['options']) && is_array($def['options']) && !isset($def['options']['model'])) {
+                $optionsReference[$field] = $def['options'];
+            }
+        }
+
+        // Then pass it to the export
+        $export = new TemplateExport($fieldNames, $exampleRow, $relationSheets, $optionsReference);
+        $fileName = 'template_' . $configKey . '_' . date('Ymd_His') . '.xlsx';
+        return Excel::download($export, $fileName);
+    }
+
+    protected function getExampleValue(array $definition): string
+    {
+        $type = $definition['field_type'] ?? 'string';
+        $multiSelect = $definition['multiSelect'] ?? false;
+
+        // 1. Handle inline options (no relationship)
+        if (!empty($definition['options']) && is_array($definition['options']) && !isset($definition['options']['model'])) {
+            $options = $definition['options'];
+            if ($multiSelect) {
+                // Multi‑select: return first 3 labels as comma‑separated string
+                $firstFew = array_slice($options, 0, 3);
+                return implode(', ', $firstFew);
+            } else {
+                // Single select: return first label
+                return reset($options);
+            }
+        }
+
+        // 2. Handle relationship fields (with lookup)
+        if (isset($definition['relationship'])) {
+            return $this->getRelationshipExample($definition);
+        }
+
+        // 3. Fallback: type‑based placeholders
+        return match ($type) {
+            'string', 'textarea', 'text' => 'Example ' . ($definition['label'] ?? 'text'),
+            'number', 'integer', 'float' => '123',
+            'datepicker', 'datetimepicker' => date('Y-m-d'),
+            'timepicker' => '09:00',
+            'checkbox', 'boolcheckbox', 'boolradio' => '1',
+            'select', 'livewire-searchable-select' => 'Example',
+            'file', 'image', 'photo', 'picture' => 'example.jpg',
+            default => 'example',
+        };
+    }
+
+    protected function getRelationshipExample(array $definition): string
+    {
+        $relatedModel = $definition['relationship']['model'] ?? null;
+        $displayField = $definition['relationship']['display_field'] ?? 'name';
+
+        if ($relatedModel && class_exists($relatedModel)) {
+            // Fetch the first record (or any one) to get a real example
+            $exampleRecord = $relatedModel::query()->first();
+            if ($exampleRecord) {
+                return $exampleRecord->$displayField . ' (auto‑matched)';
+            }
+        }
+        return 'Example ' . ($definition['label'] ?? 'related record');
+    }
+
+    protected function getFirstOptionKey(array $definition): string
+    {
+        $options = $definition['options'] ?? [];
+        if (empty($options))
+            return 'example';
+        // If options is a model reference, we cannot get a static key easily; use 'example'
+        if (isset($options['model']))
+            return 'example';
+        // Get first key of associative array
+        return array_key_first($options);
+    }
+
+
+
+
 }

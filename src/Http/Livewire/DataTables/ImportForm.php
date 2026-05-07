@@ -14,7 +14,7 @@ class ImportForm extends Component
     use WithFileUploads;
 
     public string $configKey;
-    public ?string $modalId = null; // To close modal when done
+    public ?string $modalId = null;
 
     // File upload
     public $file;
@@ -27,7 +27,9 @@ class ImportForm extends Component
     public ?int $importId = null;
     public ?string $error = null;
 
-public $importStatus = null;
+    // NEW: store import result to display in modal
+    public ?array $importResult = null;
+    public $runInBackground = false;
 
     protected $listeners = [
         'importCompleted' => 'handleImportCompleted',
@@ -80,7 +82,6 @@ public $importStatus = null;
         $fieldDefinitions = $resolver->getFieldDefinitions();
         $fillableFields = array_keys(array_filter($fieldDefinitions, fn($def) => ($def['fillable'] ?? false) === true));
 
-        
         $mapping = [];
         if ($this->hasHeaderRow && !empty($this->previewHeaders)) {
             foreach ($this->previewHeaders as $index => $header) {
@@ -93,7 +94,6 @@ public $importStatus = null;
                 }
             }
         } else {
-            // Simple heuristic: if column count matches fillable fields, map in order
             if (!empty($this->previewRows) && count($fillableFields) === count($this->previewRows[0])) {
                 foreach ($fillableFields as $i => $field) {
                     $mapping[$field] = $i;
@@ -112,72 +112,83 @@ public $importStatus = null;
         $path = $this->file->store('imports', 'local');
 
         $import = Import::create([
-            'config_key'        => $this->configKey,
-            'file_path'         => $path,
+            'config_key' => $this->configKey,
+            'file_path' => $path,
             'original_filename' => $this->file->getClientOriginalName(),
-            'total_rows'        => $this->getTotalRows(),
-            'user_id'           => auth()->id(),
-            'status'            => 'pending',
+            'total_rows' => $this->getTotalRows(),
+            'user_id' => auth()->id(),
+            'status' => 'pending',
         ]);
+
+        /*ProcessImport::dispatch($import->id, $this->columnMapping, $this->hasHeaderRow);
+        $this->importId = $import->id;
+        $this->importResult = null; // clear previous result */
+
+
 
         ProcessImport::dispatch($import->id, $this->columnMapping, $this->hasHeaderRow);
 
-        $this->importId = $import->id;
 
-        /*$this->dispatch('showAlert', [
-            'type'    => 'info',
-            'message' => 'Import started. You will be notified when complete.',
-        ]);*/
-
-        // Close the modal
-        /*if ($this->modalId) {
+        if ($this->runInBackground) {
             $this->dispatch('closeModal')->to('qf.import-modal');
-        }*/
+            $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Import started. You will be notified when complete.']);
+        } else {
+            // Keep modal open, show progress spinner (existing behaviour)
+            $this->importId = $import->id;
+            $this->importResult = null; // clear previous result 
+        }
+
     }
 
 
+    public function checkImportStatus()
+    {
+        if (!$this->importId) {
+            return;
+        }
 
-/**
- * Polling method to check import status.
- */
-public function checkImportStatus()
-{
-    if (!$this->importId) {
-        return;
+        $import = Import::find($this->importId);
+        if (!$import) {
+            \Log::error('Import not found', ['id' => $this->importId]);
+            $this->importId = null;
+            return;
+        }
+
+        // Still processing or pending? Wait.
+        if (in_array($import->status, ['pending', 'processing'])) {
+            return; // do nothing, polling will retry
+        }
+
+        // Now status is either 'completed' or 'failed'
+        if ($import->status === 'completed') {
+            $result = [
+                'successful' => $import->successful_rows ?? 0,
+                'failed' => $import->failed_rows ?? 0,
+            ];
+            if ($import->error_file) {
+                $result['errorFileUrl'] = route('import.download-errors', $import);
+            }
+            $this->importResult = $result;
+            $this->dispatch('refreshDataTable');
+        } elseif ($import->status === 'failed') {
+            $errors = json_decode($import->errors, true);
+            $errorMsg = is_array($errors) ? implode('; ', $errors) : 'Unknown error';
+            $this->importResult = [
+                'failed' => true,
+                'error' => $errorMsg,
+            ];
+        } else {
+            // Should never happen
+            \Log::error('Unexpected import status', ['id' => $import->id, 'status' => $import->status]);
+            $this->importResult = [
+                'failed' => true,
+                'error' => "Unexpected status: {$import->status}",
+            ];
+        }
+
+        // Stop polling after we have a result
+        $this->importId = null;
     }
-
-    $import = Import::find($this->importId);
-    if (!$import || $import->status === 'pending') {
-        return;
-    }
-
-    // Import is no longer pending (completed or failed)
-    $this->importStatus = $import->status;
-
-    if ($import->status === 'completed') {
-        $this->dispatch('showAlert', [
-            'type'    => 'success',
-            'message' => "Import completed: {$import->successful_rows} records imported, {$import->failed_rows} failed.",
-        ]);
-        $this->dispatch('refreshDataTable'); // Optional: refresh table
-        
-    } elseif ($import->status === 'failed') {
-        $errors = json_decode($import->errors, true);
-        $errorMsg = is_array($errors) ? implode('; ', $errors) : 'Unknown error';
-        $this->dispatch('showAlert', [
-            'type'    => 'error',
-            'message' => "Import failed: {$errorMsg}",
-        ]);
-    }
-
-    // Stop polling by resetting importId
-    $this->importId = null;
-    $this->dispatch('closeModal')->to('qf.import-modal');
-
-}
-
-
-
 
 
     protected function getTotalRows(): int
@@ -190,26 +201,14 @@ public function checkImportStatus()
 
     public function handleImportCompleted(array $payload)
     {
-        $importId = $payload['importId'];
-        $success = $payload['success'];
-        $message = $payload['message'] ?? '';
-
-        if ($success) {
-            $this->dispatch('showAlert', [
-                'type'    => 'success',
-                'message' => $message ?: 'Import completed successfully.',
-            ]);
-            $this->dispatch('refreshDataTable')->to('qf.data-table'); // Optionally refresh table
-        } else {
-            $this->dispatch('showAlert', [
-                'type'    => 'error',
-                'message' => $message ?: 'Import failed. Check logs for details.',
-            ]);
-        }
+        // This method might be used by Livewire events if you prefer event-based completion
+        // We use polling, so it's not essential. Keep for compatibility.
     }
 
     public function render()
     {
-        return view('qf::livewire.data-tables.import-form');
+        return view('qf::livewire.data-tables.import-form', [
+            'importResult' => $this->importResult,
+        ]);
     }
 }

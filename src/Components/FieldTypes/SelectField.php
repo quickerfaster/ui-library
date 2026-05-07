@@ -84,7 +84,7 @@ class SelectField implements FieldType
 
 
         // If relationship is defined, load options from related model.
-        /*if (isset($this->definition['relationship'])) {
+        if (isset($this->definition['relationship'])) {
             $rel = $this->definition['relationship'];
             if (isset($rel['model']) && isset($rel['display_field'])) {
                 $model = $rel['model'];
@@ -102,7 +102,7 @@ class SelectField implements FieldType
                     return $model::pluck($displayField, 'id')->toArray();
                 }
             }
-        }*/
+        }
 
 
         if (isset($this->definition['options']['model'])) {

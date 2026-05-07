@@ -72,6 +72,16 @@
                                         </a>
                                     </li>
                                 @endforeach
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center" href="#"
+                                        wire:click.prevent="exportTemplate">
+                                        <i class="fas fa-download me-2"></i> Export Template (for import)
+                                    </a>
+                                </li>
+
                             @endif
 
                             {{-- Separator if both export and import/print exist --}}
@@ -158,6 +168,12 @@
 
         <!-- Right Side: Create & View Switches -->
         <div class="d-flex flex-wrap align-items-center">
+            @if (auth()->check())
+                <livewire:qf.recent-exports :key="'recent-exports-' . auth()->id()" />
+                <livewire:qf.recent-imports :key="'recent-imports-' . auth()->id()" />
+            @endif
+
+
             @if (in_array('create', $simpleActions) == false)
                 {{-- This needs to be adjusted later --}}
                 <button wire:click="add" class="btn btn-sm btn-primary d-flex align-items-center">
