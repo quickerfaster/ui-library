@@ -55,6 +55,13 @@
                 <div class="row g-3">
                     @foreach ($filtersConfig as $index => $filter)
                         <div class="col-12 ">
+
+                            @if ($filter['field'] === '_trashed')
+                                <div class="mt-3 pt-2 border-top border-2 border-light">
+                                    <small class="text-muted text-uppercase fw-semibold">Archive filter</small>
+                                </div>
+                            @endif
+
                             <label class="form-label">{{ $filter['label'] }}</label>
                             <div class="d-flex gap-2">
                                 {{-- Operator dropdown --}}
@@ -113,7 +120,9 @@
                                             {{-- Single select dropdown --}}
                                             <select wire:model.live="activeFilters.{{ $index }}.value"
                                                 class="form-select">
+                                                @if ($filter['field'] != '_trashed')
                                                 <option value="">All</option>
+                                                @endif
                                                 @foreach ($filter['options'] ?? [] as $optValue => $optLabel)
                                                     <option value="{{ $optValue }}">{{ $optLabel }}</option>
                                                 @endforeach
@@ -184,6 +193,14 @@
                                             class="form-control">
                                 @endswitch
                             </div>
+
+
+                            @if ($filter['field'] === '_trashed')
+                                <div class="mt-3 pt-2 border-top border-2 border-light">
+                                    
+                                </div>
+                            @endif
+
                         </div>
                     @endforeach
                 </div>
@@ -231,34 +248,39 @@
 
 
     {{-- Save Filter Modal (Livewire-controlled) --}}
-@if($saveFilterModalOpen)
-    <div class="modal fade show d-block" id="saveFilterModal" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" wire:ignore.self>
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ $modalTitle }}</h5>
-                    <button type="button" class="btn-close" wire:click="closeSaveFilterModal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Filter Name</label>
-                        <input type="text" class="form-control" wire:model="filterName" placeholder="e.g., Pending approvals December">
+    @if ($saveFilterModalOpen)
+        <div class="modal fade show d-block" id="saveFilterModal" tabindex="-1"
+            style="background-color: rgba(0,0,0,0.5);" wire:ignore.self>
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ $modalTitle }}</h5>
+                        <button type="button" class="btn-close" wire:click="closeSaveFilterModal"></button>
                     </div>
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" wire:model="filterIsGlobal" id="globalFilter">
-                        <label class="form-check-label" for="globalFilter">
-                            Make available to all users (admin only)
-                        </label>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Filter Name</label>
+                            <input type="text" class="form-control" wire:model="filterName"
+                                placeholder="e.g., Pending approvals December">
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" wire:model="filterIsGlobal"
+                                id="globalFilter">
+                            <label class="form-check-label" for="globalFilter">
+                                Make available to all users (admin only)
+                            </label>
+                        </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" wire:click="closeSaveFilterModal">Cancel</button>
-                    <button type="button" class="btn btn-primary" wire:click="saveFilter">{{ $saveButtonLabel }}</button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                            wire:click="closeSaveFilterModal">Cancel</button>
+                        <button type="button" class="btn btn-primary"
+                            wire:click="saveFilter">{{ $saveButtonLabel }}</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-@endif
+    @endif
 
 
 

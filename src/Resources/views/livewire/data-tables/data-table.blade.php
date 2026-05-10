@@ -25,266 +25,275 @@
 
 
 
-    <!-- Toolbar -->
-    <div class="d-flex flex-wrap align-items-center justify-content-between data-table-toolbar">
-        <!-- Left Side: Actions & Search -->
-        <div class="d-flex flex-wrap align-items-center">
 
-            {{-- Action Buttons Group --}}
+    {{-- NORMAL TOOLBAR (no selection) --}}
+    @if (empty($bulkSelection['ids']))
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
             <div class="d-flex align-items-center">
-                {{-- FILE DROPDOWN (Export, Import, Print) --}}
-                @if (!empty($filesActions['export']) || !empty($filesActions['import']) || ($filesActions['print'] ?? false))
-                    <div class="dropdown d-flex align-items-center">
-                        <button type="button"
-                            class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-file-alt"></i> <span>File</span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-start">
-                            {{-- Export sub-items (multiple formats) --}}
-                            @if (!empty($filesActions['export']))
-                                @foreach ($filesActions['export'] as $format)
-                                    <li>
-                                        <a class="dropdown-item d-flex align-items-center" href="#"
-                                            wire:click.prevent="exportAll('{{ $format }}')">
-                                            <i
-                                                class="fas fa-file-{{ $format === 'pdf' ? 'pdf' : ($format === 'csv' ? 'csv' : 'excel') }} me-2"></i>
-                                            Export as {{ strtoupper($format) }}
-                                        </a>
-                                    </li>
-                                @endforeach
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li>
-                                    <a class="dropdown-item d-flex align-items-center" href="#"
-                                        wire:click.prevent="exportTemplate">
-                                        <i class="fas fa-download me-2"></i> Export Template (for import)
-                                    </a>
-                                </li>
-
-                            @endif
-
-                            {{-- Separator if both export and import/print exist --}}
-                            @if (!empty($filesActions['export']) && (!empty($filesActions['import']) || ($filesActions['print'] ?? false)))
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                            @endif
-
-                            {{-- Import --}}
-                            @if (!empty($filesActions['import']))
-                                <li>
-                                    <a class="dropdown-item d-flex align-items-center" href="#"
-                                        wire:click.prevent="import">
-                                        <i class="fas fa-upload me-2"></i> Import
-                                    </a>
-                                </li>
-                            @endif
-
-                            {{-- Print --}}
-                            @if (!empty($filesActions['print']) && $filesActions['print'] === true)
-                                <li>
-                                    <a class="dropdown-item d-flex align-items-center" href="#"
-                                        wire:click.prevent="print">
-                                        <i class="fas fa-print me-2"></i> Print
-                                    </a>
-                                </li>
-                            @endif
-                        </ul>
-                    </div>
-                @endif
-
-                {{-- Edit mode toggle (optional) --}}
-                @if ($controls['editable'] ?? false)
-                    <button wire:click="toggleEditing"
-                        class="btn btn-sm {{ $this->editable ? 'btn-primary' : 'btn-outline-secondary' }}">
-                        <i class="fas {{ $this->editable ? 'fa-save' : 'fa-pen' }}"></i>
-                        {{ $this->editable ? 'Done' : 'Edit' }}
+                {{-- Search + Filter group --}}
+                <div class="input-group input-group-sm" style="min-width: 250px;">
+                    <input type="text" wire:model.live.debounce.300ms="search" class="form-control"
+                        placeholder="Search..." />
+                    <button class="btn btn-outline-secondary" type="button" wire:click="openSearchDrawer"
+                        title="Advanced search">
+                        <i class="fas fa-sliders-h"></i>
                     </button>
-                @endif
-
-            </div>
-
-            <!-- Search and PerPage -->
-            <div class="d-flex align-items-center">
-                @if ($controls['search'] ?? false)
-                    <div class="d-flex align-items-center">
-                        {{-- Combined search input + advanced search button --}}
-                        <div class="input-group input-group-sm" style="min-width: 150px;">
-                            <input type="text" wire:model.live.debounce.300ms="search" class="form-control input-sm"
-                                placeholder="Search..." />
-
-                            {{-- Advanced search drawer trigger --}}
-                            <button class="btn btn-outline-secondary position-relative" type="button"
-                                wire:click="openSearchDrawer" title="Advanced search (columns, exact match)">
-                                <i class="fas fa-sliders-h"></i>
-                                @if (!empty($this->search) || $this->exactMatch)
-                                    <span class="badge bg-info"> ●</span>
-                                @endif
-                            </button>
-
-                            <button class="btn btn-outline-secondary" type="button" wire:click="openFilterDrawer"
-                                title="Filter">
-                                <i class="fas fa-filter"></i>
-                                @if (count($activeFilters) > 0)
-                                    <span class="badge bg-primary">{{ count($activeFilters) }}</span>
-                                @endif
-                            </button>
-                        </div>
-                    </div>
-                @endif
-
-                @if (($controls['perPage'] ?? false) && count($controls['perPage']) > 1)
-                    <div class="d-flex align-items-center">
-                        <select wire:model.live="perPage" class="form-select form-select-sm">
-                            @foreach ($controls['perPage'] as $value)
-                                <option value="{{ $value }}">{{ $value }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- Right Side: Create & View Switches -->
-        <div class="d-flex flex-wrap align-items-center">
-            @if (auth()->check())
-                <livewire:qf.recent-exports :key="'recent-exports-' . auth()->id()" />
-                <livewire:qf.recent-imports :key="'recent-imports-' . auth()->id()" />
-            @endif
-
-
-            @if (in_array('create', $simpleActions) == false)
-                {{-- This needs to be adjusted later --}}
-                <button wire:click="add" class="btn btn-sm btn-primary d-flex align-items-center">
-                    <i class="fas fa-plus"></i> Add
-                </button>
-            @endif
-
-            @if (count($switchViews ?? []) >= 2)
-                <button wire:click="toggleViewMode" class="btn btn-sm btn-outline-secondary d-flex align-items-center">
-                    @if ($this->nextViewMode === 'table')
-                        <i class="fas fa-table"></i> <span>Table</span>
-                    @elseif($this->nextViewMode === 'list')
-                        <i class="fas fa-list"></i> <span>List</span>
-                    @elseif($this->nextViewMode === 'card')
-                        <i class="fas fa-th-large"></i> <span>Card</span>
-                    @endif
-                </button>
-            @endif
-
-
-            @if ($this->showHideColumnsEnabled())
-                <div class="dropdown me-4" wire:key="column-dropdown-{{ $configKey }}">
-                    <button type="button"
-                        class="btn dropdown-togglebtn btn-sm btn-outline-secondary d-flex align-items-center"
-                        wire:click="toggleColumnDropdown">
-                        <i class="fas fa-columns"></i> Columns
+                    <button class="btn btn-outline-secondary" type="button" wire:click="openFilterDrawer"
+                        title="Filter">
+                        <i class="fas fa-filter"></i>
+                        @if (count($activeFilters) > 0)
+                            <span class="badge bg-primary ms-1">{{ count($activeFilters) }}</span>
+                        @endif
                     </button>
-
-                    @if ($columnDropdownOpen)
-                        <ul class="dropdown-menu dropdown-menu-end p-2 show" wire:click.away="closeColumnDropdown">
-                            @foreach ($allColumns as $column)
-                                @php $def = $columns[$column]; @endphp
-                                <li wire:key="col-{{ $column }}-{{ count($visibleColumns) }}"
-                                    class="dropdown-item">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox"
-                                            wire:click="toggleColumn('{{ $column }}')"
-                                            id="col-{{ $column }}" @checked(in_array($column, $visibleColumns))>
-                                        <label class="form-check-label" for="col-{{ $column }}">
-                                            {{ $def['label'] ?? ucfirst($column) }}
-                                        </label>
-                                    </div>
-                                </li>
-                            @endforeach
-
-                            @if ($this->isResetVisible())
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li class="dropdown-item">
-                                    <button class="dropdown-item btn-sm d-flex align-items-center"
-                                        wire:click="resetColumns">
-                                        <i class="fas fa-undo-alt me-2"></i> Reset
-                                    </button>
-                                </li>
-                            @endif
-
-                        </ul>
-                    @endif
-                </div>
-            @endif
-
-
-
-
-            @if ($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
-                <div class="d-flex align-items-center">
-                    <select wire:model.live="trashedFilter" class="form-select form-select-sm">
-                        <option value="without">Active</option>
-                        <option value="with">With Trashed</option>
-                        <option value="only">Trashed Only</option>
-                    </select>
-                </div>
-            @endif
-
-
-        </div>
-    </div>
-
-    <!-- Bulk Actions Bar -->
-    @if (!empty($bulkSelection['ids']) && !empty($bulkActions))
-        <div class="alert alert-primary bg-gradient-primary d-flex justify-content-between align-items-center py-2 px-3 mb-4"
-            role="alert">
-            <div class="d-flex align-items-center">
-                <span class="alert-icon text-white me-3">
-                    <i class="fas fa-check-double fa-lg"></i>
-                </span>
-                <span class="alert-text text-white">
-                    <strong style="font-size: 2em">{{ count($bulkSelection['ids']) }}</strong> <strong>items selected
-                        for bulk actions</strong>
-                </span>
-            </div>
-
-
-
-            <div class="d-flex align-items-center">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" wire:model.live="bulkSelection.all" />
-                    <strong class="text-white me-4">Select All</strong>
                 </div>
 
-                <div class="btn-group">
-                    <button type="button" class="btn btn-sm btn-white mb-0 dropdown-toggle d-flex align-items-center"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-bolt me-2"></i> Bulk Actions
+                {{-- View Menu --}}
+
+                {{-- View Menu --}}
+                <div class="dropdown ms-2">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown">
+                        <i class="fas fa-eye"></i> View
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-lg">
-                        @foreach ($bulkActions as $key => $action)
+                    <ul class="dropdown-menu shadow-sm">
+                        {{-- Display section --}}
+                        <li>
+                            <h6 class="dropdown-header">Display</h6>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
+                                wire:click.prevent="setViewMode('table')">
+                                <span class="{{ $viewMode === 'table' ? 'fw-bold text-primary' : '' }}">
+                                    <i class="fas fa-table me-2"></i>Table
+                                </span>
+                                <i class="fas fa-check {{ $viewMode === 'table' ? 'text-primary' : 'invisible' }}"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
+                                wire:click.prevent="setViewMode('list')">
+                                <span class="{{ $viewMode === 'list' ? 'fw-bold text-primary' : '' }}">
+                                    <i class="fas fa-list me-2"></i>List
+                                </span>
+                                <i class="fas fa-check {{ $viewMode === 'list' ? 'text-primary' : 'invisible' }}"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
+                                wire:click.prevent="setViewMode('card')">
+                                <span class="{{ $viewMode === 'card' ? 'fw-bold text-primary' : '' }}">
+                                    <i class="fas fa-th-large me-2"></i>Cards
+                                </span>
+                                <i class="fas fa-check {{ $viewMode === 'card' ? 'text-primary' : 'invisible' }}"></i>
+                            </a>
+                        </li>
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+                        {{-- Density section --}}
+                        <li>
+                            <h6 class="dropdown-header">Density</h6>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
+                                wire:click.prevent="setDensity('comfortable')">
+                                <span class="{{ $density === 'comfortable' ? 'fw-bold text-primary' : '' }}">
+                                    Comfortable
+                                </span>
+                                <i
+                                    class="fas fa-check {{ $density === 'comfortable' ? 'text-primary' : 'invisible' }}"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
+                                wire:click.prevent="setDensity('compact')">
+                                <span class="{{ $density === 'compact' ? 'fw-bold text-primary' : '' }}">
+                                    Compact
+                                </span>
+                                <i
+                                    class="fas fa-check {{ $density === 'compact' ? 'text-primary' : 'invisible' }}"></i>
+                            </a>
+                        </li>
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+                        {{-- Rows per page section --}}
+                        <li>
+                            <h6 class="dropdown-header">Rows per page</h6>
+                        </li>
+                        @foreach ($controls['perPage'] ?? [10, 25, 50, 100] as $value)
                             <li>
-                                <a class="dropdown-item d-flex align-items-center" href="#"
-                                    wire:click.prevent="handleBulkAction('{{ $key }}')">
-                                    @if (!empty($action['icon']))
-                                        <i class="{{ $action['icon'] }} me-2 opacity-6"></i>
-                                    @endif
-                                    {{ $action['label'] }}
+                                <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                    href="#" wire:click.prevent="setPerPageFromView({{ $value }})">
+                                    <span class="{{ $perPage == $value ? 'fw-bold text-primary' : '' }}">
+                                        {{ $value }}
+                                    </span>
+                                    <i
+                                        class="fas fa-check {{ $perPage == $value ? 'text-primary' : 'invisible' }}"></i>
                                 </a>
                             </li>
                         @endforeach
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+                        {{-- Extra actions --}}
+                        <li>
+                            <a class="dropdown-item" href="#" wire:click.prevent="openColumnManager">
+                                <i class="fas fa-columns me-2"></i> Columns...
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
+                                wire:click.prevent="toggleInlineEditing">
+                                <span class="{{ $editable ? 'fw-bold text-primary' : '' }}">
+                                    <i class="fas fa-pen me-2"></i> Inline Editing
+                                </span>
+                                <i class="fas fa-check {{ $editable ? 'text-primary' : 'invisible' }}"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+
+                {{-- Tools Menu --}}
+                <div class="dropdown ms-2">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown">
+                        <i class="fas fa-tools"></i> Tools
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('csv')">
+                                <i class="fas fa-file-csv me-2"></i> Export as CSV
+                            </a></li>
+                        <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('xls')">
+                                <i class="fas fa-file-excel me-2"></i> Export as XLS
+                            </a></li>
+                        <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('pdf')">
+                                <i class="fas fa-file-pdf me-2"></i> Export as PDF
+                            </a></li>
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" href="#"
+                                wire:click.prevent="exportTemplate">
+                                <i class="fas fa-download me-2"></i> Export Template (for import)
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="#" wire:click.prevent="import">
+                                <i class="fas fa-upload me-2"></i> Import
+                            </a></li>
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+                        <li><a class="dropdown-item" href="#" wire:click.prevent="print">
+                                <i class="fas fa-print me-2"></i> Print
+                            </a></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li><a class="dropdown-item" href="#" wire:click.prevent="openBackgroundJobsDrawer">
+                                <i class="fas fa-history me-2"></i> Background Jobs
+                            </a></li>
                     </ul>
                 </div>
             </div>
 
+            <div class="d-flex align-items-center">
+                {{-- Status filter (renamed) --}}
+                {{--@if ($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
+                    <select wire:model.live="trashedFilter" class="form-select form-select-sm me-2">
+                        <option value="without">Active</option>
+                        <option value="with">With archived</option>
+                        <option value="only">Archived only</option>
+                    </select>
+                @endif --}}
 
+                {{-- Add button --}}
+                @if (in_array('create', $simpleActions))
+                    <button wire:click="add" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Add
+                    </button>
+                @endif
+            </div>
+        </div>
+    @else
+        {{-- SELECTION MODE TOOLBAR --}}
+        <div
+            class="alert alert-primary bg-gradient-primary d-flex justify-content-between align-items-center py-2 px-3 mb-3">
+            <div class="d-flex align-items-center text-white" style="font-size: 1.5em; font-weight: bold">
+                <i class="fas fa-check-double fa-lg me-3"></i>
+                <strong class="me-2">{{ count($bulkSelection['ids']) }}</strong> Selected
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <div class="form-check me-3">
+                    <input type="checkbox" class="form-check-input" wire:model.live="bulkSelection.all" />
+                    <strong class="text-white ms-1">Select All</strong>
+                </div>
+
+                {{-- Primary bulk actions as separate buttons --}}
+                @php
+                    $primaryBulkActions = ['export', 'delete', 'restore'];
+                    $moreBulkActions = array_diff(array_keys($bulkActions), $primaryBulkActions);
+                @endphp
+
+                @foreach ($primaryBulkActions as $actionKey)
+                    @if (isset($bulkActions[$actionKey]))
+                        <button class="btn btn-sm btn-outline-white text-white"
+                            wire:click.prevent="handleBulkAction('{{ $actionKey }}')">
+                            @if (!empty($bulkActions[$actionKey]['icon']))
+                                <i class="{{ $bulkActions[$actionKey]['icon'] }} me-1"></i>
+                            @endif
+                            {{ $bulkActions[$actionKey]['label'] }}
+                        </button>
+                    @endif
+                @endforeach
+
+                {{-- More dropdown for secondary bulk actions --}}
+                @if (!empty($moreBulkActions))
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-white dropdown-toggle" type="button"
+                            data-bs-toggle="dropdown">
+                            More
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg">
+                            @foreach ($moreBulkActions as $actionKey)
+                                @php $action = $bulkActions[$actionKey]; @endphp
+                                <li>
+                                    <a class="dropdown-item" href="#"
+                                        wire:click.prevent="handleBulkAction('{{ $actionKey }}')">
+                                        @if (!empty($action['icon']))
+                                            <i class="{{ $action['icon'] }} me-2"></i>
+                                        @endif
+                                        {{ $action['label'] }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
         </div>
     @endif
+
+
+
 
     {{-- Table View --}}
     @if ($viewMode === 'table')
         <div class="table-responsive" style="min-height: 500px">
-            <table class="table align-items-center mb-0 table-striped">
+            <table class="table align-items-center mb-0 table-striped {{ $density === 'compact' ? 'table-sm' : '' }}">
+
                 <thead>
                     <tr>
                         @if (!empty($controls['bulkActions']))

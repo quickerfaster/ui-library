@@ -34,7 +34,7 @@ class FilterPanel extends Component
     public array $selectedLabels = []; // Labels for selected IDs per filter index
 
 
-        public bool $saveFilterModalOpen = false;
+    public bool $saveFilterModalOpen = false;
 
 
 
@@ -78,6 +78,31 @@ class FilterPanel extends Component
         $this->loadSavedFilters();
         $this->loadFilterSelectedLabels();
     }
+
+
+
+
+    protected function getTrashedFilterConfig(): array
+    {
+        return [
+            'field' => '_trashed',
+            'label' => 'Status',
+            'type' => 'select',
+            'options' => [
+                'without' => 'Active',
+                'with' => 'With archived',
+                'only' => 'Archived only',
+            ],
+            'defaultOperator' => 'equals',
+            'operators' => ['equals' => 'Is'],
+            'multi' => false,
+        ];
+    }
+
+
+
+
+
 
 
     public function updateFilters($filters)
@@ -124,39 +149,39 @@ class FilterPanel extends Component
     }
 
     // ========== SAVED FILTERS – EDIT MODE ==========
-public function showSaveFilterModal(?int $filterId = null): void
-{
-    if ($filterId) {
-        $filter = SavedFilter::where('id', $filterId)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
-        $this->filterName = $filter->name;
-        $this->filterIsGlobal = $filter->is_global;
-        $this->editingFilterId = $filterId;
-        $this->modalTitle = 'Rename Filter';
-        $this->saveButtonLabel = 'Update';
-    } else {
-        $this->filterName = '';
-        $this->filterIsGlobal = false;
-        $this->editingFilterId = null;
-        $this->modalTitle = 'Save Filter Set';
-        $this->saveButtonLabel = 'Save';
+    public function showSaveFilterModal(?int $filterId = null): void
+    {
+        if ($filterId) {
+            $filter = SavedFilter::where('id', $filterId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
+            $this->filterName = $filter->name;
+            $this->filterIsGlobal = $filter->is_global;
+            $this->editingFilterId = $filterId;
+            $this->modalTitle = 'Rename Filter';
+            $this->saveButtonLabel = 'Update';
+        } else {
+            $this->filterName = '';
+            $this->filterIsGlobal = false;
+            $this->editingFilterId = null;
+            $this->modalTitle = 'Save Filter Set';
+            $this->saveButtonLabel = 'Save';
+        }
+        $this->saveFilterModalOpen = true; // open modal
     }
-    $this->saveFilterModalOpen = true; // open modal
-}
 
 
 
-public function openSaveFilterModal(): void
-{
-    $this->saveFilterModalOpen = true;
-}
+    public function openSaveFilterModal(): void
+    {
+        $this->saveFilterModalOpen = true;
+    }
 
-public function closeSaveFilterModal(): void
-{
-    $this->saveFilterModalOpen = false;
-    $this->reset(['filterName', 'filterIsGlobal', 'editingFilterId']);
-}
+    public function closeSaveFilterModal(): void
+    {
+        $this->saveFilterModalOpen = false;
+        $this->reset(['filterName', 'filterIsGlobal', 'editingFilterId']);
+    }
 
 
 
@@ -180,7 +205,7 @@ public function closeSaveFilterModal(): void
             $this->saveCurrentFilters($this->filterName, $this->filterIsGlobal);
         }
 
-    $this->closeSaveFilterModal(); // close modal
+        $this->closeSaveFilterModal(); // close modal
         $this->reset(['filterName', 'filterIsGlobal', 'editingFilterId']);
         $this->loadSavedFilters();
     }
@@ -287,6 +312,10 @@ public function closeSaveFilterModal(): void
             $filters[] = $filter;
         }
 
+
+        // Add trashed filter at the beginning (or end)
+        $trashedFilter = $this->getTrashedFilterConfig();
+        array_unshift($filters, $trashedFilter); // or array_push
         return $filters;
     }
 
@@ -499,6 +528,7 @@ public function closeSaveFilterModal(): void
                 'value' => $this->getDefaultValueForType($config['type'], $defaultOperator, $config['multi'] ?? false),
             ];
         }
+        
         $this->emitFilters();
     }
 

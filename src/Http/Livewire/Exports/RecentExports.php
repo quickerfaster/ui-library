@@ -12,14 +12,20 @@ class RecentExports extends Component
     public $completedExports = [];
     public $inProgressExports = [];
     public $dropdownOpen = false;
+    public bool $embedded = false;
+
 
     protected $listeners = [
         'refreshExports' => 'loadExports',
         'clearAllExportsConfirmed' => 'performClearAllExports',
     ];
 
-    public function mount()
+
+
+
+    public function mount(bool $embedded = false)
     {
+        $this->embedded = $embedded;
         $this->loadExports();
     }
 

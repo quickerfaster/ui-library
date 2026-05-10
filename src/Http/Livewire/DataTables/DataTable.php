@@ -75,6 +75,14 @@ class DataTable extends Component
     public $columnFilterValue = null;
     public array $allFieldDefinitions = [];
 
+    // Add these properties
+    public string $density = 'comfortable';      // 'comfortable' or 'compact'
+    public bool $showInlineEditing = false;     // mirror of $editable, used in View menu
+
+
+
+
+
     protected $listeners = [
         'performDelete' => 'performDelete',
         'refreshDataTable' => '$refresh',
@@ -82,6 +90,8 @@ class DataTable extends Component
         'filtersUpdated' => 'updateFilters',
         'executeRowAction' => 'executeRowAction',
         'searchApplied' => 'applySearchPanel',
+        'columnsUpdated' => 'handleColumnsUpdated',
+
 
 
     ];
@@ -104,10 +114,22 @@ class DataTable extends Component
         $this->initializeComponent();
         $this->loadSortFromSession();
 
+        // Add to mount() after loading session filters
+        $this->density = session()->get("density_{$this->configKey}", 'comfortable');
+        $this->showInlineEditing = $this->editable;
+
 
         // Load saved filters from session
         $sessionFilters = $this->loadFiltersFromSession();
         $this->activeFilters = $sessionFilters;
+        // Extract trashed filter from activeFilters if present
+foreach ($this->activeFilters as $filter) {
+    if ($filter['field'] === '_trashed') {
+        $this->trashedFilter = $filter['value'];
+        break;
+    }
+}
+
         $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
         $this->rebuildQuickFilterValues();
 
@@ -150,7 +172,96 @@ class DataTable extends Component
         // $this->perPage = $settings->get('pagination.per_page', 15);
         // $this->sort = $settings->get('default_sort', ['field' => 'id', 'direction' => 'asc']);
 
+        if ($this->trashedFilter != 'without') // Initilise only applied  trashed filters
+            $this->syncTrashedFilterToActiveFilters();
+
+
     }
+
+
+
+
+
+
+
+
+    public function handleColumnsUpdated($visibleColumns)
+    {
+        $this->visibleColumns = $visibleColumns;
+        // Also update session in DataTable for consistency (though ColumnManager already does)
+        if ($this->showHideColumnsEnabled()) {
+            $this->saveVisibleColumns($this->configKey, $this->visibleColumns);
+        }
+        $this->resetPage();
+        $this->dispatch('refreshDataTable');
+    }
+
+
+
+    public function openColumnManager()
+    {
+        $this->dispatch('openDrawer', 'qf.column-manager', ['configKey' => $this->configKey], 'Manage Columns');
+    }
+
+
+
+
+
+    /**
+     * Set density (compact / comfortable) and persist in session.
+     */
+    public function setDensity(string $density): void
+    {
+        if (!in_array($density, ['comfortable', 'compact'])) {
+            return;
+        }
+        $this->density = $density;
+        session()->put("density_{$this->configKey}", $density);
+        $this->dispatch('refreshDataTable');
+    }
+
+    /**
+     * Set rows per page from the View menu dropdown.
+     */
+    public function setPerPageFromView(int $value): void
+    {
+        $this->perPage = $value;
+        $this->resetPage();
+    }
+
+
+
+    public function setViewMode(string $mode): void
+    {
+        if (in_array($mode, ['table', 'list', 'card']) && isset($this->getConfigResolver()->getSwitchViews()[$mode])) {
+            $this->viewMode = $mode;
+            session(["view_preference.{$this->configKey}" => $mode]);
+            $this->resetPage();
+        }
+    }
+
+
+
+    public function toggleInlineEditing(): void
+    {
+        $this->editable = !$this->editable;
+        $this->showInlineEditing = $this->editable;
+        $this->editMode = [];
+        $this->editedData = [];
+        $this->dispatch('refreshDataTable');
+    }
+
+    public function openBackgroundJobsDrawer(): void
+    {
+        $this->dispatch('openDrawer', 'qf.background-jobs-panel', [], 'Background Jobs');
+    }
+
+
+
+
+
+
+
 
 
 
@@ -983,14 +1094,26 @@ class DataTable extends Component
 
 
 
-    public function updateFilters($filters)
-    {
-        $this->activeFilters = $this->sanitizeActiveFilters($filters);
-        $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
-        $this->saveFiltersToSession();
-        $this->rebuildQuickFilterValues();
-        $this->resetPage();
+public function updateFilters($filters)
+{
+    $regularFilters = [];
+    $trashedValue = 'without';
+
+    foreach ($filters as $filter) {
+        if ($filter['field'] === '_trashed') {
+            $trashedValue = $filter['value'];
+        } else {
+            $regularFilters[] = $filter;
+        }
     }
+
+    $this->trashedFilter = $trashedValue;
+    $this->activeFilters = $regularFilters;
+    $this->syncTrashedFilterToActiveFilters(); // adds _trashed back
+    $this->saveFiltersToSession();
+    $this->rebuildQuickFilterValues();
+    $this->resetPage();
+}
 
 
 
@@ -1342,6 +1465,10 @@ class DataTable extends Component
                 continue;
             }
 
+            if ($filter['field'] === '_trashed') {
+                continue; // Skip, already handled in getRecordsProperty
+            }
+
 
             $field = $filter['field'];
             $operator = $filter['operator'] ?? '=';
@@ -1639,12 +1766,24 @@ class DataTable extends Component
 
     public function removeFilter(string $field): void
     {
+
+    if ($field === '_trashed') {
+        $this->trashedFilter = 'without';
+        // Remove _trashed from activeFilters
+        $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
+        $this->saveFiltersToSession();
+        $this->resetPage();
+        return;
+    }
+
         $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== $field));
         $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
         unset($this->quickFilterValues[$field]);
         $this->saveFiltersToSession();
         $this->resetPage();
     }
+
+
 
 
     protected function saveFiltersToSession(): void
@@ -1657,16 +1796,40 @@ class DataTable extends Component
         return session()->get("active_filters.{$this->configKey}", []);
     }
 
+protected function syncTrashedFilterToActiveFilters(): void
+{
+    // Remove any existing _trashed filter
+    $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
+    
+    // Add current trashedFilter as a filter
+    $this->activeFilters[] = [
+        'field' => '_trashed',
+        'type' => 'select',
+        'operator' => 'equals',
+        'value' => $this->trashedFilter,
+        'multi' => false,
+    ];
+    // Re-enrich to get display values
+    $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
+}
 
 
-    public function clearAllFilters(): void
-    {
-        $this->activeFilters = [];
-        $this->quickFilterValues = [];
-        $this->saveFiltersToSession();
-        $this->dispatch('filtersUpdated', filters: []);
-        $this->resetPage();
-    }
+
+public function clearAllFilters(): void
+{
+
+
+
+    $this->activeFilters = [];
+    $this->trashedFilter = 'without';
+    $this->syncTrashedFilterToActiveFilters(); // adds _trashed with 'without'
+            $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
+
+    $this->quickFilterValues = [];
+    $this->saveFiltersToSession();
+    // $this->dispatch('filtersUpdated', filters: $this->activeFilters);
+    $this->resetPage();
+}
 
     // ==================== ROW ACTIONS ====================
 
@@ -2123,8 +2286,22 @@ class DataTable extends Component
 
     // ==================== FILES ====================
 
+
+
     public function exportAll(string $format): void
     {
+        // PDF limit check
+        if ($format === 'pdf') {
+            $totalRows = $this->getTotalRowsCount(); // implement helper
+            if ($totalRows > 500) {
+                $this->dispatch('showAlert', [
+                    'type' => 'warning',
+                    'message' => 'PDF export is limited to 500 rows. Use XLS or CSV for larger datasets.',
+                ]);
+                return;
+            }
+        }
+
         $columns = $this->showHideColumnsEnabled() ? $this->visibleColumns : [];
         $params = [
             'configKey' => $this->configKey,
@@ -2135,6 +2312,14 @@ class DataTable extends Component
         ];
         $this->dispatch('openExportModal', ['configKey' => $this->configKey, 'params' => $params]);
     }
+
+
+
+
+
+
+
+
 
     public function import(): void
     {

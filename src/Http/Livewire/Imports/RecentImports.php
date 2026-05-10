@@ -13,14 +13,22 @@ class RecentImports extends Component
     public $inProgressImports = [];
     public $dropdownOpen = false;
 
+    public bool $embedded = false; // add this
+
+
+
     protected $listeners = [
         'refreshImports' => 'loadImports',
         'clearAllImportsConfirmed' => 'performClearAll',
-        
+
     ];
 
-    public function mount()
+ 
+
+
+    public function mount(bool $embedded = false)
     {
+        $this->embedded = $embedded;
         $this->loadImports();
     }
 
@@ -51,12 +59,12 @@ class RecentImports extends Component
             if ($import) {
                 if ($import->failed_rows > 0) {
                     $this->dispatch('showAlert', [
-                        'type'    => 'warning',
+                        'type' => 'warning',
                         'message' => "Import completed with {$import->failed_rows} errors. Check the Imports dropdown to download the error report.",
                     ]);
                 } else {
                     $this->dispatch('showAlert', [
-                        'type'    => 'success',
+                        'type' => 'success',
                         'message' => "Import completed: {$import->successful_rows} records imported.",
                     ]);
                 }
@@ -108,7 +116,7 @@ class RecentImports extends Component
 
         // Mark as cancelled
         $import->update([
-            'status'        => 'cancelled',
+            'status' => 'cancelled',
             'error_message' => 'Cancelled by user',
         ]);
 
@@ -128,14 +136,14 @@ class RecentImports extends Component
 
     public function confirmClearAll()
     {
-        
+
         $this->dispatch('showAlert', [
-            'type'          => 'confirm',
-            'title'         => 'Clear All Imports?',
-            'message'       => 'This will permanently delete all import records and their associated files. This action cannot be undone.',
-            'icon'          => 'fas fa-trash-alt text-danger',
-            'size'          => 'sm',
-            'confirmEvent'  => 'clearAllImportsConfirmed',
+            'type' => 'confirm',
+            'title' => 'Clear All Imports?',
+            'message' => 'This will permanently delete all import records and their associated files. This action cannot be undone.',
+            'icon' => 'fas fa-trash-alt text-danger',
+            'size' => 'sm',
+            'confirmEvent' => 'clearAllImportsConfirmed',
             'confirmParams' => [],
         ]);
     }

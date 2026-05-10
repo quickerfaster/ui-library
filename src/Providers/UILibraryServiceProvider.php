@@ -64,7 +64,9 @@ use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard;
+use QuickerFaster\UILibrary\Http\Livewire\BackgroundJobsPanel;
 use QuickerFaster\UILibrary\Http\Livewire\Collapsible;
+use QuickerFaster\UILibrary\Http\Livewire\ColumnManager;
 use QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports;
 use QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports;
 use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
@@ -269,7 +271,8 @@ class UILibraryServiceProvider extends ServiceProvider
 
 
         Livewire::component('qf.collapsible', Collapsible::class);
-
+        Livewire::component('qf.background-jobs-panel', BackgroundJobsPanel::class);
+        Livewire::component('qf.column-manager', ColumnManager::class);
 
 
         // Local modules's livewire components register
