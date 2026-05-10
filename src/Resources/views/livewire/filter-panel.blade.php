@@ -4,41 +4,47 @@
             <h5 class="mb-0">Filters</h5>
             @if (!empty($filtersConfig))
 
-            <div class="btn-group">
-    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="fas fa-save"></i> Saved Filters
-    </button>
-    <ul class="dropdown-menu">
-        @foreach ($savedFilters as $saved)
-            <li>
-                <div class="dropdown-item d-flex justify-content-between align-items-center">
-                    <span wire:click.prevent="loadSavedFilter({{ $saved['id'] }})" style="cursor: pointer; flex-grow: 1;">
-                        {{ $saved['name'] }}
-                        @if ($saved['is_global'] ?? false)
-                            <span class="badge bg-info ms-2">Global</span>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown">
+                        <i class="fas fa-save"></i> Saved Filters
+                    </button>
+                    <ul class="dropdown-menu">
+                        @foreach ($savedFilters as $saved)
+                            <li>
+                                <div class="dropdown-item d-flex justify-content-between align-items-center">
+                                    <span wire:click.prevent="loadSavedFilter({{ $saved['id'] }})"
+                                        style="cursor: pointer; flex-grow: 1;">
+                                        {{ $saved['name'] }}
+                                        @if ($saved['is_global'] ?? false)
+                                            <span class="badge bg-info ms-2">Global</span>
+                                        @endif
+                                    </span>
+                                    <div>
+                                        <button wire:click.prevent="showSaveFilterModal({{ $saved['id'] }})"
+                                            class="btn btn-sm btn-link" title="Rename">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button wire:click.prevent="confirmDeleteSavedFilter({{ $saved['id'] }})"
+                                            class="btn btn-sm btn-link text-danger" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </li>
+                        @endforeach
+                        @if (count($savedFilters) > 0)
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
                         @endif
-                    </span>
-                    <div>
-                        <button wire:click.prevent="showSaveFilterModal({{ $saved['id'] }})" class="btn btn-sm btn-link" title="Rename">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button wire:click.prevent="confirmDeleteSavedFilter({{ $saved['id'] }})" class="btn btn-sm btn-link text-danger" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
+                        <li>
+                            <a class="dropdown-item" href="#" wire:click.prevent="showSaveFilterModal">
+                                <i class="fas fa-plus"></i> Save current filters...
+                            </a>
+                        </li>
+                    </ul>
                 </div>
-            </li>
-        @endforeach
-        @if (count($savedFilters) > 0)
-            <li><hr class="dropdown-divider"></li>
-        @endif
-        <li>
-            <a class="dropdown-item" href="#" wire:click.prevent="showSaveFilterModal">
-                <i class="fas fa-plus"></i> Save current filters...
-            </a>
-        </li>
-    </ul>
-</div>
             @endif
         </div>
 
@@ -70,14 +76,41 @@
                                 @switch($filter['type'])
                                     @case('select')
                                         @if ($filter['multi'] ?? false)
-                                            <select wire:model.live="activeFilters.{{ $index }}.value"
-                                                class="form-select" multiple size="3">
-                                                @foreach ($filter['options'] ?? [] as $optValue => $optLabel)
-                                                    <option value="{{ $optValue }}">{{ $optLabel }}</option>
-                                                @endforeach
-                                            </select>
-                                            <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                                            {{-- Searchable multi‑select --}}
+                                            <div class="w-100">
+                                                {{-- Selected badges --}}
+                                                <div class="selected-items mb-2">
+                                                    @foreach ($selectedLabels[$index] ?? [] as $id => $labelText)
+                                                        <span class="badge bg-primary me-1">
+                                                            {{ $labelText }}
+                                                            <button type="button" class="btn-close btn-close-white ms-1"
+                                                                wire:click="removeSelected({{ $index }}, {{ $id }})"
+                                                                style="font-size: 0.5rem;"></button>
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+
+                                                {{-- Search input --}}
+                                                <input type="text" class="form-control" placeholder="Search..."
+                                                    wire:model.live.debounce.300ms="searches.{{ $index }}">
+
+                                                {{-- Results dropdown --}}
+                                                @if (!empty($searches[$index]) && !empty($searchResults[$index]))
+                                                    <ul class="list-group mt-1" style="max-height: 200px; overflow-y: auto;">
+                                                        @foreach ($searchResults[$index] as $id => $resultLabel)
+                                                            <li class="list-group-item list-group-item-action"
+                                                                wire:click="selectOption({{ $index }}, {{ $id }}, '{{ $resultLabel }}')"
+                                                                style="cursor: pointer;">
+                                                                {{ $resultLabel }}
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                @elseif(!empty($searches[$index]) && strlen($searches[$index]) >= 2 && empty($searchResults[$index]))
+                                                    <div class="mt-1 text-muted small">No matches found</div>
+                                                @endif
+                                            </div>
                                         @else
+                                            {{-- Single select dropdown --}}
                                             <select wire:model.live="activeFilters.{{ $index }}.value"
                                                 class="form-select">
                                                 <option value="">All</option>
@@ -193,6 +226,39 @@
             </div>
         </div>
     </div>
+
+
+
+
+    {{-- Save Filter Modal (Livewire-controlled) --}}
+@if($saveFilterModalOpen)
+    <div class="modal fade show d-block" id="saveFilterModal" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" wire:ignore.self>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ $modalTitle }}</h5>
+                    <button type="button" class="btn-close" wire:click="closeSaveFilterModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Filter Name</label>
+                        <input type="text" class="form-control" wire:model="filterName" placeholder="e.g., Pending approvals December">
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" wire:model="filterIsGlobal" id="globalFilter">
+                        <label class="form-check-label" for="globalFilter">
+                            Make available to all users (admin only)
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" wire:click="closeSaveFilterModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" wire:click="saveFilter">{{ $saveButtonLabel }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
 
 
 

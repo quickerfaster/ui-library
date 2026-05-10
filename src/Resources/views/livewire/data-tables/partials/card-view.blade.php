@@ -41,17 +41,26 @@
                     {{-- Floating Badge (Top-Right) --}}
                     @if (!empty($viewConfig['badgeField']))
                         @php
-                            $val = $record->{$viewConfig['badgeField']};
+                            // Safely access nested data like 'employeePosition.employment_status'
+                            $val = data_get($record, $viewConfig['badgeField']);
+
+                            // Map the value to the configured color
                             $color = ($viewConfig['badgeColors'] ?? [])[$val] ?? 'secondary';
                         @endphp
-                        <div class="position-absolute top-0 end-0 m-3 stop-propagation">
-                            <span
-                                class="badge rounded-pill bg-white text-{{ $color }} shadow-sm border border-{{ $color }} px-2 py-1"
-                                style="font-size: 0.65rem;">
-                                {{ $val ? 'ACTIVE' : 'INACTIVE' }}
-                            </span>
-                        </div>
+
+                        @if ($val)
+                            <div class="position-absolute top-0 end-0 m-3 stop-propagation">
+                                <span
+                                    class="badge rounded-pill bg-white text-{{ $color }} shadow-sm border border-{{ $color }} px-2 py-1"
+                                    style="font-size: 0.65rem; text-transform: uppercase;">
+                                    {{ $val }}
+                                </span>
+                            </div>
+                        @endif
                     @endif
+
+
+
                 </div>
 
                 {{-- 3. Card Body --}}

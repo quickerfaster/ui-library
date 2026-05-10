@@ -71,24 +71,69 @@ class LivewireSearchableSelectField implements FieldType
 
 
 
-    public function renderTable($value, $record): string
-    {
-        // If the relation is already loaded, use it.
-        if ($this->isRelationship() && $record && $record->relationLoaded($this->name)) {
-            $related = $record->{$this->name};
-            $displayField = $this->definition['relationship']['display_field'] ?? 'name';
-            return $related->$displayField ?? e($value);
+
+    /**
+ * Render the field for a table cell.
+ */
+public function renderTable($value, $record): string
+{
+    $relName = $this->definition["relationship"]["dynamic_property"] ?? '';
+    
+    // If it's a many-to-many relationship, show badges
+    if ($this->isManyToMany() && $record && $record->relationLoaded($relName)) {
+        $related = $record->{$relName}; // use property, not method
+        
+        if ($related && $related->count() > 0) {
+            $badges = [];
+            foreach ($related as $item) {
+                $color = $item->color ?? 'secondary';
+                $name = $item->{$this->getDisplayField()};
+                $badges[] = "<span style = \" padding:0.3em 0.4em \" class=\"badge  badge-{$color} bg-gradient-{$color}\">{$name}</span>";
+            }
+            return implode(' ', $badges);
         }
-
-        // Fallback: try to get the label from the relationship or static options.
-        return $this->getLabelForValue($value);
+        return '';
     }
 
-    public function renderDetail($value, $record): string
-    {
-        // For detail view, we may not have the record, so we always fetch the label.
-        return $this->getLabelForValue($value);
+    // Fallback to the existing label lookup
+    return $this->getLabelForValue($value);
+}
+
+/**
+ * Render the field for a detail view.
+ */
+public function renderDetail($value, $record): string
+{
+    // Same logic as table, but maybe with different styling? Reuse.
+    return $this->renderTable($value, $record);
+}
+
+
+
+/**
+ * Check if the field represents a many-to-many relationship.
+ */
+protected function isManyToMany(): bool
+{
+    $rel = $this->definition['relationship'] ?? null;
+    if (!$rel) {
+        return false;
     }
+    $type = $rel['type'] ?? '';
+    return in_array($type, ['belongsToMany', 'morphToMany']);
+}
+
+/**
+ * Get the display field from relationship config.
+ */
+protected function getDisplayField(): string
+{
+    return $this->definition['relationship']['display_field'] ?? 'name';
+}
+
+
+
+
 
     /**
      * Get the human‑readable label for a given value (ID or array of IDs).

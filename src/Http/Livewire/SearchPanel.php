@@ -33,7 +33,7 @@ class SearchPanel extends Component
         } elseif (!empty($initialColumns)) {
             $this->selectedColumns = array_intersect($initialColumns, array_keys($this->allColumns));
         } else {
-            $this->selectedColumns = array_slice(array_keys($this->allColumns), 0, 3);
+            $this->selectedColumns = array_slice(array_keys($this->allColumns), 0, 2);  // 2 is also the datatble
         }
 
         if ($savedTerm !== null) {
@@ -104,7 +104,7 @@ class SearchPanel extends Component
     public function resetSearch(): void
     {
         $this->searchTerm = '';
-        $this->selectedColumns = array_slice(array_keys($this->allColumns), 0, 3);
+        $this->selectedColumns = array_slice(array_keys($this->allColumns), 0, 2); // 2 is also the datatble selection
         $this->exactMatch = false;
 
         // Clear session

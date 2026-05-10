@@ -2,30 +2,11 @@
 
     {{-- <livewire:qf.filter-panel :configKey="$configKey" wire:key="filters-{{ $configKey }}" /> --}}
 
-    @php
-        $fieldDefinitions = $this->getConfigResolver()->getFieldDefinitions();
-        $activeFilters = $this->activeFilters ?? [];
 
-        $activeFiltersList = collect($activeFilters)
-            ->map(function ($filter, $index) use ($fieldDefinitions) {
-                $def = $fieldDefinitions[$filter['field']] ?? [];
-                $label = $def['label'] ?? ucfirst($filter['field']);
-                $displayValue = $filter['value'];
-                if ($filter['type'] === 'select' && isset($def['options'])) {
-                    if (is_array($displayValue)) {
-                        $displayValue = array_map(fn($v) => $def['options'][$v] ?? $v, $displayValue);
-                    } else {
-                        $displayValue = $def['options'][$displayValue] ?? $displayValue;
-                    }
-                }
-                return ['field' => $filter['field'], 'label' => $label, 'displayValue' => $displayValue];
-            })
-            ->toArray();
-    @endphp
 
-    @if (count($activeFiltersList))
+    @if (count($this->activeFilters))
         <hr />
-        <x-qf::active-filters :filters="$activeFiltersList" />
+        <x-qf::active-filters />
         <hr />
     @endif
 
@@ -183,15 +164,16 @@
 
             @if (count($switchViews ?? []) >= 2)
                 <button wire:click="toggleViewMode" class="btn btn-sm btn-outline-secondary d-flex align-items-center">
-                    @if ($viewMode === 'table')
-                        <i class="fas fa-list"></i> <span>List</span>
-                    @elseif($viewMode === 'list')
-                        <i class="fas fa-th-large"></i> <span>Card</span>
-                    @else
+                    @if ($this->nextViewMode === 'table')
                         <i class="fas fa-table"></i> <span>Table</span>
+                    @elseif($this->nextViewMode === 'list')
+                        <i class="fas fa-list"></i> <span>List</span>
+                    @elseif($this->nextViewMode === 'card')
+                        <i class="fas fa-th-large"></i> <span>Card</span>
                     @endif
                 </button>
             @endif
+
 
             @if ($this->showHideColumnsEnabled())
                 <div class="dropdown me-4" wire:key="column-dropdown-{{ $configKey }}">
@@ -331,19 +313,9 @@
                                     <span>{{ $def['label'] ?? ucfirst($name) }}</span>
                                     @if (!$isRelationship && ($controls['filterColumns'] ?? true))
                                         <i class="fas fa-filter ms-1 {{ $hasActiveFilter ? 'text-primary' : 'text-muted' }}"
-                                            style="font-size: 0.75rem; cursor: pointer;" data-column-filter
-                                            data-field="{{ $name }}"
-                                            data-popover-content='@include('qf::components.column-filter', [
-                                                'field' => $name,
-                                                'label' => $def['label'] ?? ucfirst($name),
-                                                'type' => $filterType,
-                                                'options' =>
-                                                    $filterType === 'select' && isset($def['options'])
-                                                        ? $def['options']
-                                                        : [],
-                                                'currentValue' => $currentFilterValue,
-                                            ])' wire:ignore
-                                            onclick="event.stopPropagation();"></i>
+                                            style="font-size: 0.75rem; cursor: pointer;"
+                                            wire:click.stop="openColumnFilter('{{ $name }}')">
+                                        </i>
                                     @endif
                                 </div>
                                 @if ($isSorted)
@@ -424,7 +396,7 @@
                             </td>
                         </tr>
 
-                        @if (in_array('expand', $simpleActions) || is_array($simpleActions['expand'] ?? false))
+                        @if (isset($simpleActions['expand']))
                             <tr wire:key="expand-row-{{ $record->id }}" class="expandable-row">
                                 <td
                                     colspan="{{ count($visibleColumns) + (empty($controls['bulkActions']) ? 0 : 1) + (!empty($simpleActions) || !empty($moreActions) ? 1 : 0) }}">
@@ -432,6 +404,7 @@
                                 </td>
                             </tr>
                         @endif
+
 
                     @empty
                         <tr>
@@ -479,6 +452,86 @@
             {{ $records->links() }}
         @endif
     </div>
+
+
+
+
+
+
+
+
+
+
+    @if ($filterModalOpen)
+        <div class="modal fade show d-block" id="columnFilterModal" tabindex="-1"
+            style="background-color: rgba(0,0,0,0.5);" wire:ignore.self>
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Filter by
+                            {{ $columns[$columnFilterField]['label'] ?? ucfirst($columnFilterField) }}</h5>
+                        <button type="button" class="btn-close" wire:click="closeColumnFilter"></button>
+                    </div>
+                    <div class="modal-body">
+                        @php
+                            $def = $columns[$columnFilterField] ?? [];
+                            $type = $def['field_type'] ?? 'string';
+                            $filterType = $this->mapFieldTypeToFilterType($type);
+                            $options = $def['options'] ?? [];
+                        @endphp
+
+                        @switch($filterType)
+                            @case('select')
+                                <select wire:model="columnFilterValue" class="form-select">
+                                    <option value="">All</option>
+                                    @foreach ($options as $val => $label)
+                                        <option value="{{ $val }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            @break
+
+                            @case('boolean')
+                                <select wire:model="columnFilterValue" class="form-select">
+                                    <option value="">All</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                            @break
+
+                            @case('date')
+                                <input type="date" wire:model="columnFilterValue" class="form-control">
+                            @break
+
+                            @case('number')
+                                <input type="number" step="any" wire:model="columnFilterValue" class="form-control"
+                                    placeholder="Equals">
+                            @break
+
+                            @default
+                                <input type="text" wire:model="columnFilterValue" class="form-control"
+                                    placeholder="Contains...">
+                        @endswitch
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                            wire:click="closeColumnFilter">Cancel</button>
+                        <button type="button" class="btn btn-primary" wire:click="applyColumnFilter">Apply</button>
+                        <button type="button" class="btn btn-link text-danger"
+                            wire:click="clearColumnFilter">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+
+
+
+
+
+
+
+
 
     <style>
         th.sorting.sorting-asc,

@@ -96,7 +96,7 @@
                                 <div class="row g-3 justify-content-center">
                                     @foreach ($group['fields'] as $field)
                                         @if (!$this->isFieldHidden($field, $isEditMode ? 'onEditForm' : 'onNewForm'))
-                                            <div class="col-12 col-lg-8"> {{-- Centered-feel width --}}
+                                            <div class="col-12  @if($crudType != "drawers") col-lg-8 @endif"> {{-- Centered-feel width --}}
                                                 {!! $this->getField($field)->renderForm($this->fields[$field] ?? null) !!}
                                             </div>
                                         @endif

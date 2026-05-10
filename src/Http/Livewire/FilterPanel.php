@@ -28,10 +28,22 @@ class FilterPanel extends Component
 
     protected ?ConfigResolver $configResolver = null;
 
+
+    public array $searches = [];      // Search queries per filter index
+    public array $searchResults = []; // Results per filter index
+    public array $selectedLabels = []; // Labels for selected IDs per filter index
+
+
+        public bool $saveFilterModalOpen = false;
+
+
+
     protected $listeners = [
         'confirmClearFilters' => 'confirmClearFilters',
         'confirmDeleteSavedFilter' => 'deleteSavedFilter'
     ];
+
+
 
     public function mount(string $configKey, array $initialFilters = []): void
     {
@@ -39,24 +51,43 @@ class FilterPanel extends Component
         $this->initialFilters = $initialFilters;
         $this->loadConfig();
         $this->normalizeFilterConfig();
-        $this->initializeFilters();
-        $this->loadSavedFilters();
 
-        $this->activeFilters = array_intersect_key($this->activeFilters, $this->filtersConfig);
-
-        foreach ($this->activeFilters as $index => $filter) {
-            $config = $this->filtersConfig[$index] ?? null;
-            if (!$config) continue;
-
-            if (!isset($filter['operator']) || !in_array($filter['operator'], array_keys($config['operators']))) {
-                $filter['operator'] = $config['defaultOperator'];
+        // Always use initialFilters (from DataTable) – no session restore
+        $this->activeFilters = [];
+        foreach ($this->filtersConfig as $index => $config) {
+            $found = false;
+            foreach ($initialFilters as $filter) {
+                if ($filter['field'] === $config['field']) {
+                    $this->activeFilters[$index] = [
+                        'operator' => $filter['operator'],
+                        'value' => $filter['value'],
+                    ];
+                    $found = true;
+                    break;
+                }
             }
-            if (!isset($filter['value'])) {
-                $filter['value'] = $this->getDefaultValueForType($config['type'], $filter['operator'], $config['multi'] ?? false);
+            if (!$found) {
+                $defaultOperator = $config['defaultOperator'];
+                $this->activeFilters[$index] = [
+                    'operator' => $defaultOperator,
+                    'value' => $this->getDefaultValueForType($config['type'], $defaultOperator, $config['multi'] ?? false),
+                ];
             }
-            $this->activeFilters[$index] = $filter;
         }
+
+        $this->loadSavedFilters();
+        $this->loadFilterSelectedLabels();
     }
+
+
+    public function updateFilters($filters)
+    {
+        $this->activeFilters = $this->sanitizeActiveFilters($filters);
+        $this->saveFiltersToSession();
+        $this->resetPage();
+    }
+
+
 
     protected function initializeFilters(): void
     {
@@ -93,26 +124,42 @@ class FilterPanel extends Component
     }
 
     // ========== SAVED FILTERS – EDIT MODE ==========
-    public function showSaveFilterModal(?int $filterId = null): void
-    {
-        if ($filterId) {
-            $filter = SavedFilter::where('id', $filterId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
-            $this->filterName = $filter->name;
-            $this->filterIsGlobal = $filter->is_global;
-            $this->editingFilterId = $filterId;
-            $this->modalTitle = 'Rename Filter';
-            $this->saveButtonLabel = 'Update';
-        } else {
-            $this->filterName = '';
-            $this->filterIsGlobal = false;
-            $this->editingFilterId = null;
-            $this->modalTitle = 'Save Filter Set';
-            $this->saveButtonLabel = 'Save';
-        }
-        $this->dispatch('openSaveFilterModal');
+public function showSaveFilterModal(?int $filterId = null): void
+{
+    if ($filterId) {
+        $filter = SavedFilter::where('id', $filterId)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+        $this->filterName = $filter->name;
+        $this->filterIsGlobal = $filter->is_global;
+        $this->editingFilterId = $filterId;
+        $this->modalTitle = 'Rename Filter';
+        $this->saveButtonLabel = 'Update';
+    } else {
+        $this->filterName = '';
+        $this->filterIsGlobal = false;
+        $this->editingFilterId = null;
+        $this->modalTitle = 'Save Filter Set';
+        $this->saveButtonLabel = 'Save';
     }
+    $this->saveFilterModalOpen = true; // open modal
+}
+
+
+
+public function openSaveFilterModal(): void
+{
+    $this->saveFilterModalOpen = true;
+}
+
+public function closeSaveFilterModal(): void
+{
+    $this->saveFilterModalOpen = false;
+    $this->reset(['filterName', 'filterIsGlobal', 'editingFilterId']);
+}
+
+
+
 
     public function saveFilter(): void
     {
@@ -133,7 +180,7 @@ class FilterPanel extends Component
             $this->saveCurrentFilters($this->filterName, $this->filterIsGlobal);
         }
 
-        $this->dispatch('closeSaveFilterModal');
+    $this->closeSaveFilterModal(); // close modal
         $this->reset(['filterName', 'filterIsGlobal', 'editingFilterId']);
         $this->loadSavedFilters();
     }
@@ -195,11 +242,25 @@ class FilterPanel extends Component
         $fieldsToInclude = is_array($autoConfig) ? $autoConfig : array_keys($this->fieldDefinitions);
 
         foreach ($this->fieldDefinitions as $fieldName => $definition) {
-            if (is_array($fieldsToInclude) && !in_array($fieldName, $fieldsToInclude)) continue;
-            if (($definition['filterable'] ?? true) === false) continue;
+            if (is_array($fieldsToInclude) && !in_array($fieldName, $fieldsToInclude))
+                continue;
+            if (($definition['filterable'] ?? true) === false)
+                continue;
+
+            // Detect many‑to‑many relations (including morphToMany)
+            $isManyToMany = false;
+            if (isset($definition['relationship']['type']) && in_array($definition['relationship']['type'], ['belongsToMany', 'morphToMany'])) {
+                $isManyToMany = true;
+            }
 
             $fieldType = $definition['field_type'] ?? 'string';
             $filterType = $this->mapFieldTypeToFilterType($fieldType);
+
+            // Override for many‑to‑many: treat as multi‑select
+            if ($isManyToMany) {
+                $filterType = 'select';
+            }
+
             $operators = $this->getOperatorsForType($filterType);
             $defaultOperator = array_key_first($operators);
 
@@ -211,6 +272,13 @@ class FilterPanel extends Component
                 'defaultOperator' => $defaultOperator,
                 'multi' => $definition['multiSelect'] ?? false,
             ];
+
+            // If many‑to‑many, force multi = true and replace operators with 'in'
+            if ($isManyToMany) {
+                $filter['multi'] = true;
+                $filter['operators'] = ['in' => 'Has any of'];
+                $filter['defaultOperator'] = 'in';
+            }
 
             if ($filterType === 'select') {
                 $filter['options'] = $this->getOptionsForField($fieldName, $definition);
@@ -287,6 +355,7 @@ class FilterPanel extends Component
 
     protected function getOptionsForField(string $fieldName, array $definition): array
     {
+        // 1. Explicit options from config
         if (isset($definition['options']['model'])) {
             $modelClass = $definition['options']['model'];
             $valueColumn = $definition['options']['column'] ?? 'name';
@@ -296,11 +365,17 @@ class FilterPanel extends Component
             }
         } elseif (isset($definition['options']) && is_array($definition['options'])) {
             return $definition['options'];
-        } elseif (isset($definition['relationship']['model'])) {
+        }
+
+        // 2. Relationship (belongsTo, belongsToMany, morphToMany)
+        if (isset($definition['relationship']['model'])) {
             $modelClass = $definition['relationship']['model'];
             $displayField = $definition['relationship']['display_field'] ?? 'name';
-            return $modelClass::pluck($displayField, 'id')->toArray();
+            if (class_exists($modelClass)) {
+                return $modelClass::pluck($displayField, 'id')->toArray();
+            }
         }
+
         return [];
     }
 
@@ -378,11 +453,21 @@ class FilterPanel extends Component
         $value = $active['value'];
         $multi = $filterConfig['multi'] ?? false;
 
-        if ($type === 'date' && in_array($operator, [
-            'today', 'this_week', 'this_month', 'this_year',
-            'last_week', 'last_month', 'last_year', 'last_7_days',
-            'next_30_days', 'this_quarter', 'last_quarter'
-        ])) {
+        if (
+            $type === 'date' && in_array($operator, [
+                'today',
+                'this_week',
+                'this_month',
+                'this_year',
+                'last_week',
+                'last_month',
+                'last_year',
+                'last_7_days',
+                'next_30_days',
+                'this_quarter',
+                'last_quarter'
+            ])
+        ) {
             return false;
         }
 
@@ -445,7 +530,7 @@ class FilterPanel extends Component
         $saved = SavedFilter::where('id', $id)
             ->where(function ($q) {
                 $q->where('user_id', Auth::id())
-                  ->orWhere('is_global', true);
+                    ->orWhere('is_global', true);
             })
             ->firstOrFail();
 
@@ -453,6 +538,122 @@ class FilterPanel extends Component
         $this->emitFilters();
         $this->dispatch('showAlert', ['type' => 'success', 'message' => "Filter '{$saved->name}' applied"]);
     }
+
+
+
+
+
+
+
+
+
+    /**
+     * When search input changes, fetch matching options.
+     */
+    public function updatedSearches($value, $index)
+    {
+        $filter = $this->filtersConfig[$index] ?? null;
+        if (!$filter || ($filter['type'] ?? '') !== 'select') {
+            return;
+        }
+
+        $options = $filter['options'] ?? [];
+        if (empty($options)) {
+            $this->searchResults[$index] = [];
+            return;
+        }
+
+        $results = [];
+        $search = strtolower(trim($value));
+        if (strlen($search) >= 2) {
+            foreach ($options as $id => $label) {
+                if (stripos($label, $search) !== false) {
+                    $results[$id] = $label;
+                }
+            }
+        }
+        $this->searchResults[$index] = $results;
+    }
+
+    /**
+     * Select an option from search results.
+     */
+    public function selectOption($index, $id, $label)
+    {
+        $filter = $this->filtersConfig[$index] ?? null;
+        if (!$filter)
+            return;
+
+        // Get current selected values
+        $current = $this->activeFilters[$index]['value'] ?? [];
+        if (!is_array($current)) {
+            $current = [];
+        }
+
+        if (!in_array($id, $current)) {
+            $current[] = $id;
+            $this->activeFilters[$index]['value'] = $current;
+            $this->selectedLabels[$index][$id] = $label;
+        }
+
+        // Clear search
+        $this->searches[$index] = '';
+        $this->searchResults[$index] = [];
+
+        $this->emitFilters();
+    }
+
+    /**
+     * Remove a selected option.
+     */
+    public function removeSelected($index, $id)
+    {
+        $filter = $this->filtersConfig[$index] ?? null;
+        if (!$filter)
+            return;
+
+        $current = $this->activeFilters[$index]['value'] ?? [];
+        if (is_array($current)) {
+            $current = array_values(array_diff($current, [$id]));
+            $this->activeFilters[$index]['value'] = $current;
+            unset($this->selectedLabels[$index][$id]);
+        }
+
+        $this->emitFilters();
+    }
+
+    /**
+     * Load initial selected labels when filter panel loads.
+     */
+    protected function loadFilterSelectedLabels(): void
+    {
+        foreach ($this->filtersConfig as $index => $filter) {
+            if (($filter['type'] ?? '') !== 'select' || !($filter['multi'] ?? false)) {
+                continue;
+            }
+            $selectedIds = $this->activeFilters[$index]['value'] ?? [];
+            if (empty($selectedIds)) {
+                $this->selectedLabels[$index] = [];
+                continue;
+            }
+            $options = $filter['options'] ?? [];
+            $labels = [];
+            foreach ((array) $selectedIds as $id) {
+                if (isset($options[$id])) {
+                    $labels[$id] = $options[$id];
+                }
+            }
+            $this->selectedLabels[$index] = $labels;
+        }
+    }
+
+
+
+
+
+
+
+
 
     public function render()
     {

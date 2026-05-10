@@ -387,8 +387,13 @@ class DataTableForm extends Component
     {
         $multiple = $this->fieldDefinitions[$field]['multiSelect'] ?? false;
 
+        // Convert to integer
+        $id = (int) $id;
+
         if ($multiple) {
             $current = $this->fields[$field] ?? [];
+            // Ensure all existing IDs are integers
+            $current = array_map('intval', $current);
             if (!in_array($id, $current)) {
                 $current[] = $id;
                 $this->fields[$field] = $current;
@@ -397,11 +402,65 @@ class DataTableForm extends Component
         } else {
             $this->fields[$field] = $id;
             $this->selectedLabels[$field] = [$id => $label];
-            // Clear search after single selection
             $this->searches[$field] = '';
             $this->searchResults[$field] = [];
         }
     }
+
+
+
+    /**
+     * Create a new tag/option on the fly and select it immediately.
+     * Works for any relationship model that has fillable 'name' and 'slug' fields.
+     *
+     * @param string $field
+     * @param string $newValue
+     * @return void
+     */
+
+
+    public function createAndSelectOption($field, $newValue)
+{
+    $definition = $this->fieldDefinitions[$field] ?? null;
+    if (!$definition || !isset($definition['relationship'])) {
+        return;
+    }
+
+    $rel = $definition['relationship'];
+    $modelClass = $rel['model'];
+    $displayField = $rel['display_field'] ?? 'name';
+
+    // Create new record (ensure fillable fields are allowed)
+    $newRecord = $modelClass::create([
+        $displayField => $newValue,
+        'slug' => \Illuminate\Support\Str::slug($newValue),
+        'color' => 'primary',
+        'is_active' => true,
+    ]);
+
+    $multiple = $definition['multiSelect'] ?? false;
+
+    if ($multiple) {
+        $currentIds = $this->fields[$field] ?? [];
+        // Ensure all IDs are integers
+        $currentIds = array_map('intval', $currentIds);
+        if (!in_array($newRecord->id, $currentIds)) {
+            $currentIds[] = $newRecord->id;
+            $this->fields[$field] = $currentIds;
+            $this->selectedLabels[$field][$newRecord->id] = $newRecord->$displayField;
+        }
+    } else {
+        $this->fields[$field] = $newRecord->id;
+        $this->selectedLabels[$field] = [$newRecord->id => $newRecord->$displayField];
+    }
+
+    // Clear search
+    $this->searches[$field] = '';
+    $this->searchResults[$field] = [];
+}
+
+
+
 
     public function removeSelected($field, $id)
     {
@@ -431,12 +490,16 @@ class DataTableForm extends Component
         foreach ($this->fieldDefinitions as $field => $definition) {
             if (isset($definition['relationship'])) {
                 $rel = $definition['relationship'];
+
                 $dynamicProp = $rel['dynamic_property'] ?? $field;
                 if ($record->$dynamicProp) {
-                    if (in_array($rel['type'], ['belongsToMany', 'hasMany', 'morphMany'])) {
-                        $this->fields[$field] = $record->$dynamicProp->pluck('id')->toArray();
+                    $relationResult = $record->$dynamicProp;
+                    if (method_exists($relationResult, 'pluck')) {
+                        // It's a collection (many‑to‑many, hasMany, morphMany, morphToMany)
+                        $this->fields[$field] = $relationResult->pluck('id')->toArray();
                     } else {
-                        $this->fields[$field] = $record->$dynamicProp->id ?? null;
+                        // It's a single model (belongsTo, hasOne)
+                        $this->fields[$field] = $relationResult->id ?? null;
                     }
                 } else {
                     $this->fields[$field] = null;
@@ -532,7 +595,7 @@ class DataTableForm extends Component
 
             // Automatically cast all checkbox/boolean fields to true/false
             foreach ($this->fieldDefinitions as $fieldName => $definition) {
-                
+
                 // Skip multiselect
                 if ($definition["multiSelect"] ?? false)
                     continue;
@@ -596,7 +659,7 @@ class DataTableForm extends Component
             $this->dispatch('refreshDataTable');
 
             // Refresh record globally
-            $refreshEventName = "refresh".\Str::plural($this->getConfigResolver()->getModelName());
+            $refreshEventName = "refresh" . \Str::plural($this->getConfigResolver()->getModelName());
             $this->dispatch($refreshEventName);
 
 
@@ -825,13 +888,20 @@ class DataTableForm extends Component
             $type = $rel['type'] ?? 'belongsTo';
             $dynamicProp = $rel['dynamic_property'] ?? $field;
 
-            if (in_array($type, ['belongsToMany', 'hasMany', 'morphMany'])) {
+            // Include morphToMany alongside other many-to-many types
+            if (in_array($type, ['belongsToMany', 'hasMany', 'morphMany', 'morphToMany'])) {
                 $ids = $this->fields[$field] ?? [];
-                $record->$dynamicProp()->sync($ids);
+                if (!empty($ids)) {
+                    $record->$dynamicProp()->sync($ids);
+                } else {
+                    $record->$dynamicProp()->sync([]);
+                }
             }
-            // For belongsTo, the foreign key is already in $data
+            // For belongsTo, foreign key is already in $data
         }
     }
+
+
 
     // ---------- Event Handlers ----------
     public function handleOpenAddModal(string $configKey): void
@@ -928,3 +998,4 @@ class DataTableForm extends Component
         ]);
     }
 }
+

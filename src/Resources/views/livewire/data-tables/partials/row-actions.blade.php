@@ -71,11 +71,13 @@
         @endif
 
 
-        @if (in_array('expand', $simpleActions) || is_array($simpleActions['expand'] ?? false))
+        @if (isset($simpleActions['expand']))
             @php
-                $expandConfig = is_array($simpleActions['expand'] ?? false)
+                // Check if the value is an array of settings or just a boolean true
+                $expandConfig = is_array($simpleActions['expand'])
                     ? $simpleActions['expand']
                     : ['component' => 'qf.data-table-detail', 'params' => []];
+
                 $expandComponent = $expandConfig['component'] ?? 'qf.data-table-detail';
                 $expandParams = array_merge(
                     [
@@ -88,6 +90,7 @@
                 $expandTitle = $expandConfig['label'] ?? 'Details';
                 $expandIcon = $expandConfig['icon'] ?? 'fas fa-chevron-down';
             @endphp
+
             <button type="button"
                 wire:click="$dispatch('toggleCollapsible', { 
             collapsibleId: 'expand-{{ $record->id }}',

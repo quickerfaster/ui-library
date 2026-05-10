@@ -279,6 +279,8 @@ class EmployeePosition extends Model
                     $position->employee->updateQuietly(['company_id' => $companyId]);
                 }
             }
+
+            
         });
 
 

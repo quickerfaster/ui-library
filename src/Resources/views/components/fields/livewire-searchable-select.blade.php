@@ -34,7 +34,6 @@
 
     {{-- Dropdown results --}}
     @if(!empty($this->searches[$fieldName]) && !empty($this->searchResults[$fieldName]))
-   
         <ul class="list-group mt-1" style="max-height: 200px; overflow-y: auto;">
             @foreach($this->searchResults[$fieldName] as $id => $resultLabel)
                 <li class="list-group-item list-group-item-action" wire:click="selectOption('{{ $fieldName }}', '{{ $id }}', '{{ $resultLabel }}')" style="cursor: pointer;">
@@ -42,6 +41,16 @@
                 </li>
             @endforeach
         </ul>
+    @endif
+
+    {{-- CREATE NEW OPTION BUTTON --}}
+    @if(!empty($this->searches[$fieldName]) && empty($this->searchResults[$fieldName]) && strlen($this->searches[$fieldName]) >= 2)
+        <div class="mt-1">
+            <button type="button" class="btn btn-sm btn-link text-primary p-0"
+                    wire:click="createAndSelectOption('{{ $fieldName }}', '{{ $this->searches[$fieldName] }}')">
+                + Create “{{ $this->searches[$fieldName] }}”
+            </button>
+        </div>
     @endif
 
     {{-- Validation error --}}

@@ -47,17 +47,27 @@
 
                         @if (!empty($viewConfig['badgeField']))
                             @php
-                                $val = $record->{$viewConfig['badgeField']};
+                                // Use data_get to safely reach nested relationships like 'employeePosition.employment_status'
+                                $val = data_get($record, $viewConfig['badgeField']);
+
+                                // Match the value to the color config, defaulting to 'secondary'
                                 $color = ($viewConfig['badgeColors'] ?? [])[$val] ?? 'secondary';
                             @endphp
-                            <div class="stop-propagation">
-                                <span
-                                    class="badge rounded-pill bg-{{ $color }}-subtle text-{{ $color }} border border-{{ $color }} px-2 py-1"
-                                    style="font-size: 0.65rem; letter-spacing: 0.02em;">
-                                    {{ $val ? 'ACTIVE' : 'INACTIVE' }}
-                                </span>
-                            </div>
+
+                            @if ($val)
+                                {{-- Only show if the value exists --}}
+                                <div class="stop-propagation">
+                                    <span
+                                        class="badge rounded-pill bg-{{ $color }}-subtle text-{{ $color }} border border-{{ $color }} px-2 py-1"
+                                        style="font-size: 0.65rem; letter-spacing: 0.02em; text-transform: uppercase;">
+                                        {{ $val }}
+                                    </span>
+                                </div>
+                            @endif
                         @endif
+
+
+
                     </div>
 
                     {{-- Metadata --}}

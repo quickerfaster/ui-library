@@ -69,6 +69,12 @@ class DataTable extends Component
     public array $selectedSearchColumns = [];   // columns to search in
     public bool $exactMatch = false;
 
+
+    public $filterModalOpen = false;
+    public $columnFilterField = null;
+    public $columnFilterValue = null;
+    public array $allFieldDefinitions = [];
+
     protected $listeners = [
         'performDelete' => 'performDelete',
         'refreshDataTable' => '$refresh',
@@ -96,6 +102,17 @@ class DataTable extends Component
 
         $this->initializeFromConfig();
         $this->initializeComponent();
+        $this->loadSortFromSession();
+
+
+        // Load saved filters from session
+        $sessionFilters = $this->loadFiltersFromSession();
+        $this->activeFilters = $sessionFilters;
+        $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
+        $this->rebuildQuickFilterValues();
+
+        $this->activeFilters = $this->sanitizeActiveFilters($this->activeFilters);
+
 
         $this->allColumns = array_keys($this->columns);
         $this->activeFilters = $this->sanitizeActiveFilters($this->activeFilters);
@@ -105,6 +122,13 @@ class DataTable extends Component
         $this->activeFilters = $this->sanitizeActiveFilters(
             array_merge($this->initialActiveFilters, $this->activeFilters)
         );
+
+        $this->activeFilters = $this->sanitizeActiveFilters(array_merge($this->initialActiveFilters, $this->activeFilters));
+        $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
+
+
+        $this->rebuildQuickFilterValues();
+
 
         $this->validateSortField();
 
@@ -151,6 +175,19 @@ class DataTable extends Component
     }
 
 
+
+    protected function saveSortToSession(): void
+    {
+        session()->put("sort_{$this->configKey}", $this->sort);
+    }
+
+    protected function loadSortFromSession(): void
+    {
+        $saved = session()->get("sort_{$this->configKey}");
+        if ($saved && is_array($saved)) {
+            $this->sort = $saved;
+        }
+    }
 
 
     /**
@@ -327,6 +364,8 @@ class DataTable extends Component
 
 
 
+
+
     public function getAvatarUrl($record): ?string
     {
         // 1. Explicit config (highest priority)
@@ -447,9 +486,13 @@ class DataTable extends Component
             'value' => $filterValue,
         ];
 
+
         $this->quickFilterValues[$field] = $value;
+        $this->saveFiltersToSession();
+
         $this->resetPage();
         $this->dispatch('filtersUpdated', filters: $this->activeFilters);
+        $this->dispatch('refreshColumnFilters');
     }
 
     /**
@@ -459,6 +502,7 @@ class DataTable extends Component
     {
         $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== $field));
         unset($this->quickFilterValues[$field]);
+        $this->saveFiltersToSession();
         $this->resetPage();
         $this->dispatch('filtersUpdated', filters: $this->activeFilters);
     }
@@ -475,6 +519,101 @@ class DataTable extends Component
 
 
 
+
+
+
+
+    public function openColumnFilter($field)
+    {
+        $this->columnFilterField = $field;
+        $this->columnFilterValue = $this->quickFilterValues[$field] ?? null;
+        $this->filterModalOpen = true;
+    }
+
+    public function closeColumnFilter()
+    {
+        $this->filterModalOpen = false;
+        $this->columnFilterField = null;
+        $this->columnFilterValue = null;
+    }
+
+    public function applyColumnFilter()
+    {
+        if ($this->columnFilterField) {
+            $this->applyQuickFilter($this->columnFilterField, $this->columnFilterValue);
+        }
+        $this->closeColumnFilter();
+    }
+
+    public function clearColumnFilter()
+    {
+        if ($this->columnFilterField) {
+            $this->clearQuickFilter($this->columnFilterField);
+        }
+        $this->closeColumnFilter();
+    }
+
+
+
+    protected function enrichFiltersWithDisplayValues(array $filters): array
+    {
+        $result = [];
+        foreach ($filters as $filter) {
+            $field = $filter['field'];
+            $value = $filter['value'];
+            $def = $this->allFieldDefinitions[$field] ?? [];
+
+            $displayValue = $value;
+
+
+            // Handle many‑to‑many / select fields
+            if (isset($def['relationship']) && in_array($def['relationship']['type'] ?? '', ['belongsToMany', 'morphToMany'])) {
+                // Many‑to‑many: value is an array of IDs
+                $displayValue = $this->getManyToManyDisplayValue($field, $value);
+            } elseif (isset($def['relationship']) && $def['relationship']['type'] === 'belongsTo') {
+
+                // Belongs to (foreign key) – single value
+                $relatedModel = $def['relationship']['model'];
+                $displayField = $def['relationship']['display_field'] ?? 'name';
+
+                if ($value && class_exists($relatedModel)) {
+                    $record = $relatedModel::find($value);
+                    $displayValue = $record ? $record->$displayField : $value;
+                }
+            } elseif (($def['field_type'] ?? '') === 'select' || isset($def['options'])) {
+                // Regular select (single or multi)
+                $options = $def['options'] ?? [];
+                if (is_array($value)) {
+                    $displayValue = array_values(array_intersect_key($options, array_flip($value)));
+                } else {
+                    $displayValue = $options[$value] ?? $value;
+                }
+            }
+
+            $result[] = array_merge($filter, [
+                'displayValue' => $displayValue,
+                'label' => $def['label'] ?? ucfirst($field),
+            ]);
+        }
+        return $result;
+    }
+
+    protected function getManyToManyDisplayValue(string $field, $value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+        $def = $this->columns[$field] ?? [];
+        $rel = $def['relationship'] ?? [];
+        $modelClass = $rel['model'] ?? null;
+        $displayField = $rel['display_field'] ?? 'name';
+        if (!$modelClass) {
+            return is_array($value) ? implode(', ', $value) : (string) $value;
+        }
+        $ids = (array) $value;
+        $records = $modelClass::whereIn('id', $ids)->pluck($displayField, 'id')->toArray();
+        return implode(', ', $records);
+    }
 
 
 
@@ -540,7 +679,6 @@ class DataTable extends Component
             'sort' => ['except' => ['field' => 'id', 'direction' => 'asc']],
             'perPage' => ['except' => 15],
             'viewMode' => ['except' => 'table'],
-            'activeFilters' => ['as' => 'filters-' . $this->configKey, 'except' => ''],
             'trashedFilter' => ['except' => 'without'],
 
         ];
@@ -614,12 +752,15 @@ class DataTable extends Component
     protected function initializeFromConfig(): void
     {
         $resolver = $this->getConfigResolver();
+        $fieldDefs = $resolver->getFieldDefinitions();
+        $this->allFieldDefinitions = $fieldDefs;
 
         // Custom columns support (unchanged)
         if (!empty($this->customColumns)) {
             $this->columns = [];
             $this->searchableFields = [];
             $this->searchableRelations = [];
+            $this->allFieldDefinitions = [];
 
             foreach ($this->customColumns as $field => $definition) {
                 if (!isset($definition['field_type'])) {
@@ -633,6 +774,9 @@ class DataTable extends Component
                 if (($definition['searchable'] ?? true) !== false) {
                     $this->searchableFields[] = $field;
                 }
+
+                $this->allFieldDefinitions[$field] = $definition;
+
             }
             return;
         }
@@ -837,11 +981,20 @@ class DataTable extends Component
 
 
 
+
+
     public function updateFilters($filters)
     {
         $this->activeFilters = $this->sanitizeActiveFilters($filters);
+        $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
+        $this->saveFiltersToSession();
+        $this->rebuildQuickFilterValues();
         $this->resetPage();
     }
+
+
+
+
 
 
 
@@ -955,7 +1108,18 @@ class DataTable extends Component
         } else {
             $this->sort = ['field' => $field, 'direction' => 'asc'];
         }
+
+        $this->saveSortToSession();
         $this->resetPage();
+    }
+
+
+    protected function rebuildQuickFilterValues(): void
+    {
+        $this->quickFilterValues = [];
+        foreach ($this->activeFilters as $filter) {
+            $this->quickFilterValues[$filter['field']] = $filter['value'];
+        }
     }
 
     protected function getValueFromRecord($record, string $path)
@@ -965,13 +1129,51 @@ class DataTable extends Component
 
     public function toggleViewMode(): void
     {
-        $modes = ['table', 'list', 'card'];
+        $allowedModes = ['table', 'list', 'card'];
+        $modes = array_keys($this->getConfigResolver()->getConfig()["switchViews"]);
+
+        // Filter and then RESET the keys (0, 1, 2...)
+        $modes = array_values(array_intersect($modes, $allowedModes));
+
+        // Safety check: if no valid modes exist, stop to avoid division by zero
+        if (empty($modes))
+            return;
+
         $currentIndex = array_search($this->viewMode, $modes);
-        $nextIndex = ($currentIndex + 1) % count($modes);
+
+        // If current mode isn't in the new list, start at the first one
+        if ($currentIndex === false) {
+            $nextIndex = 0;
+        } else {
+            $nextIndex = ($currentIndex + 1) % count($modes);
+        }
+
         $this->viewMode = $modes[$nextIndex];
         session(["view_preference.{$this->configKey}" => $this->viewMode]);
         $this->resetPage();
     }
+
+
+
+    // Inside your Livewire component
+    public function getNextViewModeProperty()
+    {
+        $allowedModes = ['table', 'list', 'card'];
+        $modes = array_values(array_intersect(
+            array_keys($this->getConfigResolver()->getConfig()["switchViews"]),
+            $allowedModes
+        ));
+
+        if (empty($modes))
+            return null;
+
+        $currentIndex = array_search($this->viewMode, $modes);
+        $nextIndex = ($currentIndex === false) ? 0 : ($currentIndex + 1) % count($modes);
+
+        return $modes[$nextIndex];
+    }
+
+
 
 
 
@@ -1150,12 +1352,20 @@ class DataTable extends Component
                 continue;
             }
 
+            if ($this->isManyToManyField($field)) {
+                $this->applyManyToManyFilter($query, $field, $operator, $value);
+                continue;
+            }
+
+
             // Get field definition to determine type
             $fieldDef = $this->columns[$field] ?? [];
             $fieldType = $fieldDef['field_type'] ?? 'string';
 
             // Route to type-specific handler
             $type = $this->mapFieldTypeToFilterType($fieldType);
+
+
 
             switch ($type) {
                 case 'string':
@@ -1179,6 +1389,18 @@ class DataTable extends Component
         }
     }
 
+
+
+    protected function isManyToManyField(string $field): bool
+    {
+        $fieldDef = $this->columns[$field] ?? [];
+        $rel = $fieldDef['relationship'] ?? null;
+        if (!$rel) {
+            return false;
+        }
+        $type = $rel['type'] ?? '';
+        return in_array($type, ['belongsToMany', 'morphToMany']);
+    }
 
 
 
@@ -1347,6 +1569,58 @@ class DataTable extends Component
         }
     }
 
+
+
+    protected function applyManyToManyFilter($query, $field, $operator, $value)
+    {
+        // Skip empty values
+        if (empty($value)) {
+            return;
+        }
+
+        $fieldDef = $this->columns[$field] ?? [];
+        $rel = $fieldDef['relationship'] ?? [];
+
+        // Determine pivot table and keys from relationship config
+        $pivotTable = $rel['pivot_table'] ?? null;
+        $foreignPivotKey = $rel['foreign_pivot_key'] ?? null; // e.g., 'taggable_id'
+        $relatedPivotKey = $rel['related_pivot_key'] ?? null; // e.g., 'tag_id'
+        $morphType = $rel['morph_type'] ?? null;
+        $morphName = $rel['morph_name'] ?? null;
+
+        if (!$pivotTable || !$foreignPivotKey || !$relatedPivotKey) {
+            // Fallback: try to guess from relation name (worse)
+            $relationName = $rel['dynamic_property'] ?? $field;
+            $query->whereHas($relationName, function ($q) use ($value) {
+                $q->whereIn('id', (array) $value);
+            });
+            return;
+        }
+
+        // For morphToMany, we also need to filter by the morph type (e.g., taggable_type = Employee::class)
+        $table = $query->getModel()->getTable();
+        $operator = $operator === 'in' ? 'whereIn' : 'whereHas'; // support 'in' (any) or maybe later 'all'
+
+        if ($operator === 'whereIn') {
+            // Subquery for employees that have any of the selected tags
+            $query->whereExists(function ($sub) use ($table, $pivotTable, $foreignPivotKey, $relatedPivotKey, $morphType, $value) {
+                $sub->select(\DB::raw(1))
+                    ->from($pivotTable)
+                    ->whereColumn("{$pivotTable}.{$foreignPivotKey}", "{$table}.id")
+                    ->whereIn("{$pivotTable}.{$relatedPivotKey}", (array) $value);
+                if ($morphType) {
+                    $modelClass = $this->getConfigResolver()->getModel();
+                    $sub->where("{$pivotTable}.{$morphType}", $modelClass);
+                }
+            });
+        } else {
+            // For 'all' operator (if needed, but we only use 'in' for now)
+            // Could implement whereHas with having count = count($value)
+        }
+    }
+
+
+
     protected function applyFilters($query, array $filters, bool $mandatory = false): void
     {
         $fieldDefinitions = $this->getConfigResolver()->getFieldDefinitions();
@@ -1366,13 +1640,30 @@ class DataTable extends Component
     public function removeFilter(string $field): void
     {
         $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== $field));
-        $this->dispatch('filtersUpdated', filters: $this->activeFilters);
+        $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
+        unset($this->quickFilterValues[$field]);
+        $this->saveFiltersToSession();
         $this->resetPage();
     }
+
+
+    protected function saveFiltersToSession(): void
+    {
+        session()->put("active_filters.{$this->configKey}", $this->activeFilters);
+    }
+
+    protected function loadFiltersFromSession(): array
+    {
+        return session()->get("active_filters.{$this->configKey}", []);
+    }
+
+
 
     public function clearAllFilters(): void
     {
         $this->activeFilters = [];
+        $this->quickFilterValues = [];
+        $this->saveFiltersToSession();
         $this->dispatch('filtersUpdated', filters: []);
         $this->resetPage();
     }

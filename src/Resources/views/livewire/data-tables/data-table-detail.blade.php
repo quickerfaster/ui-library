@@ -1,5 +1,5 @@
   <div>
-      <div class="detail-page-wrapper mb-5 p-2">
+      <div class="detail-page-wrapper mb-5 p-2"> 
           {{-- 1. HEADER SECTION --}}
           @php
               $module = strtolower($this->getConfigResolver()->getModuleName());
@@ -52,7 +52,7 @@
           {{-- 2. DATA GROUPS --}}
           <div class="row g-4">
               @forelse($fieldGroups as $group)
-                  <div class="col-12 col-xl-6"> {{-- Two groups side-by-side on wide screens --}}
+                  <div class="col-12 @if($crudType != "drawers") col-xl-6 @endif"> {{-- Two groups side-by-side on wide screens --}}
                       <div class="card border-0 shadow-sm h-100">
                           @if (!empty($group['title']))
                               <div class="card-header bg-white border-bottom-0 pt-4 px-4">
