@@ -1,6 +1,6 @@
 
 <div class="row g-2">
-    @hasanyrole('admin|super_admin')
+    @hasanyrole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES)
 
         <!-- Scope Selection Dropdown -->
         <div class="input-group col-12 w-100 col-sm-auto w-sm-auto">

@@ -64,7 +64,11 @@ use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview;
 use App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard;
+use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionGroup;
+use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionManager;
+use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionToggle;
 use QuickerFaster\UILibrary\Http\Livewire\BackgroundJobsPanel;
+use QuickerFaster\UILibrary\Http\Livewire\Buttons\Toggle;
 use QuickerFaster\UILibrary\Http\Livewire\Collapsible;
 use QuickerFaster\UILibrary\Http\Livewire\ColumnManager;
 use QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports;
@@ -273,6 +277,16 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.collapsible', Collapsible::class);
         Livewire::component('qf.background-jobs-panel', BackgroundJobsPanel::class);
         Livewire::component('qf.column-manager', ColumnManager::class);
+
+
+        Livewire::component('qf.permission-toggle', PermissionToggle::class);
+        Livewire::component('qf.permission-group', PermissionGroup::class);
+        Livewire::component('qf.permission-manager', PermissionManager::class);
+        Livewire::component('qf.toggle', Toggle::class);
+
+
+
+
 
 
         // Local modules's livewire components register

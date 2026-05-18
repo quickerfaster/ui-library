@@ -65,16 +65,30 @@
                             <label class="form-label">{{ $filter['label'] }}</label>
                             <div class="d-flex gap-2">
                                 {{-- Operator dropdown --}}
-                                @if (count($filter['operators']) > 1)
-                                    <select wire:model.live="activeFilters.{{ $index }}.operator"
-                                        class="form-select w-auto" style="min-width: 100px;">
-                                        @foreach ($filter['operators'] as $opKey => $opLabel)
-                                            <option value="{{ $opKey }}">{{ $opLabel }}</option>
-                                        @endforeach
-                                    </select>
+                                @php
+                                    $hideOperator =
+                                        $filter['type'] === 'select' &&
+                                        !($filter['multi'] ?? false) &&
+                                        ($filter['searchable'] ?? false);
+                                @endphp
+
+                                @if (!$hideOperator)
+                                    {{-- Operator dropdown --}}
+                                    @if (count($filter['operators']) > 1)
+                                        <select wire:model.live="activeFilters.{{ $index }}.operator"
+                                            class="form-select w-auto" style="min-width: 100px;">
+                                            @foreach ($filter['operators'] as $opKey => $opLabel)
+                                                <option value="{{ $opKey }}">{{ $opLabel }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <input type="hidden" wire:model="activeFilters.{{ $index }}.operator"
+                                            value="{{ array_key_first($filter['operators']) }}">
+                                    @endif
                                 @else
+                                    {{-- Force operator to 'equals' for searchable single-select --}}
                                     <input type="hidden" wire:model="activeFilters.{{ $index }}.operator"
-                                        value="{{ array_key_first($filter['operators']) }}">
+                                        value="equals">
                                 @endif
 
                                 @php $operator = $activeFilters[$index]['operator'] ?? $filter['defaultOperator']; @endphp
@@ -83,50 +97,57 @@
                                 @switch($filter['type'])
                                     @case('select')
                                         @if ($filter['multi'] ?? false)
-                                            {{-- Searchable multi‑select --}}
+                                            {{-- Multi‑select searchable (already has search, badges, etc.) --}}
                                             <div class="w-100">
-                                                {{-- Selected badges --}}
-                                                <div class="selected-items mb-2">
-                                                    @foreach ($selectedLabels[$index] ?? [] as $id => $labelText)
-                                                        <span class="badge bg-primary me-1">
-                                                            {{ $labelText }}
-                                                            <button type="button" class="btn-close btn-close-white ms-1"
-                                                                wire:click="removeSelected({{ $index }}, {{ $id }})"
-                                                                style="font-size: 0.5rem;"></button>
-                                                        </span>
-                                                    @endforeach
-                                                </div>
-
-                                                {{-- Search input --}}
-                                                <input type="text" class="form-control" placeholder="Search..."
-                                                    wire:model.live.debounce.300ms="searches.{{ $index }}">
-
-                                                {{-- Results dropdown --}}
-                                                @if (!empty($searches[$index]) && !empty($searchResults[$index]))
-                                                    <ul class="list-group mt-1" style="max-height: 200px; overflow-y: auto;">
-                                                        @foreach ($searchResults[$index] as $id => $resultLabel)
-                                                            <li class="list-group-item list-group-item-action"
-                                                                wire:click="selectOption({{ $index }}, {{ $id }}, '{{ $resultLabel }}')"
-                                                                style="cursor: pointer;">
-                                                                {{ $resultLabel }}
-                                                            </li>
-                                                        @endforeach
-                                                    </ul>
-                                                @elseif(!empty($searches[$index]) && strlen($searches[$index]) >= 2 && empty($searchResults[$index]))
-                                                    <div class="mt-1 text-muted small">No matches found</div>
-                                                @endif
+                                                {{-- Your existing multi‑select searchable UI --}}
+                                                {{-- (It should not contain an operator dropdown) --}}
                                             </div>
                                         @else
-                                            {{-- Single select dropdown --}}
-                                            <select wire:model.live="activeFilters.{{ $index }}.value"
-                                                class="form-select">
-                                                @if ($filter['field'] != '_trashed')
-                                                <option value="">All</option>
-                                                @endif
-                                                @foreach ($filter['options'] ?? [] as $optValue => $optLabel)
-                                                    <option value="{{ $optValue }}">{{ $optLabel }}</option>
-                                                @endforeach
-                                            </select>
+                                            @if ($filter['searchable'] ?? false)
+                                                {{-- Searchable single‑select – no operator dropdown (handled by outer) --}}
+                                                <div class="w-100">
+                                                    {{-- Selected badge --}}
+                                                    <div class="selected-items mb-2">
+                                                        @foreach ($selectedLabels[$index] ?? [] as $id => $labelText)
+                                                            <span class="badge bg-primary me-1">
+                                                                {{ $labelText }}
+                                                                <button type="button" class="btn-close btn-close-white ms-1"
+                                                                    wire:click="removeSelected({{ $index }}, {{ $id }})"
+                                                                    style="font-size: 0.5rem;"></button>
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+
+                                                    {{-- Search input --}}
+                                                    <input type="text" class="form-control" placeholder="Search..."
+                                                        wire:model.live.debounce.300ms="searches.{{ $index }}">
+
+                                                    {{-- Results dropdown --}}
+                                                    @if (!empty($searches[$index]) && !empty($searchResults[$index]))
+                                                        <ul class="list-group mt-1"
+                                                            style="max-height: 200px; overflow-y: auto;">
+                                                            @foreach ($searchResults[$index] as $id => $resultLabel)
+                                                                <li class="list-group-item list-group-item-action"
+                                                                    wire:click="selectOption({{ $index }}, {{ $id }}, '{{ addslashes($resultLabel) }}')"
+                                                                    style="cursor: pointer;">
+                                                                    {{ $resultLabel }}
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
+                                                    @elseif(!empty($searches[$index]) && strlen($searches[$index]) >= 2 && empty($searchResults[$index]))
+                                                        <div class="mt-1 text-muted small">No matches found</div>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                {{-- Non‑searchable single‑select – only the value dropdown (operator handled by outer) --}}
+                                                <select wire:model.live="activeFilters.{{ $index }}.value"
+                                                    class="form-select">
+                                                    <option value="">All</option>
+                                                    @foreach ($filter['options'] ?? [] as $optValue => $optLabel)
+                                                        <option value="{{ $optValue }}">{{ $optLabel }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @endif
                                         @endif
                                     @break
 
@@ -183,7 +204,8 @@
                                             </div>
                                         @else
                                             <input type="number" step="any"
-                                                wire:model.live="activeFilters.{{ $index }}.value" class="form-control">
+                                                wire:model.live="activeFilters.{{ $index }}.value"
+                                                class="form-control">
                                         @endif
                                     @break
 
@@ -197,7 +219,7 @@
 
                             @if ($filter['field'] === '_trashed')
                                 <div class="mt-3 pt-2 border-top border-2 border-light">
-                                    
+
                                 </div>
                             @endif
 

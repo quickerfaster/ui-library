@@ -9,6 +9,7 @@ use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Traits\DataTables\HasColumnPreferences;
 use App\Modules\Admin\Services\ActivityLogger;
 use QuickerFaster\UILibrary\Services\Search\SearchEngine;
+use App\Modules\Admin\Services\AuthorizationService;
 
 
 
@@ -79,6 +80,8 @@ class DataTable extends Component
     public string $density = 'comfortable';      // 'comfortable' or 'compact'
     public bool $showInlineEditing = false;     // mirror of $editable, used in View menu
 
+    protected AuthorizationService $authService;
+
 
 
 
@@ -114,6 +117,21 @@ class DataTable extends Component
         $this->initializeComponent();
         $this->loadSortFromSession();
 
+
+
+
+        $user = auth()->user();
+        $modelName = $this->getModelNameForPermissions();
+        $viewName = \Str::kebab($modelName);
+
+        
+        // Global view permission (no specific record)
+        if (!$this->authService->canAccessView($user, $viewName)) {
+            abort(403, 'You do not have permission to view this data.');
+        }
+
+
+
         // Add to mount() after loading session filters
         $this->density = session()->get("density_{$this->configKey}", 'comfortable');
         $this->showInlineEditing = $this->editable;
@@ -123,12 +141,12 @@ class DataTable extends Component
         $sessionFilters = $this->loadFiltersFromSession();
         $this->activeFilters = $sessionFilters;
         // Extract trashed filter from activeFilters if present
-foreach ($this->activeFilters as $filter) {
-    if ($filter['field'] === '_trashed') {
-        $this->trashedFilter = $filter['value'];
-        break;
-    }
-}
+        foreach ($this->activeFilters as $filter) {
+            if ($filter['field'] === '_trashed') {
+                $this->trashedFilter = $filter['value'];
+                break;
+            }
+        }
 
         $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
         $this->rebuildQuickFilterValues();
@@ -178,6 +196,11 @@ foreach ($this->activeFilters as $filter) {
 
     }
 
+
+    public function boot(AuthorizationService $authService)
+    {
+        $this->authService = $authService;
+    }
 
 
 
@@ -306,21 +329,35 @@ foreach ($this->activeFilters as $filter) {
      */
     public function startEditingCell($rowId, $field = null)
     {
+        $modelClass = $this->getConfigResolver()->getModel();
+        $record = $modelClass::find($rowId);
+
+        if (!$record) {
+            $this->dispatch('showAlert', [
+                'type' => 'error',
+                'message' => 'Record not found.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        if (!$this->authService->canUpdate(auth()->user(), $record)) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to edit this record.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        // Original logic continues...
         $rowKey = 'row_' . $rowId;
-
-        // Always fetch fresh values from database (ignore any previous editedData)
         $this->editedData[$rowKey] = $this->getRowOriginalValues($rowId);
-
-        // Reset edit mode for this row
         $this->editMode[$rowKey] = [];
-
-        // Clear any previous errors for this row
         unset($this->fieldErrors[$rowKey]);
-
         if ($field) {
             $this->editMode[$rowKey][$field] = true;
         }
-
         $this->dispatch('$refresh');
     }
 
@@ -349,6 +386,29 @@ foreach ($this->activeFilters as $filter) {
 
     public function saveCell($rowId, $field)
     {
+
+        $modelClass = $this->getConfigResolver()->getModel();
+        $record = $modelClass::find($rowId);
+
+        if (!$record) {
+            $this->dispatch('showAlert', [
+                'type' => 'error',
+                'message' => 'Record not found.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        if (!$this->authService->canUpdate(auth()->user(), $record)) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to edit this record.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+
         $rowKey = 'row_' . $rowId;
         $value = $this->editedData[$rowKey][$field] ?? null;
 
@@ -390,6 +450,14 @@ foreach ($this->activeFilters as $filter) {
      */
     public function exportTemplate(): void
     {
+        if (!$this->canImport()) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to download the import template.',
+                'autoClose' => true
+            ]);
+            return;
+        }
         $url = route('export.template', ['configKey' => $this->configKey]);
         $this->dispatch('open-url-new-tab', $url);
     }
@@ -1094,26 +1162,29 @@ foreach ($this->activeFilters as $filter) {
 
 
 
-public function updateFilters($filters)
-{
-    $regularFilters = [];
-    $trashedValue = 'without';
+    public function updateFilters($filters)
+    {
 
-    foreach ($filters as $filter) {
-        if ($filter['field'] === '_trashed') {
-            $trashedValue = $filter['value'];
-        } else {
-            $regularFilters[] = $filter;
+        $regularFilters = [];
+        $trashedValue = 'without';
+
+        foreach ($filters as $filter) {
+            if ($filter['field'] === '_trashed') {
+                $trashedValue = $filter['value'];
+            } else {
+                $regularFilters[] = $filter;
+            }
         }
-    }
 
-    $this->trashedFilter = $trashedValue;
-    $this->activeFilters = $regularFilters;
-    $this->syncTrashedFilterToActiveFilters(); // adds _trashed back
-    $this->saveFiltersToSession();
-    $this->rebuildQuickFilterValues();
-    $this->resetPage();
-}
+        $this->trashedFilter = $trashedValue;
+        $this->activeFilters = $regularFilters;
+
+        $this->syncTrashedFilterToActiveFilters(); // adds _trashed back
+
+        $this->saveFiltersToSession();
+        $this->rebuildQuickFilterValues();
+        $this->resetPage();
+    }
 
 
 
@@ -1429,12 +1500,21 @@ public function updateFilters($filters)
     {
         $modelClass = $this->getConfigResolver()->getModel();
         $record = $modelClass::withTrashed()->find($id);
-        if ($record && $record->trashed()) {
-            $record->restore();
-            ActivityLogger::log($this->configKey, 'restored', $record, [], [], 'Record restored');
-            $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record restored.']);
-            $this->dispatch('refreshDataTable');
+
+        if (!$record || !$record->trashed()) {
+            $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Record not found or not deleted.', 'autoClose' => true]);
+            return;
         }
+
+        if (!$this->authService->canRestore(auth()->user(), $modelClass)) {
+            $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'You do not have permission to restore records.', 'autoClose' => true]);
+            return;
+        }
+
+        $record->restore();
+        ActivityLogger::log($this->configKey, 'restored', $record, [], [], 'Record restored');
+        $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record restored.', 'autoClose' => true]);
+        $this->dispatch('refreshDataTable');
     }
 
     // Single record force delete
@@ -1442,13 +1522,23 @@ public function updateFilters($filters)
     {
         $modelClass = $this->getConfigResolver()->getModel();
         $record = $modelClass::withTrashed()->find($id);
-        if ($record) {
-            $old = $record->toArray();
-            $record->forceDelete();
-            ActivityLogger::deleted($this->configKey, $record, $old, true);
-            $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record permanently deleted.']);
-            $this->dispatch('refreshDataTable');
+
+        if (!$record) {
+            $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Record not found.', 'autoClose' => true]);
+            return;
         }
+
+        $modelName = $this->getModelNameForPermissions();
+        if (!$this->authService->canForceDelete(auth()->user(), $modelClass)) {
+            $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'You do not have permission to permanently delete records.', 'autoClose' => true]);
+            return;
+        }
+
+        $old = $record->toArray();
+        $record->forceDelete();
+        ActivityLogger::deleted($this->configKey, $record, $old, true);
+        $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record permanently deleted.', 'autoClose' => true]);
+        $this->dispatch('refreshDataTable');
     }
 
 
@@ -1767,14 +1857,14 @@ public function updateFilters($filters)
     public function removeFilter(string $field): void
     {
 
-    if ($field === '_trashed') {
-        $this->trashedFilter = 'without';
-        // Remove _trashed from activeFilters
-        $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
-        $this->saveFiltersToSession();
-        $this->resetPage();
-        return;
-    }
+        if ($field === '_trashed') {
+            $this->trashedFilter = 'without';
+            // Remove _trashed from activeFilters
+            $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
+            $this->saveFiltersToSession();
+            $this->resetPage();
+            return;
+        }
 
         $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== $field));
         $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
@@ -1796,61 +1886,58 @@ public function updateFilters($filters)
         return session()->get("active_filters.{$this->configKey}", []);
     }
 
-protected function syncTrashedFilterToActiveFilters(): void
-{
-    // Remove any existing _trashed filter
-    $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
-    
-    // Add current trashedFilter as a filter
-    $this->activeFilters[] = [
-        'field' => '_trashed',
-        'type' => 'select',
-        'operator' => 'equals',
-        'value' => $this->trashedFilter,
-        'multi' => false,
-    ];
-    // Re-enrich to get display values
-    $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
-}
+    protected function syncTrashedFilterToActiveFilters(): void
+    {
+        // Remove any existing _trashed filter
+        $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
+
+        if ($this->trashedFilter != "without") {
+
+            // Add current trashedFilter as a filter
+            $this->activeFilters[] = [
+                'field' => '_trashed',
+                'type' => 'select',
+                'operator' => 'equals',
+                'value' => $this->trashedFilter,
+                'multi' => false,
+            ];
+        }
+        // Re-enrich to get display values
+        $this->activeFilters = $this->enrichFiltersWithDisplayValues($this->activeFilters);
+    }
 
 
 
-public function clearAllFilters(): void
-{
+    public function clearAllFilters(): void
+    {
 
 
 
-    $this->activeFilters = [];
-    $this->trashedFilter = 'without';
-    $this->syncTrashedFilterToActiveFilters(); // adds _trashed with 'without'
-            $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
+        $this->activeFilters = [];
+        $this->trashedFilter = 'without';
+        $this->syncTrashedFilterToActiveFilters(); // adds _trashed with 'without'
+        $this->activeFilters = array_values(array_filter($this->activeFilters, fn($f) => $f['field'] !== '_trashed'));
 
-    $this->quickFilterValues = [];
-    $this->saveFiltersToSession();
-    // $this->dispatch('filtersUpdated', filters: $this->activeFilters);
-    $this->resetPage();
-}
+        $this->quickFilterValues = [];
+        $this->saveFiltersToSession();
+        // $this->dispatch('filtersUpdated', filters: $this->activeFilters);
+        $this->resetPage();
+    }
 
     // ==================== ROW ACTIONS ====================
 
     public function handleRowAction(int $actionIndex, int $recordId): void
     {
         $action = $this->moreActions[$actionIndex] ?? null;
-        if (!$action)
-            return;
-
-        if (!$this->userCan($action)) {
-            $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Unauthorized access.']);
+        if (!$action) {
             return;
         }
 
+        // Load record first (needed for both permission and conditions)
         $query = ($this->getConfigResolver()->getModel())::query();
-
-        // Only hit the DB once by chaining withTrashed conditionally
         if ($this->usesSoftDeletes()) {
             $query->withTrashed();
         }
-
         $record = $query->find($recordId);
 
         if (!$record) {
@@ -1858,12 +1945,29 @@ public function clearAllFilters(): void
             return;
         }
 
+        // Check permission with record
+        if (!$this->userCan($action, $record)) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to perform this action.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        // Check business conditions (if any)
         if (!$this->checkConditions($action, $record)) {
-            $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'Action unavailable for this record state.']);
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'Action unavailable for this record state.',
+                'autoClose' => true
+            ]);
             return;
         }
 
         $params = ["actionIndex" => $actionIndex, "recordId" => $recordId];
+
+        // If action requires confirmation
         if (!empty($action['confirm'])) {
             $this->dispatch('showAlert', [
                 'type' => 'confirm',
@@ -1972,9 +2076,25 @@ public function clearAllFilters(): void
         }
     }
 
-    protected function userCan(array $action): bool
+    protected function userCan(array $action, $record = null): bool
     {
-        return true; // Implement your permission logic
+        $user = auth()->user();
+        if (!$user)
+            return false;
+
+        // If action requires a specific permission
+        if (!empty($action['requiredPermission'])) {
+            // If we have a record, use canPerformAction for row-level scope
+            if ($record) {
+                $permAction = ['requiredPermission' => $action['requiredPermission']];
+                return $this->authService->canPerformAction($user, $permAction, $record);
+            }
+            // No record – just check permission globally
+            return $user->can($action['requiredPermission']);
+        }
+
+        // If no permission defined, allow (but you might want to default to false)
+        return false;
     }
 
     protected function checkConditions(array $action, $record): bool
@@ -2062,6 +2182,32 @@ public function clearAllFilters(): void
         $this->executeBulkAction(["actionKey" => $actionKey]);
     }
 
+
+
+
+    protected function canExport(): bool
+    {
+        return $this->authService->canExport(auth()->user(), $this->getConfigResolver()->getModel());
+    }
+
+    protected function canImport(): bool
+    {
+        return $this->authService->canImport(auth()->user(), $this->getConfigResolver()->getModel());
+    }
+
+    protected function canPrint(): bool
+    {
+        return $this->authService->canPrint(auth()->user(), $this->getConfigResolver()->getModel());
+    }
+
+
+
+    protected function getModelNameForPermissions(): string
+    {
+        return \Str::snake($this->getConfigResolver()->getModelName());
+    }
+
+
     public function executeBulkAction(array $params): void
     {
         $actionKey = $params["actionKey"] ?? null;
@@ -2070,31 +2216,63 @@ public function clearAllFilters(): void
             return;
 
         $selectedIds = $this->bulkSelection['ids'] ?? [];
-        if (empty($selectedIds))
+        if (empty($selectedIds)) {
+            $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'No items selected.', 'autoClose' => true]);
             return;
+        }
 
+        $user = auth()->user();
+        $modelClass = $this->getConfigResolver()->getModel();
+
+        // Permission checks based on action type
         switch ($action['type']) {
             case 'delete':
+                if (!$this->authService->canBulkDelete($user, $modelClass)) {
+                    $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'You do not have permission to delete records.', 'autoClose' => true]);
+                    return;
+                }
                 $this->performBulkDelete($selectedIds);
                 break;
-            case 'export':
-                $this->performBulkExport($selectedIds, $action['format']);
-                break;
-            case 'updateField':
-                $this->performBulkUpdateField($selectedIds, $action['field'], $action['value']);
-                break;
+
             case 'restore':
+                if (!$this->authService->canBulkRestore($user, $modelClass)) {
+                    $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'You do not have permission to restore records.', 'autoClose' => true]);
+                    return;
+                }
                 $this->performBulkRestore($selectedIds);
                 break;
+
             case 'forceDelete':
+                if (!$this->authService->canBulkForceDelete($user, $modelClass)) {
+                    $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'You do not have permission to permanently delete records.', 'autoClose' => true]);
+                    return;
+                }
                 $this->performBulkForceDelete($selectedIds);
                 break;
+
+            case 'export':
+                if (!$this->authService->canBulkExport($user, $modelClass)) {
+                    $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'You do not have permission to export records.', 'autoClose' => true]);
+                    return;
+                }
+                $this->performBulkExport($selectedIds, $action['format']);
+                break;
+
+            case 'updateField':
+                if (!$this->authService->canBulkUpdate($user, $modelClass)) {
+                    $this->dispatch('showAlert', ['type' => 'warning', 'message' => 'You do not have permission to update records.', 'autoClose' => true]);
+                    return;
+                }
+                $this->performBulkUpdateField($selectedIds, $action['field'], $action['value']);
+                break;
+
             default:
                 return;
         }
 
+        // Reset bulk selection after successful action
         $this->bulkSelection = ['all' => false, 'ids' => []];
-        $this->dispatch('$refresh');
+        $this->dispatch('refreshDataTable');
     }
 
 
@@ -2206,14 +2384,40 @@ public function clearAllFilters(): void
 
     public function performDelete($params)
     {
-        if (isset($params["recordId"])) {
-            $modelClass = $this->getConfigResolver()->getModel();
-            $record = $modelClass::find($params["recordId"]);
-            if ($record) {
-                ActivityLogger::deleted($this->configKey, $record, $record->toArray());
-                $record->delete();
-            }
+        if (!isset($params["recordId"])) {
+            return;
         }
+
+        $modelClass = $this->getConfigResolver()->getModel();
+        $record = $modelClass::find($params["recordId"]);
+
+        if (!$record) {
+            $this->dispatch('showAlert', [
+                'type' => 'error',
+                'message' => 'Record not found.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        if (!$this->authService->canDelete(auth()->user(), $record)) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to delete this record.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        ActivityLogger::deleted($this->configKey, $record, $record->toArray());
+        $record->delete();
+
+        $this->dispatch('showAlert', [
+            'type' => 'success',
+            'message' => 'Record deleted successfully.',
+            'autoClose' => true
+        ]);
+        $this->dispatch('refreshDataTable');
     }
 
     // ==================== EVENT EMITTERS ====================
@@ -2221,16 +2425,73 @@ public function clearAllFilters(): void
     // Replace the existing add() method
     public function add($prefilledData = []): void
     {
+        $modelClass = $this->getConfigResolver()->getModel();
+
+        if (!$this->authService->canCreate(auth()->user(), $modelClass)) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to create new records.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
         $this->dispatch('openAddModal', $this->configKey, $prefilledData);
     }
 
+
+
     public function edit($id)
     {
+        $modelClass = $this->getConfigResolver()->getModel();
+        $record = $modelClass::find($id);
+
+        if (!$record) {
+            $this->dispatch('showAlert', [
+                'type' => 'error',
+                'message' => 'Record not found.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        if (!$this->authService->canUpdate(auth()->user(), $record)) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to edit this record.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
         $this->dispatch('openEditModal', $this->configKey, $id);
     }
 
+
+
     public function show($id)
     {
+        $modelClass = $this->getConfigResolver()->getModel();
+        $record = $modelClass::find($id);
+
+        if (!$record) {
+            $this->dispatch('showAlert', [
+                'type' => 'error',
+                'message' => 'Record not found.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+        if (!$this->authService->canView(auth()->user(), $record)) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to view this record.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
         $currentPageIds = $this->getCurrentPageIds();
         $index = array_search($id, $currentPageIds);
         $this->dispatch('openDetailModal', $this->configKey, $id, $currentPageIds, $index);
@@ -2290,6 +2551,18 @@ public function clearAllFilters(): void
 
     public function exportAll(string $format): void
     {
+
+        if (!$this->canExport()) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to export records.',
+                'autoClose' => true
+            ]);
+            return;
+        }
+
+
+
         // PDF limit check
         if ($format === 'pdf') {
             $totalRows = $this->getTotalRowsCount(); // implement helper
@@ -2323,11 +2596,27 @@ public function clearAllFilters(): void
 
     public function import(): void
     {
+        if (!$this->canImport()) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to import records.',
+                'autoClose' => true
+            ]);
+            return;
+        }
         $this->dispatch('openImportModal', $this->configKey);
     }
 
     public function print(): void
     {
+        if (!$this->canPrint()) {
+            $this->dispatch('showAlert', [
+                'type' => 'warning',
+                'message' => 'You do not have permission to print.',
+                'autoClose' => true
+            ]);
+            return;
+        }
         $url = route('print.data', [
             'configKey' => $this->configKey,
             'search' => $this->search,
@@ -2338,7 +2627,7 @@ public function clearAllFilters(): void
             'activeFilters' => json_encode($this->activeFilters),
             'trashedFilter' => $this->trashedFilter,
             'columns' => json_encode($this->visibleColumns),
-            'perPage' => $this->perPage, // NEW
+            'perPage' => $this->perPage,
         ]);
         $this->dispatch('open-url-new-tab', $url);
     }

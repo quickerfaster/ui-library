@@ -98,6 +98,15 @@ Route::group(['middleware' => 'web'], function () {
 
 
 
+    Route::get('/documents/{document}/download', 
+        [\QuickerFaster\UILibrary\Http\Controllers\Documents\DocumentController::class, 'download'])
+        ->name('documents.download');
+
+
+
+
+
+
 
 
 

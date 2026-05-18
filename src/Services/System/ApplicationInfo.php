@@ -59,7 +59,7 @@ class ApplicationInfo
             $moduleNames[] = basename($module); // Get the module name from the directory
         }
 
-        return $moduleNames;
+        return array_intersect($moduleNames, ["Admin", "Hr"]);
     }
 
     

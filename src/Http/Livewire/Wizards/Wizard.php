@@ -22,7 +22,7 @@ class Wizard extends Component
     public string $title = '';
     public string $description = '';
     public string $returnPath = '';
-    
+
 
     protected $listeners = [
         'stepFormSaved' => 'handleStepFormSaved',
@@ -32,9 +32,9 @@ class Wizard extends Component
 
     public function mount(string $configKey): void
     {
-        
+
         $this->configKey = $configKey;
-        $this->wizardId = 'wizard-' . md5($configKey . '-' . auth()->id());
+        $this->wizardId = 'wizard-' . md5($configKey . '-' . session()->getId());
 
         $resolver = new WizardConfigResolver($configKey);
         $this->steps = $resolver->getSteps();
@@ -49,8 +49,10 @@ class Wizard extends Component
             $data = session()->get($this->wizardId);
             $this->stepData = $data['stepData'] ?? [];
             $this->currentStep = $data['currentStep'] ?? 0;
-            $this->createdRecordIds = $data['createdRecordIds'] ?? [];
+            $this->createdRecords = $data['createdRecords'] ?? []; // Fixed name
+            $this->primaryModelId = $data['primaryModelId'];
         }
+
     }
 
     public function goToStep(int $index): void
@@ -111,14 +113,16 @@ class Wizard extends Component
 
 
 
+
+
     public function getPrimaryModelData(): array
     {
         foreach ($this->createdRecords as $createdRecord) {
             if ($createdRecord["model"] === $this->models["primary"]) {
                 // Return immediately once the primary model is found
                 return [
-                    "class" => $createdRecord["model"], 
-                    "id"    => $createdRecord["id"] // Assuming 'id' is the key for the record ID
+                    "class" => $createdRecord["model"],
+                    "id" => $createdRecord["id"] // Assuming 'id' is the key for the record ID
                 ];
             }
         }
@@ -132,24 +136,24 @@ class Wizard extends Component
 
 
 
-// In your Wizard component, enhance dispatchCompletionEvent to support multiple placeholders
-public function dispatchCompletionEvent(string $eventName, array $params): void
-{
-    // Replace placeholders like {employee_id}, {position_id} with actual record IDs
-    $placeholders = [
-        '{id}' => $this->primaryModelId,
-        // '{employee_id}' => $this->stepData[0] ?? null,   // assuming step 0 is Employee
-        // '{position_id}' => $this->stepData[1] ?? null,   // assuming step 1 is EmployeePosition
-    ];
-    
-    array_walk_recursive($params, function (&$value) use ($placeholders) {
-        if (is_string($value)) {
-            $value = str_replace(array_keys($placeholders), array_values($placeholders), $value);
-        }
-    });
-    
-    $this->dispatch($eventName, ...array_values($params));
-}
+    // In your Wizard component, enhance dispatchCompletionEvent to support multiple placeholders
+    public function dispatchCompletionEvent(string $eventName, array $params): void
+    {
+        // Replace placeholders like {employee_id}, {position_id} with actual record IDs
+        $placeholders = [
+            '{id}' => $this->primaryModelId,
+            // '{employee_id}' => $this->stepData[0] ?? null,   // assuming step 0 is Employee
+            // '{position_id}' => $this->stepData[1] ?? null,   // assuming step 1 is EmployeePosition
+        ];
+
+        array_walk_recursive($params, function (&$value) use ($placeholders) {
+            if (is_string($value)) {
+                $value = str_replace(array_keys($placeholders), array_values($placeholders), $value);
+            }
+        });
+
+        $this->dispatch($eventName, ...array_values($params));
+    }
 
 
 
@@ -179,20 +183,25 @@ public function dispatchCompletionEvent(string $eventName, array $params): void
 
     public function cancelKeep(): void
     {
-        session()->forget($this->wizardId);
-        $this->redirect($this->returnPath?? '/');
+        $this->redirect($this->returnPath ?? '/');
     }
 
     public function cancelDelete(): void
     {
+
         \DB::transaction(function () {
             foreach ($this->createdRecords as $record) {
                 $modelClass = $record['model'];
-                $modelClass::destroy($record['id']);
+                $instance = $modelClass::withTrashed()->find($record['id']);
+
+                if ($instance) {
+                    $instance->forceDelete();
+                }
             }
+
         });
         session()->forget($this->wizardId);
-        $this->redirect($this->returnPath?? '/');
+        $this->redirect($this->returnPath ?? '/');
     }
 
 
@@ -264,9 +273,11 @@ public function dispatchCompletionEvent(string $eventName, array $params): void
         session()->put($this->wizardId, [
             'stepData' => $this->stepData,
             'currentStep' => $this->currentStep,
-            'createdRecordIds' => $this->createdRecordIds,
+            'createdRecords' => $this->createdRecords, // Fixed name
+            'primaryModelId' => $this->primaryModelId,
         ]);
     }
+
 
     public function render()
     {

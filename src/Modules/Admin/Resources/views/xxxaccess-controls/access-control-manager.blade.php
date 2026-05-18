@@ -1,6 +1,5 @@
     <x-qf::navigation-layout configKey="admin.role" context="Users & Permissions" moduleName="admin" :overrides=[]></x-qf::navigation-layout>
         
-    
     @hasanyrole('admin|super_admin')
         <x-slot name="mainTitle"> <strong class="text-info text-gradient">{{ $selectedScope?->name}}</strong> Permissions</x-slot>
             <x-slot name="subtitle"> {{ $selectedModuleName? ucfirst($selectedModuleName. " Module"): ''}}</x-slot>

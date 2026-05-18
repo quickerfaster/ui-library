@@ -1,9 +1,11 @@
 @php
     $isTrashed = $this->isTrashed($record) ?? false;
-    $crudType = $crudType ?? 'modal'; // 'pages', 'modal', or 'drawers'
+    $crudType = $crudType ?? 'modal';
     $routePrefix = Str::plural(Str::kebab($modelName));
     $queryParams = $queryParams ?? [];
     $isPage = $crudType === 'pages';
+    $user = auth()->user();
+    $authService = app(\App\Modules\Admin\Services\AuthorizationService::class);
 @endphp
 
 <div class="d-flex justify-content-end align-items-center gap-1 stop-propagation">
@@ -13,7 +15,7 @@
         @endphp
 
         {{-- SHOW action --}}
-        @if (in_array('show', $simpleActions))
+        @if (in_array('show', $simpleActions) && $authService->canView($user, $record))
             @if ($isPage)
                 <a href="{{ route($routePrefix . '.show', ['id' => $record->id] + $queryParams) }}"
                     class="{{ $btnClass }} text-info-hover" title="View">
@@ -38,7 +40,7 @@
         @endif
 
         {{-- EDIT action --}}
-        @if (in_array('edit', $simpleActions))
+        @if (in_array('edit', $simpleActions) && $authService->canUpdate($user, $record))
             @if ($isPage)
                 <a href="{{ route($routePrefix . '.edit', ['id' => $record->id] + $queryParams) }}"
                     class="{{ $btnClass }} text-primary-hover" title="Edit">
@@ -62,22 +64,20 @@
             @endif
         @endif
 
-        {{-- DELETE action (always uses confirmation modal – no page navigation) --}}
-        @if (in_array('delete', $simpleActions))
+        {{-- DELETE action --}}
+        @if (in_array('delete', $simpleActions) && $authService->canDelete($user, $record))
             <button wire:click="confirmDelete({{ $record->id }})" class="{{ $btnClass }} text-danger-hover"
                 title="Delete">
                 <i class="fas fa-trash-alt"></i>
             </button>
         @endif
 
-
+        {{-- Expand action (no permission check – optional) --}}
         @if (isset($simpleActions['expand']))
             @php
-                // Check if the value is an array of settings or just a boolean true
                 $expandConfig = is_array($simpleActions['expand'])
                     ? $simpleActions['expand']
                     : ['component' => 'qf.data-table-detail', 'params' => []];
-
                 $expandComponent = $expandConfig['component'] ?? 'qf.data-table-detail';
                 $expandParams = array_merge(
                     [
@@ -93,21 +93,34 @@
 
             <button type="button"
                 wire:click="$dispatch('toggleCollapsible', { 
-            collapsibleId: 'expand-{{ $record->id }}',
-            component: '{{ $expandComponent }}', 
-            params: {{ json_encode($expandParams) }},
-            title: '{{ $expandTitle }}',
-            target: 'expand-{{ $record->id }}',
-        })"
+                    collapsibleId: 'expand-{{ $record->id }}',
+                    component: '{{ $expandComponent }}', 
+                    params: {{ json_encode($expandParams) }},
+                    title: '{{ $expandTitle }}',
+                    target: 'expand-{{ $record->id }}'
+                })"
                 class="{{ $btnClass }} text-info-hover" title="{{ $expandTitle }}">
                 <i class="{{ $expandIcon }}"></i>
             </button>
         @endif
     @else
+        {{-- Trashed record: show badge + restore / force delete buttons --}}
         <span class="badge rounded-pill bg-white text-secondary border fw-medium px-2 small">Deleted</span>
+
+        @if (in_array('restore', $simpleActions) && $authService->canRestore($user, $record)) 
+            <button wire:click="restore({{ $record->id }})" class="btn btn-action-icon text-success-hover" title="Restore">
+                <i class="fas fa-trash-restore"></i>
+            </button>
+        @endif
+
+        @if (in_array('forceDelete', $simpleActions) && $authService->canForceDelete($user, $record))
+            <button wire:click="forceDelete({{ $record->id }})" class="btn btn-action-icon text-danger-hover" title="Permanently Delete">
+                <i class="fas fa-skull-crossbones"></i>
+            </button>
+        @endif
     @endif
 
-    {{-- More actions dropdown (unchanged) --}}
+    {{-- More actions dropdown – filter items by requiredPermission using AuthorizationService --}}
     @if (!empty($moreActions))
         <div class="dropdown">
             <button class="btn btn-action-icon no-caret" type="button" data-bs-toggle="dropdown">
@@ -115,19 +128,32 @@
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
                 @foreach ($moreActions as $index => $action)
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center py-2" href="#"
-                            wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
-                            @if (!empty($action['icon']))
-                                <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
-                            @endif
-                            <span class="small">{{ $action['title'] }}</span>
-                        </a>
-                    </li>
-                    @if (!empty($action['appendSeparator']))
+                    @php
+
+
+                        $perm = $action['requiredPermission'] ?? null;
+                        $hasPermission = true;
+                        if ($perm) {
+                            // Build an action array for canPerformAction or just check the permission globally
+                            // For simplicity, we use can() on the permission string; but if you want row scope,
+                            // you would pass the record. For custom actions you may want row-level as well.
+                            // $hasPermission = $user && $user->can($perm);
+                            $hasPermission = $authService->canPerformAction($user, $action, $record);
+                        }
+                    @endphp
+                    @if ($hasPermission)
                         <li>
-                            <hr class="dropdown-divider opacity-50">
+                            <a class="dropdown-item d-flex align-items-center py-2" href="#"
+                                wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
+                                @if (!empty($action['icon']))
+                                    <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
+                                @endif
+                                <span class="small">{{ $action['title'] }}</span>
+                            </a>
                         </li>
+                        @if (!empty($action['appendSeparator']))
+                            <li><hr class="dropdown-divider opacity-50"></li>
+                        @endif
                     @endif
                 @endforeach
             </ul>

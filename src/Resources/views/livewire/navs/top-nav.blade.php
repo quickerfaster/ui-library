@@ -67,7 +67,7 @@
 
                 {{-- Constant Left shared items [Admin/HR and Dashboard] --}}
 
-                @if ($currentModule == 'hr')
+                @if ($currentModule == 'hr' &&  auth()->user()->hasAnyRole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES))
                     <li class="nav-item border-end-lg border-start-lg me" wire:key="nav-item-admin-dashboard">
                         <a href="/admin/dashboard" role="link"
                             class="btn btn-sm px-3 py-1 mx-3 mb-0 mt-1 rounded-pill btn-outline-primary">

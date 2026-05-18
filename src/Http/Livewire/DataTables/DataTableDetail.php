@@ -5,6 +5,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\DataTables;
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
+use App\Modules\Admin\Services\AuthorizationService;
 
 class DataTableDetail extends Component
 {
@@ -30,6 +31,10 @@ class DataTableDetail extends Component
 
         $this->loadConfiguration();
         $this->loadRecord();
+
+        $modelClass = app(ConfigResolver::class, ['configKey' => $this->configKey])->getModel();
+        app(AuthorizationService::class)->authorizeView(auth()->user(), $this->recordId, $modelClass);
+
     }
 
     protected function getConfigResolver(): ConfigResolver

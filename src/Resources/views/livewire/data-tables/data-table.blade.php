@@ -211,7 +211,7 @@
 
             <div class="d-flex align-items-center">
                 {{-- Status filter (renamed) --}}
-                {{--@if ($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
+                {{-- @if ($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
                     <select wire:model.live="trashedFilter" class="form-select form-select-sm me-2">
                         <option value="without">Active</option>
                         <option value="with">With archived</option>
@@ -221,9 +221,17 @@
 
                 {{-- Add button --}}
                 @if (in_array('create', $simpleActions))
-                    <button wire:click="add" class="btn btn-sm btn-primary">
-                        <i class="fas fa-plus"></i> Add
-                    </button>
+                    @php
+                        $canCreate = $this->authService->canCreate(
+                            auth()->user(),
+                            $this->getConfigResolver()->getModel(),
+                        );
+                    @endphp
+                    @if ($canCreate)
+                        <button wire:click="add" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    @endif
                 @endif
             </div>
         </div>
@@ -394,7 +402,10 @@
                                             @if ($isEditable) wire:dblclick="startEditingCell({{ $record->id }}, '{{ $name }}')" 
                     style="cursor: pointer;" @endif>
                                             {!! $this->getField($name, $def)->renderTable($record->$name, $record) !!}
+
+                                            
                                         </div>
+                                        
                                     @endif
                                 </td>
                             @endforeach

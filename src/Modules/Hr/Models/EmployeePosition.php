@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 class EmployeePosition extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
 
 

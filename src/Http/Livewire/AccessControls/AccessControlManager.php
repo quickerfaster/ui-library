@@ -18,7 +18,7 @@ class AccessControlManager extends Component
 
     public $moduleNames = [];
     public $showResourceControlButtonGroup = false;
-    public $resourceNames = ['Store', 'HumanResource'];
+    public $resourceNames = [];
 
     public $selectedScopeName = 'Role';
     public $scopeNames;
@@ -56,17 +56,7 @@ class AccessControlManager extends Component
     ];
 
 
-    const CUSTOM_VIEW_MODEL_NAMES = [
-        'user-role-management' => 'role',
-        'user-role-assignment' => 'role',
-        'access-control-management' => 'role',
-    ];
-
-    const ROLE_ADMIN_ONLY_VIEWS = [
-        'user-role-management',
-        'user-role-assignment',
-        'access-control-management'
-    ];
+  
 
     public $resourceControlButtonGroup = [];
 
@@ -82,20 +72,15 @@ class AccessControlManager extends Component
         $this->moduleNames = ApplicationInfo::getModuleNames();
         $selectedScopeClassName = "App\Modules\Admin\Models\\".$this->selectedScopeName;
         $this->scopeNames =  $selectedScopeClassName::all()->pluck("name", "id");
+
+        
+        if (strtolower($this->selectedScopeName) == "role")
+            $this->scopeNames = array_diff($this->scopeNames->toArray(), \App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES);
+       
     }
 
 
-    public static function getViewPerminsionModelName($view){
-        // Check if the view is in the custom permission model names and return it
-        if (array_key_exists($view, self::CUSTOM_VIEW_MODEL_NAMES)) {
-            return self::CUSTOM_VIEW_MODEL_NAMES[$view];
-        }
 
-        // Convert the view name to a permission model name
-        $view = str_replace('-', '_', $view);
-        $view = Str::singular($view);
-        return $view;
-    }
 
 
 
@@ -190,6 +175,8 @@ class AccessControlManager extends Component
 
       return $resourcePermissionNameConfig;
     }
+
+
 
 
 

@@ -289,6 +289,8 @@ class FilterPanel extends Component
             $operators = $this->getOperatorsForType($filterType);
             $defaultOperator = array_key_first($operators);
 
+            $isSearchableSelect = ($definition['field_type'] ?? '') === 'livewire-searchable-select';
+
             $filter = [
                 'field' => $fieldName,
                 'label' => $definition['label'] ?? ucfirst($fieldName),
@@ -296,6 +298,8 @@ class FilterPanel extends Component
                 'operators' => $operators,
                 'defaultOperator' => $defaultOperator,
                 'multi' => $definition['multiSelect'] ?? false,
+                'searchable' => $isSearchableSelect,   // <-- add this
+
             ];
 
             // If many‑to‑many, force multi = true and replace operators with 'in'
@@ -305,7 +309,7 @@ class FilterPanel extends Component
                 $filter['defaultOperator'] = 'in';
             }
 
-            if ($filterType === 'select') {
+            if ($filterType === 'select' && !($isSearchableSelect ?? false)) {
                 $filter['options'] = $this->getOptionsForField($fieldName, $definition);
             }
 
@@ -327,7 +331,7 @@ class FilterPanel extends Component
             'datepicker', 'datetimepicker' => 'date',
             'timepicker', 'time' => 'time',
             'checkbox', 'boolcheckbox', 'radio' => 'boolean',
-            'select' => 'select',
+            'select', 'livewire-searchable-select' => 'select',
             default => 'string',
         };
     }
@@ -430,7 +434,7 @@ class FilterPanel extends Component
                 $filter['defaultOperator'] = array_key_first($filter['operators']);
             }
 
-            if ($filter['type'] === 'select' && !isset($filter['options'])) {
+            if ($filter['type'] === 'select' && !isset($filter['options']) && !($filter['searchable'] ?? false)) {
                 $fieldDef = $this->fieldDefinitions[$filter['field']] ?? [];
                 $filter['options'] = $this->getOptionsForField($filter['field'], $fieldDef);
             }
@@ -472,6 +476,7 @@ class FilterPanel extends Component
                 'multi' => $config['multi'] ?? false,
             ];
         }
+
         $this->dispatch('filtersUpdated', filters: $filters);
     }
 
@@ -528,7 +533,8 @@ class FilterPanel extends Component
                 'value' => $this->getDefaultValueForType($config['type'], $defaultOperator, $config['multi'] ?? false),
             ];
         }
-        
+
+
         $this->emitFilters();
     }
 
@@ -587,6 +593,37 @@ class FilterPanel extends Component
             return;
         }
 
+        // For searchable selects, query the database directly
+        if ($filter['searchable'] ?? false) {
+            $fieldDef = $this->fieldDefinitions[$filter['field']] ?? [];
+            $relation = $fieldDef['relationship'] ?? null;
+            if ($relation && isset($relation['model'])) {
+                $model = $relation['model'];
+                $displayField = $relation['display_field'] ?? 'name';
+                $searchFields = $relation['search_fields'] ?? [$displayField];
+
+                $query = $model::query();
+                $search = trim($value);
+                if (strlen($search) >= 3) {
+                    $query->where(function ($q) use ($searchFields, $search) {
+                        foreach ($searchFields as $field) {
+                            $q->orWhere($field, 'LIKE', "%{$search}%");
+                        }
+                    });
+                    $items = $query->limit(50)->get();
+                    $results = [];
+                    foreach ($items as $item) {
+                        $results[$item->id] = $item->$displayField;
+                    }
+                    $this->searchResults[$index] = $results;
+                } else {
+                    $this->searchResults[$index] = [];
+                }
+                return;
+            }
+        }
+
+        // Fallback for non‑searchable selects (original behaviour)
         $options = $filter['options'] ?? [];
         if (empty($options)) {
             $this->searchResults[$index] = [];
@@ -595,7 +632,7 @@ class FilterPanel extends Component
 
         $results = [];
         $search = strtolower(trim($value));
-        if (strlen($search) >= 2) {
+        if (strlen($search) >= 3) {
             foreach ($options as $id => $label) {
                 if (stripos($label, $search) !== false) {
                     $results[$id] = $label;
@@ -614,22 +651,25 @@ class FilterPanel extends Component
         if (!$filter)
             return;
 
-        // Get current selected values
-        $current = $this->activeFilters[$index]['value'] ?? [];
-        if (!is_array($current)) {
-            $current = [];
-        }
+        $isMulti = $filter['multi'] ?? false;
 
-        if (!in_array($id, $current)) {
-            $current[] = $id;
-            $this->activeFilters[$index]['value'] = $current;
-            $this->selectedLabels[$index][$id] = $label;
+        if ($isMulti) {
+            // Existing multi‑select logic
+            $current = $this->activeFilters[$index]['value'] ?? [];
+            if (!in_array($id, $current)) {
+                $current[] = $id;
+                $this->activeFilters[$index]['value'] = $current;
+                $this->selectedLabels[$index][$id] = $label;
+            }
+        } else {
+            // Single‑select: replace value
+            $this->activeFilters[$index]['value'] = $id;
+            $this->selectedLabels[$index] = [$id => $label];
         }
 
         // Clear search
         $this->searches[$index] = '';
         $this->searchResults[$index] = [];
-
         $this->emitFilters();
     }
 
@@ -642,11 +682,17 @@ class FilterPanel extends Component
         if (!$filter)
             return;
 
-        $current = $this->activeFilters[$index]['value'] ?? [];
-        if (is_array($current)) {
+        $isMulti = $filter['multi'] ?? false;
+
+        if ($isMulti) {
+            $current = $this->activeFilters[$index]['value'] ?? [];
             $current = array_values(array_diff($current, [$id]));
             $this->activeFilters[$index]['value'] = $current;
             unset($this->selectedLabels[$index][$id]);
+        } else {
+            // Single‑select: clear value
+            $this->activeFilters[$index]['value'] = '';
+            $this->selectedLabels[$index] = [];
         }
 
         $this->emitFilters();
@@ -658,22 +704,49 @@ class FilterPanel extends Component
     protected function loadFilterSelectedLabels(): void
     {
         foreach ($this->filtersConfig as $index => $filter) {
-            if (($filter['type'] ?? '') !== 'select' || !($filter['multi'] ?? false)) {
+            if (($filter['type'] ?? '') !== 'select')
                 continue;
-            }
-            $selectedIds = $this->activeFilters[$index]['value'] ?? [];
-            if (empty($selectedIds)) {
+
+            $value = $this->activeFilters[$index]['value'] ?? null;
+            if (empty($value)) {
                 $this->selectedLabels[$index] = [];
                 continue;
             }
-            $options = $filter['options'] ?? [];
-            $labels = [];
-            foreach ((array) $selectedIds as $id) {
-                if (isset($options[$id])) {
-                    $labels[$id] = $options[$id];
+
+            $isMulti = $filter['multi'] ?? false;
+            $isSearchable = $filter['searchable'] ?? false;
+
+            // For searchable selects, fetch from DB dynamically
+            if ($isSearchable && ($isMulti || !$isMulti)) {
+                $fieldDef = $this->fieldDefinitions[$filter['field']] ?? [];
+                $relation = $fieldDef['relationship'] ?? null;
+                if ($relation && isset($relation['model'])) {
+                    $model = $relation['model'];
+                    $displayField = $relation['display_field'] ?? 'name';
+                    $ids = $isMulti ? (array) $value : [$value];
+                    $ids = array_filter($ids);
+                    if (!empty($ids)) {
+                        $records = $model::whereIn('id', $ids)->pluck($displayField, 'id')->toArray();
+                        $this->selectedLabels[$index] = $records;
+                    } else {
+                        $this->selectedLabels[$index] = [];
+                    }
+                    continue;
                 }
             }
-            $this->selectedLabels[$index] = $labels;
+
+            // Fallback for normal selects with pre‑loaded options
+            $options = $filter['options'] ?? [];
+            if ($isMulti && is_array($value)) {
+                $labels = [];
+                foreach ($value as $id) {
+                    if (isset($options[$id]))
+                        $labels[$id] = $options[$id];
+                }
+                $this->selectedLabels[$index] = $labels;
+            } elseif (!$isMulti && !is_array($value)) {
+                $this->selectedLabels[$index] = isset($options[$value]) ? [$value => $options[$value]] : [];
+            }
         }
     }
 

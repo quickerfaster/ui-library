@@ -18,16 +18,24 @@ class UserSeeder extends Seeder
     public function run()
     {
 
-        $superAdmin = User::create([ // For clocking device authentication 
+        $clockingAccess = User::create([ // For clocking device authentication 
             'id' => 1,
             'name' => 'admin',
             'email' => 'admin@softui.com',
             'password' => Hash::make('secret'),
         ]);
 
-        $dmin = User::create([
+        $superAdmin = User::create([ 
             'id' => 2,
             'name' => 'super admin',
+            'email' => 'superadmin@quickerfaster.com',
+            'password' => Hash::make('QuickHR@12345'),
+        ]);
+
+
+        $companyAdmin = User::create([
+            'id' => 3,
+            'name' => 'company admin',
             'email' => 'gmadmin@agriwatts.ng',
             'password' => Hash::make('Test@12345'),
         ]);
@@ -35,22 +43,29 @@ class UserSeeder extends Seeder
 
         // Check if the 'super_admin' role exists
         $superAdminRole = Role::findByName('super_admin', 'web'); // 'web' is the default guard
-        $adminRole = Role::findByName('admin', 'web'); // 'web' is the default guard
+        $companyAdminRole = Role::findByName('company_admin', 'web'); // 'web' is the default guard
+        $employeeRole = Role::findByName('employee', 'web'); // 'web' is the default guard
         
         if ($superAdminRole) {
             $superAdmin->assignRole($superAdminRole); // For clocking purposes
-            $dmin->assignRole($adminRole); // For testing purposes
-
         } else {
             // Optional: throw an exception or log a warning
             throw new \Exception('Role "super_admin" not found. Did you run RoleSeeder?');
         }
 
-        if ($adminRole) {
-            // $dmin->assignRole($adminRole);
+        if ($companyAdminRole) {
+             $companyAdmin->assignRole($companyAdminRole);
         } else {
             // Optional: throw an exception or log a warning
-            // throw new \Exception('Role "admin" not found. Did you run RoleSeeder?');
+            throw new \Exception('Role "company admin" not found. Did you run RoleSeeder?');
+        }
+        
+
+        if ($employeeRole) {
+             $clockingAccess->assignRole($employeeRole);
+        } else {
+            // Optional: throw an exception or log a warning
+            throw new \Exception('Role "employee" not found. Did you run RoleSeeder?');
         }
 
     }

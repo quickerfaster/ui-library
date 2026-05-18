@@ -10,7 +10,7 @@ class SetupWizard extends Wizard
     {
         // Do NOT call parent::mount() – we handle initialization ourselves
         $this->configKey = $configKey ?? 'setup'; // placeholder, not used
-        $this->wizardId = 'setup-wizard-' . auth()->id();
+        $this->wizardId = 'setup-wizard-' . session()->getId();
 
         $config = config('app_setup');
 

@@ -8,6 +8,15 @@ use Illuminate\Contracts\Http\Kernel;
 use QuickerFaster\UILibrary\Http\Middleware\CheckSetup;
 use Spatie\Onboard\Facades\Onboard;
 
+
+use ReflectionClass;
+use ReflectionException;
+
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+
+
+
 class ModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -90,9 +99,117 @@ class ModuleServiceProvider extends ServiceProvider
         $this->registerModuleViewAlias($modulePath);
         $this->registerModuleRoutes($modulePath);
         $this->registerModuleMigrations($modulePath);
+        $this->registerModuleEvents($modulePath);
+
 
     }
 
+
+
+
+
+
+
+
+
+/**
+ * Automatically register event listeners from all modules.
+ * Uses caching in production for better performance.
+ *
+ * @param string $modulePath Absolute path to the app/Modules directory
+ */
+private function registerModuleEvents($modulePath)
+{
+    if (!is_dir($modulePath)) {
+        return;
+    }
+
+    $cacheKey = 'module_event_listeners';
+
+    // In production, use cached listener map
+    if (app()->environment('production') && cache()->has($cacheKey)) {
+        $listenersMap = cache()->get($cacheKey);
+        foreach ($listenersMap as $eventClass => $listenerClass) {
+            Event::listen($eventClass, $listenerClass);
+        }
+        return;
+    }
+
+    // Scan modules and build listener map
+    $listenersMap = [];
+    $moduleDirectories = glob($modulePath . '/*', GLOB_ONLYDIR);
+
+    foreach ($moduleDirectories as $directory) {
+        $moduleName = basename($directory);
+        $listenersPath = $directory . '/Listeners';
+
+        if (!is_dir($listenersPath)) {
+            continue;
+        }
+
+        $listenerFiles = File::allFiles($listenersPath);
+
+        foreach ($listenerFiles as $file) {
+            $listenerClass = $this->getClassFromFile($moduleName, 'Listeners', $file->getPathname());
+
+            if (!class_exists($listenerClass)) {
+                continue;
+            }
+
+            $eventClass = $this->getEventFromListener($listenerClass);
+            if ($eventClass && class_exists($eventClass)) {
+                Event::listen($eventClass, $listenerClass);
+                $listenersMap[$eventClass] = $listenerClass;
+                // Log::info("Registered event listener: {$listenerClass} for event: {$eventClass}");
+            }
+        }
+    }
+
+    // Store the map in cache for production
+    if (app()->environment('production')) {
+        cache()->forever($cacheKey, $listenersMap);
+    }
+}
+
+
+
+
+    /**
+     * Extract the fully-qualified class name from a file.
+     */
+    protected function getClassFromFile($moduleName, $directory, $filePath)
+    {
+        $className = str_replace('.php', '', basename($filePath));
+        return "App\\Modules\\{$moduleName}\\{$directory}\\{$className}";
+    }
+
+
+    /**
+     * Detect the event from a listener.
+     */
+    protected function getEventFromListener($class)
+    {
+        try {
+            $reflection = new \ReflectionClass($class);
+
+            // Ensure the class has a handle method
+            if ($reflection->hasMethod('handle')) {
+                $method = $reflection->getMethod('handle');
+                $parameters = $method->getParameters();
+
+                // Extract the event type from the first argument
+                if (!empty($parameters)) {
+                    $parameterType = $parameters[0]->getType();
+                    return $parameterType ? $parameterType->getName() : null;
+                }
+            }
+        } catch (\ReflectionException $e) {
+            //dd("Error");
+            //\Log::error("Reflection error for class {$class}: " . $e->getMessage());
+        }
+
+        return null;
+    }
 
 
 
@@ -126,10 +243,6 @@ class ModuleServiceProvider extends ServiceProvider
 
 
 
-
-
-
-
     private function registerModuleRoutes($modulePath)
     {
         if (!is_dir($modulePath)) {
@@ -159,19 +272,19 @@ class ModuleServiceProvider extends ServiceProvider
         }
 
 
-// Load module's api routes 
-$apiFiles = glob($modulePath . '/*/Routes/api.php');
-foreach ($apiFiles as $path) {
-    // Get module name correctly
-    $moduleName = strtolower(basename(dirname(dirname($path))));
-    
-    if ($moduleName !== 'system') {
-        if (File::exists($path)) {
-            // It is standard practice to add the 'api' prefix here too
-            \Route::prefix('api')->middleware('api')->group($path);
+        // Load module's api routes 
+        $apiFiles = glob($modulePath . '/*/Routes/api.php');
+        foreach ($apiFiles as $path) {
+            // Get module name correctly
+            $moduleName = strtolower(basename(dirname(dirname($path))));
+
+            if ($moduleName !== 'system') {
+                if (File::exists($path)) {
+                    // It is standard practice to add the 'api' prefix here too
+                    \Route::prefix('api')->middleware('api')->group($path);
+                }
+            }
         }
-    }
-}
 
 
 
@@ -243,35 +356,35 @@ foreach ($apiFiles as $path) {
 
             // Create the key: 'hr_employee'
             $key = "{$module}_{$file}";
-//dd($path, $key);
+            //dd($path, $key);
             $this->mergeConfigFrom($path, $key);
         }
     }
 
-    
+
     /**
      * Merge report configuration files from all modules.
      *
      * @param string $modulePath Path to the Modules directory (e.g., app_path('Modules'))
      */
-private function mergeReportConfigs($modulePath)
-{
-    $configFiles = glob($modulePath . '/*/Data/reports/*.php');
-    $reportKeys = [];
+    private function mergeReportConfigs($modulePath)
+    {
+        $configFiles = glob($modulePath . '/*/Data/reports/*.php');
+        $reportKeys = [];
 
-    foreach ($configFiles as $path) {
-        $module = strtolower(basename(dirname(dirname(dirname($path)))));
-        $file   = pathinfo($path, PATHINFO_FILENAME);
-        $key    = "{$module}_{$file}";
+        foreach ($configFiles as $path) {
+            $module = strtolower(basename(dirname(dirname(dirname($path)))));
+            $file = pathinfo($path, PATHINFO_FILENAME);
+            $key = "{$module}_{$file}";
 
-        $this->mergeConfigFrom($path, $key);
-        $reportKeys[] = $key;
+            $this->mergeConfigFrom($path, $key);
+            $reportKeys[] = $key;
+        }
+
+        if (!empty($reportKeys)) {
+            config(['reports.registered' => $reportKeys]);
+        }
     }
-
-    if (!empty($reportKeys)) {
-        config(['reports.registered' => $reportKeys]);
-    }
-}
 
 
 

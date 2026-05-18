@@ -44,41 +44,41 @@ class WizardForm extends Component
         'saveStepForm' => 'save',
     ];
 
-public function mount(string $configKey, array $presetData = [], int $stepIndex = 0, ?int $recordId = null): void
-{
-    $this->configKey = $configKey;
-    $this->presetData = $presetData;
-    $this->stepIndex = $stepIndex;
-    $this->recordId = $recordId;
+    public function mount(string $configKey, array $presetData = [], int $stepIndex = 0, ?int $recordId = null): void
+    {
+        $this->configKey = $configKey;
+        $this->presetData = $presetData;
+        $this->stepIndex = $stepIndex;
+        $this->recordId = $recordId;
 
-    // Single listener for all step save events
-    $this->listeners['saveStepForm'] = 'handleSaveStepForm';
+        // Single listener for all step save events
+        $this->listeners['saveStepForm'] = 'handleSaveStepForm';
 
-    $this->loadConfiguration();
-    $this->initializeFields();
-    $this->applyPresetData();
+        $this->loadConfiguration();
+        $this->initializeFields();
+        $this->applyPresetData();
 
-    if ($this->recordId) {
-        $this->isEditMode = true;
-        $this->loadRecord();
+        if ($this->recordId) {
+            $this->isEditMode = true;
+            $this->loadRecord();
+        }
     }
-}
 
-/**
- * Handle the saveStepForm event – only proceed if the step index matches.
- */
-public function handleSaveStepForm($stepIndex): void
-{
-    if ($stepIndex == $this->stepIndex) {
-        $this->save();
+    /**
+     * Handle the saveStepForm event – only proceed if the step index matches.
+     */
+    public function handleSaveStepForm($stepIndex): void
+    {
+        if ($stepIndex == $this->stepIndex) {
+            $this->save();
+        }
     }
-}
 
 
 
     protected function loadRecord(): void
     {
-        
+
         $record = $this->modelClass::with(array_keys($this->relations))->find($this->recordId);
         if (!$record) {
             abort(404, 'Record not found');
@@ -87,18 +87,28 @@ public function handleSaveStepForm($stepIndex): void
         foreach ($this->fieldDefinitions as $field => $definition) {
             if (isset($definition['relationship'])) {
                 $rel = $definition['relationship'];
+
                 $dynamicProp = $rel['dynamic_property'] ?? $field;
                 if ($record->$dynamicProp) {
-                    if (in_array($rel['type'], ['belongsToMany', 'hasMany', 'morphMany'])) {
-                        $this->fields[$field] = $record->$dynamicProp->pluck('id')->toArray();
+                    $relationResult = $record->$dynamicProp;
+                    if (method_exists($relationResult, 'pluck')) {
+                        // It's a collection (many‑to‑many, hasMany, morphMany, morphToMany)
+                        $this->fields[$field] = $relationResult->pluck('id')->toArray();
                     } else {
-                        $this->fields[$field] = $record->$dynamicProp->id ?? null;
+                        // It's a single model (belongsTo, hasOne)
+                        $this->fields[$field] = $relationResult->id ?? null;
                     }
                 } else {
                     $this->fields[$field] = null;
                 }
             } else {
-                $this->fields[$field] = $record->$field;
+                $value = $record->$field;
+                // ✅ Convert date fields to string in Y-m-d format
+                if (isset($definition['field_type']) && in_array($definition['field_type'], ['date', 'datepicker'])) {
+                    $this->fields[$field] = $value instanceof \Carbon\Carbon ? $value->format('Y-m-d') : $value;
+                } else {
+                    $this->fields[$field] = $value;
+                }
             }
         }
 
@@ -159,6 +169,9 @@ public function handleSaveStepForm($stepIndex): void
             } elseif (isset($definition['field_type']) && $definition['field_type'] === 'boolradio') {
                 $this->fields[$field] = $default ?? null;
             } else {
+                if (isset($definition['field_type']) && in_array($definition['field_type'], ['date', 'datepicker'])) {
+                    $default = $default instanceof \Carbon\Carbon ? $default->format('Y-m-d') : $default;
+                }
                 $this->fields[$field] = $default;
             }
         }
@@ -191,7 +204,8 @@ public function handleSaveStepForm($stepIndex): void
     public function updatedSearches($value, $field)
     {
         $definition = $this->fieldDefinitions[$field] ?? null;
-        if (!$definition) return;
+        if (!$definition)
+            return;
 
         $results = [];
 
@@ -334,44 +348,44 @@ public function handleSaveStepForm($stepIndex): void
         });
     }
 
-protected function validateFields(): void
-{
-    $rules = [];
+    protected function validateFields(): void
+    {
+        $rules = [];
 
-    foreach ($this->fieldDefinitions as $field => $def) {
-        if (isset($def['validation']) && !$this->isFieldHidden($field, $this->isEditMode ? 'onEditForm' : 'onNewForm')) {
-            $rule = $def['validation'];
+        foreach ($this->fieldDefinitions as $field => $def) {
+            if (isset($def['validation']) && !$this->isFieldHidden($field, $this->isEditMode ? 'onEditForm' : 'onNewForm')) {
+                $rule = $def['validation'];
 
-            // If we are editing and the rule contains 'unique', append the record ID to ignore
-            if ($this->isEditMode && $this->recordId && str_contains($rule, 'unique')) {
-                // Split the rule string (could be pipe-separated)
-                $parts = explode('|', $rule);
-                foreach ($parts as &$part) {
-                    if (str_starts_with($part, 'unique:')) {
-                        // unique:table,column,except,id
-                        // If the rule doesn't already have an except clause, add it
-                        if (!str_contains($part, ',' . $this->recordId)) {
-                            $part .= ',' . $this->recordId . ',id';
+                // If we are editing and the rule contains 'unique', append the record ID to ignore
+                if ($this->isEditMode && $this->recordId && str_contains($rule, 'unique')) {
+                    // Split the rule string (could be pipe-separated)
+                    $parts = explode('|', $rule);
+                    foreach ($parts as &$part) {
+                        if (str_starts_with($part, 'unique:')) {
+                            // unique:table,column,except,id
+                            // If the rule doesn't already have an except clause, add it
+                            if (!str_contains($part, ',' . $this->recordId)) {
+                                $part .= ',' . $this->recordId . ',id';
+                            }
                         }
                     }
+                    $rule = implode('|', $parts);
                 }
-                $rule = implode('|', $parts);
-            }
 
-            $rules[$field] = $rule;
-        }
-    }
-
-    $validator = Validator::make($this->fields, $rules);
-    if ($validator->fails()) {
-        $this->resetErrorBag();
-        foreach ($validator->errors()->messages() as $key => $errors) {
-            foreach ($errors as $error) {
-                $this->addError($key, $error);
+                $rules[$field] = $rule;
             }
         }
+
+        $validator = Validator::make($this->fields, $rules);
+        if ($validator->fails()) {
+            $this->resetErrorBag();
+            foreach ($validator->errors()->messages() as $key => $errors) {
+                foreach ($errors as $error) {
+                    $this->addError($key, $error);
+                }
+            }
+        }
     }
-}
 
     protected function handleFileUploads($record, array $data): array
     {
@@ -388,78 +402,78 @@ protected function validateFields(): void
 
 
     protected function syncRelationships($record): void
-{
-    foreach ($this->fieldDefinitions as $field => $def) {
-        if (!isset($def['relationship'])) {
-            continue;
-        }
-        $rel = $def['relationship'];
-        $type = $rel['type'] ?? 'belongsTo';
-        $dynamicProp = $rel['dynamic_property'] ?? $field;
+    {
+        foreach ($this->fieldDefinitions as $field => $def) {
+            if (!isset($def['relationship'])) {
+                continue;
+            }
+            $rel = $def['relationship'];
+            $type = $rel['type'] ?? 'belongsTo';
+            $dynamicProp = $rel['dynamic_property'] ?? $field;
 
-        // belongsTo is handled via foreign key in main data
-        if ($type === 'belongsTo') {
-            continue;
-        }
-
-        $ids = $this->fields[$field] ?? [];
-        // Clean up: remove nulls/empties and duplicates
-        $ids = array_unique(array_filter($ids));
-
-        if ($type === 'belongsToMany') {
-            $record->$dynamicProp()->sync($ids);
-        } elseif (in_array($type, ['hasMany', 'morphMany'])) {
-            // Must have foreign_key defined in config
-            if (!isset($rel['foreign_key'])) {
+            // belongsTo is handled via foreign key in main data
+            if ($type === 'belongsTo') {
                 continue;
             }
 
-            $relatedClass = $rel['model'];
-            $foreignKey = $rel['foreign_key'];
+            $ids = $this->fields[$field] ?? [];
+            // Clean up: remove nulls/empties and duplicates
+            $ids = array_unique(array_filter($ids));
 
-            // Get the primary key name of the related model (usually 'id')
-            $relatedInstance = new $relatedClass;
-            $localKey = $relatedInstance->getKeyName();
+            if ($type === 'belongsToMany') {
+                $record->$dynamicProp()->sync($ids);
+            } elseif (in_array($type, ['hasMany', 'morphMany'])) {
+                // Must have foreign_key defined in config
+                if (!isset($rel['foreign_key'])) {
+                    continue;
+                }
 
-            if (empty($ids)) {
-                // No selected: disassociate all currently linked
-                $relatedClass::where($foreignKey, $record->id)
-                    ->update([$foreignKey => null]);
-            } else {
-                // Disassociate those not in the selected list
-                $relatedClass::where($foreignKey, $record->id)
-                    ->whereNotIn($localKey, $ids)
-                    ->update([$foreignKey => null]);
+                $relatedClass = $rel['model'];
+                $foreignKey = $rel['foreign_key'];
 
-                // Associate the selected ones
-                $relatedClass::whereIn($localKey, $ids)
-                    ->update([$foreignKey => $record->id]);
+                // Get the primary key name of the related model (usually 'id')
+                $relatedInstance = new $relatedClass;
+                $localKey = $relatedInstance->getKeyName();
+
+                if (empty($ids)) {
+                    // No selected: disassociate all currently linked
+                    $relatedClass::where($foreignKey, $record->id)
+                        ->update([$foreignKey => null]);
+                } else {
+                    // Disassociate those not in the selected list
+                    $relatedClass::where($foreignKey, $record->id)
+                        ->whereNotIn($localKey, $ids)
+                        ->update([$foreignKey => null]);
+
+                    // Associate the selected ones
+                    $relatedClass::whereIn($localKey, $ids)
+                        ->update([$foreignKey => $record->id]);
+                }
             }
         }
     }
-}
 
     // ---------- Render ----------
-public function render()
-{
-    // Filter groups based on step configuration
-    $displayGroups = [];
-    if (!empty($this->stepGroups)) {
-        foreach ($this->stepGroups as $groupKey) {
-            if (isset($this->fieldGroups[$groupKey])) {
-                $displayGroups[$groupKey] = $this->fieldGroups[$groupKey];
+    public function render()
+    {
+        // Filter groups based on step configuration
+        $displayGroups = [];
+        if (!empty($this->stepGroups)) {
+            foreach ($this->stepGroups as $groupKey) {
+                if (isset($this->fieldGroups[$groupKey])) {
+                    $displayGroups[$groupKey] = $this->fieldGroups[$groupKey];
+                }
             }
+        } else {
+            // Fallback: show all groups
+            $displayGroups = $this->fieldGroups;
         }
-    } else {
-        // Fallback: show all groups
-        $displayGroups = $this->fieldGroups;
-    }
 
-    return view('qf::livewire.wizards.wizard-form', [
-        'displayGroups' => $displayGroups,
-        'fieldDefinitions' => $this->fieldDefinitions,
-        'hiddenFields' => $this->hiddenFields,
-    ]);
-}
+        return view('qf::livewire.wizards.wizard-form', [
+            'displayGroups' => $displayGroups,
+            'fieldDefinitions' => $this->fieldDefinitions,
+            'hiddenFields' => $this->hiddenFields,
+        ]);
+    }
 
 }

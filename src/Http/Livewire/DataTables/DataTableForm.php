@@ -15,6 +15,8 @@ use Livewire\Attributes\On;
 
 use QuickerFaster\UILibrary\Services\Validation\DataTableFormValidationService;
 use QuickerFaster\UILibrary\Traits\HasAutoGenerateFields;
+use App\Modules\Admin\Services\AuthorizationService;
+use QuickerFaster\UILibrary\Services\Documents\EmployeeDocumentService;
 
 class DataTableForm extends Component
 {
@@ -89,12 +91,16 @@ class DataTableForm extends Component
         $this->initializeFields();
 
         if ($this->recordId) {
+            app(AuthorizationService::class)->authorizeUpdate(auth()->user(), $this->recordId, $this->modelClass);
+
             $this->isEditMode = true;
             $this->loadRecord();
         } else {
+            app(AuthorizationService::class)->authorizeCreate(auth()->user(), $this->modelClass);
             // Apply prefilled data only for new records
             $this->applyPrefilledData();
         }
+
     }
 
 
@@ -143,9 +149,6 @@ class DataTableForm extends Component
         foreach ($this->fieldDefinitions as $field => $definition) {
             $default = $definition['default'] ?? null;
 
-
-
-
             if (isset($definition['multiSelect']) && $definition['multiSelect']) {
                 $this->fields[$field] = [];
             } elseif (isset($definition['field_type']) && $definition['field_type'] === 'boolcheckbox') {
@@ -153,6 +156,13 @@ class DataTableForm extends Component
             } elseif (isset($definition['field_type']) && $definition['field_type'] === 'boolradio') {
                 $this->fields[$field] = $default ?? null;
             } else {
+                $default = $definition['default'] ?? null;
+
+                // ✅ For date fields, ensure default is a string
+                if (isset($definition['field_type']) && in_array($definition['field_type'], ['date', 'datepicker'])) {
+                    $default = $default instanceof \Carbon\Carbon ? $default->format('Y-m-d') : $default;
+                }
+
                 $this->fields[$field] = $default;
             }
 
@@ -420,44 +430,44 @@ class DataTableForm extends Component
 
 
     public function createAndSelectOption($field, $newValue)
-{
-    $definition = $this->fieldDefinitions[$field] ?? null;
-    if (!$definition || !isset($definition['relationship'])) {
-        return;
-    }
-
-    $rel = $definition['relationship'];
-    $modelClass = $rel['model'];
-    $displayField = $rel['display_field'] ?? 'name';
-
-    // Create new record (ensure fillable fields are allowed)
-    $newRecord = $modelClass::create([
-        $displayField => $newValue,
-        'slug' => \Illuminate\Support\Str::slug($newValue),
-        'color' => 'primary',
-        'is_active' => true,
-    ]);
-
-    $multiple = $definition['multiSelect'] ?? false;
-
-    if ($multiple) {
-        $currentIds = $this->fields[$field] ?? [];
-        // Ensure all IDs are integers
-        $currentIds = array_map('intval', $currentIds);
-        if (!in_array($newRecord->id, $currentIds)) {
-            $currentIds[] = $newRecord->id;
-            $this->fields[$field] = $currentIds;
-            $this->selectedLabels[$field][$newRecord->id] = $newRecord->$displayField;
+    {
+        $definition = $this->fieldDefinitions[$field] ?? null;
+        if (!$definition || !isset($definition['relationship'])) {
+            return;
         }
-    } else {
-        $this->fields[$field] = $newRecord->id;
-        $this->selectedLabels[$field] = [$newRecord->id => $newRecord->$displayField];
-    }
 
-    // Clear search
-    $this->searches[$field] = '';
-    $this->searchResults[$field] = [];
-}
+        $rel = $definition['relationship'];
+        $modelClass = $rel['model'];
+        $displayField = $rel['display_field'] ?? 'name';
+
+        // Create new record (ensure fillable fields are allowed)
+        $newRecord = $modelClass::create([
+            $displayField => $newValue,
+            'slug' => \Illuminate\Support\Str::slug($newValue),
+            'color' => 'primary',
+            'is_active' => true,
+        ]);
+
+        $multiple = $definition['multiSelect'] ?? false;
+
+        if ($multiple) {
+            $currentIds = $this->fields[$field] ?? [];
+            // Ensure all IDs are integers
+            $currentIds = array_map('intval', $currentIds);
+            if (!in_array($newRecord->id, $currentIds)) {
+                $currentIds[] = $newRecord->id;
+                $this->fields[$field] = $currentIds;
+                $this->selectedLabels[$field][$newRecord->id] = $newRecord->$displayField;
+            }
+        } else {
+            $this->fields[$field] = $newRecord->id;
+            $this->selectedLabels[$field] = [$newRecord->id => $newRecord->$displayField];
+        }
+
+        // Clear search
+        $this->searches[$field] = '';
+        $this->searchResults[$field] = [];
+    }
 
 
 
@@ -505,7 +515,15 @@ class DataTableForm extends Component
                     $this->fields[$field] = null;
                 }
             } else {
-                $this->fields[$field] = $record->$field;
+
+                $value = $record->$field;
+                // ✅ Convert date fields to string in Y-m-d format
+                if (isset($definition['field_type']) && in_array($definition['field_type'], ['date', 'datepicker'])) {
+                    $this->fields[$field] = $value instanceof \Carbon\Carbon ? $value->format('Y-m-d') : $value;
+                } else {
+                    $this->fields[$field] = $value;
+                }
+
             }
         }
 
@@ -557,6 +575,13 @@ class DataTableForm extends Component
         if ($this->getErrorBag()->any()) {
             return;
         }
+
+
+        // Pre-save document limit check
+        if (!$this->checkDocumentLimit()) {
+            return;
+        }
+
 
         DB::transaction(function () {
             $record = $this->isEditMode
@@ -683,6 +708,67 @@ class DataTableForm extends Component
 
 
 
+
+
+
+    /**
+     * Check document limit for Document model before saving.
+     *
+     * @return bool True if limit is not exceeded (or not applicable), false otherwise.
+     */
+    private function checkDocumentLimit(): bool
+    {
+        // Only applies to Document model
+        if ($this->modelClass !== \App\Modules\Hr\Models\Document::class) {
+            return true;
+        }
+
+        $employeeId = $this->fields['employee_id'] ?? null;
+        if (!$employeeId) {
+            // No employee selected yet – validation will catch required rule later
+            return true;
+        }
+
+        $employee = \App\Modules\Hr\Models\Employee::find($employeeId);
+        if (!$employee) {
+            return true;
+        }
+
+        // Get max limit from config or default to 10
+        $max = $this->fieldDefinitions['document']['maxDocumentsPerEmployee'] ?? 3;
+        $service = new EmployeeDocumentService($max);
+
+        $isCreating = !$this->isEditMode;
+        $isChangingEmployee = false;
+
+        if ($this->isEditMode && $this->recordId) {
+            $existingDocument = $this->modelClass::find($this->recordId);
+            if ($existingDocument && $existingDocument->employee_id != $employeeId) {
+                $isChangingEmployee = true;
+            }
+        }
+
+        $shouldCheck = $isCreating || $isChangingEmployee;
+
+        if ($shouldCheck) {
+            $excludeDocumentId = ($this->isEditMode && $isChangingEmployee) ? $this->recordId : null;
+            if (!$service->canUpload($employee, $excludeDocumentId)) {
+                $this->dispatch('showAlert', [
+                    'type' => 'error',
+                    'message' => "This employee already has the maximum allowed documents ({$max}). Cannot add another document.",
+                    'autoClose' => true,
+                ]);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+
+
+
     protected function prepareMorphToSelectFields(array &$data): void
     {
         foreach ($this->fieldDefinitions as $field => $def) {
@@ -776,14 +862,10 @@ class DataTableForm extends Component
     {
         // 1. Process cropped images (data URLs) first
         foreach ($this->croppedImages as $field => $dataUrl) {
-            // Convert data URL to a temporary file
             $imageData = explode(',', $dataUrl)[1];
             $imageData = base64_decode($imageData);
-
             $tempFile = tempnam(sys_get_temp_dir(), 'crop_') . '.jpg';
             file_put_contents($tempFile, $imageData);
-
-            // Create a proper UploadedFile instance
             $uploadedFile = new \Illuminate\Http\UploadedFile(
                 $tempFile,
                 'cropped_image.jpg',
@@ -791,50 +873,55 @@ class DataTableForm extends Component
                 null,
                 true
             );
-
-            // Store the file
             $folder = 'uploads/' . $this->configKey;
             $storedPath = $uploadedFile->store($folder, 'public');
-
             if ($storedPath) {
                 $data[$field] = $storedPath;
-
-                // Delete old file if editing
                 if ($this->isEditMode && !empty($record->$field)) {
                     \Storage::disk('public')->delete($record->$field);
                 }
             }
-
-            // Remove from cropped images array
             unset($this->croppedImages[$field]);
         }
 
-        // 2. Process normal file uploads (TemporaryUploadedFile objects)
+        // 2. Process normal file uploads
         foreach ($this->fieldDefinitions as $field => $def) {
             $fieldType = $def['field_type'] ?? null;
             if (!in_array($fieldType, ['file', 'image'])) {
                 continue;
             }
-
-            // Skip if already handled as cropped image
             if (isset($data[$field]) && !($this->fields[$field] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)) {
                 continue;
             }
-
             if (isset($this->fields[$field]) && $this->fields[$field] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
                 $tempFile = $this->fields[$field];
-                $folder = 'uploads/' . $this->configKey;
-                $storedPath = $tempFile->store($folder, 'public');
 
-                if ($storedPath) {
-                    $data[$field] = $storedPath;
+                $disk = 'public';
+                $customFolder = null;
 
-                    if ($this->isEditMode && !empty($record->$field)) {
-                        \Storage::disk('public')->delete($record->$field);
+                // Override for Document model's 'document' field
+                if ($this->modelClass === \App\Modules\Hr\Models\Document::class && $field === 'document') {
+                    $employeeId = $data['employee_id'] ?? $this->fields['employee_id'] ?? null;
+                    if ($employeeId) {
+                        $employee = \App\Modules\Hr\Models\Employee::find($employeeId);
+                        if ($employee) {
+                            $service = new EmployeeDocumentService();
+                            $customFolder = $service->getStorageFolder($employee);
+                            $disk = 'documents';
+                        }
                     }
                 }
 
-                // Clear the temporary field
+                $folder = $customFolder ?? ('uploads/' . $this->configKey);
+                $storedPath = $tempFile->store($folder, $disk);
+
+                if ($storedPath) {
+                    $data[$field] = $storedPath;
+                    if ($this->isEditMode && !empty($record->$field)) {
+                        $oldDisk = ($this->modelClass === \App\Modules\Hr\Models\Document::class && $field === 'document') ? 'documents' : 'public';
+                        \Storage::disk($oldDisk)->delete($record->$field);
+                    }
+                }
                 $this->fields[$field] = null;
             } elseif (isset($data[$field]) && is_string($data[$field]) && !empty($data[$field])) {
                 // Keep existing path

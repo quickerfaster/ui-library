@@ -1,6 +1,6 @@
     <x-qf::dashboards.default-dashboard>
 
-        @hasanyrole('admin|super_admin')
+        @hasanyrole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES)
         <x-slot name="mainTitle"> <strong class="text-info text-gradient">{{ $selectedScope?->name}}</strong> Permissions</x-slot>
             <x-slot name="subtitle"> {{ $selectedModuleName? ucfirst($selectedModuleName. " Module"): ''}}</x-slot>
             <x-slot name="controls">

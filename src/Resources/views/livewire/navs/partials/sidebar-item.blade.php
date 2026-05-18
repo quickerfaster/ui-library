@@ -25,20 +25,32 @@
         // Compare with item key (already snake_case) or label (case-insensitive)
         $isActive = ($itemKey === $normalizedModel) || (strtolower($itemLabel) === strtolower($currentModelName));
     }
+
+
+    $splittedUrl = explode('/', $item['route']);
+    $viewName = count($splittedUrl) > 0 ? $splittedUrl[count($splittedUrl) - 1] : '';
+    $viewName = str_replace("dashboard-", "", $viewName);
+    $permissionName = 'view_' . str_replace('-', '_', $viewName);
+    $hasPermission = app(App\Modules\Admin\Services\AuthorizationService::class)
+        ->canAccessView( auth()->user(), $permissionName);
+        
 @endphp
 
-<li class="nav-item text-nowrap" wire:key="sidebar-item-{{ $item['key'] ?? $item['label'] }}">
-    <a href="{{ $item['route'] ?? '#' }}" 
-       class="nav-link d-flex align-items-center {{ $isActive ? 'active fw-bold text-primary' : 'text-dark' }}"
-       data-bs-toggle="tooltip"
-       data-bs-placement="right"
-       title="{{ $item['label'] }}">
-        <i class="{{ $item['icon'] ?? 'fas fa-circle' }} me-2"></i>
-        @if ($state === 'full')
-            <span>{{ $item['label'] }}</span>
-        @endif
-    </a>
-</li>
+@if ($hasPermission)
+    <li class="nav-item text-nowrap" wire:key="sidebar-item-{{ $item['key'] ?? $item['label'] }}">
+        <a href="{{ $item['route'] ?? '#' }}" 
+        class="nav-link d-flex align-items-center {{ $isActive ? 'active fw-bold text-primary' : 'text-dark' }}"
+        data-bs-toggle="tooltip"
+        data-bs-placement="right"
+        title="{{ $item['label'] }}">
+            <i class="{{ $item['icon'] ?? 'fas fa-circle' }} me-2"></i>
+            @if ($state === 'full')
+                <span>{{ $item['label'] }}</span>
+            @endif
+        </a>
+    </li>
+@endif
+
 
 {{-- Optional: Add CSS for the active class  
 <style>

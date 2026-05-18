@@ -33,45 +33,42 @@ class FileField implements FieldType
         ]);
     }
 
+
+
     public function renderTable($value, $record): string
-    {
-        if (!$value)
-            return '<span class="text-muted small italic">None</span>';
-
-        $url = asset('storage/' . $value);
-        $filename = basename($value);
-        $extension = strtolower(pathinfo($value, PATHINFO_EXTENSION));
-        $isImage = in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
-
-        $fileStyle = match ($extension) {
-            'pdf' => ['icon' => 'fa-file-pdf', 'color' => '#e74c3c'],
-            'xls', 'xlsx' => ['icon' => 'fa-file-excel', 'color' => '#27ae60'],
-            'doc', 'docx' => ['icon' => 'fa-file-word', 'color' => '#2980b9'],
-            default => ['icon' => 'fa-file-alt', 'color' => '#7f8c8d'],
-        };
-
-        // Main Wrapper
-        $html = '<div class="d-inline-flex align-items-center bg-light border rounded px-2 py-1 shadow-sm" style="max-width: 200px; cursor: pointer;" ';
-        // Dispatching directly on the container click for better UX
-        $html .= 'onclick="Livewire.dispatch(\'openDocumentPreview\', [{ fileUrl: \'' . $url . '\', fileName: \'' . $filename . '\' }])">';
-
-        // Visual Indicator (Thumbnail or Icon)
-        if ($isImage) {
-            $html .= '<img src="' . $url . '" style="width: 20px; height: 20px; object-fit: cover;" class="rounded-sm me-2">';
-        } else {
-            $html .= '<i class="fas ' . $fileStyle['icon'] . ' me-2" style="color: ' . $fileStyle['color'] . ';"></i>';
-        }
-
-        // Filename
-        $html .= '<span class="text-truncate small fw-medium text-dark" style="max-width: 120px;" title="' . $filename . '">' . $filename . '</span>';
-
-        // Small Eye Icon to hint at preview
-        $html .= '<i class="fas fa-eye ms-2 text-muted small" style="font-size: 0.75rem;"></i>';
-
-        $html .= '</div>';
-
-        return $html;
+{
+    if (!$value) {
+        return '<span class="text-muted small italic">None</span>';
     }
+
+    // Detect if this is a Document model (has an 'employee' relationship)
+    $isDocument = method_exists($record, 'employee') && $record->employee;
+    
+    if ($isDocument && $record->id) {
+        $url = route('documents.download', $record->id);
+        $filename = $record->name ?? basename($value);
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        
+        $icon = match($extension) {
+            'pdf' => 'fa-file-pdf',
+            'xls', 'xlsx' => 'fa-file-excel',
+            'doc', 'docx' => 'fa-file-word',
+            'jpg', 'jpeg', 'png', 'gif' => 'fa-file-image',
+            default => 'fa-file-alt',
+        };
+        
+        return '<a href="' . $url . '" target="_blank" class="d-inline-flex align-items-center gap-1 text-decoration-none">
+                    <i class="fas ' . $icon . '"></i>
+                    <span>' . e($filename) . '</span>
+                    <i class="fas fa-download ms-1 small"></i>
+                </a>';
+    }
+    
+    // Fallback for public files (profile images, etc.)
+    $url = asset('storage/' . $value);
+    $filename = basename($value);
+    return '<a href="' . $url . '" target="_blank">' . e($filename) . '</a>';
+}
 
 
 
