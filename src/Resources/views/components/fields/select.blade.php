@@ -7,7 +7,7 @@
         'class' => 'form-select ' . ($errors->has($name) ? 'is-invalid' : ''),
         'id' => $name,
         'name' => $name . ($multiple ? '[]' : ''),
-        'wire:model' => "fields.{$name}", 
+        'wire:model.live' => "fields.{$name}", 
         $multiple ? 'multiple' : '',
     ]) }}>
         @if(!$multiple && $placeholder)

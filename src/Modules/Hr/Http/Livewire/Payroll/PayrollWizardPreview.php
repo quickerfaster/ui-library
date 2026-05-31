@@ -44,6 +44,11 @@ class PayrollWizardPreview extends Component
     public bool $isPolling = false;
     public bool $processingStartedEventSent = false;
 
+    // Sorting properties
+    public string $sortField = 'employee_name';
+    public string $sortDirection = 'asc';
+    
+
     protected $listeners = [
         'refreshPreview' => 'loadPreviewData',
         'savePreview' => 'save',
@@ -79,6 +84,21 @@ class PayrollWizardPreview extends Component
         }
     }
 
+
+
+    public function sortBy($field): void
+    {
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+        $this->resetPage();
+    }
+
+
+
     protected function startCalculation(): void
     {
         $run = PayrollRun::findOrFail($this->payrollRunId);
@@ -106,39 +126,39 @@ class PayrollWizardPreview extends Component
         $this->dispatch('refreshPayslips');
     }
 
-public function checkCalculationStatus(): void
-{
-    $progress = \App\Modules\Hr\Models\PayrollRunProgress::where('payroll_run_id', $this->payrollRunId)->first();
+    public function checkCalculationStatus(): void
+    {
+        $progress = \App\Modules\Hr\Models\PayrollRunProgress::where('payroll_run_id', $this->payrollRunId)->first();
 
-    if ($progress) {
-        $this->calculationStatus = $progress->status;
-        $this->totalEmployees = $progress->total_employees ?? 0;
-        $this->processedEmployees = $progress->processed_employees ?? 0;
+        if ($progress) {
+            $this->calculationStatus = $progress->status;
+            $this->totalEmployees = $progress->total_employees ?? 0;
+            $this->processedEmployees = $progress->processed_employees ?? 0;
 
-        if ($this->totalEmployees > 0) {
-            $this->progress = round(($this->processedEmployees / $this->totalEmployees) * 100);
+            if ($this->totalEmployees > 0) {
+                $this->progress = round(($this->processedEmployees / $this->totalEmployees) * 100);
+            }
+        } else {
+            // fallback: read from payroll_runs
+            $run = PayrollRun::findOrFail($this->payrollRunId);
+            $this->calculationStatus = $run->calculation_status;
+            $this->totalEmployees = $run->total_employees ?? 0;
+            $this->processedEmployees = $run->processed_employees ?? 0;
+            $this->progress = $this->totalEmployees ? round(($this->processedEmployees / $this->totalEmployees) * 100) : 0;
         }
-    } else {
-        // fallback: read from payroll_runs
-        $run = PayrollRun::findOrFail($this->payrollRunId);
-        $this->calculationStatus = $run->calculation_status;
-        $this->totalEmployees = $run->total_employees ?? 0;
-        $this->processedEmployees = $run->processed_employees ?? 0;
-        $this->progress = $this->totalEmployees ? round(($this->processedEmployees / $this->totalEmployees) * 100) : 0;
+
+        if ($this->calculationStatus === 'completed') {
+            $this->dispatch('processingFinished');
+            $this->loadCalculatedData();
+        } elseif ($this->calculationStatus === 'failed') {
+            $this->isPolling = false;
+            $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Calculation failed.']);
+        }
+
+        if ($this->progress && $this->progress > 0 && $this->calculationStatus != 'completed')
+            $this->dispatch('processingStarted');
+
     }
-
-    if ($this->calculationStatus === 'completed') {
-        $this->dispatch('processingFinished'); 
-        $this->loadCalculatedData();
-    } elseif ($this->calculationStatus === 'failed') {
-        $this->isPolling = false;
-        $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Calculation failed.']);
-    }
-
-    if ($this->progress && $this->progress > 0 &&  $this->calculationStatus != 'completed')
-        $this->dispatch('processingStarted'); 
-
-}
 
     public function getPayslipsProperty()
     {
@@ -175,6 +195,26 @@ public function checkCalculationStatus(): void
         if ($this->filterEmploymentStatus === 'Active' || $this->filterEmploymentStatus === 'On Leave' || $this->filterEmploymentStatus === 'Terminated') {
             $query->whereHas('employee.employeePosition', fn($q) => $q->where('employment_status', $this->filterEmploymentStatus));
         }
+
+
+
+        // Apply sorting
+        if ($this->sortField === 'employee_name') {
+            $query->join('employees', 'payroll_payslips.employee_id', '=', 'employees.id')
+                ->orderBy('employees.first_name', $this->sortDirection)
+                ->orderBy('employees.last_name', $this->sortDirection)
+                ->select('payroll_payslips.*');
+        } elseif ($this->sortField === 'gross_pay') {
+            $query->orderBy('gross_pay', $this->sortDirection);
+        } elseif ($this->sortField === 'total_deductions') {
+            $query->orderBy('total_deductions', $this->sortDirection);
+        } elseif ($this->sortField === 'net_pay') {
+            $query->orderBy('net_pay', $this->sortDirection);
+        }
+
+
+
+
 
         return $query->paginate(50);
     }
@@ -231,6 +271,7 @@ public function checkCalculationStatus(): void
         $this->search = '';
         $this->resetPage();
         $this->expandedPayslipId = null;
+        
     }
 
     public function save(): void

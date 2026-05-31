@@ -76,7 +76,7 @@ class DataTableFormValidationService
         // If password fiied is changed on edit form validate
         if ($field === 'password' || $field === 'password_confirmation') {
             // $modelClass eg. App\Modules\Admin\Models\User
-            return $isEditMode && isset($fields['password']);
+            return !$isEditMode || (isset($fields['password']) && !empty($fields['password']));
 
         }
 

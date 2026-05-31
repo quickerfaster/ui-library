@@ -252,7 +252,9 @@ class FilterPanel extends Component
     {
         $resolver = $this->getConfigResolver();
         $controls = $resolver->getControls();
-        $this->filtersConfig = $controls['filters'] ?? [];
+
+        // Config driven filters to be implemented later
+        // $this->filtersConfig = $controls['filters'] ?? [];
         $this->fieldDefinitions = $resolver->getFieldDefinitions();
 
         if (empty($this->filtersConfig) && ($controls['autoFilters'] ?? true)) {

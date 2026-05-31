@@ -3,6 +3,7 @@
 namespace QuickerFaster\UILibrary\Widgets;
 
 use Illuminate\Support\Facades\DB;
+use QuickerFaster\UILibrary\Services\Filters\FilterService;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
 
 class ListWidgetProcessor
@@ -22,10 +23,11 @@ class ListWidgetProcessor
         if ($model && class_exists($model)) {
             $query = $model::query();
 
-            // Apply conditions
-            foreach ($conditions as $condition) {
-                $query->where(...$condition);
-            }
+
+            // ✅ Reuse the filter logic – dot notation works automatically
+            $filterService = new FilterService();
+            $filterService->applySimpleFilters($query, $conditions);
+
 
             // Apply sorting
             $query->orderBy($sort[0], $sort[1] ?? 'asc');
@@ -58,13 +60,13 @@ class ListWidgetProcessor
         }
 
         return [
-            'type'        => 'list',
-            'title'       => $definition['title'] ?? 'List',
+            'type' => 'list',
+            'title' => $definition['title'] ?? 'List',
             'description' => $definition['description'] ?? '',
-            'icon'        => $definition['icon'] ?? null,
-            'columns'     => $columns,
-            'items'       => $items,
-            'width'       => $definition['width'] ?? 6,
+            'icon' => $definition['icon'] ?? null,
+            'columns' => $columns,
+            'items' => $items,
+            'width' => $definition['width'] ?? 6,
             'showViewAll' => $definition['show_view_all'] ?? false,
             'viewAllLink' => $definition['view_all_link'] ?? null,
         ];
@@ -105,7 +107,8 @@ class ListWidgetProcessor
             case 'number':
                 return number_format((float) $value);
             case 'expiry_warning':
-                if (!$value) return '';
+                if (!$value)
+                    return '';
                 $daysLeft = now()->diffInDays($value, false);
                 if ($daysLeft <= 0) {
                     return '<span class="badge bg-danger">Expired</span>';

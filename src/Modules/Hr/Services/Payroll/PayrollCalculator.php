@@ -20,54 +20,54 @@ class PayrollCalculator
     /**
      * Main calculation entry point – processes payroll run in chunks.
      */
-public function calculate(PayrollRun $run): void
-{
-    $this->run = $run;
+    public function calculate(PayrollRun $run): void
+    {
+        $this->run = $run;
 
-    // Get total employee count
-    $totalEmployees = EmployeePosition::where('pay_schedule_id', $this->run->pay_schedule_id)
-        ->where('employment_status', 'Active')
-        ->count();
+        // Get total employee count
+        $totalEmployees = EmployeePosition::where('pay_schedule_id', $this->run->pay_schedule_id)
+            ->where('employment_status', 'Active')
+            ->count();
 
-    // Create or reset progress record (outside transaction, so immediately visible)
-    \App\Modules\Hr\Models\PayrollRunProgress::updateOrCreate(
-        ['payroll_run_id' => $this->run->id],
-        [
-            'total_employees' => $totalEmployees,
-            'processed_employees' => 0,
-            'status' => 'processing',
-        ]
-    );
+        // Create or reset progress record (outside transaction, so immediately visible)
+        \App\Modules\Hr\Models\PayrollRunProgress::updateOrCreate(
+            ['payroll_run_id' => $this->run->id],
+            [
+                'total_employees' => $totalEmployees,
+                'processed_employees' => 0,
+                'status' => 'processing',
+            ]
+        );
 
-    // Delete previous payslips & items (inside a transaction – but this is quick)
-    DB::transaction(function () {
-        PayrollPayslip::where('payroll_run_id', $this->run->id)->delete();
-    });
-
-    // Process employees in chunks – each employee’s data saved in its own transaction
-    EmployeePosition::where('pay_schedule_id', $this->run->pay_schedule_id)
-        ->where('employment_status', 'Active')
-        ->with(['employee', 'location', 'employee.employeeProfile', 'employee.user'])
-        ->chunk(100, function ($positions) {
-            foreach ($positions as $position) {
-                // Save payslip in a small transaction (for atomicity per employee)
-                DB::transaction(function () use ($position) {
-                    $this->calculateForEmployee($position);
-                });
-
-                // Update progress (outside transaction, commits immediately)
-                \App\Modules\Hr\Models\PayrollRunProgress::where('payroll_run_id', $this->run->id)
-                    ->increment('processed_employees');
-            }
+        // Delete previous payslips & items (inside a transaction – but this is quick)
+        DB::transaction(function () {
+            PayrollPayslip::where('payroll_run_id', $this->run->id)->delete();
         });
 
-    // Mark as completed
-    \App\Modules\Hr\Models\PayrollRunProgress::where('payroll_run_id', $this->run->id)
-        ->update(['status' => 'completed']);
+        // Process employees in chunks – each employee’s data saved in its own transaction
+        EmployeePosition::where('pay_schedule_id', $this->run->pay_schedule_id)
+            ->where('employment_status', 'Active')
+            ->with(['employee', 'location', 'employee.employeeProfile', 'employee.user'])
+            ->chunk(100, function ($positions) {
+                foreach ($positions as $position) {
+                    // Save payslip in a small transaction (for atomicity per employee)
+                    DB::transaction(function () use ($position) {
+                        $this->calculateForEmployee($position);
+                    });
 
-    // Finally, update the run totals (inside a transaction, but done once at the end)
-    $this->updateRunTotals();
-}
+                    // Update progress (outside transaction, commits immediately)
+                    \App\Modules\Hr\Models\PayrollRunProgress::where('payroll_run_id', $this->run->id)
+                        ->increment('processed_employees');
+                }
+            });
+
+        // Mark as completed
+        \App\Modules\Hr\Models\PayrollRunProgress::where('payroll_run_id', $this->run->id)
+            ->update(['status' => 'completed']);
+
+        // Finally, update the run totals (inside a transaction, but done once at the end)
+        $this->updateRunTotals();
+    }
 
     /**
      * Calculate payslip for a single employee.
@@ -89,11 +89,12 @@ public function calculate(PayrollRun $run): void
                 $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
             })->get();
 
+
         foreach ($recurring as $adj) {
-            $amount = $adj->calculation_type === 'Percentage'
+            $amount = strtolower($adj->calculation_type) === 'percentage'
                 ? $baseSalary * ($adj->value / 100)
                 : $adj->value;
-            $type = $adj->type === 'earning' ? 'earning' : 'deduction';
+            $type = strtolower($adj->type) === 'earning' ? 'earning' : 'deduction';
             $items[] = $this->makeItem(null, $type, $adj->label, $amount);
         }
 
@@ -102,12 +103,16 @@ public function calculate(PayrollRun $run): void
             ->where('employee_id', $employeeId)
             ->get();
 
+
+
+
+
         foreach ($oneTime as $adj) {
             $amount = $adj->amount;
             if ($amount == 0)
                 continue;
 
-            switch ($adj->type) {
+            switch (strtolower($adj->type)) {
                 case 'bonus':
                 case 'commission':
                 case 'reimbursement':
@@ -174,6 +179,7 @@ public function calculate(PayrollRun $run): void
         return $payslip;
     }
 
+
     /**
      * Resolve applicable policies for an employee based on assignments and global rules.
      */
@@ -183,10 +189,11 @@ public function calculate(PayrollRun $run): void
         $locationId = $position->location_id;
         $departmentId = $position->department_id;
         $shiftId = $position->shift_id;
+        $employeeGroupId = $position->employee->employee_group_id; // one group per employee
 
         $assignments = PayrollPolicyAssignment::with('policy')
             ->whereIn('assignable_type', ['company', 'location', 'department', 'shift', 'employee_group'])
-            ->where(function ($q) use ($companyId, $locationId, $departmentId, $shiftId, $position) {
+            ->where(function ($q) use ($companyId, $locationId, $departmentId, $shiftId, $employeeGroupId) {
                 $q->where(function ($q2) use ($companyId) {
                     $q2->where('assignable_type', 'company')->where('assignable_id', $companyId);
                 })->orWhere(function ($q2) use ($locationId) {
@@ -195,14 +202,8 @@ public function calculate(PayrollRun $run): void
                     $q2->where('assignable_type', 'department')->where('assignable_id', $departmentId);
                 })->orWhere(function ($q2) use ($shiftId) {
                     $q2->where('assignable_type', 'shift')->where('assignable_id', $shiftId);
-                })->orWhere(function ($q2) use ($position) {
-                    $q2->where('assignable_type', 'employee_group')
-                        ->whereExists(function ($sub) use ($position) {
-                            $sub->select(DB::raw(1))
-                                ->from('employee_employee_group') // ✅ fixed table name
-                                ->whereColumn('employee_employee_group.employee_group_id', 'payroll_policy_assignments.assignable_id')
-                                ->where('employee_employee_group.employee_id', $position->employee_id);
-                        });
+                })->orWhere(function ($q2) use ($employeeGroupId) {
+                    $q2->where('assignable_type', 'employee_group')->where('assignable_id', $employeeGroupId);
                 });
             })
             ->orderBy('priority', 'desc')
@@ -310,6 +311,6 @@ public function calculate(PayrollRun $run): void
             'calculation_status' => 'completed',
         ]);
 
-        Log::info("Payroll run {$this->run->id} calculation completed. Total employees: {$this->run->total_employees}, Net total: {$totals->total_net}");
+        // Log::info("Payroll run {$this->run->id} calculation completed. Total employees: {$this->run->total_employees}, Net total: {$totals->total_net}");
     }
 }

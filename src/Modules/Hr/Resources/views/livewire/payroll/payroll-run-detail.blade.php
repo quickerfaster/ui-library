@@ -1,5 +1,6 @@
 <div>
-    <div class="d-flex justify-content-between align-items-start mb-3">
+    {{-- Header and action buttons --}}
+    <div class="d-flex justify-content-between align-items-start mb-3 mt-4">
         <div>
             <h3>Payroll Run #{{ $run->id }}</h3>
             <p class="text-muted">
@@ -35,7 +36,8 @@
     </div>
 
     {{-- Status Banner --}}
-    <div class="alert alert-{{ $run->status === 'paid' ? 'success' : ($run->status === 'approved' ? 'info' : ($run->status === 'cancelled' ? 'secondary' : 'warning')) }} mb-3">
+    <div
+        class="alert alert-{{ $run->status === 'paid' ? 'success' : ($run->status === 'approved' ? 'info' : ($run->status === 'cancelled' ? 'secondary' : 'warning')) }} mb-3">
         <strong>Status:</strong> {{ ucfirst($run->status) }}
         @if ($run->approved_at)
             | Approved by {{ $run->approved_by }} on {{ $run->approved_at->format('M d, Y H:i') }}
@@ -58,176 +60,175 @@
     </ul>
 
     <div class="tab-content">
-        {{-- Overview Tab (unchanged) --}}
+        {{-- Overview Tab --}}
         @if ($activeTab === 'overview')
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card mb-3">
-                        <div class="card-header">Period Details</div>
-                        <div class="card-body">
-                            <dl class="row">
-                                <dt class="col-sm-4">Pay Schedule</dt>
-                                <dd class="col-sm-8">{{ $run->paySchedule->name }}</dd>
-                                <dt class="col-sm-4">Period Start</dt>
-                                <dd class="col-sm-8">{{ $run->period_start->format('M d, Y') }}</dd>
-                                <dt class="col-sm-4">Period End</dt>
-                                <dd class="col-sm-8">{{ $run->period_end->format('M d, Y') }}</dd>
-                            </dl>
+            <div class="row g-4">
+                {{-- Period Details Card --}}
+                <div class="col-12 col-xl-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                            <h5 class="fw-bold text-primary mb-0">Period Details</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row gy-3">
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Pay Schedule</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->paySchedule->name }}
+                                </div>
+
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Period Start</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->period_start->format('M d, Y') }}
+                                </div>
+
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Period End</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->period_end->format('M d, Y') }}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="card mb-3">
-                        <div class="card-header">Financial Totals</div>
-                        <div class="card-body">
+
+                {{-- Financial Totals Card --}}
+                <div class="col-12 col-xl-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                            <h5 class="fw-bold text-primary mb-0">Financial Totals</h5>
+                        </div>
+                        <div class="card-body p-4">
                             @php
                                 $defaultCurrency = $run->paySchedule->currency_code ?? 'USD';
                                 $currencySymbol = $this->getCurrencySymbol($defaultCurrency);
                             @endphp
-                            <dl class="row">
-                                <dt class="col-sm-6">Total Gross Pay</dt>
-                                <dd class="col-sm-6 text-end">{{ $currencySymbol }}{{ number_format($run->total_gross_pay, 2) }}</dd>
-                                <dt class="col-sm-6">Total Deductions</dt>
-                                <dd class="col-sm-6 text-end">{{ $currencySymbol }}{{ number_format($run->total_deductions, 2) }}</dd>
-                                <dt class="col-sm-6">Total Taxes</dt>
-                                <dd class="col-sm-6 text-end">{{ $currencySymbol }}{{ number_format($run->total_taxes, 2) }}</dd>
-                                <dt class="col-sm-6"><strong>Net Cash Required</strong></dt>
-                                <dd class="col-sm-6 text-end"><strong>{{ $currencySymbol }}{{ number_format($run->total_cash_required, 2) }}</strong></dd>
-                            </dl>
+                            <div class="row gy-3">
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Total Gross Pay</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $currencySymbol }}{{ number_format($run->total_gross_pay, 2) }}
+                                </div>
+
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Total Deductions</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $currencySymbol }}{{ number_format($run->total_deductions, 2) }}
+                                </div>
+
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Total Taxes</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $currencySymbol }}{{ number_format($run->total_taxes, 2) }}
+                                </div>
+
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Net Cash Required
+                                </div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    <strong>{{ $currencySymbol }}{{ number_format($run->total_cash_required, 2) }}</strong>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                {{-- Notes Card (if any) --}}
+                @if ($run->notes)
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                                <h5 class="fw-bold text-primary mb-0">Notes</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                {{ $run->notes }}
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
-            @if ($run->notes)
-                <div class="card mb-3">
-                    <div class="card-header">Notes</div>
-                    <div class="card-body">{{ $run->notes }}</div>
-                </div>
-            @endif
         @endif
 
-        {{-- Payslips Tab (now using DataTable) --}}
+        {{-- Payslips Tab --}}
         @if ($activeTab === 'payslips')
-            <livewire:qf.data-table
-                :configKey="'hr.payroll_run'"
-                :customColumns="[
-                    'employee_name' => [
-                        'label' => 'Employee',
-                        'field_type' => 'string',
-                        'sortable' => true,
-                        'render' => fn($payslip) => $payslip->employee->first_name . ' ' . $payslip->employee->last_name . ' (' . $payslip->employee->employee_number . ')',
-                    ],
-                    'gross_pay' => [
-                        'label' => 'Gross Pay',
-                        'field_type' => 'number',
-                        'sortable' => true,
-                        'render' => fn($payslip) => $this->getCurrencySymbol($payslip->employee->employeePosition->salary_currency ?? 'USD') . number_format($payslip->gross_pay, 2),
-                    ],
-                    'total_deductions' => [
-                        'label' => 'Deductions',
-                        'field_type' => 'number',
-                        'sortable' => true,
-                        'render' => fn($payslip) => $this->getCurrencySymbol($payslip->employee->employeePosition->salary_currency ?? 'USD') . number_format($payslip->total_deductions, 2),
-                    ],
-                    'net_pay' => [
-                        'label' => 'Net Pay',
-                        'field_type' => 'number',
-                        'sortable' => true,
-                        'render' => fn($payslip) => $this->getCurrencySymbol($payslip->employee->employeePosition->salary_currency ?? 'USD') . number_format($payslip->net_pay, 2),
-                    ],
-                ]"
-                :queryFilters="['payroll_run_id' => $run->id]"
-                :controls="[
-                    'search' => true,
-                    'perPage' => [10, 25, 50, 100],
-                    'showHideColumns' => true,
-                    'filterColumns' => true,
-                ]"
-                :simpleActions="['expand']"
+            <livewire:qf.data-table :configKey="'hr.payroll_payslip'" :queryFilters="['payroll_run_id' => $run->id]" :controls="[
+                'search' => true,
+                'perPage' => [10, 25, 50, 100],
+                'showHideColumns' => true,
+                'filterColumns' => true,
+            ]" :simpleActions="['expand']"
                 :expandConfig="[
                     'component' => 'qf.payslip-items',
                     'params' => [],
                     'label' => 'Items',
                     'icon' => 'fas fa-list',
-                ]"
-            />
+                ]" />
         @endif
 
-        {{-- Adjustments Tab (read-only DataTable) --}}
+        {{-- Adjustments Tab (read-only) --}}
         @if ($activeTab === 'adjustments')
-            <livewire:qf.data-table
-                :configKey="'hr.payroll_run_adjustment'"
-                :customColumns="[
-                    'employee_name' => [
-                        'label' => 'Employee',
-                        'field_type' => 'string',
-                        'sortable' => true,
-                        'render' => fn($adjustment) => $adjustment->employee->first_name . ' ' . $adjustment->employee->last_name . ' (' . $adjustment->employee->employee_number . ')',
-                    ],
-                    'type' => [
-                        'label' => 'Type',
-                        'field_type' => 'select',
-                        'sortable' => true,
-                        'options' => [
-                            'bonus' => 'Bonus',
-                            'commission' => 'Commission',
-                            'correction' => 'Correction',
-                            'reimbursement' => 'Reimbursement',
-                            'deduction' => 'Deduction',
-                        ],
-                        'render' => fn($adjustment) => ucfirst($adjustment->type),
-                    ],
-                    'label' => [
-                        'label' => 'Description',
-                        'field_type' => 'string',
-                        'sortable' => false,
-                    ],
-                    'amount' => [
-                        'label' => 'Amount',
-                        'field_type' => 'number',
-                        'sortable' => true,
-                        'render' => fn($adjustment) => 
-                            ($adjustment->type !== 'deduction' ? '+' : '-') . 
-                            ' ' . $this->getCurrencySymbol($adjustment->employee->employeePosition->salary_currency ?? 'USD') . 
-                            number_format($adjustment->amount, 2),
-                    ],
-                ]"
-                :queryFilters="['payroll_run_id' => $run->id]"
-                :controls="[
-                    'search' => true,
-                    'perPage' => [10, 25, 50, 100],
-                    'bulkActions' => [
-                        'delete' => true,
-                        'export' => ['csv', 'pdf'],
-                    ],
-                    'showHideColumns' => true,
-                    'filterColumns' => true,
-                ]"
-            />
+            <livewire:qf.data-table :configKey="'hr.payroll_run_adjustment'" :queryFilters="['payroll_run_id' => $run->id]" :controls="[
+                'search' => true,
+                'perPage' => [10, 25, 50, 100],
+                'bulkActions' => [
+                    'delete' => true,
+                    'export' => ['csv', 'pdf'],
+                ],
+                'showHideColumns' => true,
+                'filterColumns' => true,
+            ]" />
         @endif
 
-        {{-- Audit Tab (unchanged) --}}
+        {{-- Audit Tab --}}
         @if ($activeTab === 'audit')
-            <div class="card">
-                <div class="card-body">
-                    <dl class="row">
-                        <dt class="col-sm-3">Created By</dt>
-                        <dd class="col-sm-9">{{ $run->created_by ?? 'System' }}</dd>
-                        <dt class="col-sm-3">Created At</dt>
-                        <dd class="col-sm-9">{{ $run->created_at->format('M d, Y H:i:s') }}</dd>
-                        <dt class="col-sm-3">Updated By</dt>
-                        <dd class="col-sm-9">{{ $run->updated_by ?? '—' }}</dd>
-                        <dt class="col-sm-3">Updated At</dt>
-                        <dd class="col-sm-9">{{ $run->updated_at->format('M d, Y H:i:s') }}</dd>
-                        <dt class="col-sm-3">Processed By</dt>
-                        <dd class="col-sm-9">{{ $run->processed_by ?? '—' }}</dd>
-                        <dt class="col-sm-3">Processed At</dt>
-                        <dd class="col-sm-9">{{ $run->processed_at ? $run->processed_at->format('M d, Y H:i:s') : '—' }}</dd>
-                        <dt class="col-sm-3">Approved By</dt>
-                        <dd class="col-sm-9">{{ $run->approved_by ?? '—' }}</dd>
-                        <dt class="col-sm-3">Approved At</dt>
-                        <dd class="col-sm-9">{{ $run->approved_at ? $run->approved_at->format('M d, Y H:i:s') : '—' }}</dd>
-                    </dl>
+            <div class="row g-4">
+                <div class="col-12 col-xl-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                            <h5 class="fw-bold text-primary mb-0">Creation & Updates</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row gy-3">
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Created By</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->created_by ?? 'System' }}
+                                </div>
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Created At</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->created_at->format('M d, Y H:i:s') }}
+                                </div>
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Updated By</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->updated_by ?? '—' }}
+                                </div>
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Updated At</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->updated_at->format('M d, Y H:i:s') }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-xl-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                            <h5 class="fw-bold text-primary mb-0">Processing & Approval</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row gy-3">
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Processed By</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->processed_by ?? '—' }}
+                                </div>
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Processed At</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->processed_at ? $run->processed_at->format('M d, Y H:i:s') : '—' }}
+                                </div>
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Approved By</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->approved_by ?? '—' }}
+                                </div>
+                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Approved At</div>
+                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                    {{ $run->approved_at ? $run->approved_at->format('M d, Y H:i:s') : '—' }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         @endif

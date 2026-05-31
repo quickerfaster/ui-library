@@ -61,9 +61,7 @@ use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 
 
-use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments;
-use App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview;
-use App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard;
+
 use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionGroup;
 use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionManager;
 use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionToggle;
@@ -71,6 +69,7 @@ use QuickerFaster\UILibrary\Http\Livewire\BackgroundJobsPanel;
 use QuickerFaster\UILibrary\Http\Livewire\Buttons\Toggle;
 use QuickerFaster\UILibrary\Http\Livewire\Collapsible;
 use QuickerFaster\UILibrary\Http\Livewire\ColumnManager;
+use QuickerFaster\UILibrary\Http\Livewire\Custom\TaxBandsRepeater;
 use QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports;
 use QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports;
 use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
@@ -246,6 +245,7 @@ class UILibraryServiceProvider extends ServiceProvider
         //Custom
         Livewire::component('qf.employee-detail', EmployeeDetail::class);
         Livewire::component('qf.searchable-employee-dropdown', SearchableEmployeeDropdown::class);
+        Livewire::component('qf.tax-bands-repeater', TaxBandsRepeater::class);
 
         Livewire::component('qf.employee-detail', EmployeeDetail::class);
         Livewire::component('qf.menu-renderer', MenuRenderer::class);
@@ -279,37 +279,53 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.column-manager', ColumnManager::class);
 
 
-        Livewire::component('qf.permission-toggle', PermissionToggle::class);
-        Livewire::component('qf.permission-group', PermissionGroup::class);
+        // Livewire::component('qf.permission-toggle', PermissionToggle::class);
+        // Livewire::component('qf.permission-group', PermissionGroup::class);
         Livewire::component('qf.permission-manager', PermissionManager::class);
-        Livewire::component('qf.toggle', Toggle::class);
+        // Livewire::component('qf.toggle', Toggle::class);
 
 
 
 
 
 
-        // Local modules's livewire components register
-        if (class_exists(PayrollWizardAdjustments::class)) {
-            Livewire::component('qf.payroll-wizard-adjustments', PayrollWizardAdjustments::class);
+        // Inside the boot method of UILibraryServiceProvider
+        $components = [
+            'qf.payroll-wizard-adjustments' => [
+                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollWizardAdjustments.php',
+                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments::class,
+            ],
+            'qf.payroll-wizard-preview' => [
+                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollWizardPreview.php',
+                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview::class,
+            ],
+            'qf.payroll-run-wizard' => [
+                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollRunWizard.php',
+                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard::class,
+            ],
+            'qf.payroll-run-detail' => [
+                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollRunDetail.php',
+                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class,
+            ],
+            'qf.payslip-items' => [
+                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayslipItems.php',
+                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayslipItems::class,
+            ],
+            'qf.policy-calculation-builder' => [
+                'path' => 'Modules/Hr/Http/Livewire/Payroll/PolicyCalculationBuilder.php',
+                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PolicyCalculationBuilder::class,
+            ],
+
+        ];
+
+        foreach ($components as $alias => $config) {
+            // Check the physical file structure directly on disk
+            if (file_exists(app_path($config['path']))) {
+                Livewire::component($alias, $config['class']);
+            }
         }
 
-        if (class_exists(PayrollWizardPreview::class)) {
-            Livewire::component('qf.payroll-wizard-preview', PayrollWizardPreview::class);
-        }
 
-        if (class_exists(PayrollRunWizard::class)) {
-            Livewire::component('qf.payroll-run-wizard', PayrollRunWizard::class);
-        }
-
-        if (class_exists(\App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class)) {
-            Livewire::component('qf.payroll-run-detail', \App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class);
-        }
-
-
-        if (class_exists(\App\Modules\Hr\Http\Livewire\Payroll\PayslipItems::class)) {
-            Livewire::component('qf.payslip-items', \App\Modules\Hr\Http\Livewire\Payroll\PayslipItems::class);
-        }
 
 
 

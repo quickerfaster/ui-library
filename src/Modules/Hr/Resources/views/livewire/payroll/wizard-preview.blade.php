@@ -5,8 +5,8 @@
             <div class="card-body text-center">
                 <div class="progress mb-3" style="height: 30px;">
                     <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar"
-                        style="height: 30px; width: {{ $progress }}%;" aria-valuenow="{{ $progress }}" aria-valuemin="0"
-                        aria-valuemax="100">
+                        style="height: 30px; width: {{ $progress }}%;" aria-valuenow="{{ $progress }}"
+                        aria-valuemin="0" aria-valuemax="100">
                         {{ $progress }}%
                     </div>
                 </div>
@@ -87,6 +87,12 @@
                     <option value="All">All</option>
                 </select>
             </div>
+            <div class="col-md-2">
+                <label class="form-label">Search</label>
+                <input type="text" wire:model.live.debounce.300ms="search" class="form-control form-control-sm"
+                    placeholder="Name or Employee #">
+            </div>
+
             <div class="col-md-2 d-flex align-items-end">
                 <button wire:click="resetFilters" class="btn btn-sm btn-secondary w-100">
                     <i class="fas fa-undo-alt"></i> Reset Filters
@@ -95,13 +101,64 @@
         </div>
 
         <div class="table-responsive">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>Showing {{ $payslips->total() }} payslips</div>
+                @if (!empty($search))
+                    <div>Search results for: <strong>{{ $search }}</strong></div>
+                @endif
+            </div>
+
             <table class="table table-bordered">
                 <thead>
                     <tr>
-                        <th>Employee</th>
-                        <th>Gross Pay</th>
-                        <th>Deductions</th>
-                        <th>Net Pay</th>
+                        <th wire:click="sortBy('employee_name')" style="cursor: pointer;">
+                            Employee
+                            @if ($sortField === 'employee_name')
+                                @if ($sortDirection === 'asc')
+                                    <i class="fas fa-sort-up"></i>
+                                @else
+                                    <i class="fas fa-sort-down"></i>
+                                @endif
+                            @else
+                                <i class="fas fa-sort text-muted"></i>
+                            @endif
+                        </th>
+                        <th wire:click="sortBy('gross_pay')" style="cursor: pointer;">
+                            Gross Pay
+                            @if ($sortField === 'gross_pay')
+                                @if ($sortDirection === 'asc')
+                                    <i class="fas fa-sort-up"></i>
+                                @else
+                                    <i class="fas fa-sort-down"></i>
+                                @endif
+                            @else
+                                <i class="fas fa-sort text-muted"></i>
+                            @endif
+                        </th>
+                        <th wire:click="sortBy('total_deductions')" style="cursor: pointer;">
+                            Deductions
+                            @if ($sortField === 'total_deductions')
+                                @if ($sortDirection === 'asc')
+                                    <i class="fas fa-sort-up"></i>
+                                @else
+                                    <i class="fas fa-sort-down"></i>
+                                @endif
+                            @else
+                                <i class="fas fa-sort text-muted"></i>
+                            @endif
+                        </th>
+                        <th wire:click="sortBy('net_pay')" style="cursor: pointer;">
+                            Net Pay
+                            @if ($sortField === 'net_pay')
+                                @if ($sortDirection === 'asc')
+                                    <i class="fas fa-sort-up"></i>
+                                @else
+                                    <i class="fas fa-sort-down"></i>
+                                @endif
+                            @else
+                                <i class="fas fa-sort text-muted"></i>
+                            @endif
+                        </th>
                         <th>Details</th>
                     </tr>
                 </thead>

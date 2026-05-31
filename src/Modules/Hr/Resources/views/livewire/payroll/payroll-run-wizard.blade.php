@@ -47,6 +47,14 @@
                         <h4>Payroll Details</h4>
 
                         <div class="row mt-3">
+                            <div class="col-md-12 mb-4">
+                                <label>Payroll Run Title</label>
+                                <input type="text" wire:model="title" class="form-control" />
+
+                                @error('title')
+                                    <span class="text-danger">{{ $message }}</span>
+                                @enderror
+                            </div>
                             <div class="col-md-6">
                                 <label>Pay Schedule</label>
                                 <select wire:model="pay_schedule_id" class="form-control">
@@ -83,7 +91,7 @@
 
                     {{-- STEP 2 --}}
                     <div class="{{ $currentStep === 2 ? '' : 'd-none' }}">
-                        @if ($payrollRunId)
+                        @if ($currentStep === 2 && $payrollRunId)
                             <livewire:qf.payroll-wizard-adjustments :stepIndex="2" :payrollRunId="$payrollRunId"
                                 wire:key="adjustments-{{ $payrollRunId }}" />
                         @endif
@@ -91,7 +99,7 @@
 
                     {{-- STEP 3 --}}
                     <div class="{{ $currentStep === 3 ? '' : 'd-none' }}">
-                        @if ($payrollRunId)
+                        @if ($currentStep === 3 && $payrollRunId)
                             <livewire:qf.payroll-wizard-preview :stepIndex="3" :payrollRunId="$payrollRunId"
                                 wire:key="preview-{{ $payrollRunId }}" />
                         @endif
@@ -106,7 +114,7 @@
                 {{-- Back --}}
                 <button type="button" class="btn btn-link text-decoration-none text-muted fw-bold p-0"
                     wire:click="goToStep({{ $currentStep - 1 }})" wire:loading.attr="disabled"
-                    @if ($currentStep <= 1 || $isProcessing) disabled 
+                    @if ($currentStep <= 1 || $isProcessing) disabled
                         style="opacity: {{ $currentStep <= 1 ? '0' : '0.5' }}; pointer-events: none;" @endif>
                     <i class="fas fa-chevron-left me-1"></i> Back
                 </button>

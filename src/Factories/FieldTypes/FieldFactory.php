@@ -14,6 +14,8 @@ use QuickerFaster\UILibrary\Components\FieldTypes\FileField;
 use QuickerFaster\UILibrary\Components\FieldTypes\TextareaField;
 use QuickerFaster\UILibrary\Components\FieldTypes\LivewireSearchableSelectField;
 use QuickerFaster\UILibrary\Components\FieldTypes\MorphToSelectField;
+use QuickerFaster\UILibrary\Components\FieldTypes\PasswordField;
+use QuickerFaster\UILibrary\Components\FieldTypes\PolicyCalculationBuilderField;
 use QuickerFaster\UILibrary\Components\FieldTypes\TimepickerField;
 use QuickerFaster\UILibrary\Contracts\FieldTypes\FieldType;
 
@@ -37,6 +39,9 @@ class FieldFactory
         'textarea'     => TextareaField::class,
         'livewire-searchable-select' => LivewireSearchableSelectField::class,
         'morph_to_select' => MorphToSelectField::class,
+        'password'     => PasswordField::class,
+        'policy_calculation_builder' => PolicyCalculationBuilderField::class,
+
 
 
     ];

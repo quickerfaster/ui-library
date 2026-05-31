@@ -14,6 +14,7 @@ class PayrollRunWizard extends Component
     public int $currentStep = 1;
     public ?int $payrollRunId = null;
     public $pay_schedule_id = null;
+    public $title = "";
     public $period_start = null;
     public $period_end = null;
     public array $stepData = [];
@@ -33,12 +34,14 @@ class PayrollRunWizard extends Component
 
     public function mount($payrollRunId = null)
     {
+        
         $wizardId = $this->getWizardId();
         if (session()->has($wizardId)) {
             $data = session()->get($wizardId);
             $this->currentStep = $data['currentStep'] ?? 1;
             $this->payrollRunId = $data['payrollRunId'] ?? null;
             $this->pay_schedule_id = $data['pay_schedule_id'] ?? null;
+            $this->title = $data['title'] ?? "";
             $this->period_start = $data['period_start'] ?? null;
             $this->period_end = $data['period_end'] ?? null;
             $this->stepData = $data['stepData'] ?? [];
@@ -46,6 +49,7 @@ class PayrollRunWizard extends Component
             $run = PayrollRun::findOrFail($payrollRunId);
             $this->payrollRunId = $run->id;
             $this->pay_schedule_id = $run->pay_schedule_id;
+            $this->title = $run->title;
             $this->period_start = $run->period_start->format('Y-m-d');
             $this->period_end = $run->period_end->format('Y-m-d');
             $this->currentStep = $run->current_step ?? 1;
@@ -67,6 +71,7 @@ class PayrollRunWizard extends Component
             'currentStep' => $this->currentStep,
             'payrollRunId' => $this->payrollRunId,
             'pay_schedule_id' => $this->pay_schedule_id,
+            'title' => $this->title,
             'period_start' => $this->period_start,
             'period_end' => $this->period_end,
             'stepData' => $this->stepData,
@@ -79,40 +84,46 @@ class PayrollRunWizard extends Component
         $this->saveToSession();
     }
 
+
     public function goToStep2()
-    {
-        $this->validate([
-            'pay_schedule_id' => 'required|exists:pay_schedules,id',
-            'period_start' => 'required|date',
-            'period_end' => 'required|date|after:period_start',
-        ]);
+{
+    $this->validate([
+        'pay_schedule_id' => 'required|exists:pay_schedules,id',
+        'period_start' => 'required|date',
+        'period_end' => 'required|date|after:period_start',
+        'title' => 'required|unique:payroll_runs,title,' . $this->payrollRunId,
+    ]);
 
-        DB::transaction(function () {
-            if (!$this->payrollRunId) {
-                $run = PayrollRun::create([
-                    'pay_schedule_id' => $this->pay_schedule_id,
-                    'period_start' => $this->period_start,
-                    'period_end' => $this->period_end,
-                    'status' => 'draft',
-                    'calculation_status' => 'pending', // <-- Added
-                    'current_step' => 2,
-                ]);
-                $this->payrollRunId = $run->id;
-                $this->stepData = ['payroll_run_id' => $run->id];
-            } else {
-                $run = PayrollRun::find($this->payrollRunId);
-                $run->update([
-                    'pay_schedule_id' => $this->pay_schedule_id,
-                    'period_start' => $this->period_start,
-                    'period_end' => $this->period_end,
-                    'current_step' => 2,
-                ]);
-            }
-        });
+    DB::transaction(function () {
+        if (!$this->payrollRunId) {
+            $run = PayrollRun::create([
+                'pay_schedule_id' => $this->pay_schedule_id,
+                'period_start' => $this->period_start,
+                'period_end' => $this->period_end,
+                'status' => 'draft',
+                'calculation_status' => 'pending',
+                'current_step' => 2,
+                'title' => $this->title ?? "",
+            ]);
+            $this->payrollRunId = $run->id;
+            $this->stepData = ['payroll_run_id' => $run->id];
+        } else {
+            $run = PayrollRun::find($this->payrollRunId);
+            $run->update([
+                'pay_schedule_id' => $this->pay_schedule_id,
+                'period_start' => $this->period_start,
+                'period_end' => $this->period_end,
+                'current_step' => 2,
+                'title' => $this->title ?? "",
+            ]);
+        }
+    });
 
-        $this->currentStep = 2;
-        $this->saveToSession();
-    }
+    $this->currentStep = 2;
+    $this->saveToSession();
+}
+
+
 
     public function goToStep3()
     {
@@ -190,6 +201,7 @@ class PayrollRunWizard extends Component
     {
         return view('hr::livewire.payroll.payroll-run-wizard', [
             'currentStep' => $this->currentStep,
+            'title' => $this->title,
             'payrollRunId' => $this->payrollRunId,
             'paySchedule' => $this->pay_schedule_id ? PaySchedule::find($this->pay_schedule_id) : null,
             'errorBag' => $this->getErrorBag(),

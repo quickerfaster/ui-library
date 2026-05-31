@@ -10,15 +10,14 @@ use QuickerFaster\UILibrary\Traits\DataTables\HasColumnPreferences;
 use App\Modules\Admin\Services\ActivityLogger;
 use QuickerFaster\UILibrary\Services\Search\SearchEngine;
 use App\Modules\Admin\Services\AuthorizationService;
-
-
+use QuickerFaster\UILibrary\Traits\Filters\AppliesFilters;
 
 
 
 
 class DataTable extends Component
 {
-    use WithPagination, HasColumnPreferences;
+    use WithPagination, HasColumnPreferences, AppliesFilters;
 
     // Public properties (persisted in query string)
     public string $configKey;
@@ -124,7 +123,7 @@ class DataTable extends Component
         $modelName = $this->getModelNameForPermissions();
         $viewName = \Str::kebab($modelName);
 
-        
+
         // Global view permission (no specific record)
         if (!$this->authService->canAccessView($user, $viewName)) {
             abort(403, 'You do not have permission to view this data.');
@@ -1548,80 +1547,6 @@ class DataTable extends Component
 
 
 
-    protected function applyActiveFilters($query): void
-    {
-        foreach ($this->activeFilters as $filter) {
-            if (empty($filter['field']) || !isset($filter['value'])) {
-                continue;
-            }
-
-            if ($filter['field'] === '_trashed') {
-                continue; // Skip, already handled in getRecordsProperty
-            }
-
-
-            $field = $filter['field'];
-            $operator = $filter['operator'] ?? '=';
-            $value = $filter['value'];
-
-            // Skip empty values (but allow 0 and '0')
-            if ($value === '' || $value === null || (is_array($value) && empty($value))) {
-                continue;
-            }
-
-            if ($this->isManyToManyField($field)) {
-                $this->applyManyToManyFilter($query, $field, $operator, $value);
-                continue;
-            }
-
-
-            // Get field definition to determine type
-            $fieldDef = $this->columns[$field] ?? [];
-            $fieldType = $fieldDef['field_type'] ?? 'string';
-
-            // Route to type-specific handler
-            $type = $this->mapFieldTypeToFilterType($fieldType);
-
-
-
-            switch ($type) {
-                case 'string':
-                    $this->applyStringFilter($query, $field, $operator, $value);
-                    break;
-                case 'number':
-                    $this->applyNumberFilter($query, $field, $operator, $value);
-                    break;
-                case 'date':
-                    $this->applyDateFilter($query, $field, $operator, $value);
-                    break;
-                case 'boolean':
-                    $this->applyBooleanFilter($query, $field, $operator, $value);
-                    break;
-                case 'select':
-                    $this->applySelectFilter($query, $field, $operator, $value);
-                    break;
-                default:
-                    $query->where($field, $operator, $value);
-            }
-        }
-    }
-
-
-
-    protected function isManyToManyField(string $field): bool
-    {
-        $fieldDef = $this->columns[$field] ?? [];
-        $rel = $fieldDef['relationship'] ?? null;
-        if (!$rel) {
-            return false;
-        }
-        $type = $rel['type'] ?? '';
-        return in_array($type, ['belongsToMany', 'morphToMany']);
-    }
-
-
-
-
 
 
     // To Address the browser forward/backward error   
@@ -1633,226 +1558,7 @@ class DataTable extends Component
         }
     }
 
-    protected function mapFieldTypeToFilterType(string $fieldType): string
-    {
-        return match ($fieldType) {
-            'string', 'textarea', 'text' => 'string',
-            'number', 'integer', 'float' => 'number',
-            'datepicker', 'datetimepicker' => 'date',
-            'checkbox', 'boolcheckbox', 'radio' => 'boolean',
-            'select' => 'select',
-            default => 'string',
-        };
-    }
 
-    protected function applyStringFilter($query, $field, $operator, $value)
-    {
-        switch ($operator) {
-            case 'equals':
-                $query->where($field, $value);
-                break;
-            case 'contains':
-                $query->where($field, 'like', '%' . $value . '%');
-                break;
-            case 'starts_with':
-                $query->where($field, 'like', $value . '%');
-                break;
-            case 'ends_with':
-                $query->where($field, 'like', '%' . $value);
-                break;
-            default:
-                $query->where($field, $value);
-        }
-    }
-
-    protected function applyNumberFilter($query, $field, $operator, $value)
-    {
-        switch ($operator) {
-            case 'equals':
-                $query->where($field, $value);
-                break;
-            case 'not_equals':
-                $query->where($field, '!=', $value);
-                break;
-            case 'greater_than':
-                $query->where($field, '>', $value);
-                break;
-            case 'less_than':
-                $query->where($field, '<', $value);
-                break;
-            case 'greater_than_or_equals':
-                $query->where($field, '>=', $value);
-                break;
-            case 'less_than_or_equals':
-                $query->where($field, '<=', $value);
-                break;
-            case 'between':
-                if (!empty($value['min'])) {
-                    $query->where($field, '>=', $value['min']);
-                }
-                if (!empty($value['max'])) {
-                    $query->where($field, '<=', $value['max']);
-                }
-                break;
-        }
-    }
-
-    protected function applyDateFilter($query, $field, $operator, $value)
-    {
-        $now = now();
-        switch ($operator) {
-            case 'equals':
-                $query->whereDate($field, $value);
-                break;
-            case 'not_equals':
-                $query->whereDate($field, '!=', $value);
-                break;
-            case 'greater_than':
-                $query->whereDate($field, '>', $value);
-                break;
-            case 'less_than':
-                $query->whereDate($field, '<', $value);
-                break;
-            case 'between':
-                if (!empty($value['start'])) {
-                    $query->whereDate($field, '>=', $value['start']);
-                }
-                if (!empty($value['end'])) {
-                    $query->whereDate($field, '<=', $value['end']);
-                }
-                break;
-            case 'today':
-                $query->whereDate($field, $now->toDateString());
-                break;
-            case 'this_week':
-                $query->whereBetween($field, [
-                    $now->copy()->startOfWeek()->toDateString(),
-                    $now->copy()->endOfWeek()->toDateString()
-                ]);
-                break;
-            case 'this_month':
-                $query->whereMonth($field, $now->month)->whereYear($field, $now->year);
-                break;
-            case 'this_year':
-                $query->whereYear($field, $now->year);
-                break;
-            case 'last_week':
-                $lastWeek = $now->copy()->subWeek();
-                $query->whereBetween($field, [
-                    $lastWeek->copy()->startOfWeek()->toDateString(),
-                    $lastWeek->copy()->endOfWeek()->toDateString()
-                ]);
-                break;
-            case 'last_month':
-                $lastMonth = $now->copy()->subMonth();
-                $query->whereMonth($field, $lastMonth->month)->whereYear($field, $lastMonth->year);
-                break;
-            case 'last_year':
-                $lastYear = $now->copy()->subYear();
-                $query->whereYear($field, $lastYear->year);
-                break;
-            case 'last_7_days':
-                $query->whereDate($field, '>=', $now->subDays(7));
-                break;
-            case 'next_30_days':
-                $query->whereBetween($field, [$now, $now->addDays(30)]);
-                break;
-            case 'this_quarter':
-                $query->whereBetween($field, [$now->startOfQuarter(), $now->endOfQuarter()]);
-                break;
-            case 'last_quarter':
-                $lastQuarterStart = $now->subQuarter()->startOfQuarter();
-                $query->whereBetween($field, [$lastQuarterStart, $lastQuarterStart->copy()->endOfQuarter()]);
-                break;
-        }
-    }
-
-    protected function applyBooleanFilter($query, $field, $operator, $value)
-    {
-        if ($value !== '') {
-            $query->where($field, $value);
-        }
-    }
-
-    protected function applySelectFilter($query, $field, $operator, $value)
-    {
-        if ($value === '' || $value === null) {
-            return;
-        }
-        if ($operator === 'in' || is_array($value)) {
-            $query->whereIn($field, (array) $value);
-        } else {
-            $query->where($field, $value);
-        }
-    }
-
-
-
-    protected function applyManyToManyFilter($query, $field, $operator, $value)
-    {
-        // Skip empty values
-        if (empty($value)) {
-            return;
-        }
-
-        $fieldDef = $this->columns[$field] ?? [];
-        $rel = $fieldDef['relationship'] ?? [];
-
-        // Determine pivot table and keys from relationship config
-        $pivotTable = $rel['pivot_table'] ?? null;
-        $foreignPivotKey = $rel['foreign_pivot_key'] ?? null; // e.g., 'taggable_id'
-        $relatedPivotKey = $rel['related_pivot_key'] ?? null; // e.g., 'tag_id'
-        $morphType = $rel['morph_type'] ?? null;
-        $morphName = $rel['morph_name'] ?? null;
-
-        if (!$pivotTable || !$foreignPivotKey || !$relatedPivotKey) {
-            // Fallback: try to guess from relation name (worse)
-            $relationName = $rel['dynamic_property'] ?? $field;
-            $query->whereHas($relationName, function ($q) use ($value) {
-                $q->whereIn('id', (array) $value);
-            });
-            return;
-        }
-
-        // For morphToMany, we also need to filter by the morph type (e.g., taggable_type = Employee::class)
-        $table = $query->getModel()->getTable();
-        $operator = $operator === 'in' ? 'whereIn' : 'whereHas'; // support 'in' (any) or maybe later 'all'
-
-        if ($operator === 'whereIn') {
-            // Subquery for employees that have any of the selected tags
-            $query->whereExists(function ($sub) use ($table, $pivotTable, $foreignPivotKey, $relatedPivotKey, $morphType, $value) {
-                $sub->select(\DB::raw(1))
-                    ->from($pivotTable)
-                    ->whereColumn("{$pivotTable}.{$foreignPivotKey}", "{$table}.id")
-                    ->whereIn("{$pivotTable}.{$relatedPivotKey}", (array) $value);
-                if ($morphType) {
-                    $modelClass = $this->getConfigResolver()->getModel();
-                    $sub->where("{$pivotTable}.{$morphType}", $modelClass);
-                }
-            });
-        } else {
-            // For 'all' operator (if needed, but we only use 'in' for now)
-            // Could implement whereHas with having count = count($value)
-        }
-    }
-
-
-
-    protected function applyFilters($query, array $filters, bool $mandatory = false): void
-    {
-        $fieldDefinitions = $this->getConfigResolver()->getFieldDefinitions();
-
-        foreach ($filters as $filter) {
-            if (!is_array($filter) || count($filter) !== 3) {
-                continue;
-            }
-            [$field, $operator, $value] = $filter;
-            if (!array_key_exists($field, $fieldDefinitions)) {
-                continue;
-            }
-            $query->where($field, $operator, $value);
-        }
-    }
 
     public function removeFilter(string $field): void
     {
@@ -1945,8 +1651,9 @@ class DataTable extends Component
             return;
         }
 
+
         // Check permission with record
-        if (!$this->userCan($action, $record)) {
+        if (!$this->authService->canPerformAction(auth()->user(), $action, $record)) {
             $this->dispatch('showAlert', [
                 'type' => 'warning',
                 'message' => 'You do not have permission to perform this action.',
@@ -2076,40 +1783,10 @@ class DataTable extends Component
         }
     }
 
-    protected function userCan(array $action, $record = null): bool
-    {
-        $user = auth()->user();
-        if (!$user)
-            return false;
 
-        // If action requires a specific permission
-        if (!empty($action['requiredPermission'])) {
-            // If we have a record, use canPerformAction for row-level scope
-            if ($record) {
-                $permAction = ['requiredPermission' => $action['requiredPermission']];
-                return $this->authService->canPerformAction($user, $permAction, $record);
-            }
-            // No record – just check permission globally
-            return $user->can($action['requiredPermission']);
-        }
-
-        // If no permission defined, allow (but you might want to default to false)
-        return false;
-    }
 
     protected function checkConditions(array $action, $record): bool
     {
-
-
-        // For now, return true for testing purpose
-        return true;
-
-
-
-
-
-
-
 
 
         if (empty($action['condition']) || !is_array($action['condition']))
@@ -2117,10 +1794,10 @@ class DataTable extends Component
 
 
         foreach ($action['condition'] as $field => $expected) {
-            if ($record->$field != $expected)
-                return false;
+            if (in_array($record->$field, $expected))
+                return true;
         }
-        return true;
+        return false;
     }
 
     protected function replacePlaceholders($value, $record)
@@ -2585,6 +2262,11 @@ class DataTable extends Component
         ];
         $this->dispatch('openExportModal', ['configKey' => $this->configKey, 'params' => $params]);
     }
+
+
+
+
+
 
 
 

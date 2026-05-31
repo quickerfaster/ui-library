@@ -67,6 +67,7 @@ class DataTableForm extends Component
         'openEditModal' => 'handleOpenEditModal',
         'refreshFields' => 'refreshFields',
         'resetForm' => 'resetFields',
+        'calculationLogicUpdated' => 'updateCalculationLogic',
 
     ];
 
@@ -105,7 +106,10 @@ class DataTableForm extends Component
 
 
 
-
+public function updateCalculationLogic($json)
+{
+    $this->fields['calculation_logic'] = $json;
+}
 
 
 
@@ -521,7 +525,11 @@ class DataTableForm extends Component
                 if (isset($definition['field_type']) && in_array($definition['field_type'], ['date', 'datepicker'])) {
                     $this->fields[$field] = $value instanceof \Carbon\Carbon ? $value->format('Y-m-d') : $value;
                 } else {
-                    $this->fields[$field] = $value;
+                     if ($definition['field_type'] != 'password')
+                        $this->fields[$field] = $value;
+                    else
+                        $this->fields[$field] = ""; // For password load empty value to the form
+
                 }
 
             }
@@ -625,15 +633,25 @@ class DataTableForm extends Component
                 if ($definition["multiSelect"] ?? false)
                     continue;
 
-                if (isset($definition['field_type']) && $definition['field_type'] === 'checkbox') {
-                    // If the key exists in $data, cast it; if it's missing (unchecked), set to false
-                    if (array_key_exists($fieldName, $data)) {
-                        $data[$fieldName] = (bool) $data[$fieldName];
-                    } else {
-                        // Only add as false if it's an "allowedField" but missing from the request
-                        if (in_array($fieldName, $allowedFields)) {
-                            $data[$fieldName] = false;
+                if (isset($definition['field_type'])) {
+                    // Prepare boolen values
+                    if ($definition['field_type'] === 'checkbox') {
+                        // If the key exists in $data, cast it; if it's missing (unchecked), set to false
+                        if (array_key_exists($fieldName, $data)) {
+                            $data[$fieldName] = (bool) $data[$fieldName];
+                        } else {
+                            // Only add as false if it's an "allowedField" but missing from the request
+                            if (in_array($fieldName, $allowedFields)) {
+                                $data[$fieldName] = false;
+                            }
                         }
+
+                    // Prepare password values
+                    } else if ($definition['field_type'] === 'password') {
+                        if (empty($data[$fieldName]) && $this->isEditMode)
+                            unset($data[$fieldName]); // Remove the none updated password fields
+                        else if (isset($data[$fieldName]))
+                            $data[$fieldName] = \Illuminate\Support\Facades\Hash::make($data[$fieldName]);
                     }
                 }
             }

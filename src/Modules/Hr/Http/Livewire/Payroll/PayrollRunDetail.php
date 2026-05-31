@@ -7,13 +7,14 @@ use App\Modules\Hr\Models\PayrollRun;
 use App\Modules\Hr\Services\Payroll\PayrollCalculator;
 use Illuminate\Support\Facades\DB;
 use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
+use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 
 
 
 class PayrollRunDetail extends Component
 {
     use HasCurrencySymbol;
-    
+
     public int $recordId;
     public string $configKey;
     public PayrollRun $run;
@@ -152,9 +153,66 @@ class PayrollRunDetail extends Component
         $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Recalculation completed.']);
     }
 
-    public function exportPayslips(): mixed
+    public function exportPayslips(): void
     {
-        return redirect()->route('payroll.payslips.export', ['payroll_run_id' => $this->run->id, 'format' => 'pdf']);
+
+        $configResolver = app(ConfigResolver::class, ['configKey' => 'hr.payroll_payslip']);
+        $fieldDefinitions = $configResolver->getFieldDefinitions();
+
+        $excludedColumns = [
+            "payslip_number", // exclude from middle & add it to custom column first item
+            "payroll_run_id",
+            "employee_id",
+            "paid_at",
+            "payment_reference",
+            "bank_account_snapshot",
+            "notes",
+            "created_by",
+            "updated_by",
+        ];
+
+
+        $customColumns = [
+            'payslip_number',
+            'employee.employee_number',
+            'employee.first_name',
+            'employee.last_name',
+        ];
+
+        $columns = array_diff(array_keys($fieldDefinitions), $excludedColumns);
+        $columns = array_merge($customColumns, $columns);
+
+
+        // Build filters in the exact format the DataTable uses
+        $filters = [
+            [
+                'field' => 'payroll_run_id',
+                'type' => 'number',          // or 'select' – both work
+                'operator' => 'equals',
+                'value' => $this->run->id,
+                'multi' => false,
+                // 'displayValue' => $this->run->id, // optional
+                // 'label'        => 'Payroll Run',  // optional
+            ]
+        ];
+
+        $options = [
+            'orientation' => 'landscape',
+            'paper' => 'a4',
+        ];
+
+        $params = [
+            'configKey' => 'hr.payroll_payslip',
+            'format' => 'xls',
+            'columns' => implode(',', $columns),
+            'filters' => json_encode($filters),
+            'options' => json_encode($options),
+        ];
+
+        $this->dispatch('openExportModal', [
+            'configKey' => 'hr.payroll_payslip',
+            'params' => $params,
+        ]);
     }
 
     public function render()

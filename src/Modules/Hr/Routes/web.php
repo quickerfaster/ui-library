@@ -85,8 +85,10 @@ Route::middleware([
     Route::get('/employees/{employee}/print', [EmployeePrintController::class, 'show'])
         ->name('hr.employees.print')
         //->middleware(['auth', 'can:view,employee']);
-        ->middleware(['auth']);
+       ;
 
 
 
-});
+})->middleware(['auth']);
+
+

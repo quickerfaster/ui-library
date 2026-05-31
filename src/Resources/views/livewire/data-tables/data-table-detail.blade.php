@@ -1,29 +1,38 @@
   <div>
-      <div class="detail-page-wrapper mb-5 p-2"> 
+      <div class="detail-page-wrapper mb-5 p-2">
           {{-- 1. HEADER SECTION --}}
           @php
               $module = strtolower($this->getConfigResolver()->getModuleName());
-              // Get Model Name and make it readable (e.g. JobTitle -> Job Title)
               $modelName = $this->getConfigResolver()->getModelName();
               $displayModelName = ucwords(str_replace(['_', '-'], ' ', \Str::snake($modelName)));
-
               $modelPlural = \Str::plural(\Str::kebab($modelName));
-              $params = $this->returnParams ?? [];
-              $queryString = !empty($params) ? '?' . http_build_query($params) : '';
-              $backUrl = url("/{$module}/{$modelPlural}" . $queryString);
+
+              // Fix: Re-define the missing query string variable
+              $queryString = !empty($this->returnParams) ? '?' . http_build_query($this->returnParams) : '';
+
+              // 1. Calculate URLs
+              $fallbackUrl = url("/{$module}/{$modelPlural}" . $queryString);
+              $backUrl = url()->previous($fallbackUrl);
+
+              // 2. Determine the smart label
+              if (str_contains($backUrl, "/{$module}/{$modelPlural}")) {
+                  $backLabel = 'Back to ' . \Str::plural($displayModelName);
+              } else {
+                  $backLabel = 'Go Back';
+              }
 
               $crudType = $this->getConfigResolver()->getConfig()['crudType'] ?? 'modal';
-
+              $simpleActions = $this->getConfigResolver()->getConfig()['simpleActions'] ?? [];
+              $editRecord = in_array('edit', $simpleActions);
           @endphp
 
           <div class="d-flex justify-content-between align-items-center my-4 d-print-none">
               <div class="d-flex flex-column">
                   {{-- Back link (only on full-page, not in modal) --}}
                   @if ($crudType == 'pages')
-                      {{-- - inline implies that the crudType is pages not modal - --}}
                       <a href="{{ $backUrl }}"
                           class="text-decoration-none text-muted small fw-bold mb-2 d-inline-flex align-items-center hover-primary">
-                          <i class="fas fa-arrow-left me-2"></i> Back to {{ \Str::plural($displayModelName) }}
+                          <i class="fas fa-arrow-left me-2"></i> {{ $backLabel }}
                       </a>
                   @endif
                   <div class="d-flex align-items-center">
@@ -37,7 +46,7 @@
                       target="_blank" class="btn btn-outline-secondary shadow-sm px-3">
                       <i class="fas fa-print me-1"></i> Print
                   </a>
-                  @if ($crudType == 'pages')
+                  @if ($crudType == 'pages' && $editRecord)
                       @php
                           $editUrl = url("/{$modelPlural}/{$record->id}/edit" . $queryString);
                       @endphp
@@ -52,7 +61,7 @@
           {{-- 2. DATA GROUPS --}}
           <div class="row g-4">
               @forelse($fieldGroups as $group)
-                  <div class="col-12 @if($crudType != "drawers") col-xl-6 @endif"> {{-- Two groups side-by-side on wide screens --}}
+                  <div class="col-12 @if ($crudType != 'drawers') col-xl-6 @endif"> {{-- Two groups side-by-side on wide screens --}}
                       <div class="card border-0 shadow-sm h-100">
                           @if (!empty($group['title']))
                               <div class="card-header bg-white border-bottom-0 pt-4 px-4">

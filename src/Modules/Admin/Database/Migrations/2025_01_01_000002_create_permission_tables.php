@@ -35,6 +35,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['name', 'guard_name']);
+                        
+            $table->softDeletes();
+
         });
 
         Schema::create($tableNames['roles'], function (Blueprint $table) use ($teams, $columnNames) {
@@ -56,6 +59,8 @@ return new class extends Migration
             } else {
                 $table->unique(['name', 'guard_name']);
             }
+
+            $table->softDeletes();
         });
 
         Schema::create($tableNames['model_has_permissions'], function (Blueprint $table) use ($tableNames, $columnNames, $pivotPermission, $teams) {

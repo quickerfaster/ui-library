@@ -99,6 +99,7 @@
                             <i class="fas fa-sort text-muted"></i>
                         @endif
                     </th>
+
                     <th>Bonus <span class="text-success">(+)</span></th>
                     <th>Commission <span class="text-success">(+)</span></th>
                     <th>Correction <span class="text-warning">(±)</span></th>
@@ -108,14 +109,21 @@
             </thead>
             <tbody>
                 @forelse($employees as $emp)
-                    <tr wire:key="emp-{{ $emp['id'] }}">
-                        <td>{{ $emp['name'] }}</td>
-                        <td>${{ number_format($emp['base_salary'], 2) }}</td>
+                    <tr wire:key="emp-{{ $emp->employee_id }}">
+                        <td>
+                            {{ $emp->employee->first_name }} {{ $emp->employee->last_name }}
+                            @if ($emp->employee->employee_number)
+                                <br><small class="text-muted">#{{ $emp->employee->employee_number }}</small>
+                            @endif
+                        </td>
+                        <td>
+                            {{ $this->getCurrencySymbol($emp->salary_currency ?? 'USD') }}{{ number_format($emp->base_salary, 2) }}
+                        </td>
                         <td>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text text-success"><i class="fas fa-plus-circle"></i></span>
                                 <input type="number" step="0.01"
-                                    wire:model.lazy="tempAdjustments.{{ $emp['id'] }}.Bonus"
+                                    wire:model.live.debounce.500ms="tempAdjustments.{{ $emp->employee_id }}.Bonus"
                                     class="form-control form-control-sm" placeholder="0.00">
                             </div>
                         </td>
@@ -123,7 +131,7 @@
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text text-success"><i class="fas fa-plus-circle"></i></span>
                                 <input type="number" step="0.01"
-                                    wire:model.lazy="tempAdjustments.{{ $emp['id'] }}.Commission"
+                                    wire:model.live.debounce.500ms="tempAdjustments.{{ $emp->employee_id }}.Commission"
                                     class="form-control form-control-sm" placeholder="0.00">
                             </div>
                         </td>
@@ -131,7 +139,7 @@
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text text-warning"><i class="fas fa-exchange-alt"></i></span>
                                 <input type="number" step="0.01"
-                                    wire:model.lazy="tempAdjustments.{{ $emp['id'] }}.Correction"
+                                    wire:model.live.debounce.500ms="tempAdjustments.{{ $emp->employee_id }}.Correction"
                                     class="form-control form-control-sm" placeholder="+100 or -50">
                             </div>
                         </td>
@@ -139,7 +147,7 @@
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text text-success"><i class="fas fa-plus-circle"></i></span>
                                 <input type="number" step="0.01"
-                                    wire:model.lazy="tempAdjustments.{{ $emp['id'] }}.Reimbursement"
+                                    wire:model.live.debounce.500ms="tempAdjustments.{{ $emp->employee_id }}.Reimbursement"
                                     class="form-control form-control-sm" placeholder="0.00">
                             </div>
                         </td>
@@ -147,7 +155,7 @@
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text text-danger"><i class="fas fa-minus-circle"></i></span>
                                 <input type="number" step="0.01"
-                                    wire:model.lazy="tempAdjustments.{{ $emp['id'] }}.Deduction"
+                                    wire:model.live.debounce.500ms="tempAdjustments.{{ $emp->employee_id }}.Deduction"
                                     class="form-control form-control-sm" placeholder="0.00">
                             </div>
                         </td>
@@ -168,6 +176,9 @@
             {{ $employees->links() }}
         </div>
     @endif
+
+
+
 
     <div class="alert alert-info mt-3">
         <i class="fas fa-save"></i> Changes are saved automatically. Click <strong>Save & Continue</strong> when done.

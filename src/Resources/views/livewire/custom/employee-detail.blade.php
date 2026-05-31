@@ -595,7 +595,7 @@
                              'qf.data-table',
                              [
                                  'configKey' => 'hr.attendance',
-                                 'queryFilters' => [['employee_number', '=', $employee->employee_number]],
+                                 'queryFilters' => [['employee.employee_number', '=', $employee->employee_number]],
                                  'hiddenFields' => ['onTable' => ['employee_id', 'employee_number']],
                              ],
                              key('attendance-' . $recordId)
@@ -608,8 +608,8 @@
                              'qf.data-table',
                              [
                                  'configKey' => 'hr.leave_request',
-                                 'queryFilters' => [['employee_id', '=', $employee->employee_number]],
-                                 'hiddenFields' => ['onTable' => ['employee_id']],
+                                 'queryFilters' => [['employee.employee_number', '=', $employee->employee_number]],
+                                 'hiddenFields' => ['onTable' => ['employee_id', 'employee_number']],
                              ],
                              key('timeoff-' . $recordId)
                          )
@@ -628,7 +628,7 @@
                              'qf.data-table',
                              [
                                  'configKey' => 'hr.document',
-                                 'queryFilters' => [['employee_number', '=', $employee->employee_number]],
+                                 'queryFilters' => [['employee.employee_number', '=', $employee->employee_number]],
                                  'hiddenFields' => ['onTable' => ['employee_id', 'employee_number']],
                              ],
                              key('documents-' . $recordId)
@@ -641,9 +641,9 @@
                              'qf.data-table',
                              [
                                  'configKey' => 'hr.clock_event',
-                                 'queryFilters' => [['employee_number', '=', $employee->employee_number]],
+                                 'queryFilters' => [['employee.employee_number', '=', $employee->employee_number]],
+                                 'hiddenFields' => ['onTable' => ['employee_id', 'employee_number']],
                                  'sort' => ['field' => 'timestamp', 'direction' => 'desc'],
-                                 'hiddenFields' => ['onTable' => ['employee_number']],
                              ],
                              key('clockevents-' . $recordId)
                          )

@@ -2,17 +2,19 @@
 
 namespace QuickerFaster\UILibrary\Widgets;
 
-
 use QuickerFaster\UILibrary\Contracts\Widgets\Widget;
 use Illuminate\Support\Facades\DB;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
+use QuickerFaster\UILibrary\Services\Filters\FilterService;
 
 class StatWidgetProcessor
 {
     use ResolvesDateStrings;
+
+
+
     public function process(array $definition): array
     {
-        // Support custom_value (bypass model query)
         if (isset($definition['custom_value'])) {
             $value = $definition['custom_value'];
         } else {
@@ -34,9 +36,9 @@ class StatWidgetProcessor
                     });
                 }
 
-                foreach ($conditions as $condition) {
-                    $query->where(...$condition);
-                }
+                // ✅ Reuse the filter logic – dot notation works automatically
+                $filterService = new FilterService();
+                $filterService->applySimpleFilters($query, $conditions);
 
                 $value = $query->{$aggregate}($field);
             }

@@ -12,11 +12,14 @@ use App\Modules\Admin\Models\Location;
 use App\Modules\Admin\Models\Company;
 use App\Modules\Hr\Models\Employee;
 use Illuminate\Support\Facades\DB;
+use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
+
 
 
 class PayrollWizardAdjustments extends Component
 {
     use WithPagination;
+    use HasCurrencySymbol;
 
     public int $stepIndex;
     public int $payrollRunId;
@@ -46,7 +49,28 @@ class PayrollWizardAdjustments extends Component
         $this->stepIndex = $stepIndex;
         $this->payrollRunId = $payrollRunId;
         $this->loadAdjustmentsCache();
+        $this->initializeAllTempAdjustments();  // <-- add this line
+
     }
+
+
+    protected function initializeAllTempAdjustments(): void
+    {
+        $run = PayrollRun::findOrFail($this->payrollRunId);
+        $allEmployeeIds = EmployeePosition::where('pay_schedule_id', $run->pay_schedule_id)
+            ->pluck('employee_id');
+
+        foreach ($allEmployeeIds as $employeeId) {
+            $this->tempAdjustments[$employeeId] = [
+                'Bonus' => $this->existingAdjustmentsCache[$employeeId]['Bonus'] ?? 0,
+                'Commission' => $this->existingAdjustmentsCache[$employeeId]['Commission'] ?? 0,
+                'Correction' => $this->existingAdjustmentsCache[$employeeId]['Correction'] ?? 0,
+                'Reimbursement' => $this->existingAdjustmentsCache[$employeeId]['Reimbursement'] ?? 0,
+                'Deduction' => $this->existingAdjustmentsCache[$employeeId]['Deduction'] ?? 0,
+            ];
+        }
+    }
+
 
     protected function loadAdjustmentsCache(): void
     {
@@ -70,8 +94,8 @@ class PayrollWizardAdjustments extends Component
             $searchTerm = '%' . $this->search . '%';
             $query->whereHas('employee', function ($q) use ($searchTerm) {
                 $q->where('first_name', 'like', $searchTerm)
-                  ->orWhere('last_name', 'like', $searchTerm)
-                  ->orWhere('employee_number', 'like', $searchTerm);
+                    ->orWhere('last_name', 'like', $searchTerm)
+                    ->orWhere('employee_number', 'like', $searchTerm);
             });
         }
 
@@ -110,19 +134,7 @@ class PayrollWizardAdjustments extends Component
 
         $positions = $query->paginate(50);
 
-        // Initialise tempAdjustments for current page
-        foreach ($positions->items() as $position) {
-            $employeeId = $position->employee_id;
-            if (!isset($this->tempAdjustments[$employeeId])) {
-                $this->tempAdjustments[$employeeId] = [
-                    'Bonus' => $this->existingAdjustmentsCache[$employeeId]['Bonus'] ?? 0,
-                    'Commission' => $this->existingAdjustmentsCache[$employeeId]['Commission'] ?? 0,
-                    'Correction' => $this->existingAdjustmentsCache[$employeeId]['Correction'] ?? 0,
-                    'Reimbursement' => $this->existingAdjustmentsCache[$employeeId]['Reimbursement'] ?? 0,
-                    'Deduction' => $this->existingAdjustmentsCache[$employeeId]['Deduction'] ?? 0,
-                ];
-            }
-        }
+
 
         return $positions;
     }
@@ -217,14 +229,23 @@ class PayrollWizardAdjustments extends Component
 
     public function save(): void
     {
-        foreach ($this->tempAdjustments as $employeeId => $types) {
+        /*foreach ($this->tempAdjustments as $employeeId => $types) {
             foreach ($types as $type => $amount) {
                 $this->saveAdjustmentForEmployee($employeeId, $type, (float) $amount);
             }
+        }*/
+        // All adjustments are already saved individually via wire:model
+
+        // Force recalculation when moving to preview
+        $run = PayrollRun::find($this->payrollRunId);
+        if ($run) {
+            $run->update(['calculation_status' => 'pending']);
+            // Delete old payslips to ensure clean slate (the job will recreate them)
+            \App\Modules\Hr\Models\PayrollPayslip::where('payroll_run_id', $this->payrollRunId)->delete();
         }
+
         $this->dispatch('adjustmentsComplete');
     }
-
 
 
 
@@ -269,3 +290,17 @@ class PayrollWizardAdjustments extends Component
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
