@@ -2,9 +2,6 @@
 
 
 
-
-
-
     
     {{-- Toggler – now inside container, with correct Bootstrap 5 attributes --}}
     <button class="navbar-toggler border-primary bg-light" type="button" data-bs-toggle="collapse"

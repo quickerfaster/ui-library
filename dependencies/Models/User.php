@@ -2,53 +2,39 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use App\Modules\Admin\Models\User as BaseUser;
 use Laravel\Sanctum\HasApiTokens;
-use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Spatie\Onboard\Concerns\GetsOnboarded;
 use Spatie\Onboard\Concerns\Onboardable;
 use QuickerFaster\UILibrary\Traits\HasSettings;
 
-class User extends Authenticatable implements MustVerifyEmail, Onboardable
+class User extends BaseUser implements MustVerifyEmail, Onboardable
 {
-    use HasApiTokens, Notifiable, HasRoles, GetsOnboarded, HasSettings, SoftDeletes, HasFactory;
+    use HasApiTokens, GetsOnboarded, HasSettings; 
 
-    protected $table = 'users';
-
+    /**
+     * Override $fillable to add application-specific fields.
+     * Merge with base $fillable to avoid losing base fields.
+     */
     protected $fillable = [
-        'name', 
-        'email', 
-        'email_verified_at', 
-        'password', 
-        'status', 
-        'has_seen_tour'
+        'name',        // from base
+        'email',       // from base
+        'status',      // from base
+        'password',    // from base
+        'email_verified_at',
+        'has_seen_tour',
     ];
 
-    protected $guard_name = 'web';
 
+
+    /**
+     * Override $casts to add application-specific casts.
+     * Again, merge with base casts.
+     */
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
+        'password' => 'hashed',   // base uses 'datetime' for email_verified_at only
     ];
 
-    /**
-     * Relationship with Employee.
-     */
-    public function employee()
-    {
-        return $this->hasOne(\App\Modules\Hr\Models\Employee::class, 'user_id', 'id');
-    }
-
-    /**
-     * Create a new factory instance for the model.
-     */
-    protected static function newFactory()
-    {
-        return \App\Modules\Admin\Database\Factories\UserFactory::new();
-    }
 }

@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 
 class EmployeeWithDependenciesSeeder extends Seeder
 {
+
+
     /**
      * Run the seeder.
      */
@@ -173,9 +175,9 @@ class EmployeeWithDependenciesSeeder extends Seeder
             $paySchedule = $paySchedules->random();
 
             // Decide pay type (70% salaried, 30% hourly)
-            $payType = $this->faker->boolean(70) ? 'salaried_full' : 'hourly';
-            $baseSalary = $payType === 'salaried_full' ? $this->faker->randomFloat(2, 40000, 120000) : 0;
-            $hourlyRate = $payType === 'hourly' ? $this->faker->randomFloat(2, 15, 50) : 0;
+            $payType = fake()->boolean(70) ? 'salaried_full' : 'hourly';
+            $baseSalary = $payType === 'salaried_full' ? fake()->randomFloat(2, 40000, 120000) : 0;
+            $hourlyRate = $payType === 'hourly' ? fake()->randomFloat(2, 15, 50) : 0;
 
             EmployeePosition::factory()
                 ->forEmployee($employee)
@@ -191,12 +193,12 @@ class EmployeeWithDependenciesSeeder extends Seeder
                     'pay_type' => $payType,
                     'hourly_rate' => $hourlyRate,
                     'base_salary' => $baseSalary,
-                    'salary_currency' => $this->faker->randomElement(['USD', 'EUR', 'GBP']),
+                    'salary_currency' => fake()->randomElement(['USD', 'EUR', 'GBP']),
                     'pay_frequency' => $paySchedule->frequency, // match the schedule's frequency
                     'employment_status' => 'Active',
-                    'cost_center' => $this->faker->optional(0.5)->bothify('CC-####'),
-                    'work_email' => $this->faker->optional(0.8)->companyEmail(),
-                    'work_phone_extension' => $this->faker->optional(0.3)->numerify('###'),
+                    'cost_center' => fake()->optional(0.5)->bothify('CC-####'),
+                    'work_email' => fake()->optional(0.8)->companyEmail(),
+                    'work_phone_extension' => fake()->optional(0.3)->numerify('###'),
                 ])
                 ->create();
         }
@@ -217,19 +219,19 @@ class EmployeeWithDependenciesSeeder extends Seeder
                 'employee_id' => $employee->id,
                 'pay_schedule_id' => $paySchedule->id,
                 'bank_account_holder_name' => $employee->first_name . ' ' . $employee->last_name,
-                'bank_name' => $this->faker->company() . ' Bank',
-                'bank_account_number' => $this->faker->bankAccountNumber(),
-                'bank_routing_number' => $this->faker->regexify('[0-9]{9}'),
-                'bank_iban' => $this->faker->optional(0.5)->iban('US'),
-                'bank_swift' => $this->faker->optional(0.3)->swiftBicNumber(),
-                'account_type' => $this->faker->randomElement(['checking', 'savings']),
+                'bank_name' => fake()->company() . ' Bank',
+                'bank_account_number' => fake()->bankAccountNumber(),
+                'bank_routing_number' => fake()->regexify('[0-9]{9}'),
+                'bank_iban' => fake()->optional(0.5)->iban('US'),
+                'bank_swift' => fake()->optional(0.3)->swiftBicNumber(),
+                'account_type' => fake()->randomElement(['checking', 'savings']),
                 'payment_method' => 'bank_transfer',
-                'tax_filing_status' => $this->faker->randomElement(['single', 'married', 'head_of_household']),
-                'allowances' => $this->faker->numberBetween(0, 5),
-                'extra_withholding' => $this->faker->randomFloat(2, 0, 200),
-                'is_exempt_from_federal_tax' => $this->faker->boolean(10),
+                'tax_filing_status' => fake()->randomElement(['single', 'married', 'head_of_household']),
+                'allowances' => fake()->numberBetween(0, 5),
+                'extra_withholding' => fake()->randomFloat(2, 0, 200),
+                'is_exempt_from_federal_tax' => fake()->boolean(10),
                 'override_country_code' => 'US',
-                'override_state_code' => $this->faker->stateAbbr(),
+                'override_state_code' => fake()->stateAbbr(),
                 'currency_code' => 'USD',
                 'effective_date' => $employee->hire_date,
                 'expiry_date' => null,
@@ -238,11 +240,5 @@ class EmployeeWithDependenciesSeeder extends Seeder
         }
     }
 
-    // Faker helper for cleaner code inside loops
-    protected $faker;
 
-    public function __construct()
-    {
-        $this->faker = \Faker\Factory::create();
-    }
 }

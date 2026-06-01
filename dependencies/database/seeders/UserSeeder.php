@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use App\Modules\Admin\Models\User;
+use App\Models\User; // Since it extednds App\Modules\Admin\Models\User
 use App\Modules\Admin\Models\Role;
 
 
