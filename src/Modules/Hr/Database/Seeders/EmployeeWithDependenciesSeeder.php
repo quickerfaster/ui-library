@@ -13,6 +13,7 @@ use App\Modules\Admin\Models\Company;
 use App\Modules\Admin\Models\Location;
 use App\Modules\Admin\Models\Shift;
 use App\Modules\Hr\Models\AttendancePolicy;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeWithDependenciesSeeder extends Seeder
 {
