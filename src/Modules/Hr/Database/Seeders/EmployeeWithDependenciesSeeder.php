@@ -21,17 +21,33 @@ class EmployeeWithDependenciesSeeder extends Seeder
      */
     public function run(): void
     {
-        // Step 1: Create static dependencies (reused for all employees)
-        $this->createDependencies();
+        // 1. Guard check: Only run on local environments
+        if (!app()->environment('local')) {
+            $this->command->warn('Skipping EmployeeWithDependenciesSeeder: Not in local environment.');
+            return;
+        }
 
-        // Step 2: Create 5,000 employees with EMP0001..EMP5000 numbers
-        $employees = $this->createEmployees(5000);
+        $this->command->info('Seeding 5,000 employees with dependencies...');
 
-        // Step 3: Create one active position for each employee
-        $this->createPositionsForEmployees($employees);
+        // 2. Wrap in a transaction for maximum speed and safety
+        DB::transaction(function () {
 
-        // Step 4: Create one payroll profile for each employee
-        $this->createPayrollProfilesForEmployees($employees);
+            // Step 1: Create static dependencies (reused for all employees)
+            $this->createDependencies();
+
+            // Step 2: Create 5,000 employees with EMP0001..EMP5000 numbers
+            // Recommendation: Ensure createEmployees uses bulk insert or chunking inside
+            $employees = $this->createEmployees(5000);
+
+            // Step 3: Create one active position for each employee
+            $this->createPositionsForEmployees($employees);
+
+            // Step 4: Create one payroll profile for each employee
+            $this->createPayrollProfilesForEmployees($employees);
+
+        });
+
+        $this->command->info('Successfully seeded 5,000 employees!');
     }
 
     /**
@@ -124,7 +140,7 @@ class EmployeeWithDependenciesSeeder extends Seeder
 
         $employees = Employee::factory()
             ->count($count)
-            ->sequence(fn ($sequence) => [
+            ->sequence(fn($sequence) => [
                 'employee_number' => $employeeNumbers[$sequence->index],
                 //'status' => 'Active', // assuming 'status' column exists – if not, remove this line
             ])

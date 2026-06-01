@@ -106,10 +106,10 @@ class DataTableForm extends Component
 
 
 
-public function updateCalculationLogic($json)
-{
-    $this->fields['calculation_logic'] = $json;
-}
+    public function updateCalculationLogic($json)
+    {
+        $this->fields['calculation_logic'] = $json;
+    }
 
 
 
@@ -525,7 +525,7 @@ public function updateCalculationLogic($json)
                 if (isset($definition['field_type']) && in_array($definition['field_type'], ['date', 'datepicker'])) {
                     $this->fields[$field] = $value instanceof \Carbon\Carbon ? $value->format('Y-m-d') : $value;
                 } else {
-                     if ($definition['field_type'] != 'password')
+                    if ($definition['field_type'] != 'password')
                         $this->fields[$field] = $value;
                     else
                         $this->fields[$field] = ""; // For password load empty value to the form
@@ -646,7 +646,7 @@ public function updateCalculationLogic($json)
                             }
                         }
 
-                    // Prepare password values
+                        // Prepare password values
                     } else if ($definition['field_type'] === 'password') {
                         if (empty($data[$fieldName]) && $this->isEditMode)
                             unset($data[$fieldName]); // Remove the none updated password fields
@@ -833,6 +833,13 @@ public function updateCalculationLogic($json)
             $rules = array_intersect_key($rules, array_flip($groupFields));
         }
 
+    // Custom validation for payroll_policy
+    if ($this->configKey === 'hr.payroll_policy') {
+        $this->validatePolicyCalculationLogic();
+    }
+
+
+
         $validator = Validator::make($this->fields, $rules, $messages);
         if ($validator->fails()) {
             $this->resetErrorBag();
@@ -844,6 +851,45 @@ public function updateCalculationLogic($json)
             return;
         }
     }
+
+
+
+
+protected function validatePolicyCalculationLogic(): void
+{
+    $type = $this->fields['type'] ?? null;
+    $calcLogic = $this->fields['calculation_logic'] ?? null;
+    if (!$type || !$calcLogic) return;
+
+    $data = json_decode($calcLogic, true);
+    if (!is_array($data)) {
+        $this->addError('calculation_logic', 'Invalid calculation logic.');
+        return;
+    }
+
+    if ($type === 'tax') {
+        $bands = $data['bands'] ?? [];
+        $hasValid = false;
+        foreach ($bands as $band) {
+            $limit = $band[0] ?? ($band['limit'] ?? 0);
+            $rate = $band[1] ?? ($band['rate'] ?? 0);
+            if ($limit > 0 || $rate > 0) {
+                $hasValid = true;
+                break;
+            }
+        }
+        if (!$hasValid) {
+            $this->addError('calculation_logic', 'At least one tax bracket with a positive limit or rate is required.');
+        }
+    } else {
+        $value = $data['value'] ?? 0;
+        if ($value <= 0) {
+            $this->addError('calculation_logic', 'Please enter a positive value (percentage or fixed amount).');
+        }
+    }
+}
+
+
 
 
     /**

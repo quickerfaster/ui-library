@@ -6,17 +6,16 @@ use Livewire\Component;
 
 class PolicyCalculationBuilder extends Component
 {
-    public string $policyType = 'benefit';   // default
+    public string $policyType = 'benefit';
     public ?string $existingJson = null;
 
-    // For tax
     public array $bands = [];
-
-    // For others
     public string $calcType = 'percentage';
     public float $calcValue = 0;
 
-    protected $listeners = ['parentPolicyTypeChanged' => 'setPolicyType'];
+    protected $listeners = [
+        'parentPolicyTypeChanged' => 'setPolicyType',
+    ];
 
     public function mount(string $policyType, ?string $existingJson = null)
     {
@@ -31,6 +30,42 @@ class PolicyCalculationBuilder extends Component
         $this->resetToDefault();
     }
 
+    // ---------- Tax Bands Methods ----------
+    public function addBand(): void
+    {
+        $this->bands[] = ['limit' => '', 'rate' => ''];
+        $this->updatedBands(); // trigger save
+    }
+
+    public function removeBand(int $index): void
+    {
+        unset($this->bands[$index]);
+        $this->bands = array_values($this->bands);
+        if (empty($this->bands)) {
+            $this->bands = [['limit' => '', 'rate' => '']];
+        }
+        $this->updatedBands();
+    }
+
+    // Called automatically when $bands changes (via wire:model.live)
+    public function updatedBands(): void
+    {
+        $this->updateParent();
+    }
+
+    public function updatedCalcValue(): void
+    {
+        $this->calcValue = $this->calcValue ?? 0.0; // To avoid empty null value error
+
+        $this->updateParent();
+    }
+
+    public function updatedCalcType(): void
+    {
+        $this->updateParent();
+    }
+
+    // ---------- JSON Handling ----------
     protected function loadFromJson(): void
     {
         if (empty($this->existingJson)) {
@@ -45,7 +80,20 @@ class PolicyCalculationBuilder extends Component
         }
 
         if ($this->policyType === 'tax') {
-            $this->bands = $data['bands'] ?? [['limit' => '', 'rate' => '']];
+            $rawBands = $data['bands'] ?? [];
+            if (empty($rawBands)) {
+                $this->bands = [['limit' => '', 'rate' => '']];
+            } else {
+                $this->bands = array_map(function ($band) {
+                    if (is_array($band) && !isset($band['limit']) && count($band) >= 2) {
+                        return ['limit' => $band[0], 'rate' => $band[1]];
+                    }
+                    return [
+                        'limit' => $band['limit'] ?? '',
+                        'rate' => $band['rate'] ?? '',
+                    ];
+                }, $rawBands);
+            }
         } else {
             $this->calcType = $data['type'] ?? 'percentage';
             $this->calcValue = $data['value'] ?? 0;
@@ -63,45 +111,38 @@ class PolicyCalculationBuilder extends Component
         $this->updateParent();
     }
 
-    public function updated($property): void
-    {
-        $this->updateParent();
-    }
-
-    public function updatedBands(): void
-    {
-        $this->updateParent();
-    }
-
-    protected function updateParent(): void
-    {
-        $json = $this->buildJson();
-        $this->dispatch('calculationLogicUpdated', $json);
-    }
-
     protected function buildJson(): string
     {
         if ($this->policyType === 'tax') {
-            $bands = [];
+            $cleanBands = [];
             foreach ($this->bands as $band) {
-                $limit = floatval($band['limit']);
-                $rate = floatval($band['rate']);
-                // Skip empty rows (limit and rate both zero)
-                if ($limit == 0 && $rate == 0 && count($this->bands) > 1) {
+                $limit = isset($band['limit']) && $band['limit'] !== '' ? (float) $band['limit'] : null;
+                $rate = isset($band['rate']) && $band['rate'] !== '' ? (float) $band['rate'] : null;
+
+                // Skip row if both limit and rate are empty/zero
+                if (($limit === null || $limit == 0) && ($rate === null || $rate == 0)) {
                     continue;
                 }
-                $bands[] = [$limit, $rate];
+
+                $cleanBands[] = [(float) $limit, (float) $rate];
             }
-            if (empty($bands)) {
-                $bands = [[0, 0]];
+
+            if (empty($cleanBands)) {
+                $cleanBands = [[0, 0]];
             }
-            return json_encode(['bands' => $bands]);
+            return json_encode(['bands' => $cleanBands]);
         } else {
             return json_encode([
                 'type' => $this->calcType,
                 'value' => floatval($this->calcValue),
             ]);
         }
+    }
+
+    protected function updateParent(): void
+    {
+        $json = $this->buildJson();
+        $this->dispatch('calculationLogicUpdated', $json);
     }
 
     public function render()
