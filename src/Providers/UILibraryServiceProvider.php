@@ -74,6 +74,7 @@ use QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports;
 use QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports;
 use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use QuickerFaster\UILibrary\Http\Livewire\AccessControls\RoleAssignmentManager;
 
 class UILibraryServiceProvider extends ServiceProvider
 {
@@ -242,6 +243,7 @@ class UILibraryServiceProvider extends ServiceProvider
         // Access control
         Livewire::component('qf.access-control-manager', AccessControlManager::class);
         Livewire::component('qf.module-selector', ModuleSelector::class);
+        Livewire::component('qf.role-assignment-manager', RoleAssignmentManager::class);
 
         // Buttons
         Livewire::component('qf.toggle-button', ToggleButton::class);

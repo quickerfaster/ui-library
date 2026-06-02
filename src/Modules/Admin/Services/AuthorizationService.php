@@ -13,15 +13,16 @@ class AuthorizationService
     const ROLE_ADMIN_ONLY_VIEWS = [
         'user-role-management',
         'user-role-assignment',
-        'access-control-management'
+        'access-control-management',
+        'role-assignment'
     ];
 
     const CUSTOM_VIEW_MODEL_NAMES = [
         'user-role-management' => 'role',
-        'user-role-assignment' => 'role',
+        'assign-user-roles' => 'role',
         'access-control-management' => 'role',
         'employee-onboarding' => 'employee', // employee permission needed
-        'payroll-wizard' => 'payroll_run', // payroll_run permission needed 
+        'payroll-wizard' => 'payroll_run', // payroll_run permission needed
     ];
 
 
