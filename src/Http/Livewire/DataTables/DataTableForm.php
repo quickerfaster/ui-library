@@ -833,10 +833,10 @@ class DataTableForm extends Component
             $rules = array_intersect_key($rules, array_flip($groupFields));
         }
 
-    // Custom validation for payroll_policy
-    if ($this->configKey === 'hr.payroll_policy') {
-        $this->validatePolicyCalculationLogic();
-    }
+        // Custom validation for payroll_policy
+        if ($this->configKey === 'hr.payroll_policy') {
+            $this->validatePolicyCalculationLogic();
+        }
 
 
 
@@ -855,39 +855,40 @@ class DataTableForm extends Component
 
 
 
-protected function validatePolicyCalculationLogic(): void
-{
-    $type = $this->fields['type'] ?? null;
-    $calcLogic = $this->fields['calculation_logic'] ?? null;
-    if (!$type || !$calcLogic) return;
+    protected function validatePolicyCalculationLogic(): void
+    {
+        $type = $this->fields['type'] ?? null;
+        $calcLogic = $this->fields['calculation_logic'] ?? null;
+        if (!$type || !$calcLogic)
+            return;
 
-    $data = json_decode($calcLogic, true);
-    if (!is_array($data)) {
-        $this->addError('calculation_logic', 'Invalid calculation logic.');
-        return;
-    }
+        $data = json_decode($calcLogic, true);
+        if (!is_array($data)) {
+            $this->addError('calculation_logic', 'Invalid calculation logic.');
+            return;
+        }
 
-    if ($type === 'tax') {
-        $bands = $data['bands'] ?? [];
-        $hasValid = false;
-        foreach ($bands as $band) {
-            $limit = $band[0] ?? ($band['limit'] ?? 0);
-            $rate = $band[1] ?? ($band['rate'] ?? 0);
-            if ($limit > 0 || $rate > 0) {
-                $hasValid = true;
-                break;
+        if ($type === 'tax') {
+            $bands = $data['bands'] ?? [];
+            $hasValid = false;
+            foreach ($bands as $band) {
+                $limit = $band[0] ?? ($band['limit'] ?? 0);
+                $rate = $band[1] ?? ($band['rate'] ?? 0);
+                if ($limit > 0 || $rate > 0) {
+                    $hasValid = true;
+                    break;
+                }
+            }
+            if (!$hasValid) {
+                $this->addError('calculation_logic', 'At least one tax bracket with a positive limit or rate is required.');
+            }
+        } else {
+            $value = $data['value'] ?? 0;
+            if ($value <= 0) {
+                $this->addError('calculation_logic', 'Please enter a positive value (percentage or fixed amount).');
             }
         }
-        if (!$hasValid) {
-            $this->addError('calculation_logic', 'At least one tax bracket with a positive limit or rate is required.');
-        }
-    } else {
-        $value = $data['value'] ?? 0;
-        if ($value <= 0) {
-            $this->addError('calculation_logic', 'Please enter a positive value (percentage or fixed amount).');
-        }
     }
-}
 
 
 

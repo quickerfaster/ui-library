@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('billing_address_line_1')->nullable();
             $table->string('billing_address_line_2')->nullable();
             $table->string('billing_city')->nullable();
-            $table->string('billing_state_province')->nullable();
+            $table->string('billing_state_code')->nullable();
             $table->string('billing_postal_code')->nullable();
             $table->string('billing_country_code')->nullable();
             $table->string('timezone')->nullable();

@@ -20,9 +20,9 @@ class LocationFactory extends Factory
             'address_line_1' => $this->faker->streetAddress(),
             'address_line_2' => $this->faker->optional(0.3)->secondaryAddress(),
             'city' => $city,
-            'state_province' => $this->faker->optional(0.7)->stateAbbr(),
+            'state_code' => $this->faker->optional(0.7)->stateAbbr(),
             'postal_code' => $this->faker->optional(0.8)->postcode(),
-            'country' => $country,
+            'country_code' => $country,
             'phone' => $this->faker->optional(0.7)->phoneNumber(),
             'email' => $this->faker->optional(0.6)->companyEmail(),
             'website' => $this->faker->optional(0.5)->url(),
@@ -96,7 +96,7 @@ class LocationFactory extends Factory
     public function inCountry(string $countryCode)
     {
         return $this->state(fn (array $attributes) => [
-            'country' => $countryCode,
+            'country_code' => $countryCode,
         ]);
     }
 }

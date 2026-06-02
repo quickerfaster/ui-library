@@ -23,7 +23,7 @@ class CompanyFactory extends Factory
             'billing_address_line_1' => $this->faker->streetAddress(),
             'billing_address_line_2' => $this->faker->optional(0.3)->secondaryAddress(),
             'billing_city' => $this->faker->city(),
-            'billing_state_province' => $this->faker->optional(0.7)->stateAbbr(),
+            'billing_state_code' => $this->faker->optional(0.7)->stateAbbr(),
             'billing_postal_code' => $this->faker->optional(0.8)->postcode(),
             'billing_country_code' => $this->faker->randomElement(['US', 'GB', 'CA', 'AU', 'IN', 'NG', 'DE', 'FR']),
             'timezone' => $this->faker->timezone(),

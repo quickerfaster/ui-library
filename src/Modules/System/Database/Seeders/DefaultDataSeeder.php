@@ -89,7 +89,7 @@ class DefaultDataSeeder extends Seeder
 
             'address_line_1' => 'Default Adress',
             'city' => 'Default City',
-            'country' => 'US',
+            'country_code' => 'US',
             'timezone' => 'America/New_York',
         ]);
 

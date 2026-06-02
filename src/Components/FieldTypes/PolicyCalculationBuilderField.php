@@ -72,6 +72,35 @@ class PolicyCalculationBuilderField implements FieldType
         // Validation will be handled by the custom component's output JSON structure.
         // We still need a basic rule to ensure it's valid JSON.
         return [$this->name => 'nullable|json'];
+
+        /*return [
+        $this->name => ['nullable', 'json', function ($attribute, $value, $fail) {
+            $data = json_decode($value, true);
+            if (!is_array($data)) {
+                $fail('The calculation logic must be valid JSON.');
+                return;
+            }
+            // Basic structural checks
+            if (isset($data['bands'])) {
+                if (!is_array($data['bands'])) {
+                    $fail('The bands must be an array.');
+                }
+            } elseif (isset($data['type'])) {
+                if (!in_array($data['type'], ['fixed', 'percentage'])) {
+                    $fail('Calculation type must be "fixed" or "percentage".');
+                }
+                if (!isset($data['value']) || !is_numeric($data['value'])) {
+                    $fail('A numeric value is required.');
+                }
+            } else {
+                $fail('Calculation logic must contain either "bands" or "type"/"value".');
+            }
+        }],
+    ];*/
+
+
+
+
     }
 
     public function getOptions(): array

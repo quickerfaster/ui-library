@@ -73,6 +73,7 @@ use QuickerFaster\UILibrary\Http\Livewire\Custom\TaxBandsRepeater;
 use QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports;
 use QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports;
 use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 class UILibraryServiceProvider extends ServiceProvider
 {
@@ -128,6 +129,10 @@ class UILibraryServiceProvider extends ServiceProvider
 
         // Translations
         $this->loadTranslationsFrom(__DIR__ . '/../Resources/lang', 'qf');
+
+
+
+    
 
     }
 

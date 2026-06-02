@@ -180,51 +180,81 @@ class PayrollCalculator
     }
 
 
+
     /**
      * Resolve applicable policies for an employee based on assignments and global rules.
      */
-    protected function resolvePoliciesForEmployee(EmployeePosition $position): \Illuminate\Support\Collection
-    {
-        $companyId = optional($position->employee->company)->id;
-        $locationId = $position->location_id;
-        $departmentId = $position->department_id;
-        $shiftId = $position->shift_id;
-        $employeeGroupId = $position->employee->employee_group_id; // one group per employee
+protected function resolvePoliciesForEmployee(EmployeePosition $position): \Illuminate\Support\Collection
+{
+    $companyId = optional($position->employee->company)->id;
+    $locationId = $position->location_id;
+    $departmentId = $position->department_id;
+    $shiftId = $position->shift_id;
+    $employeeGroupId = $position->employee->employee_group_id;
 
-        $assignments = PayrollPolicyAssignment::with('policy')
-            ->whereIn('assignable_type', ['company', 'location', 'department', 'shift', 'employee_group'])
-            ->where(function ($q) use ($companyId, $locationId, $departmentId, $shiftId, $employeeGroupId) {
-                $q->where(function ($q2) use ($companyId) {
-                    $q2->where('assignable_type', 'company')->where('assignable_id', $companyId);
-                })->orWhere(function ($q2) use ($locationId) {
-                    $q2->where('assignable_type', 'location')->where('assignable_id', $locationId);
-                })->orWhere(function ($q2) use ($departmentId) {
-                    $q2->where('assignable_type', 'department')->where('assignable_id', $departmentId);
-                })->orWhere(function ($q2) use ($shiftId) {
-                    $q2->where('assignable_type', 'shift')->where('assignable_id', $shiftId);
-                })->orWhere(function ($q2) use ($employeeGroupId) {
-                    $q2->where('assignable_type', 'employee_group')->where('assignable_id', $employeeGroupId);
-                });
-            })
-            ->orderBy('priority', 'desc')
-            ->get();
+    // Use the actual class names stored in the database
+    $assignments = PayrollPolicyAssignment::with('payrollPolicy')
+        ->whereIn('assignable_type', [
+            'App\Modules\Admin\Models\Company',
+            'App\Modules\Admin\Models\Location',
+            'App\Modules\Admin\Models\Department',
+            'App\Modules\Hr\Models\Shift',
+            'App\Modules\Hr\Models\EmployeeGroup',
+        ])
+        ->where(function ($q) use ($companyId, $locationId, $departmentId, $shiftId, $employeeGroupId) {
+            $q->where(function ($q2) use ($companyId) {
+                $q2->where('assignable_type', 'App\Modules\Admin\Models\Company')
+                   ->where('assignable_id', $companyId);
+            })->orWhere(function ($q2) use ($locationId) {
+                $q2->where('assignable_type', 'App\Modules\Admin\Models\Location')
+                   ->where('assignable_id', $locationId);
+            })->orWhere(function ($q2) use ($departmentId) {
+                $q2->where('assignable_type', 'App\Modules\Admin\Models\Department')
+                   ->where('assignable_id', $departmentId);
+            })->orWhere(function ($q2) use ($shiftId) {
+                $q2->where('assignable_type', 'App\Modules\Hr\Models\Shift')
+                   ->where('assignable_id', $shiftId);
+            })->orWhere(function ($q2) use ($employeeGroupId) {
+                $q2->where('assignable_type', 'App\Modules\Hr\Models\EmployeeGroup')
+                   ->where('assignable_id', $employeeGroupId);
+            });
+        })
+        ->where('effective_date', '<=', $this->run->period_end)
+        ->where(function ($q) {
+            $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
+        })
+        ->orderBy('priority', 'desc')
+        ->get();
 
-        $countryCode = $position->location->country_code ?? 'US';
-        $stateCode = $position->location->state_code ?? null;
+    // Global policies (by country/state, but allow null as "any")
+    // Null means the global will be applied to any country/state
+    // A default country_code eg. 'US', 'NG' means it will ony be applied to the employee from that country/state
+    // use $countryCode = $position->location->country_code ?? 'US'; // 'NG' to effect the overide
+    $countryCode = $position->location->country_code ?? null;
+    $stateCode = $position->location->state_code ?? null;
+    if ($position->employee->employee_number == "EMP0090")
+        \Log::debug("Policies", [$countryCode, $stateCode]);
 
-        $globalPolicies = PayrollPolicy::where('is_active', true)
-            ->where('effective_date', '<=', $this->run->period_end)
-            ->where(function ($q) {
-                $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
-            })
-            ->where('country_code', $countryCode)
-            ->where(function ($q) use ($stateCode) {
-                $q->whereNull('state_code')->orWhere('state_code', $stateCode);
-            })
-            ->get();
+    $globalPolicies = PayrollPolicy::where('is_active', true)
+        ->where('effective_date', '<=', $this->run->period_end)
+        ->where(function ($q) {
+            $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
+        })
+        ->where(function ($q) use ($countryCode) {
+            $q->where('country_code', $countryCode)->orWhereNull('country_code');
+        })
+        ->where(function ($q) use ($stateCode) {
+            $q->where('state_code', $stateCode)->orWhereNull('state_code');
+        })
+        ->get();
 
-        return $assignments->pluck('policy')->merge($globalPolicies)->unique('id');
-    }
+    // Merge and deduplicate
+    $policies = $assignments->pluck('payrollPolicy')->merge($globalPolicies)->unique('id');
+
+
+
+    return $policies;
+}
 
     /**
      * Apply policy logic to calculate amount.
