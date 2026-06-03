@@ -17,7 +17,6 @@
         $currentModuleName = $moduleNames[$currentModule] ?? 'QuickHR';
         $moduleIcons = ['hr' => 'fas fa-users'];
         $currentModuleIcon = $moduleIcons[$currentModule] ?? 'fas fa-th-large';
-
     @endphp
 
 

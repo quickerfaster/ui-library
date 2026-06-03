@@ -5,7 +5,7 @@ namespace App\Modules\Hr\Services;
 
 use App\Modules\Hr\Models\DailyAttendance;
 use App\Modules\Hr\Models\EmployeeProfile;
-use App\Modules\Hr\Models\Shift; // Assuming you have a Shift model
+use App\Modules\Admin\Models\Shift; // Assuming you have a Shift model
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;

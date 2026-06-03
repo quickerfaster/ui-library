@@ -70,8 +70,7 @@ class AuthorizationService
             return $user->can($permission);
         }
 
-        // Regular admins can access everything else
-        return true;
+        return false;
     }
 
     /**
@@ -83,8 +82,12 @@ class AuthorizationService
             return self::CUSTOM_VIEW_MODEL_NAMES[$view];
         }
 
-        if (str_contains($view, 'dashboard') || str_contains($view, 'overview')) {
+        /*if (str_contains($view, 'dashboard') || str_contains($view, 'overview')) {
             return 'overview';
+        }*/
+
+        if (str_starts_with($view, 'dashboard-')) {
+            $view = str_replace("dashboard-", "", $view);
         }
 
         $view = str_replace('-', '_', $view);
@@ -115,15 +118,16 @@ class AuthorizationService
 
         // 2. Check required permission
         if (isset($action['requiredPermission'])) {
-            $requiredPermissions = (array) $action['requiredPermission'];
-            if (!$user->hasAnyPermission($requiredPermissions)) {
-                return false;
+            $requiredPermissions = (array) $action['requiredPermission']; // This should be fixed with array of requiredPermissions
+            if ($user->hasAnyPermission($requiredPermissions)) {
+                return true;
             }
         }
 
         // 3. Check business conditions (state-based)
-        if (isset($action['condition'])) {
-            if (!$this->checkBusinessConditions($row, $action['condition'])) {
+        if (isset($action['condition'])) { // This should be fixed with array of conditions
+            $actions = (array) $action['condition'];
+            if (!$this->checkBusinessConditions($row, $actions)) {
                 return false;
             }
         }
@@ -284,9 +288,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canUpdate($user, $record): bool
     {
+        // Note that "update" is represented by "edit"
         if (!$user) return false;
         if ($this->isBypassAllowed($user)) return true;
-        $action = ['requiredPermission' => 'update_' . $this->getModelNameFromRecord($record)];
+        $action = ['requiredPermission' => 'edit_' . $this->getModelNameFromRecord($record)];
         return $this->canPerformAction($user, $action, $record);
     }
 

@@ -5,9 +5,14 @@
     $splittedUrl = explode('/', $url);
     $viewName = count($splittedUrl) > 0 ? $splittedUrl[count($splittedUrl) - 1] : '';
     $viewName = str_replace("dashboard-", "", $viewName);
-    $permissionName = 'view_' . str_replace('-', '_', $viewName);
+    // $permissionName = 'view_' . str_replace('-', '_', $viewName);
     $hasPermission = app(App\Modules\Admin\Services\AuthorizationService::class)
-        ->canAccessView( auth()->user(), $permissionName);
+        ->canAccessView(auth()->user(), $viewName);
+
+        // Overide untill AuthorizationService::canAccessView( auth()->user(), $permissionName); is fixed
+    // $hasPermission = auth()->user()->hasPermissionTo($permissionName);
+
+       
 @endphp
 @if ($hasPermission)
     <li class="nav-item" wire:key="nav-item-{{ $item['key'] ?? $item['label'] }}"

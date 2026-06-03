@@ -543,7 +543,7 @@ class AttendanceCalculator
         $dayOfWeek = $date->dayOfWeekIso; // 1=Monday, 7=Sunday
 
         // Priority 1: Specific ShiftSchedule for the date
-        $shiftSchedule = \App\Modules\Hr\Models\ShiftSchedule::where('employee_id', $employee->id)
+        $shiftSchedule = \App\Modules\Admin\Models\ShiftSchedule::where('employee_id', $employee->id)
             ->whereDate('schedule_date', $dateString)
             ->where('is_published', true)
             ->first();

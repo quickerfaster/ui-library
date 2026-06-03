@@ -29,10 +29,9 @@
 
     $splittedUrl = explode('/', $item['route']);
     $viewName = count($splittedUrl) > 0 ? $splittedUrl[count($splittedUrl) - 1] : '';
-    $viewName = str_replace("dashboard-", "", $viewName);
-    $permissionName = 'view_' . str_replace('-', '_', $viewName);
+    // $viewName = str_replace("dashboard-", "", $viewName);
     $hasPermission = app(App\Modules\Admin\Services\AuthorizationService::class)
-        ->canAccessView( auth()->user(), $permissionName);
+        ->canAccessView( auth()->user(), $viewName);
         
 @endphp
 

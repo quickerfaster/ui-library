@@ -12,6 +12,7 @@ use App\Modules\Hr\Models\PayrollPolicy;
 use App\Modules\Hr\Models\PayrollPolicyAssignment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class PayrollCalculator
 {
@@ -89,8 +90,34 @@ class PayrollCalculator
                 $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
             })->get();
 
+        $overridePolicies = []; // policies that come from adjustments with policy_id
+        $standaloneAdjustments = collect();
 
         foreach ($recurring as $adj) {
+            if ($adj->policy_id) {
+                // Load the linked policy
+                $policy = $adj->policy;
+                if (!$policy || !$policy->is_active) {
+                    continue;
+                }
+
+                // Clone to avoid modifying original
+                $overridePolicy = clone $policy;
+                // Override calculation logic with adjustment's values
+                $overridePolicy->calculation_logic = json_encode([
+                    'type' => $adj->calculation_type, // 'fixed' or 'percentage'
+                    'value' => (float) $adj->value,
+                ]);
+                // Optionally override label – use adjustment's label if provided, else keep policy name
+                $overridePolicy->name = $adj->label ?: $policy->name;
+                $overridePolicies[$policy->id] = $overridePolicy;
+            } else {
+                $standaloneAdjustments->push($adj);
+            }
+        }
+
+        // Process standalone adjustments (no policy link)
+        foreach ($standaloneAdjustments as $adj) {
             $amount = strtolower($adj->calculation_type) === 'percentage'
                 ? $baseSalary * ($adj->value / 100)
                 : $adj->value;
@@ -103,14 +130,9 @@ class PayrollCalculator
             ->where('employee_id', $employeeId)
             ->get();
 
-
-
-
-
         foreach ($oneTime as $adj) {
             $amount = $adj->amount;
-            if ($amount == 0)
-                continue;
+            if ($amount == 0) continue;
 
             switch (strtolower($adj->type)) {
                 case 'bonus':
@@ -133,17 +155,41 @@ class PayrollCalculator
             $items[] = $this->makeItem(null, $type, ucfirst($adj->type) . ': ' . $adj->label, $absAmount, $adj->id);
         }
 
-        // 4. Global policies (tax, pension, etc.)
-        $policies = $this->resolvePoliciesForEmployee($position);
-        foreach ($policies as $policy) {
-            $amount = $this->applyPolicyLogic($policy, $items, $baseSalary);
+        // 4. Resolve normally assigned and global policies
+        $normalPolicies = $this->resolvePoliciesForEmployee($position);
+
+        // 5. Merge policies, giving precedence to overrides (same ID)
+        $allPolicies = [];
+        foreach ($normalPolicies as $policy) {
+            $allPolicies[$policy->id] = $policy;
+        }
+        foreach ($overridePolicies as $id => $overridePolicy) {
+            $allPolicies[$id] = $overridePolicy; // override replaces original
+        }
+
+        // 6. Apply policies with proration and inheritance
+        $periodStart = $this->run->period_start;
+        $periodEnd = $this->run->period_end;
+        $totalDays = $periodStart->diffInDays($periodEnd) + 1;
+
+        foreach ($allPolicies as $policy) {
+            // Resolve effective policy (handles parent_policy_id chain)
+            $effectivePolicy = $this->resolveEffectivePolicy($policy);
+
+            $activeDays = $this->getActiveDaysInRun($effectivePolicy, $periodStart, $periodEnd);
+            if ($activeDays <= 0) {
+                continue;
+            }
+            $prorationFactor = $activeDays / $totalDays;
+
+            $amount = $this->applyPolicyLogic($effectivePolicy, $items, $baseSalary, $prorationFactor);
             if ($amount != 0) {
-                // Determine item type based on policy effect (addition or subtraction)
-                $itemType = match ($policy->effect) {
+                $itemType = match ($effectivePolicy->effect) {
                     'addition' => 'earning',
-                    default => ($policy->type === 'tax' ? 'tax' : 'deduction'),
+                    default => ($effectivePolicy->type === 'tax' ? 'tax' : 'deduction'),
                 };
-                $items[] = $this->makeItem($policy->id, $itemType, $policy->name, $amount);
+                // Store line item using original policy ID for audit trail
+                $items[] = $this->makeItem($policy->id, $itemType, $effectivePolicy->name, $amount);
             }
         }
 
@@ -179,91 +225,167 @@ class PayrollCalculator
         return $payslip;
     }
 
+    /**
+     * Get number of days a policy is active within the payroll period.
+     */
+    protected function getActiveDaysInRun(PayrollPolicy $policy, Carbon $periodStart, Carbon $periodEnd): int
+    {
+        $policyStart = $policy->effective_date;
+        $policyEnd = $policy->expiry_date ?? $periodEnd;
 
+        // If policy starts after period end or ends before period start, zero days
+        if ($policyStart > $periodEnd || ($policyEnd && $policyEnd < $periodStart)) {
+            return 0;
+        }
+
+        $activeStart = $policyStart > $periodStart ? $policyStart : $periodStart;
+        $activeEnd = $policyEnd < $periodEnd ? $policyEnd : $periodEnd;
+
+        return $activeStart->diffInDays($activeEnd) + 1; // inclusive
+    }
+
+    /**
+     * Resolve the effective policy by traversing parent chain and merging overrides.
+     */
+    protected function resolveEffectivePolicy(PayrollPolicy $policy): PayrollPolicy
+    {
+        if (!$policy->parent_policy_id) {
+            return $policy;
+        }
+
+        // Load parent recursively
+        $parent = $policy->parentPolicy;
+        if (!$parent) {
+            return $policy;
+        }
+        $effectiveParent = $this->resolveEffectivePolicy($parent);
+
+        // Clone the child to avoid modifying database instance
+        $effective = clone $policy;
+
+        // Merge fields: child takes precedence, fallback to parent
+        $fieldsToMerge = [
+            'calculation_logic', 'effect', 'employer_ratio', 'is_statutory',
+            'country_code', 'state_code', 'type', 'name'
+        ];
+        foreach ($fieldsToMerge as $field) {
+            if (empty($effective->$field) && !is_null($effectiveParent->$field)) {
+                $effective->$field = $effectiveParent->$field;
+            }
+        }
+
+        // Special handling for dates: effective = max(child, parent), expiry = min(child, parent)
+        $childStart = $policy->effective_date;
+        $parentStart = $effectiveParent->effective_date;
+        $effective->effective_date = $childStart > $parentStart ? $childStart : $parentStart;
+
+        $childEnd = $policy->expiry_date;
+        $parentEnd = $effectiveParent->expiry_date;
+        if ($childEnd && $parentEnd) {
+            $effective->expiry_date = $childEnd < $parentEnd ? $childEnd : $parentEnd;
+        } elseif ($childEnd) {
+            $effective->expiry_date = $childEnd;
+        } else {
+            $effective->expiry_date = $parentEnd;
+        }
+
+        return $effective;
+    }
 
     /**
      * Resolve applicable policies for an employee based on assignments and global rules.
      */
-protected function resolvePoliciesForEmployee(EmployeePosition $position): \Illuminate\Support\Collection
-{
-    $companyId = optional($position->employee->company)->id;
-    $locationId = $position->location_id;
-    $departmentId = $position->department_id;
-    $shiftId = $position->shift_id;
-    $employeeGroupId = $position->employee->employee_group_id;
+    protected function resolvePoliciesForEmployee(EmployeePosition $position): \Illuminate\Support\Collection
+    {
+        // 1. Get assignments (with their policies)
+        $assignments = PayrollPolicyAssignment::with('payrollPolicy')
+            ->whereIn('assignable_type', [
+                'App\Modules\Admin\Models\Company',
+                'App\Modules\Admin\Models\Location',
+                'App\Modules\Admin\Models\Department',
+                'App\Modules\Admin\Models\Shift',
+                'App\Modules\Hr\Models\EmployeeGroup',
+            ])
+            ->where(function ($q) use ($position) {
+                $companyId = optional($position->employee->company)->id;
+                $locationId = $position->location_id;
+                $departmentId = $position->department_id;
+                $shiftId = $position->shift_id;
+                $employeeGroupId = $position->employee->employee_group_id;
 
-    // Use the actual class names stored in the database
-    $assignments = PayrollPolicyAssignment::with('payrollPolicy')
-        ->whereIn('assignable_type', [
-            'App\Modules\Admin\Models\Company',
-            'App\Modules\Admin\Models\Location',
-            'App\Modules\Admin\Models\Department',
-            'App\Modules\Hr\Models\Shift',
-            'App\Modules\Hr\Models\EmployeeGroup',
-        ])
-        ->where(function ($q) use ($companyId, $locationId, $departmentId, $shiftId, $employeeGroupId) {
-            $q->where(function ($q2) use ($companyId) {
-                $q2->where('assignable_type', 'App\Modules\Admin\Models\Company')
-                   ->where('assignable_id', $companyId);
-            })->orWhere(function ($q2) use ($locationId) {
-                $q2->where('assignable_type', 'App\Modules\Admin\Models\Location')
-                   ->where('assignable_id', $locationId);
-            })->orWhere(function ($q2) use ($departmentId) {
-                $q2->where('assignable_type', 'App\Modules\Admin\Models\Department')
-                   ->where('assignable_id', $departmentId);
-            })->orWhere(function ($q2) use ($shiftId) {
-                $q2->where('assignable_type', 'App\Modules\Hr\Models\Shift')
-                   ->where('assignable_id', $shiftId);
-            })->orWhere(function ($q2) use ($employeeGroupId) {
-                $q2->where('assignable_type', 'App\Modules\Hr\Models\EmployeeGroup')
-                   ->where('assignable_id', $employeeGroupId);
-            });
-        })
-        ->where('effective_date', '<=', $this->run->period_end)
-        ->where(function ($q) {
-            $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
-        })
-        ->orderBy('priority', 'desc')
-        ->get();
+                $q->where(function ($q2) use ($companyId) {
+                    $q2->where('assignable_type', 'App\Modules\Admin\Models\Company')
+                       ->where('assignable_id', $companyId);
+                })->orWhere(function ($q2) use ($locationId) {
+                    $q2->where('assignable_type', 'App\Modules\Admin\Models\Location')
+                       ->where('assignable_id', $locationId);
+                })->orWhere(function ($q2) use ($departmentId) {
+                    $q2->where('assignable_type', 'App\Modules\Admin\Models\Department')
+                       ->where('assignable_id', $departmentId);
+                })->orWhere(function ($q2) use ($shiftId) {
+                    $q2->where('assignable_type', 'App\Modules\Admin\Models\Shift')
+                       ->where('assignable_id', $shiftId);
+                })->orWhere(function ($q2) use ($employeeGroupId) {
+                    $q2->where('assignable_type', 'App\Modules\Hr\Models\EmployeeGroup')
+                       ->where('assignable_id', $employeeGroupId);
+                });
+            })
+            ->where('effective_date', '<=', $this->run->period_end)
+            ->where(function ($q) {
+                $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
+            })
+            ->orderBy('priority', 'desc')
+            ->get();
 
-    // Global policies (by country/state, but allow null as "any")
-    // Null means the global will be applied to any country/state
-    // A default country_code eg. 'US', 'NG' means it will ony be applied to the employee from that country/state
-    // use $countryCode = $position->location->country_code ?? 'US'; // 'NG' to effect the overide
-    $countryCode = $position->location->country_code ?? null;
-    $stateCode = $position->location->state_code ?? null;
-    if ($position->employee->employee_number == "EMP0090")
-        \Log::debug("Policies", [$countryCode, $stateCode]);
+        // 2. Get IDs of policies that have ANY assignment (not just those that match this employee)
+        $assignedPolicyIds = PayrollPolicyAssignment::whereIn('assignable_type', [
+                'App\Modules\Admin\Models\Company',
+                'App\Modules\Admin\Models\Location',
+                'App\Modules\Admin\Models\Department',
+                'App\Modules\Admin\Models\Shift',
+                'App\Modules\Hr\Models\EmployeeGroup',
+            ])
+            ->where('effective_date', '<=', $this->run->period_end)
+            ->where(function ($q) {
+                $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
+            })
+            ->pluck('payroll_policy_id')
+            ->unique()
+            ->toArray();
 
-    $globalPolicies = PayrollPolicy::where('is_active', true)
-        ->where('effective_date', '<=', $this->run->period_end)
-        ->where(function ($q) {
-            $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
-        })
-        ->where(function ($q) use ($countryCode) {
-            $q->where('country_code', $countryCode)->orWhereNull('country_code');
-        })
-        ->where(function ($q) use ($stateCode) {
-            $q->where('state_code', $stateCode)->orWhereNull('state_code');
-        })
-        ->get();
+        // 3. Global policies: exclude those that have any assignment
+        $countryCode = $position->location->country_code ?? null;
+        $stateCode = $position->location->state_code ?? null;
 
-    // Merge and deduplicate
-    $policies = $assignments->pluck('payrollPolicy')->merge($globalPolicies)->unique('id');
+        $globalPolicies = PayrollPolicy::where('is_active', true)
+            ->where('effective_date', '<=', $this->run->period_end)
+            ->where(function ($q) {
+                $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
+            })
+            ->whereNotIn('id', $assignedPolicyIds)
+            ->where(function ($q) use ($countryCode) {
+                $q->where('country_code', $countryCode)->orWhereNull('country_code');
+            })
+            ->where(function ($q) use ($stateCode) {
+                $q->where('state_code', $stateCode)->orWhereNull('state_code');
+            })
+            ->get();
 
-
-
-    return $policies;
-}
+        // 4. Merge (assignment policies take precedence)
+        return $assignments->pluck('payrollPolicy')->merge($globalPolicies)->unique('id');
+    }
 
     /**
-     * Apply policy logic to calculate amount.
+     * Apply policy logic to calculate amount, with optional proration factor.
      */
-    protected function applyPolicyLogic(PayrollPolicy $policy, array $items, float $baseSalary): float
+    protected function applyPolicyLogic(PayrollPolicy $policy, array $items, float $baseSalary, float $prorationFactor = 1.0): float
     {
         $logic = json_decode($policy->calculation_logic, true);
-        if (!$logic)
+        if (!$logic) {
             return 0;
+        }
+
+        $amount = 0;
 
         switch ($policy->type) {
             case 'tax':
@@ -277,30 +399,35 @@ protected function resolvePoliciesForEmployee(EmployeePosition $position): \Illu
                     $taxable = min($remaining, $bandLimit);
                     $tax += $taxable * $rate;
                     $remaining -= $taxable;
-                    if ($remaining <= 0)
-                        break;
+                    if ($remaining <= 0) break;
                 }
-                return $tax / 12; // monthly tax (positive)
+                $amount = $tax / 12;
+                break;
+
             case 'pension':
                 $rate = $logic['rate'] ?? 8;
-                return $baseSalary * ($rate / 100);
+                $amount = $baseSalary * ($rate / 100);
+                break;
+
             case 'benefit':
             case 'bonus':
-                if ($logic['type'] === 'fixed')
-                    return $logic['value'];
-                if ($logic['type'] === 'percentage')
-                    return $baseSalary * ($logic['value'] / 100);
-                return 0;
             case 'insurance':
             case 'deduction':
-                if ($logic['type'] === 'fixed')
-                    return $logic['value'];
-                if ($logic['type'] === 'percentage')
-                    return $baseSalary * ($logic['value'] / 100);
-                return 0;
+                if ($logic['type'] === 'fixed') {
+                    $amount = $logic['value'];
+                } elseif ($logic['type'] === 'percentage') {
+                    $amount = $baseSalary * ($logic['value'] / 100);
+                } else {
+                    $amount = 0;
+                }
+                break;
+
             default:
                 return 0;
         }
+
+        // Apply proration factor
+        return $amount * $prorationFactor;
     }
 
     /**
@@ -340,7 +467,5 @@ protected function resolvePoliciesForEmployee(EmployeePosition $position): \Illu
             'total_cash_required' => $totals->total_net ?? 0,
             'calculation_status' => 'completed',
         ]);
-
-        // Log::info("Payroll run {$this->run->id} calculation completed. Total employees: {$this->run->total_employees}, Net total: {$totals->total_net}");
     }
 }

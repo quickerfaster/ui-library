@@ -4,7 +4,7 @@ namespace App\Modules\Hr\Database\Factories;
 
 use App\Modules\Hr\Models\Employee;
 use App\Modules\Hr\Models\EmployeePosition;
-use App\Modules\Hr\Models\Shift;
+use App\Modules\Admin\Models\Shift;
 use App\Modules\Admin\Models\Department;
 use App\Modules\Admin\Models\JobTitle;
 use Illuminate\Database\Eloquent\Factories\Factory;

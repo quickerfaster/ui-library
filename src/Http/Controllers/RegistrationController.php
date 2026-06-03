@@ -5,7 +5,7 @@ namespace QuickerFaster\UILibrary\Http\Controllers;
 use App\Modules\Admin\Models\Company;
 use App\Modules\Admin\Models\Location;
 use App\Modules\Admin\Models\Department;
-use App\Modules\Hr\Models\Shift;
+use App\Modules\Admin\Models\Shift;
 use App\Modules\Hr\Models\AttendancePolicy;
 use App\Modules\Hr\Models\WorkPattern;
 use App\Modules\Hr\Models\PolicyAssignment;
