@@ -2,7 +2,7 @@
 
 
 
-    
+
     {{-- Toggler – now inside container, with correct Bootstrap 5 attributes --}}
     <button class="navbar-toggler border-primary bg-light" type="button" data-bs-toggle="collapse"
         data-bs-target="#topNavCollapse" aria-controls="topNavCollapse" aria-expanded="false"
@@ -12,7 +12,7 @@
 
     {{-- Brand / Module Switcher --}}
     @php
-        $currentModule = strtolower($this->moduleName);// request()->segment(1);
+        $currentModule = strtolower($this->moduleName); // request()->segment(1);
         $moduleNames = ['hr' => 'QuickHR'];
         $currentModuleName = $moduleNames[$currentModule] ?? 'QuickHR';
         $moduleIcons = ['hr' => 'fas fa-users'];
@@ -63,7 +63,10 @@
 
                 {{-- Constant Left shared items [Admin/HR and Dashboard] --}}
 
-                @if ($currentModule == 'hr' && auth()->user() &&  auth()->user()->hasAnyRole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES))
+                @if (
+                    $currentModule == 'hr' &&
+                        auth()->user() &&
+                        auth()->user()->hasAnyRole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES))
                     <li class="nav-item border-end-lg border-start-lg me" wire:key="nav-item-admin-dashboard">
                         <a href="/admin/dashboard" role="link"
                             class="btn btn-sm px-3 py-1 mx-3 mb-0 mt-1 rounded-pill btn-outline-primary">
@@ -236,9 +239,9 @@
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2 mt-2">
                         <li>
                             @auth
-                            <a class="dropdown-item border-radius-md mb-1" href="/hr/my-profile">
-                                <i class="fas fa-user-cog me-2 opacity-6 text-sm"></i> My Profile
-                            </a>
+                                <a class="dropdown-item border-radius-md mb-1" href="/hr/my-profile">
+                                    <i class="fas fa-user-cog me-2 opacity-6 text-sm"></i> My Profile
+                                </a>
                             @endauth
                         </li>
 

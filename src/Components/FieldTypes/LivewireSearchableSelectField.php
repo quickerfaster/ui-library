@@ -31,6 +31,10 @@ class LivewireSearchableSelectField implements FieldType
         ]);
     }
 
+
+    /**
+     * Override getInitialOptions to return combined labels.
+     */
     public function getInitialOptions($value): array
     {
         if (empty($value)) {
@@ -39,18 +43,26 @@ class LivewireSearchableSelectField implements FieldType
 
         if ($this->isRelationship()) {
             $rel = $this->definition['relationship'];
-            $model = $rel['model'];
-            $displayField = $rel['display_field'] ?? 'name';
+            $modelClass = $rel['model'];
+            $displayField = $this->getDisplayField();
+            $hintField = $this->getHintField();
             $multiple = $this->definition['multiSelect'] ?? false;
 
+            $query = $modelClass::query();
             if ($multiple && is_array($value)) {
-                return $model::whereIn('id', $value)->pluck($displayField, 'id')->toArray();
+                $records = $query->whereIn('id', $value)->get();
+                $result = [];
+                foreach ($records as $record) {
+                    $result[$record->id] = $this->getCombinedLabel($record);
+                }
+                return $result;
             } else {
-                $item = $model::find($value);
-                return $item ? [$value => $item->$displayField] : [];
+                $record = $query->find($value);
+                return $record ? [$record->id => $this->getCombinedLabel($record)] : [];
             }
         }
 
+        // Static options – hint field not applicable
         if (isset($this->definition['options'])) {
             $options = $this->definition['options'];
             if (is_array($value)) {
@@ -70,73 +82,135 @@ class LivewireSearchableSelectField implements FieldType
     }
 
 
+    /**
+     * Get the hint field name (if any) from the config.
+     */
+    protected function getHintField(): ?string
+    {
+        // First check inside 'relationship' (preferred), then fallback to 'options'
+        if ($this->isRelationship()) {
+            return $this->definition['relationship']['hint_field'] ?? null;
+        }
+        return $this->definition['options']['hintField'] ?? null;
+    }
+
+    /**
+     * Get the display field name.
+     */
+    protected function getDisplayField(): string
+    {
+        if ($this->isRelationship()) {
+            return $this->definition['relationship']['display_field'] ?? 'name';
+        }
+        return $this->definition['options']['column'] ?? 'name';
+    }
+
+    /**
+     * Build a combined label: "display (hint)" or just "display" if no hint.
+     */
+    protected function getCombinedLabel($model, $displayValue = null, $hintValue = null): string
+    {
+        if ($model && $this->isRelationship()) {
+            $displayField = $this->getDisplayField();
+            $displayValue = $model->$displayField ?? '';
+            $hintField = $this->getHintField();
+            $hintValue = $hintField ? ($model->$hintField ?? '') : null;
+        }
+        if (!empty($hintValue)) {
+            return "{$displayValue} ({$hintValue})";
+        }
+        return $displayValue;
+    }
+
+
 
 
     /**
- * Render the field for a table cell.
- */
-public function renderTable($value, $record): string
-{
-    $relName = $this->definition["relationship"]["dynamic_property"] ?? '';
-    
-    // If it's a many-to-many relationship, show badges
-    if ($this->isManyToMany() && $record && $record->relationLoaded($relName)) {
-        $related = $record->{$relName}; // use property, not method
-        
-        if ($related && $related->count() > 0) {
-            $badges = [];
-            foreach ($related as $item) {
-                $color = $item->color ?? 'secondary';
-                $name = $item->{$this->getDisplayField()};
-                $badges[] = "<span style = \" padding:0.3em 0.4em \" class=\"badge  badge-{$color} bg-gradient-{$color}\">{$name}</span>";
-            }
-            return implode(' ', $badges);
+     * Whether inline creation of new options is allowed.
+     */
+    public function canInlineAdd(): bool
+    {
+        if ($this->isRelationship()) {
+            return $this->definition['relationship']['inlineAdd'] ?? false;
         }
-        return '';
-    }
-
-    // Fallback to the existing label lookup
-    return $this->getLabelForValue($value);
-}
-
-/**
- * Render the field for a detail view.
- */
-public function renderDetail($value, $record): string
-{
-    // Same logic as table, but maybe with different styling? Reuse.
-    return $this->renderTable($value, $record);
-}
-
-
-
-/**
- * Check if the field represents a many-to-many relationship.
- */
-protected function isManyToMany(): bool
-{
-    $rel = $this->definition['relationship'] ?? null;
-    if (!$rel) {
         return false;
     }
-    $type = $rel['type'] ?? '';
-    return in_array($type, ['belongsToMany', 'morphToMany']);
-}
 
-/**
- * Get the display field from relationship config.
- */
-protected function getDisplayField(): string
-{
-    return $this->definition['relationship']['display_field'] ?? 'name';
-}
+    /**
+     * Get the searchable fields array (if defined), otherwise null.
+     */
+    public function getSearchableFields(): ?array
+    {
+        if ($this->isRelationship()) {
+            return $this->definition['relationship']['searchable_fields'] ?? null;
+        }
+        return null;
+    }
+
 
 
 
 
 
     /**
-     * Get the human‑readable label for a given value (ID or array of IDs).
+     * Render the field for a table cell.
+     */
+    public function renderTable($value, $record): string
+    {
+        $relName = $this->definition["relationship"]["dynamic_property"] ?? '';
+
+        // If it's a many-to-many relationship, show badges
+        if ($this->isManyToMany() && $record && $record->relationLoaded($relName)) {
+            $related = $record->{$relName}; // use property, not method
+
+            if ($related && $related->count() > 0) {
+                $badges = [];
+                foreach ($related as $item) {
+                    $color = $item->color ?? 'secondary';
+                    $name = $item->{$this->getDisplayField()};
+                    $badges[] = "<span style = \" padding:0.3em 0.4em \" class=\"badge  badge-{$color} bg-gradient-{$color}\">{$name}</span>";
+                }
+                return implode(' ', $badges);
+            }
+            return '';
+        }
+
+        // Fallback to the existing label lookup
+        return $this->getLabelForValue($value);
+    }
+
+    /**
+     * Render the field for a detail view.
+     */
+    public function renderDetail($value, $record): string
+    {
+        // Same logic as table, but maybe with different styling? Reuse.
+        return $this->renderTable($value, $record);
+    }
+
+
+
+    /**
+     * Check if the field represents a many-to-many relationship.
+     */
+    protected function isManyToMany(): bool
+    {
+        $rel = $this->definition['relationship'] ?? null;
+        if (!$rel) {
+            return false;
+        }
+        $type = $rel['type'] ?? '';
+        return in_array($type, ['belongsToMany', 'morphToMany']);
+    }
+
+
+
+
+
+
+
+    /**
+     * Override getLabelForValue (used in table/detail views).
      */
     protected function getLabelForValue($value): string
     {
@@ -144,20 +218,23 @@ protected function getDisplayField(): string
             return '';
         }
 
-        // Relationship lookup
         if ($this->isRelationship()) {
             $rel = $this->definition['relationship'];
-            $model = $rel['model'];
-            $displayField = $rel['display_field'] ?? 'name';
-
+            $modelClass = $rel['model'];
+            $displayField = $this->getDisplayField();
+            $hintField = $this->getHintField();
             $multiple = $this->definition['multiSelect'] ?? false;
 
             if ($multiple && is_array($value)) {
-                $items = $model::whereIn('id', $value)->pluck($displayField, 'id')->toArray();
-                return implode(', ', $items);
+                $records = $modelClass::whereIn('id', $value)->get();
+                $labels = [];
+                foreach ($records as $record) {
+                    $labels[] = $this->getCombinedLabel($record);
+                }
+                return implode(', ', $labels);
             } else {
-                $item = $model::find($value);
-                return $item ? $item->$displayField : e($value);
+                $record = $modelClass::find($value);
+                return $record ? $this->getCombinedLabel($record) : e($value);
             }
         }
 
@@ -174,7 +251,6 @@ protected function getDisplayField(): string
 
         return e($value);
     }
-
 
 
 

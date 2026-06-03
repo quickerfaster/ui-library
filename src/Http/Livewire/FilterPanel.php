@@ -595,14 +595,14 @@ class FilterPanel extends Component
             return;
         }
 
-        // For searchable selects, query the database directly
         if ($filter['searchable'] ?? false) {
             $fieldDef = $this->fieldDefinitions[$filter['field']] ?? [];
             $relation = $fieldDef['relationship'] ?? null;
             if ($relation && isset($relation['model'])) {
                 $model = $relation['model'];
-                $displayField = $relation['display_field'] ?? 'name';
-                $searchFields = $relation['search_fields'] ?? [$displayField];
+                $displayField = $this->getDisplayField($relation);
+                $hintField = $this->getHintField($relation, $fieldDef);
+                $searchFields = $this->getSearchableFields($relation, $fieldDef);
 
                 $query = $model::query();
                 $search = trim($value);
@@ -615,7 +615,8 @@ class FilterPanel extends Component
                     $items = $query->limit(50)->get();
                     $results = [];
                     foreach ($items as $item) {
-                        $results[$item->id] = $item->$displayField;
+                        $label = $this->buildCombinedLabel($item, $displayField, $hintField);
+                        $results[$item->id] = $label;
                     }
                     $this->searchResults[$index] = $results;
                 } else {
@@ -624,6 +625,7 @@ class FilterPanel extends Component
                 return;
             }
         }
+
 
         // Fallback for non‑searchable selects (original behaviour)
         $options = $filter['options'] ?? [];
@@ -718,18 +720,23 @@ class FilterPanel extends Component
             $isMulti = $filter['multi'] ?? false;
             $isSearchable = $filter['searchable'] ?? false;
 
-            // For searchable selects, fetch from DB dynamically
-            if ($isSearchable && ($isMulti || !$isMulti)) {
+            if ($isSearchable) {
                 $fieldDef = $this->fieldDefinitions[$filter['field']] ?? [];
                 $relation = $fieldDef['relationship'] ?? null;
                 if ($relation && isset($relation['model'])) {
                     $model = $relation['model'];
-                    $displayField = $relation['display_field'] ?? 'name';
+                    $displayField = $this->getDisplayField($relation);
+                    $hintField = $this->getHintField($relation, $fieldDef);
                     $ids = $isMulti ? (array) $value : [$value];
                     $ids = array_filter($ids);
                     if (!empty($ids)) {
-                        $records = $model::whereIn('id', $ids)->pluck($displayField, 'id')->toArray();
-                        $this->selectedLabels[$index] = $records;
+                        $records = $model::whereIn('id', $ids)->get();
+                        $labels = [];
+                        foreach ($records as $record) {
+                            $label = $this->buildCombinedLabel($record, $displayField, $hintField);
+                            $labels[$record->id] = $label;
+                        }
+                        $this->selectedLabels[$index] = $labels;
                     } else {
                         $this->selectedLabels[$index] = [];
                     }
@@ -752,6 +759,71 @@ class FilterPanel extends Component
         }
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+    /**
+     * Get the display field for a relationship-based filter.
+     */
+    protected function getDisplayField(array $relation): string
+    {
+        return $relation['display_field'] ?? 'name';
+    }
+
+    /**
+     * Get the hint field for a relationship-based filter (if any).
+     * Checks both 'relationship' and 'options' arrays.
+     */
+    protected function getHintField(array $relation, array $fieldDef): ?string
+    {
+        // Priority: relationship > options
+        if (!empty($relation['hint_field'])) {
+            return $relation['hint_field'];
+        }
+        return $fieldDef['options']['hintField'] ?? null;
+    }
+
+    /**
+     * Get searchable fields for a relationship-based filter.
+     * Returns an array of column names.
+     * Checks 'searchable_fields' in relationship, or falls back to display + hint.
+     */
+    protected function getSearchableFields(array $relation, array $fieldDef): array
+    {
+        // 1. Explicit searchable_fields in relationship
+        if (!empty($relation['searchable_fields'])) {
+            return $relation['searchable_fields'];
+        }
+        // 2. Fallback: display field + optional hint field
+        $displayField = $this->getDisplayField($relation);
+        $hintField = $this->getHintField($relation, $fieldDef);
+        $fields = [$displayField];
+        if ($hintField) {
+            $fields[] = $hintField;
+        }
+        return $fields;
+    }
+
+    /**
+     * Build a combined label: "display (hint)" or just "display".
+     */
+    protected function buildCombinedLabel($model, string $displayField, ?string $hintField = null): string
+    {
+        $displayValue = $model->$displayField ?? '';
+        if ($hintField && !empty($model->$hintField)) {
+            return "{$displayValue} ({$model->$hintField})";
+        }
+        return $displayValue;
+    }
 
 
 

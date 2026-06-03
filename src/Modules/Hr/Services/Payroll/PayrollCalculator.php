@@ -132,7 +132,8 @@ class PayrollCalculator
 
         foreach ($oneTime as $adj) {
             $amount = $adj->amount;
-            if ($amount == 0) continue;
+            if ($amount == 0)
+                continue;
 
             switch (strtolower($adj->type)) {
                 case 'bonus':
@@ -265,8 +266,14 @@ class PayrollCalculator
 
         // Merge fields: child takes precedence, fallback to parent
         $fieldsToMerge = [
-            'calculation_logic', 'effect', 'employer_ratio', 'is_statutory',
-            'country_code', 'state_code', 'type', 'name'
+            'calculation_logic',
+            'effect',
+            'employer_ratio',
+            'is_statutory',
+            'country_code',
+            'state_code',
+            'type',
+            'name'
         ];
         foreach ($fieldsToMerge as $field) {
             if (empty($effective->$field) && !is_null($effectiveParent->$field)) {
@@ -315,19 +322,19 @@ class PayrollCalculator
 
                 $q->where(function ($q2) use ($companyId) {
                     $q2->where('assignable_type', 'App\Modules\Admin\Models\Company')
-                       ->where('assignable_id', $companyId);
+                        ->where('assignable_id', $companyId);
                 })->orWhere(function ($q2) use ($locationId) {
                     $q2->where('assignable_type', 'App\Modules\Admin\Models\Location')
-                       ->where('assignable_id', $locationId);
+                        ->where('assignable_id', $locationId);
                 })->orWhere(function ($q2) use ($departmentId) {
                     $q2->where('assignable_type', 'App\Modules\Admin\Models\Department')
-                       ->where('assignable_id', $departmentId);
+                        ->where('assignable_id', $departmentId);
                 })->orWhere(function ($q2) use ($shiftId) {
                     $q2->where('assignable_type', 'App\Modules\Admin\Models\Shift')
-                       ->where('assignable_id', $shiftId);
+                        ->where('assignable_id', $shiftId);
                 })->orWhere(function ($q2) use ($employeeGroupId) {
                     $q2->where('assignable_type', 'App\Modules\Hr\Models\EmployeeGroup')
-                       ->where('assignable_id', $employeeGroupId);
+                        ->where('assignable_id', $employeeGroupId);
                 });
             })
             ->where('effective_date', '<=', $this->run->period_end)
@@ -339,12 +346,12 @@ class PayrollCalculator
 
         // 2. Get IDs of policies that have ANY assignment (not just those that match this employee)
         $assignedPolicyIds = PayrollPolicyAssignment::whereIn('assignable_type', [
-                'App\Modules\Admin\Models\Company',
-                'App\Modules\Admin\Models\Location',
-                'App\Modules\Admin\Models\Department',
-                'App\Modules\Admin\Models\Shift',
-                'App\Modules\Hr\Models\EmployeeGroup',
-            ])
+            'App\Modules\Admin\Models\Company',
+            'App\Modules\Admin\Models\Location',
+            'App\Modules\Admin\Models\Department',
+            'App\Modules\Admin\Models\Shift',
+            'App\Modules\Hr\Models\EmployeeGroup',
+        ])
             ->where('effective_date', '<=', $this->run->period_end)
             ->where(function ($q) {
                 $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $this->run->period_start);
@@ -399,7 +406,8 @@ class PayrollCalculator
                     $taxable = min($remaining, $bandLimit);
                     $tax += $taxable * $rate;
                     $remaining -= $taxable;
-                    if ($remaining <= 0) break;
+                    if ($remaining <= 0)
+                        break;
                 }
                 $amount = $tax / 12;
                 break;

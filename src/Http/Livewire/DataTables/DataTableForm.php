@@ -360,9 +360,11 @@ class DataTableForm extends Component
 
 
 
+
+    // DataTableForm.php
+
     public function updatedSearches($value, $field)
     {
-        // When search query changes, fetch matching options
         $definition = $this->fieldDefinitions[$field] ?? null;
         if (!$definition)
             return;
@@ -373,19 +375,42 @@ class DataTableForm extends Component
             $rel = $definition['relationship'];
             $model = $rel['model'];
             $displayField = $rel['display_field'] ?? 'name';
-            $searchFields = $rel['search_fields'] ?? [$displayField];
+            $hintField = $rel['hint_field'] ?? ($definition['options']['hintField'] ?? null);
+
+            // Priority: use searchable_fields if provided
+            $searchableFields = $rel['searchable_fields'] ?? null;
 
             $query = $model::query();
-            $query->where(function ($q) use ($searchFields, $value) {
-                foreach ($searchFields as $sf) {
-                    $q->orWhere($sf, 'LIKE', '%' . $value . '%');
-                }
-            });
+
+            if (is_array($searchableFields) && !empty($searchableFields)) {
+                // Use exact searchable fields
+                $query->where(function ($q) use ($searchableFields, $value) {
+                    foreach ($searchableFields as $sf) {
+                        $q->orWhere($sf, 'LIKE', "%{$value}%");
+                    }
+                });
+            } else {
+                // Fallback: display field + optional hint field
+                $query->where(function ($q) use ($displayField, $hintField, $value) {
+                    $q->where($displayField, 'LIKE', "%{$value}%");
+                    if ($hintField) {
+                        $q->orWhere($hintField, 'LIKE', "%{$value}%");
+                    }
+                });
+            }
+
             $items = $query->limit(50)->get();
+
             foreach ($items as $item) {
-                $results[$item->id] = $item->$displayField;
+                // Build combined label (same as before)
+                $label = $item->$displayField;
+                if ($hintField && !empty($item->$hintField)) {
+                    $label .= " ({$item->$hintField})";
+                }
+                $results[$item->id] = $label;
             }
         } elseif (isset($definition['options'])) {
+            // Static options – unchanged
             $options = $definition['options'];
             foreach ($options as $id => $label) {
                 if (stripos($label, $value) !== false) {
@@ -433,6 +458,8 @@ class DataTableForm extends Component
      */
 
 
+    // DataTableForm.php
+
     public function createAndSelectOption($field, $newValue)
     {
         $definition = $this->fieldDefinitions[$field] ?? null;
@@ -440,39 +467,61 @@ class DataTableForm extends Component
             return;
         }
 
+        // Check if inline creation is allowed
+        $inlineAdd = $definition['relationship']['inlineAdd'] ?? false;
+        if (!$inlineAdd) {
+            // Optionally dispatch a message or just silently ignore
+            return;
+        }
+
         $rel = $definition['relationship'];
         $modelClass = $rel['model'];
         $displayField = $rel['display_field'] ?? 'name';
 
-        // Create new record (ensure fillable fields are allowed)
-        $newRecord = $modelClass::create([
-            $displayField => $newValue,
-            'slug' => \Illuminate\Support\Str::slug($newValue),
-            'color' => 'primary',
-            'is_active' => true,
-        ]);
+        // Create new record – ensure fillable fields are allowed
+        // You might want to customize which fields are set. For simplicity:
+        $fillable = (new $modelClass)->getFillable();
+        $data = [];
+        if (in_array($displayField, $fillable)) {
+            $data[$displayField] = $newValue;
+        }
+        // Optionally set slug, color, is_active if they exist in fillable
+        if (in_array('slug', $fillable)) {
+            $data['slug'] = \Illuminate\Support\Str::slug($newValue);
+        }
+        if (in_array('color', $fillable)) {
+            $data['color'] = 'primary';
+        }
+        if (in_array('is_active', $fillable)) {
+            $data['is_active'] = true;
+        }
+
+        $newRecord = $modelClass::create($data);
 
         $multiple = $definition['multiSelect'] ?? false;
+        $hintField = $rel['hint_field'] ?? ($definition['options']['hintField'] ?? null);
+        $label = $newRecord->$displayField;
+        if ($hintField && !empty($newRecord->$hintField)) {
+            $label .= " ({$newRecord->$hintField})";
+        }
 
         if ($multiple) {
             $currentIds = $this->fields[$field] ?? [];
-            // Ensure all IDs are integers
             $currentIds = array_map('intval', $currentIds);
             if (!in_array($newRecord->id, $currentIds)) {
                 $currentIds[] = $newRecord->id;
                 $this->fields[$field] = $currentIds;
-                $this->selectedLabels[$field][$newRecord->id] = $newRecord->$displayField;
+                $this->selectedLabels[$field][$newRecord->id] = $label;
             }
         } else {
             $this->fields[$field] = $newRecord->id;
-            $this->selectedLabels[$field] = [$newRecord->id => $newRecord->$displayField];
+            $this->selectedLabels[$field] = [$newRecord->id => $label];
         }
 
         // Clear search
         $this->searches[$field] = '';
         $this->searchResults[$field] = [];
     }
-
 
 
 
