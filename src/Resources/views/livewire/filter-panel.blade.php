@@ -97,10 +97,40 @@
                                 @switch($filter['type'])
                                     @case('select')
                                         @if ($filter['multi'] ?? false)
-                                            {{-- Multi‑select searchable (already has search, badges, etc.) --}}
+                                            {{-- Multi‑select searchable --}}
                                             <div class="w-100">
-                                                {{-- Your existing multi‑select searchable UI --}}
-                                                {{-- (It should not contain an operator dropdown) --}}
+                                                {{-- Selected badges --}}
+                                                @if (!empty($selectedLabels[$index]))
+                                                    <div class="selected-items mb-2">
+                                                        @foreach ($selectedLabels[$index] as $id => $labelText)
+                                                            <span class="badge bg-primary me-1">
+                                                                {{ $labelText }}
+                                                                <button type="button" class="btn-close btn-close-white ms-1"
+                                                                    wire:click="removeSelected({{ $index }}, {{ $id }})"
+                                                                    style="font-size: 0.5rem;"></button>
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+
+                                                {{-- Search input --}}
+                                                <input type="text" class="form-control" placeholder="Search..."
+                                                    wire:model.live.debounce.300ms="searches.{{ $index }}">
+
+                                                {{-- Results dropdown --}}
+                                                @if (!empty($searches[$index]) && !empty($searchResults[$index]))
+                                                    <ul class="list-group mt-1" style="max-height: 200px; overflow-y: auto;">
+                                                        @foreach ($searchResults[$index] as $id => $resultLabel)
+                                                            <li class="list-group-item list-group-item-action"
+                                                                wire:click="selectOption({{ $index }}, {{ $id }}, '{{ addslashes($resultLabel) }}')"
+                                                                style="cursor: pointer;">
+                                                                {{ $resultLabel }}
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                @elseif(!empty($searches[$index]) && strlen($searches[$index]) >= 2 && empty($searchResults[$index]))
+                                                    <div class="mt-1 text-muted small">No matches found</div>
+                                                @endif
                                             </div>
                                         @else
                                             @if ($filter['searchable'] ?? false)

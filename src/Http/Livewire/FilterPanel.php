@@ -300,8 +300,7 @@ class FilterPanel extends Component
                 'operators' => $operators,
                 'defaultOperator' => $defaultOperator,
                 'multi' => $definition['multiSelect'] ?? false,
-                'searchable' => $isSearchableSelect,   // <-- add this
-
+                'searchable' => $isSearchableSelect,  
             ];
 
             // If many‑to‑many, force multi = true and replace operators with 'in'
