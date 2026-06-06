@@ -7,11 +7,15 @@ use Livewire\Component;
 class PolicyCalculationBuilder extends Component
 {
     public string $policyType = 'benefit';
-    public ?string $existingJson = null;
+    public ?string $existingJson = null;  // only used for tax policies now
 
+    // For tax
     public array $bands = [];
-    public string $calcType = 'percentage';
-    public float $calcValue = 0;
+
+    // For non‑tax (new structure)
+    public string $calculationType = 'percentage';
+    public float $employeeValue = 0;
+    public float $employerValue = 0;
 
     protected $listeners = [
         'parentPolicyTypeChanged' => 'setPolicyType',
@@ -34,7 +38,7 @@ class PolicyCalculationBuilder extends Component
     public function addBand(): void
     {
         $this->bands[] = ['limit' => '', 'rate' => ''];
-        $this->updatedBands(); // trigger save
+        $this->updatedBands();
     }
 
     public function removeBand(int $index): void
@@ -47,21 +51,26 @@ class PolicyCalculationBuilder extends Component
         $this->updatedBands();
     }
 
-    // Called automatically when $bands changes (via wire:model.live)
     public function updatedBands(): void
     {
         $this->updateParent();
     }
 
-    public function updatedCalcValue(): void
+    // ---------- Non‑Tax Methods ----------
+    public function updatedCalculationType(): void
     {
-        $this->calcValue = $this->calcValue ?? 0.0; // To avoid empty null value error
-
         $this->updateParent();
     }
 
-    public function updatedCalcType(): void
+    public function updatedEmployeeValue(): void
     {
+        $this->employeeValue = $this->employeeValue ?? 0;
+        $this->updateParent();
+    }
+
+    public function updatedEmployerValue(): void
+    {
+        $this->employerValue = $this->employerValue ?? 0;
         $this->updateParent();
     }
 
@@ -95,8 +104,10 @@ class PolicyCalculationBuilder extends Component
                 }, $rawBands);
             }
         } else {
-            $this->calcType = $data['type'] ?? 'percentage';
-            $this->calcValue = $data['value'] ?? 0;
+            // Load from new structure
+            $this->calculationType = $data['calculation_type'] ?? 'percentage';
+            $this->employeeValue = $data['employee_value'] ?? 0;
+            $this->employerValue = $data['employer_value'] ?? 0;
         }
     }
 
@@ -105,8 +116,9 @@ class PolicyCalculationBuilder extends Component
         if ($this->policyType === 'tax') {
             $this->bands = [['limit' => '', 'rate' => '']];
         } else {
-            $this->calcType = 'percentage';
-            $this->calcValue = 0;
+            $this->calculationType = 'percentage';
+            $this->employeeValue = 0;
+            $this->employerValue = 0;
         }
         $this->updateParent();
     }
@@ -118,23 +130,21 @@ class PolicyCalculationBuilder extends Component
             foreach ($this->bands as $band) {
                 $limit = isset($band['limit']) && $band['limit'] !== '' ? (float) $band['limit'] : null;
                 $rate = isset($band['rate']) && $band['rate'] !== '' ? (float) $band['rate'] : null;
-
-                // Skip row if both limit and rate are empty/zero
                 if (($limit === null || $limit == 0) && ($rate === null || $rate == 0)) {
                     continue;
                 }
-
                 $cleanBands[] = [(float) $limit, (float) $rate];
             }
-
             if (empty($cleanBands)) {
                 $cleanBands = [[0, 0]];
             }
             return json_encode(['bands' => $cleanBands]);
         } else {
+            // New structure
             return json_encode([
-                'type' => $this->calcType,
-                'value' => floatval($this->calcValue),
+                'calculation_type' => $this->calculationType,
+                'employee_value' => (float) $this->employeeValue,
+                'employer_value' => (float) $this->employerValue,
             ]);
         }
     }

@@ -1,13 +1,12 @@
 @php
     // Find employee linked to the logged-in user
-    $employee = App\Modules\Hr\Models\Employee::where('user_id', Auth::id())->first(); //->firstOrFail();
-    if (!$employee) {
-        abort(403, 'You have not been enrolled. Please contact HR.');
+    //$user = App\Modules\Admin\Models\User::find(Auth::id())->first(); //->firstOrFail();
+    if (!auth()->user()) {
+        abort(403, 'You are not assigned login record. Please contact HR Office.');
     }
 
-    $recordId = $employee->id;
+    // $recordId = $user->id;
     $returnParams = []; // no table state needed
-    $customComponent = 'qf.employee-detail';
 
 @endphp
 
@@ -18,5 +17,5 @@
     'titleRow' => ['enabled' => false],
     'context_menu' => ['enabled' => false],
 ]">
-    @livewire($customComponent, ['inline' => false, 'recordId' => $recordId, 'configKey' => 'hr.employee', 'returnParams' => $returnParams])
+    @livewire("qf.data-table-form", ['inline' => false, 'recordId' => auth()->user()->id, 'configKey' => 'admin.user', 'returnParams' => $returnParams])
 </x-qf::navigation-layout>

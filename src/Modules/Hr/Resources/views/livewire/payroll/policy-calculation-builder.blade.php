@@ -41,23 +41,46 @@
             <label class="form-label fw-bold">Calculation Type</label>
             <div class="mb-2">
                 <div class="form-check form-check-inline">
-                    <input type="radio" id="fixed" value="fixed" wire:model.live="calcType" class="form-check-input">
-                    <label class="form-check-label" for="fixed">Fixed amount</label>
+                    <input type="radio" id="fixed" value="fixed" wire:model.live="calculationType" class="form-check-input">
+                    <label class="form-check-label" for="fixed">Fixed amount (per pay period)</label>
                 </div>
                 <div class="form-check form-check-inline">
-                    <input type="radio" id="percentage" value="percentage" wire:model.live="calcType" class="form-check-input">
+                    <input type="radio" id="percentage" value="percentage" wire:model.live="calculationType" class="form-check-input">
                     <label class="form-check-label" for="percentage">Percentage of salary</label>
                 </div>
             </div>
-            <div class="input-group">
-                <span class="input-group-text">
-                    @if($calcType === 'fixed')
-                        <i class="fas fa-dollar-sign"></i>
-                    @else
-                        <i class="fas fa-percent"></i>
-                    @endif
-                </span>
-                <input type="number" step="any" class="form-control" wire:model.live.debounce.1000ms="calcValue" placeholder="0.00">
+
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Employee Contribution</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            @if($calculationType === 'fixed')
+                                <i class="fas fa-dollar-sign"></i>
+                            @else
+                                <i class="fas fa-percent"></i>
+                            @endif
+                        </span>
+                        <input type="number" step="any" class="form-control"
+                               wire:model.live.debounce.1000ms="employeeValue" placeholder="0.00">
+                    </div>
+                    <small class="text-muted">The amount deducted from employee's pay.</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Employer Contribution</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            @if($calculationType === 'fixed')
+                                <i class="fas fa-dollar-sign"></i>
+                            @else
+                                <i class="fas fa-percent"></i>
+                            @endif
+                        </span>
+                        <input type="number" step="any" class="form-control"
+                               wire:model.live.debounce.1000ms="employerValue" placeholder="0.00">
+                    </div>
+                    <small class="text-muted">The amount paid by the employer (informational).</small>
+                </div>
             </div>
         </div>
     @endif

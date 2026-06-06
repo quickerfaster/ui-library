@@ -245,6 +245,14 @@
                             @endauth
                         </li>
 
+                        <li>
+                            @auth
+                                <a class="dropdown-item border-radius-md mb-1" href="/hr/my-account">
+                                    <i class="fas fa-user-edit me-2 opacity-6 text-sm"></i> Edit My User Account
+                                </a>
+                            @endauth
+                        </li>
+
                         {{-- Responsive "Take Tour" Link: Hidden on mobile, visible on desktop --}}
                         <li class="d-none d-md-block">
                             <a class="dropdown-item border-radius-md mb-1" href="{{ route('tour.restart') }}">

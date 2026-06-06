@@ -932,9 +932,10 @@ class DataTableForm extends Component
                 $this->addError('calculation_logic', 'At least one tax bracket with a positive limit or rate is required.');
             }
         } else {
-            $value = $data['value'] ?? 0;
-            if ($value <= 0) {
-                $this->addError('calculation_logic', 'Please enter a positive value (percentage or fixed amount).');
+            $employeeValue = $data['employee_value'] ?? 0;
+            $employerValue = $data['employer_value'] ?? 0;
+            if ($employeeValue <= 0 && $employerValue <= 0) {
+                $this->addError('calculation_logic', 'At least one of Employee or Employer contribution must be positive.');
             }
         }
     }

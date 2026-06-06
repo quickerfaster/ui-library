@@ -2,7 +2,7 @@
 
 namespace App\Modules\Admin\Services;
 
-use App\Models\User;
+use App\Modules\Admin\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -59,8 +59,8 @@ class AuthorizationService
             return $user->hasAnyRole(self::ADMIN_ROLES);
         }
 
-        // Public views that don't require permission
-        if (in_array($view, ['dashboard', 'my-profile'])) {
+        // Public views that don't require permission or belongs to the user
+        if (in_array($view, ['dashboard', 'my-profile', 'my-account'])) {
             return true;
         }
 
@@ -142,51 +142,61 @@ class AuthorizationService
 
 
 
-public function canBulkDelete($user, string $modelClass): bool
-{
-    if (!$user) return false;
-    if ($this->isBypassAllowed($user)) return true;
-    $modelName = $this->getModelNameFromClassName($modelClass);
-    return $user->can('delete_' . $modelName);
-}
+    public function canBulkDelete($user, string $modelClass): bool
+    {
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
+        $modelName = $this->getModelNameFromClassName($modelClass);
+        return $user->can('delete_' . $modelName);
+    }
 
 
 
-public function canBulkRestore($user, string $modelClass): bool
-{
-    if (!$user) return false;
-    if ($this->isBypassAllowed($user)) return true;
-    $modelName = $this->getModelNameFromClassName($modelClass);
-    return $user->can('restore_' . $modelName);
-}
+    public function canBulkRestore($user, string $modelClass): bool
+    {
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
+        $modelName = $this->getModelNameFromClassName($modelClass);
+        return $user->can('restore_' . $modelName);
+    }
 
 
-public function canBulkForceDelete($user, string $modelClass): bool
-{
-    if (!$user) return false;
-    if ($this->isBypassAllowed($user)) return true;
-    $modelName = $this->getModelNameFromClassName($modelClass);
-    return $user->can('force_delete_' . $modelName);
-}
+    public function canBulkForceDelete($user, string $modelClass): bool
+    {
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
+        $modelName = $this->getModelNameFromClassName($modelClass);
+        return $user->can('force_delete_' . $modelName);
+    }
 
 
 
-public function canBulkExport($user, string $modelClass): bool
-{
-    if (!$user) return false;
-    if ($this->isBypassAllowed($user)) return true;
-    $modelName = $this->getModelNameFromClassName($modelClass);
-    return $user->can('export_' . $modelName);
-}
+    public function canBulkExport($user, string $modelClass): bool
+    {
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
+        $modelName = $this->getModelNameFromClassName($modelClass);
+        return $user->can('export_' . $modelName);
+    }
 
 
-public function canBulkUpdate($user, string $modelClass): bool
-{
-    if (!$user) return false;
-    if ($this->isBypassAllowed($user)) return true;
-    $modelName = $this->getModelNameFromClassName($modelClass);
-    return $user->can('edit_' . $modelName);
-}
+    public function canBulkUpdate($user, string $modelClass): bool
+    {
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
+        $modelName = $this->getModelNameFromClassName($modelClass);
+        return $user->can('edit_' . $modelName);
+    }
 
 
 
@@ -218,7 +228,7 @@ public function canBulkUpdate($user, string $modelClass): bool
 
         // For other actions, resolve the record
         $record = $this->resolveRecord($recordOrId, $modelClass);
-        $can = match($action) {
+        $can = match ($action) {
             'view' => $this->canView($user, $record),
             'edit', 'update' => $this->canUpdate($user, $record),
             'delete' => $this->canDelete($user, $record),
@@ -277,8 +287,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canView($user, $record): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $action = ['requiredPermission' => 'view_' . $this->getModelNameFromRecord($record)];
         return $this->canPerformAction($user, $action, $record);
     }
@@ -289,8 +301,10 @@ public function canBulkUpdate($user, string $modelClass): bool
     public function canUpdate($user, $record): bool
     {
         // Note that "update" is represented by "edit"
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $action = ['requiredPermission' => 'edit_' . $this->getModelNameFromRecord($record)];
         return $this->canPerformAction($user, $action, $record);
     }
@@ -300,8 +314,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canDelete($user, $record): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $action = ['requiredPermission' => 'delete_' . $this->getModelNameFromRecord($record)];
         return $this->canPerformAction($user, $action, $record);
     }
@@ -311,8 +327,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canCreate($user, string $modelClass): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $modelName = $this->getModelNameFromClassName($modelClass);
         return $user->can('create_' . $modelName);
     }
@@ -322,8 +340,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canExport($user, string $modelClass): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $modelName = $this->getModelNameFromClassName($modelClass);
         return $user->can('export_' . $modelName);
     }
@@ -333,8 +353,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canImport($user, string $modelClass): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $modelName = $this->getModelNameFromClassName($modelClass);
         return $user->can('import_' . $modelName);
     }
@@ -344,8 +366,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canPrint($user, string $modelClass): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $modelName = $this->getModelNameFromClassName($modelClass);
         return $user->can('print_' . $modelName);
     }
@@ -355,8 +379,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canRestore($user, string $modelClass): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $modelName = $this->getModelNameFromClassName($modelClass);
         return $user->can('restore_' . $modelName);
     }
@@ -366,8 +392,10 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     public function canForceDelete($user, string $modelClass): bool
     {
-        if (!$user) return false;
-        if ($this->isBypassAllowed($user)) return true;
+        if (!$user)
+            return false;
+        if ($this->isBypassAllowed($user))
+            return true;
         $modelName = $this->getModelNameFromClassName($modelClass);
         return $user->can('forceDelete_' . $modelName);
     }
@@ -425,6 +453,13 @@ public function canBulkUpdate($user, string $modelClass): bool
      */
     private function isInUserScope(User $user, $row): bool
     {
+
+        // Allow user related data such as profile
+        if (method_exists($row, 'getTable') && $row->getTable() === 'users' && $user->id === $row->id) {
+            return true;
+        }
+
+
         $employeeId = $row->employee_id ?? $row->id;
 
         if ($user->hasRole('employee')) {
