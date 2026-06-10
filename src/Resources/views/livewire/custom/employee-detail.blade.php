@@ -535,6 +535,22 @@
                          </div>
                      @endif
 
+
+
+@if ($activeTab === 'payslips')
+    @livewire('qf.data-table', [
+        'configKey' => 'hr.payroll_payslip',
+        'queryFilters' => [['employee_id', '=', $employee->id]],
+        'simpleActions' => ['show'],
+        'moreActions' => [
+            ['title' => 'View Items', 'icon' => 'fas fa-list', 'route' => 'payroll-payslips.items', 'params' => ['id' => '{id}']]
+        ]
+    ], key('payslips-'.$recordId))
+@endif
+
+
+
+
                      {{-- Work Patterns Tab --}}
                      @if ($activeTab == 'workpatterns')
                          <div class="card border-0 shadow-sm">

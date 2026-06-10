@@ -5,10 +5,11 @@ namespace QuickerFaster\UILibrary\Widgets;
 
 use Illuminate\Support\Facades\DB;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
+use QuickerFaster\UILibrary\Traits\Widgets\HandlesRelationshipGroupBy;
 
 class ChartWidgetProcessor
 {
-    use ResolvesDateStrings;
+    use HandlesRelationshipGroupBy, ResolvesDateStrings;
 
     public function process(array $definition): array
     {
@@ -50,16 +51,18 @@ class ChartWidgetProcessor
                 $aggregate = $definition['aggregate'] ?? 'count';
                 $field = $definition['field'] ?? '*';
 
-                $results = $query->select($groupBy, DB::raw("$aggregate($field) as value"))
-                    ->groupBy($groupBy)
-                    ->get();
+                // Use the trait method to build the group by expression
+                $groupExpression = $this->applyGroupByWithRelations($query, $groupBy, 'group_label');
+                $query->select(DB::raw($groupExpression), DB::raw("$aggregate($field) as value"));
+
+                $results = $query->get();
 
                 foreach ($results as $row) {
-                    $labels[] = $row->$groupBy;
+                    $labels[] = $row->group_label;
                     $values[] = $row->value;
                 }
             }
-            
+
             $chartData = [
                 'labels' => $labels,
                 'datasets' => [

@@ -8,6 +8,7 @@ use App\Modules\Hr\Services\Payroll\PayrollCalculator;
 use Illuminate\Support\Facades\DB;
 use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 
 
@@ -28,6 +29,8 @@ class PayrollRunDetail extends Component
         'markPaid' => 'markPaid',
         'cancelRun' => 'cancel',
         'recalculate' => 'recalculate',
+        'forceGenerateBankFile' => 'forceGenerateBankFile',
+        'cancelBankFile' => 'cancelBankFile',
     ];
 
     public function mount(int $recordId, string $configKey, array $returnParams = []): void
@@ -45,6 +48,7 @@ class PayrollRunDetail extends Component
             'overview' => ['title' => 'Overview', 'icon' => 'fas fa-info-circle'],
             'payslips' => ['title' => 'Payslips', 'icon' => 'fas fa-receipt'],
             'adjustments' => ['title' => 'Adjustments', 'icon' => 'fas fa-edit'],
+            'reconciliation' => ['title' => 'Reconciliation', 'icon' => 'fas fa-check-double'],
             'audit' => ['title' => 'Audit', 'icon' => 'fas fa-history'],
         ];
     }
@@ -214,6 +218,163 @@ class PayrollRunDetail extends Component
             'params' => $params,
         ]);
     }
+
+
+
+public function generateBankFile(): void
+{
+    $this->run->load(['payslips.employee.employeePayrollProfile', 'paySchedule']);
+
+    // Group missing details by field combination
+    $missingGroups = [];
+    $employeeNames = [];
+
+    foreach ($this->run->payslips as $payslip) {
+        $employee = $payslip->employee;
+        $profile = $employee->payrollProfile;
+        $country = $this->run->paySchedule->country_code ?? 'US';
+
+        $missing = [];
+        if ($country === 'US' && empty($profile->bank_routing_number)) {
+            $missing[] = 'Routing Number';
+        }
+        if (in_array($country, ['US', 'UK', 'NG']) && empty($profile->bank_account_number)) {
+            $missing[] = 'Account Number';
+        }
+        if ($country === 'UK' && empty($profile->bank_sort_code)) {
+            $missing[] = 'Sort Code';
+        }
+        if ($country === 'NG' && empty($profile->bank_code)) {
+            $missing[] = 'Bank Code';
+        }
+        if (!empty($missing)) {
+            $key = implode(', ', $missing);
+            $missingGroups[$key][] = $employee;
+        }
+    }
+
+    if (empty($missingGroups)) {
+        // No missing details – proceed
+        $this->forceGenerateBankFile();
+        return;
+    }
+
+    // Build a human‑readable message
+    $totalMissing = array_sum(array_map('count', $missingGroups));
+    $fieldList = implode(' & ', array_keys($missingGroups));
+    $message = "{$totalMissing} employee(s) are missing {$fieldList}. ";
+
+    if ($totalMissing <= 5) {
+        // Show all names
+        $names = [];
+        foreach ($missingGroups as $employees) {
+            foreach ($employees as $emp) {
+                $names[] = $emp->full_name ?? "{$emp->first_name} {$emp->last_name}";
+            }
+        }
+        $message .= "Affected: " . implode(', ', $names) . ". ";
+    } else {
+        // Show first 5
+        $sample = [];
+        foreach ($missingGroups as $employees) {
+            foreach (array_slice($employees, 0, 5) as $emp) {
+                $sample[] = $emp->full_name ?? "{$emp->first_name} {$emp->last_name}";
+            }
+            if (count($sample) >= 5) break;
+        }
+        $message .= "Example: " . implode(', ', array_slice($sample, 0, 5)) . " and " . ($totalMissing - 5) . " more. ";
+    }
+
+    $message .= "The bank file will skip these employees. Please update their payroll profiles and try again.";
+
+    $this->dispatch('showAlert', [
+        'type' => 'confirm',
+        'title' => 'Missing Bank Details',
+        'message' => $message,
+        'confirmText' => 'Continue Anyway (Skip Missing)',
+        'cancelText' => 'Cancel & Fix Profiles',
+        'confirmEvent' => 'forceGenerateBankFile',
+        'cancelEvent' => 'cancelBankFile',
+    ]);
+}
+
+public function forceGenerateBankFile(): void
+{
+    $this->dispatch('open-url-new-tab', route('payroll.bank-file', $this->run->id));
+}
+
+public function cancelBankFile(): void
+{
+    // Do nothing – user cancelled
+}
+
+
+
+public function exportSummaryPdf()
+{
+    $this->dispatch('open-url-new-tab', route('payroll-run.summary-pdf', $this->run->id));
+}
+
+
+public function queueSummaryPdf()
+{
+    $currencyCode = $this->run->paySchedule->currency_code ?? 'USD';
+    $currencySymbol = $this->getCurrencySymbol($currencyCode);
+    $companyName = optional($this->run->paySchedule->company)->name ?? config('app.name');
+
+    // Create an export record (similar to ExportController::queueExport)
+    $export = \QuickerFaster\UILibrary\Models\Export::create([
+        'user_id' => auth()->id(),
+        'config_key' => 'hr.payroll_payslip', // dummy, not used for this custom export
+        'filters' => ['payroll_run_id' => $this->run->id],
+        'columns' => [],
+        'format' => 'pdf',
+        'options' => [
+            'custom_view' => 'hr::livewire.payroll.exports.payroll_run_summary_pdf',
+            'run_id' => $this->run->id,
+            'currency_symbol' => $currencySymbol,
+            'company_name' => $companyName,
+        ],
+        'status' => 'pending',
+    ]);
+
+    // Dispatch a custom job that uses the export ID
+    \App\Modules\Hr\Jobs\Payrolls\GeneratePayrollRunSummaryPdf::dispatch($export->id);
+
+    // Open the export modal (same as data table exports)
+    $this->dispatch('openExportModal', [
+        'configKey' => 'hr.payroll_payslip',
+        'params' => [
+            'export_id' => $export->id,
+        ],
+    ]);
+}
+
+
+
+
+
+public function markAsReconciled(): void
+{
+    if ($this->run->status !== 'paid') {
+        $this->dispatch('showAlert', [
+            'type' => 'warning',
+            'message' => 'Only paid runs can be marked as reconciled.',
+        ]);
+        return;
+    }
+
+    $this->run->update([
+        'reconciliation_status' => 'reconciled',
+        'reconciled_at' => now(),
+    ]);
+
+    $this->run->refresh();
+    $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Payroll run marked as reconciled.']);
+}
+
+
+
 
     public function render()
     {

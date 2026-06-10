@@ -18,6 +18,8 @@ class EmployeeDetail extends Component
     public $currentPosition;        // now directly from employee->employeePosition (hasOne)
     public $jobHistory;             // renamed from $positionHistory – collection of EmployeeJobHistory
     public $payrollProfile;
+    public $payrollPayslip;
+    
     public $workPatterns;
     public string $modelName;
     public string $moduleName;
@@ -70,7 +72,7 @@ class EmployeeDetail extends Component
     {
         $this->selfServiceConfig = [
             'enabled' => true,
-            'allowedTabs' => ['overview', 'personal', 'employment', 'history', 'payroll', 'workpatterns', 'attendance', 'timeoff', 'documents', 'clockevents'],
+            'allowedTabs' => ['overview', 'personal', 'employment', 'history', 'payroll','payslips', 'workpatterns', 'attendance', 'timeoff', 'documents', 'clockevents'],
             'hideEditButtons' => true,
         ];
 
@@ -95,7 +97,7 @@ class EmployeeDetail extends Component
 
     protected function getAllPossibleTabs(): array
     {
-        return ['overview', 'personal', 'contact', 'employment', 'history', 'payroll', 'workpatterns', 'attendance', 'timeoff', 'documents', 'clockevents'];
+        return ['overview', 'personal', 'contact', 'employment', 'history', 'payroll', 'payslips', 'workpatterns', 'attendance', 'timeoff', 'documents', 'clockevents'];
     }
 
     public function jumpToEmployee(int $id): void
@@ -180,6 +182,8 @@ class EmployeeDetail extends Component
             $this->loadTabData($newTab);
         } elseif ($newTab === 'payroll' && $this->payrollProfile === null) {
             $this->loadTabData($newTab);
+        } elseif ($newTab === 'payslips' && $this->payrollPayslip === null) {
+            $this->loadTabData($newTab);
         } elseif ($newTab === 'workpatterns' && $this->workPatterns === null) {
             $this->loadTabData($newTab);
         }
@@ -234,6 +238,10 @@ class EmployeeDetail extends Component
             case 'payroll':
                 $payrollModel = 'App\Modules\Hr\Models\EmployeePayrollProfile';
                 $this->payrollProfile = $payrollModel::where('employee_id', $this->employee->id)->first();
+                break;
+            case 'payslips':
+                $payrollModel = 'App\Modules\Hr\Models\PayrollPayslip';
+                $this->payrollPayslip = $payrollModel::where('employee_id', $this->employee->id)->first();
                 break;
             case 'workpatterns':
                 $this->employee->load('employeeWorkPatterns.workPattern');

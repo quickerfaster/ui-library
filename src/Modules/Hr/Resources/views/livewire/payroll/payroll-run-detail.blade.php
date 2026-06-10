@@ -24,6 +24,46 @@
                     <i class="fas fa-money-check"></i> Mark as Paid
                 </button>
             @endif
+            @if ($canMarkPaid || $run->status === 'approved')
+                <button wire:click="generateBankFile" class="btn btn-sm btn-outline-primary me-1">
+                    <i class="fas fa-file-export"></i> Bank File
+                </button>
+            @endif
+
+            <button wire:click="queueSummaryPdf" class="btn btn-sm btn-secondary me-1">
+                <i class="fas fa-file-pdf"></i> Summary PDF
+            </button>
+
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-print"></i> Reports
+                </button>
+                <ul class="dropdown-menu">
+<li><a class="dropdown-item" href="{{ route('payroll-run.executive-summary', $run->id) }}" target="_blank">
+    <i class="fas fa-chart-pie"></i> Executive Summary
+</a></li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+
+                    <li><a class="dropdown-item" href="{{ route('payroll-run.print-summary', $run->id) }}"
+                            target="_blank">Full Employee List (Detailed)</a></li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li><a class="dropdown-item"
+                            href="{{ route('payroll-run.summary-grouped', [$run->id, 'group_by' => 'department']) }}"
+                            target="_blank">Summary by Department</a></li>
+                    <li><a class="dropdown-item"
+                            href="{{ route('payroll-run.summary-grouped', [$run->id, 'group_by' => 'location']) }}"
+                            target="_blank">Summary by Location</a></li>
+                    <li><a class="dropdown-item"
+                            href="{{ route('payroll-run.summary-grouped', [$run->id, 'group_by' => 'company']) }}"
+                            target="_blank">Summary by Company</a></li>
+                </ul>
+            </div>
+
+
             @if ($canCancel)
                 <button wire:click="confirmCancel" class="btn btn-sm btn-danger me-1">
                     <i class="fas fa-ban"></i> Cancel
@@ -40,10 +80,14 @@
         class="alert alert-{{ $run->status === 'paid' ? 'success' : ($run->status === 'approved' ? 'info' : ($run->status === 'cancelled' ? 'secondary' : 'warning')) }} mb-3">
         <strong>Status:</strong> {{ ucfirst($run->status) }}
         @if ($run->approved_at)
-            | Approved by {{ $run->approved_by }} on {{ $run->approved_at->format('M d, Y H:i') }}
+            | Approved by {{ $run->approvedByUser?->name ?? $run->approved_by }} on
+            {{ $run->approved_at->format('M d, Y H:i') }}
         @endif
         @if ($run->processed_at)
             | Paid on {{ $run->processed_at->format('M d, Y H:i') }}
+        @endif
+        @if ($run->payment_batch_id)
+            | Batch: {{ $run->payment_batch_id }}
         @endif
     </div>
 
@@ -85,12 +129,27 @@
                                 <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
                                     {{ $run->period_end->format('M d, Y') }}
                                 </div>
+
+                                @if ($run->base_currency)
+                                    <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Base Currency
+                                    </div>
+                                    <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                        {{ $run->base_currency }}
+                                    </div>
+                                @endif
+
+                                @if ($run->payment_date)
+                                    <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Payment Date</div>
+                                    <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                        {{ $run->payment_date->format('M d, Y') }}
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Financial Totals Card --}}
+                {{-- Financial Totals Card (extended) --}}
                 <div class="col-12 col-xl-6">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-header bg-white border-bottom-0 pt-4 px-4">
@@ -102,24 +161,40 @@
                                 $currencySymbol = $this->getCurrencySymbol($defaultCurrency);
                             @endphp
                             <div class="row gy-3">
-                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Total Gross Pay</div>
-                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                <div class="col-sm-5 text-muted fw-semibold small text-uppercase">Total Gross Pay</div>
+                                <div class="col-sm-7 text-dark fw-medium border-bottom pb-2 border-light">
                                     {{ $currencySymbol }}{{ number_format($run->total_gross_pay, 2) }}
                                 </div>
 
-                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Total Deductions</div>
-                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                <div class="col-sm-5 text-muted fw-semibold small text-uppercase">Total Deductions</div>
+                                <div class="col-sm-7 text-dark fw-medium border-bottom pb-2 border-light">
                                     {{ $currencySymbol }}{{ number_format($run->total_deductions, 2) }}
                                 </div>
 
-                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Total Taxes</div>
-                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                <div class="col-sm-5 text-muted fw-semibold small text-uppercase">Total Taxes</div>
+                                <div class="col-sm-7 text-dark fw-medium border-bottom pb-2 border-light">
                                     {{ $currencySymbol }}{{ number_format($run->total_taxes, 2) }}
                                 </div>
 
-                                <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Net Cash Required
+                                @if (isset($run->total_employer_contributions))
+                                    <div class="col-sm-5 text-muted fw-semibold small text-uppercase">Employer
+                                        Contributions</div>
+                                    <div class="col-sm-7 text-dark fw-medium border-bottom pb-2 border-light">
+                                        {{ $currencySymbol }}{{ number_format($run->total_employer_contributions, 2) }}
+                                    </div>
+                                @endif
+
+                                @if (isset($run->total_employee_contributions))
+                                    <div class="col-sm-5 text-muted fw-semibold small text-uppercase">Employee
+                                        Contributions</div>
+                                    <div class="col-sm-7 text-dark fw-medium border-bottom pb-2 border-light">
+                                        {{ $currencySymbol }}{{ number_format($run->total_employee_contributions, 2) }}
+                                    </div>
+                                @endif
+
+                                <div class="col-sm-5 text-muted fw-semibold small text-uppercase">Net Cash Required
                                 </div>
-                                <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                <div class="col-sm-7 text-dark fw-medium border-bottom pb-2 border-light">
                                     <strong>{{ $currencySymbol }}{{ number_format($run->total_cash_required, 2) }}</strong>
                                 </div>
                             </div>
@@ -127,7 +202,45 @@
                     </div>
                 </div>
 
-                {{-- Notes Card (if any) --}}
+                {{-- Payment & Reconciliation Card (new) --}}
+                @if ($run->reconciliation_status || $run->payment_batch_id || $run->reconciled_at)
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                                <h5 class="fw-bold text-primary mb-0">Payment & Reconciliation</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row gy-3">
+                                    @if ($run->payment_batch_id)
+                                        <div class="col-sm-3 text-muted fw-semibold small text-uppercase">Batch ID</div>
+                                        <div class="col-sm-9 text-dark fw-medium border-bottom pb-2 border-light">
+                                            {{ $run->payment_batch_id }}
+                                        </div>
+                                    @endif
+                                    @if ($run->reconciliation_status)
+                                        <div class="col-sm-3 text-muted fw-semibold small text-uppercase">Reconciliation
+                                            Status</div>
+                                        <div class="col-sm-9 text-dark fw-medium border-bottom pb-2 border-light">
+                                            <span
+                                                class="badge bg-{{ $run->reconciliation_status === 'reconciled' ? 'success' : ($run->reconciliation_status === 'pending' ? 'warning' : 'danger') }}">
+                                                {{ ucfirst($run->reconciliation_status) }}
+                                            </span>
+                                        </div>
+                                    @endif
+                                    @if ($run->reconciled_at)
+                                        <div class="col-sm-3 text-muted fw-semibold small text-uppercase">Reconciled At
+                                        </div>
+                                        <div class="col-sm-9 text-dark fw-medium border-bottom pb-2 border-light">
+                                            {{ $run->reconciled_at->format('M d, Y H:i:s') }}
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Notes Card --}}
                 @if ($run->notes)
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
@@ -143,7 +256,7 @@
             </div>
         @endif
 
-        {{-- Payslips Tab --}}
+        {{-- Payslips Tab (unchanged) --}}
         @if ($activeTab === 'payslips')
             <livewire:qf.data-table :configKey="'hr.payroll_payslip'" :queryFilters="['payroll_run_id' => $run->id]" :controls="[
                 'search' => true,
@@ -159,7 +272,7 @@
                 ]" />
         @endif
 
-        {{-- Adjustments Tab (read-only) --}}
+        {{-- Adjustments Tab (unchanged) --}}
         @if ($activeTab === 'adjustments')
             <livewire:qf.data-table :configKey="'hr.payroll_run_adjustment'" :queryFilters="['payroll_run_id' => $run->id]" :controls="[
                 'search' => true,
@@ -173,7 +286,63 @@
             ]" />
         @endif
 
-        {{-- Audit Tab --}}
+        {{-- Reconciliation Tab --}}
+        @if ($activeTab === 'reconciliation')
+            <div class="row g-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                            <h5 class="fw-bold text-primary mb-0">Bank Reconciliation</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row gy-3">
+                                <div class="col-sm-3 text-muted fw-semibold small text-uppercase">Reconciliation Status
+                                </div>
+                                <div class="col-sm-9 text-dark fw-medium">
+                                    @if ($run->reconciliation_status === 'reconciled')
+                                        <span class="badge bg-success">Reconciled</span>
+                                    @elseif ($run->reconciliation_status === 'failed')
+                                        <span class="badge bg-danger">Failed</span>
+                                    @else
+                                        <span class="badge bg-warning">Pending</span>
+                                    @endif
+                                </div>
+
+                                @if ($run->payment_batch_id)
+                                    <div class="col-sm-3 text-muted fw-semibold small text-uppercase">Payment Batch ID
+                                    </div>
+                                    <div class="col-sm-9 text-dark fw-medium">
+                                        {{ $run->payment_batch_id }}
+                                    </div>
+                                @endif
+
+                                @if ($run->reconciled_at)
+                                    <div class="col-sm-3 text-muted fw-semibold small text-uppercase">Reconciled At
+                                    </div>
+                                    <div class="col-sm-9 text-dark fw-medium">
+                                        {{ $run->reconciled_at->format('M d, Y H:i:s') }}
+                                    </div>
+                                @endif
+
+                                <div class="col-12 mt-3">
+                                    @if ($run->status === 'paid' && $run->reconciliation_status !== 'reconciled')
+                                        <button wire:click="markAsReconciled" class="btn btn-primary">
+                                            <i class="fas fa-check-double"></i> Mark as Reconciled
+                                        </button>
+                                    @endif
+                                    @if ($run->reconciliation_status === 'reconciled')
+                                        <span class="text-success"><i class="fas fa-check-circle"></i> This run has
+                                            been reconciled.</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- Audit Tab (improved) --}}
         @if ($activeTab === 'audit')
             <div class="row g-4">
                 <div class="col-12 col-xl-6">
@@ -220,12 +389,19 @@
                                 </div>
                                 <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Approved By</div>
                                 <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
-                                    {{ $run->approved_by ?? '—' }}
+                                    {{ $run->approvedByUser?->name ?? ($run->approved_by ?? '—') }}
                                 </div>
                                 <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Approved At</div>
                                 <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
                                     {{ $run->approved_at ? $run->approved_at->format('M d, Y H:i:s') : '—' }}
                                 </div>
+                                @if ($run->reconciled_at)
+                                    <div class="col-sm-4 text-muted fw-semibold small text-uppercase">Reconciled At
+                                    </div>
+                                    <div class="col-sm-8 text-dark fw-medium border-bottom pb-2 border-light">
+                                        {{ $run->reconciled_at->format('M d, Y H:i:s') }}
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>

@@ -20,6 +20,7 @@ use QuickerFaster\UILibrary\Widgets\ProgressWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\TrainingCompletionRateWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\TrendWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\TurnoverRateWidgetProcessor;
+use QuickerFaster\UILibrary\Widgets\GroupedListWidgetProcessor;
 
 class WidgetProcessor
 {
@@ -27,6 +28,8 @@ class WidgetProcessor
         'stat'        => StatWidgetProcessor::class,
         'chart'       => ChartWidgetProcessor::class,
         'list'        => ListWidgetProcessor::class,
+        'grouped_list' => GroupedListWidgetProcessor::class,
+
         'progress'    => ProgressWidgetProcessor::class, 
         'metric'      => MetricWidgetProcessor::class,
         'trend'       => TrendWidgetProcessor::class,

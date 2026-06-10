@@ -218,7 +218,7 @@ class EmployeeWithDependenciesSeeder extends Seeder
             EmployeePayrollProfile::create([
                 'employee_id' => $employee->id,
                 'pay_schedule_id' => $paySchedule->id,
-                'bank_account_holder_name' => $employee->first_name . ' ' . $employee->last_name,
+                'bank_account_name' => $employee->first_name . ' ' . $employee->last_name,
                 'bank_name' => fake()->company() . ' Bank',
                 'bank_account_number' => fake()->bankAccountNumber(),
                 'bank_routing_number' => fake()->regexify('[0-9]{9}'),
