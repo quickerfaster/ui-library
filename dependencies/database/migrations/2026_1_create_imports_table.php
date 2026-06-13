@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('config_key');
             $table->string('file_path');
             $table->string('original_filename');
-            $table->integer('total_rows')->default(0);
+            // $table->integer('total_rows')->default(0);
             $table->integer('processed_rows')->default(0);
             $table->integer('successful_rows')->default(0);
             $table->integer('failed_rows')->default(0);
@@ -22,6 +22,9 @@ return new class extends Migration
 
             $table->string('status')->default('pending'); // pending, processing, completed, failed
 
+            $table->unsignedInteger('total_rows')->nullable();
+            $table->unsignedInteger('chunk_size')->nullable();
+            $table->unsignedInteger('total_chunks')->nullable();
 
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();

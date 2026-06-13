@@ -7,10 +7,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
-use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
-use QuickerFaster\UILibrary\Services\Imports\ImportProcessor;
+use Maatwebsite\Excel\Facades\Excel;
 use QuickerFaster\UILibrary\Models\Import;
+use QuickerFaster\UILibrary\Models\ImportChunk;
 
 class ProcessImport implements ShouldQueue
 {
@@ -30,58 +29,56 @@ class ProcessImport implements ShouldQueue
     public function handle()
     {
         $import = Import::find($this->importId);
-        if (!$import) {
-            return;
-        }
-
-        // Check cancellation before starting
-        if ($import->status === 'cancelled') {
-            \Log::info("Import {$import->id} was cancelled before processing.");
+        if (!$import || $import->status === 'cancelled') {
             return;
         }
 
         $import->update(['status' => 'processing']);
 
-        try {
-            $configResolver = new ConfigResolver($import->config_key);
-            $fieldFactory = new FieldFactory();
-            $processor = new ImportProcessor($configResolver, $fieldFactory);
+        // Count total rows (excluding header if present)
+        $rows = Excel::toArray([], $import->file_path)[0];
+        $totalRows = count($rows);
+        if ($this->hasHeaderRow && $totalRows > 0) {
+            $totalRows--; // subtract header row
+        }
 
-            $result = $processor->process(
-                $import->file_path,
-                $this->columnMapping,
-                $this->hasHeaderRow,
-                function ($processedRows) use ($import) {
-                    // Callback after each row (or chunk) to check cancellation
-                    if ($processedRows % 100 === 0) {
-                        $import->refresh();
-                        if ($import->status === 'cancelled') {
-                            throw new \Exception('Import cancelled by user.');
-                        }
-                    }
-                }
-            );
-
+        if ($totalRows === 0) {
             $import->update([
-                'status'          => 'completed',
-                'processed_rows'  => $result['processed'],
-                'successful_rows' => $result['successful'],
-                'failed_rows'     => $result['failed'],
-                'errors'          => json_encode($result['errors']),
+                'status' => 'failed',
+                'errors' => json_encode(['No data rows found in file.']),
+            ]);
+            return;
+        }
+
+        // Determine chunk size (e.g., 100 rows per chunk)
+        $chunkSize = $import->chunk_size ?? 100;
+        $totalChunks = (int) ceil($totalRows / $chunkSize);
+
+        $import->update([
+            'total_rows' => $totalRows,
+            'chunk_size' => $chunkSize,
+            'total_chunks' => $totalChunks,
+        ]);
+
+        // Create chunk records and dispatch jobs
+        for ($i = 0; $i < $totalChunks; $i++) {
+            $offset = $i * $chunkSize;
+            // For first chunk, if header exists, offset must account for it (we'll handle inside chunk job)
+            $chunk = ImportChunk::create([
+                'import_id' => $import->id,
+                'chunk_index' => $i,
+                'offset' => $offset,
+                'limit' => $chunkSize,
+                'status' => 'pending',
             ]);
 
-        } catch (\Exception $e) {
-            if ($e->getMessage() === 'Import cancelled by user.') {
-                $import->update([
-                    'status'     => 'cancelled',
-                    'errors'     => json_encode(['Cancelled by user']),
-                ]);
-            } else {
-                $import->update([
-                    'status' => 'failed',
-                    'errors' => json_encode([$e->getMessage()]),
-                ]);
-            }
+            ProcessImportChunk::dispatch(
+                $import->id,
+                $chunk->id,
+                $this->columnMapping,
+                $this->hasHeaderRow,
+                $chunkSize
+            );
         }
     }
 }

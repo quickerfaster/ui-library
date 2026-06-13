@@ -9,7 +9,7 @@ use App\Modules\Hr\Models\PayrollPayslip;
 use App\Modules\Hr\Models\EmployeePosition;
 use App\Modules\Hr\Services\Payroll\PayrollCalculator;
 use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
-use App\Modules\Hr\Jobs\Payroll\ProcessPayrollRun;
+use App\Modules\Hr\Jobs\Payrolls\ProcessPayrollRun;
 
 
 

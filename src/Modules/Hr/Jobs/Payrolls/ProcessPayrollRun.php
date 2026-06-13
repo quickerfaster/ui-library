@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Hr\Jobs\Payroll;
+namespace App\Modules\Hr\Jobs\Payrolls;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

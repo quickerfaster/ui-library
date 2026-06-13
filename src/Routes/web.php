@@ -58,6 +58,7 @@ Route::group(['middleware' => 'web'], function () {
     Route::get('/export/template/{configKey}', [ExportController::class, 'exportTemplate'])->name('export.template');
 
     Route::get('/import/download-errors/{import}', [ImportController::class, 'downloadErrors'])->name('import.download-errors');
+    Route::get('/import/status/{id}', [ImportController::class, 'status'])->name('import.status');
 
     Route::get('/print/data', [GenericTablePrintController::class, 'print'])->name('print.data');
 

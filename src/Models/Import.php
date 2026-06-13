@@ -20,6 +20,10 @@ class Import extends Model
         'status',
         'user_id',
         'error_file',
+
+        'total_rows',
+        'chunk_size',
+        'total_chunks',
     ];
 
     /**

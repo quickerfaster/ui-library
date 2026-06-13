@@ -15,7 +15,7 @@ use QuickerFaster\UILibrary\Traits\AppliesFilters;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use QuickerFaster\UILibrary\Models\Export;
-use QuickerFaster\UILibrary\Traits\ResolvesExportValues; // <-- Add this
+use QuickerFaster\UILibrary\Traits\ResolvesExportValues; 
 
 
 class GenerateExport implements ShouldQueue
@@ -30,6 +30,7 @@ class GenerateExport implements ShouldQueue
     }
 
 
+    /*
     public function handle()
     {
         $export = Export::find($this->exportId);
@@ -116,6 +117,65 @@ class GenerateExport implements ShouldQueue
             ]);
         }
     }
+*/
+
+
+
+
+// Inside GenerateExport::handle() - REPLACE existing logic
+
+public function handle()
+{
+    $export = Export::find($this->exportId);
+    if (!$export || $export->status === 'cancelled') {
+        return;
+    }
+
+
+
+
+    
+
+    $export->update(['status' => 'processing']);
+
+    $resolver = app(ConfigResolver::class, ['configKey' => $export->config_key]);
+    $modelClass = $resolver->getModel();
+    $query = $modelClass::query();
+
+    if (!empty($export->filters)) {
+        $this->applyActiveFilters($query, $export->filters, $resolver);
+    }
+
+    $totalRows = $query->count();
+    if ($totalRows === 0) {
+        $export->update([
+            'status' => 'failed',
+            'error_message' => 'No records to export'
+        ]);
+        return;
+    }
+
+    // --- Set chunking parameters ---
+    $chunkSize = $export->chunk_size ?? 100; // default 100 rows per chunk
+    $totalChunks = (int) ceil($totalRows / $chunkSize);
+
+    $export->update([
+        'total_rows'   => $totalRows,
+        'chunk_size'   => $chunkSize,
+        'total_chunks' => $totalChunks,
+    ]);
+    // -----------------------------
+
+    // Dispatch chunk jobs
+    for ($i = 0; $i < $totalChunks; $i++) {
+        $offset = $i * $chunkSize;
+        ExportChunk::dispatch($export->id, $i, $offset, $chunkSize);
+    }
+}
+
+
+
+
 
 
 

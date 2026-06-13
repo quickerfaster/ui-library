@@ -76,24 +76,69 @@
 
         {{-- Processing state --}}
     @elseif($importId && !$importResult)
-        <div wire:poll.5s="checkImportStatus"></div>
+        <div wire:poll.2s="checkImportStatus">
+            @if ($importStatus === 'processing' || $importStatus === 'pending')
+                <p>Your import is being processed. Please wait...</p>
 
-        <div class="text-center py-4">
-            <div class="spinner-border text-primary mb-3" role="status"><span class="visually-hidden">Loading...</span>
-            </div>
-            <p>Import in progress... You can close this modal and you'll be notified when complete.</p>
+                @if ($totalChunks > 0)
+                    <div class="progress mt-2" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary py-3"
+                            style="width: {{ ($completedChunks / $totalChunks) * 100 }}%">
+                            {{ round(($completedChunks / $totalChunks) * 100) }}%
+                        </div>
+                    </div>
+                    <p class="mt-2 small text-muted">
+                        {{ $completedChunks }} of {{ $totalChunks }} chunks completed
+                    </p>
+                    <p class="mt-1 small text-muted">
+                        Rows processed: {{ $successfulRows + $failedRows }} / {{ $totalRows }}
+                        ({{ $successfulRows }} succeeded, {{ $failedRows }} failed)
+                    </p>
+                @else
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated py-3" style="width: 100%">
+                        </div>
+                    </div>
+                    <p class="mt-2 small text-muted">Preparing chunks...</p>
+                @endif
+
+                <div class="d-flex justify-content-between mt-3">
+                    <button wire:click="cancelImport" class="btn btn-sm btn-danger">
+                        <i class="fas fa-times"></i> Cancel Import
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            @elseif($importStatus === 'completed')
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> Import completed!<br>
+                    Processed: {{ $totalRows }} rows<br>
+                    Success: {{ $successfulRows }}, Failed: {{ $failedRows }}
+                    @if ($errorFileUrl)
+                        <div class="mt-2">
+                            <a href="{{ $errorFileUrl }}" class="btn btn-sm btn-outline-danger" target="_blank">
+                                <i class="fas fa-download"></i> Download Error Report
+                            </a>
+                        </div>
+                    @endif
+                </div>
+                <div class="text-end">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            @elseif($importStatus === 'failed')
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> Import failed.
+                    @if ($error)
+                        <br>{{ $error }}
+                    @endif
+                </div>
+                <div class="text-end">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            @endif
         </div>
-        {{-- 
-        <div class="mb-3 form-check">
-            <input type="checkbox" id="runInBackground" wire:model="runInBackground" class="form-check-input">
-            <label for="runInBackground" class="form-check-label">Run in background (close modal immediately)</label>
-            <small class="text-muted d-block">Recommended for large files. For small imports, leave unchecked to
-                wait.</small>
-        </div>
-        --}}
-        <div class="text-end">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        </div>
+
+
+
 
         {{-- Result state --}}
     @elseif($importResult)
@@ -126,4 +171,50 @@
             @endif
         </div>
     @endif
+
+
+
+
+
+    @script
+        <script>
+            let pollingInterval = null;
+
+            function startImportPolling(importId) {
+                if (pollingInterval) clearInterval(pollingInterval);
+                pollingInterval = setInterval(async () => {
+                    const response = await fetch(`/import/status/${importId}`, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const data = await response.json();
+
+                    // Use $wire to update Livewire properties
+                    $wire.set('importStatus', data.status);
+                    $wire.set('completedChunks', data.completed_chunks || 0);
+                    $wire.set('totalChunks', data.total_chunks || 0);
+                    $wire.set('totalRows', data.total_rows || 0);
+                    $wire.set('successfulRows', data.successful_rows || 0);
+                    $wire.set('failedRows', data.failed_rows || 0);
+                    $wire.set('errorFileUrl', data.error_file_url || null);
+
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollingInterval);
+                        // Reopen modal if hidden
+                        const modalEl = document.getElementById('{{ $modalId }}');
+                        if (modalEl && !modalEl.classList.contains('show')) {
+                            const modal = new bootstrap.Modal(modalEl);
+                            modal.show();
+                        }
+                    }
+                }, 2000);
+            }
+
+            // Listen for the event emitted from Livewire when a new import starts
+            $wire.on('startImportPolling', (importId) => {
+                startImportPolling(importId);
+            });
+        </script>
+    @endscript
 </div>

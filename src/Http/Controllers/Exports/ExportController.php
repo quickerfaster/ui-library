@@ -10,10 +10,11 @@ use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Storage;
-use QuickerFaster\UILibrary\Models\Export; // Ensure this model exists in your main app
+use QuickerFaster\UILibrary\Models\Export;
 use QuickerFaster\UILibrary\Services\Exports\TemplateExport;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Traits\ResolvesExportValues;
+use QuickerFaster\UILibrary\Models\ExportChunk;
 
 class ExportController extends Controller
 {
@@ -209,6 +210,7 @@ class ExportController extends Controller
         ]);
     }
 
+
     public function exportStatus($id)
     {
         $export = Export::findOrFail($id);
@@ -216,12 +218,21 @@ class ExportController extends Controller
             ? route('export.download', ['token' => $export->download_token])
             : null;
 
+        // Calculate chunk progress
+        $completedChunks = 0;
+        $totalChunks = $export->total_chunks ?? 0;
+        if ($totalChunks > 0 && in_array($export->status, ['processing', 'pending', 'completed'])) {
+            $completedChunks = ExportChunk::where('export_id', $export->id)->count();
+        }
+
         return response()->json([
             'status' => $export->status,
             'file_url' => $fileUrl,
             'file_size' => $export->file_size,
             'error' => $export->error_message,
             'completed_at' => $export->completed_at,
+            'completed_chunks' => $completedChunks,
+            'total_chunks' => $totalChunks,
         ]);
     }
 
@@ -257,7 +268,12 @@ class ExportController extends Controller
         // Optional: one‑time use – delete the token after download
         // $export->update(['download_token' => null, 'expires_at' => null]);
 
-        return $disk->download($path, 'export.' . $export->format);
+        // ✅ Use the actual file extension from the stored file
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+        $filename = 'export.' . $extension;
+
+        return $disk->download($path, $filename);
+
     }
 
 
@@ -426,24 +442,32 @@ class ExportController extends Controller
 
 
 
-    public function cancelExport($id)
-    {
-        $export = Export::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
 
-        if (in_array($export->status, ['pending', 'processing'])) {
-            $export->update(['status' => 'cancelled', 'error_message' => 'Cancelled by user']);
+public function cancelExport($id)
+{
+    $export = Export::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
 
-            // Optionally delete any partial file if exists
-            if ($export->file_path && Storage::disk('local')->exists($export->file_path)) {
-                Storage::disk('local')->delete($export->file_path);
-                $export->update(['file_path' => null]);
-            }
-
-            return response()->json(['message' => 'Export cancelled']);
-        }
-
+    if (!in_array($export->status, ['pending', 'processing'])) {
         return response()->json(['message' => 'Cannot cancel export in current status'], 400);
     }
+
+    $export->update([
+        'status' => 'cancelled',
+        'error_message' => 'Cancelled by user',
+        'completed_at' => now(),
+    ]);
+
+    // Delete all chunk files and the parent directory
+    $exportDir = "exports/{$export->id}";
+    if (Storage::disk('local')->exists($exportDir)) {
+        Storage::disk('local')->deleteDirectory($exportDir);
+    }
+
+    // Also delete any ExportChunk records (optional, but keeps DB clean)
+    ExportChunk::where('export_id', $export->id)->delete();
+
+    return response()->json(['message' => 'Export cancelled']);
+}
 
 
 

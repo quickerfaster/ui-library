@@ -75,6 +75,9 @@ use QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports;
 use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use QuickerFaster\UILibrary\Http\Livewire\AccessControls\RoleAssignmentManager;
+use QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalActions;
+use QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalHistoryTimeline;
+
 
 class UILibraryServiceProvider extends ServiceProvider
 {
@@ -289,6 +292,8 @@ class UILibraryServiceProvider extends ServiceProvider
         // Livewire::component('qf.permission-toggle', PermissionToggle::class);
         // Livewire::component('qf.permission-group', PermissionGroup::class);
         Livewire::component('qf.permission-manager', PermissionManager::class);
+        Livewire::component('qf.approval-actions', ApprovalActions::class);
+        Livewire::component('qf.approval-history-timeline', ApprovalHistoryTimeline::class);
         // Livewire::component('qf.toggle', Toggle::class);
 
 

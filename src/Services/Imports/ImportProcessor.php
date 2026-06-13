@@ -105,6 +105,89 @@ class ImportProcessor
         ];
     }
 
+
+
+    public function processRows(array $rows, array $columnMapping, bool $hasHeaderRow, ?callable $checkCallback = null): array
+    {
+        $modelClass = $this->configResolver->getModel();
+        $fieldDefinitions = $this->configResolver->getFieldDefinitions();
+
+        $processed = 0;
+        $successful = 0;
+        $failed = 0;
+        $errors = [];
+
+        foreach ($rows as $rowIndex => $row) {
+            if ($checkCallback && $rowIndex % 100 === 0) {
+                $checkCallback($rowIndex);
+            }
+
+            $processed++;
+            $rowErrors = [];
+            $data = [];
+
+            foreach ($columnMapping as $field => $columnIndex) {
+                $rawValue = $row[$columnIndex] ?? null;
+                $def = $fieldDefinitions[$field] ?? [];
+                $data[$field] = $this->resolveFieldValue($field, $rawValue, $def, $rowErrors);
+            }
+
+            if (!empty($rowErrors)) {
+                $failed++;
+                $errors[] = [
+                    'row' => ($hasHeaderRow ? $rowIndex + 2 : $rowIndex + 1),
+                    'errors' => $rowErrors,
+                ];
+                continue;
+            }
+
+            // Build validation rules (same as before)
+            $rules = [];
+            foreach ($fieldDefinitions as $field => $def) {
+                if (($def['fillable'] ?? false) && isset($data[$field])) {
+                    $fieldObj = $this->fieldFactory->make($field, $def);
+                    $rules[$field] = $fieldObj->getValidationRules();
+                }
+            }
+
+            $flatRules = array_map(function ($rule) {
+                return is_array($rule) ? implode('|', $rule) : $rule;
+            }, $rules);
+
+            $validator = Validator::make($data, $flatRules);
+
+            if ($validator->fails()) {
+                $failed++;
+                $errors[] = [
+                    'row' => ($hasHeaderRow ? $rowIndex + 2 : $rowIndex + 1),
+                    'errors' => $validator->errors()->all(),
+                ];
+                continue;
+            }
+
+            try {
+                $modelClass::create($data);
+                $successful++;
+            } catch (\Exception $e) {
+                $failed++;
+                $errors[] = [
+                    'row' => ($hasHeaderRow ? $rowIndex + 2 : $rowIndex + 1),
+                    'errors' => [$e->getMessage()],
+                ];
+            }
+        }
+
+        return [
+            'processed' => $processed,
+            'successful' => $successful,
+            'failed' => $failed,
+            'errors' => $errors,
+        ];
+    }
+
+
+
+
     /**
      * Convert a human‑readable value from the import file to the database format.
      *

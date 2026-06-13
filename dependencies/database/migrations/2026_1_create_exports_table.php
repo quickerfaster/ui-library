@@ -17,7 +17,13 @@ return new class extends Migration
             $table->string('format');                  // csv, xls, pdf
             $table->json('options')->nullable();       // pdf orientation, etc.
             $table->string('status')->default('pending'); // pending, processing, completed, failed
+
+            $table->unsignedInteger('total_rows')->nullable();
+            $table->unsignedInteger('chunk_size')->nullable();
+            $table->unsignedInteger('total_chunks')->nullable();
+
             $table->string('file_path')->nullable();
+
 
             $table->unsignedBigInteger('file_size')->nullable();
             $table->string('download_token', 64)->nullable()->unique();

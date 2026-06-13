@@ -136,20 +136,32 @@ class PayrollRunWizard extends Component
      * Finalize the wizard – does NOT run calculation synchronously.
      * The calculation is handled by the queue job (triggered by the preview component).
      */
-    public function finalize()
-    {
-        $run = PayrollRun::findOrFail($this->payrollRunId);
-        $run->update([
-            'status' => 'ready_for_review',
-            'current_step' => 4,
-        ]);
+public function finalize()
+{
+    $run = PayrollRun::findOrFail($this->payrollRunId);
+    
+    // Update run status (optional, can stay 'ready_for_review')
+    $run->update([
+        'status' => 'ready_for_review',
+        'current_step' => 4,
+    ]);
 
-        // Clear wizard session
-        session()->forget($this->getWizardId());
-
-        session()->flash('message', 'Payroll run submitted. The calculation is being processed in the background. You will be notified when ready for review.');
-        return redirect()->route('payroll-runs.show', $this->payrollRunId);
+    // Start approval process
+    $configKey = 'hr.approvals.payroll_run_approval';
+    $resolver = app(\QuickerFaster\UILibrary\Services\Config\Approvals\ApprovalConfigResolver::class, ['configKey' => $configKey]);
+    $engine = app(\QuickerFaster\UILibrary\Services\Approvals\ApprovalEngine::class, ['configResolver' => $resolver]);
+    
+    // Only start if not already under approval
+    if (!$run->isUnderApproval()) {
+        $engine->startApproval($run, auth()->user());
     }
+
+    // Clear wizard session
+    session()->forget($this->getWizardId());
+
+    session()->flash('message', 'Payroll run submitted for approval. You will be notified when reviewed.');
+    return redirect()->route('payroll-runs.show', $this->payrollRunId);
+}
 
 
     public function setProcessing(): void

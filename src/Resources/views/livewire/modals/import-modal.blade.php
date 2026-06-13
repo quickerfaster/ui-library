@@ -7,15 +7,10 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    @if($showModal && $configKey)
-                        <livewire:qf.import-form
-                            :configKey="$configKey"
-                            :modalId="$modalId"
-                            wire:key="import-{{ $configKey }}-{{ time() }}"
-                        />
-                    @endif
+                    {{-- Always render the child, modal visibility is controlled by Bootstrap --}}
+                    <livewire:qf.import-form :configKey="$configKey" :modalId="$modalId"
+                        wire:key="import-{{ $configKey }}" />
                 </div>
-                
             </div>
         </div>
     </div>

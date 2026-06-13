@@ -15,14 +15,29 @@ class ExportProgress extends Component
     public bool $exportStarted = false;
     public ?int $fileSize = null;
 
+    public int $completedChunks = 0;
+    public int $totalChunks = 0;
+
+    // You can also add a flag to track if modal was closed (optional for auto‑reopen)
+    // public bool $modalWasClosed = false;
+
     protected $listeners = [
         'startExport' => 'startExport',
     ];
 
-    public function mount(string $configKey, array $exportParams = [])
+    public ?int $resumeExportId = null;
+
+    public function mount(string $configKey, array $exportParams = [], ?int $resumeExportId = null)
     {
         $this->configKey = $configKey;
-        if (!empty($exportParams) && !$this->exportStarted) {
+        $this->resumeExportId = $resumeExportId;
+
+        if ($resumeExportId) {
+            $this->exportId = $resumeExportId;
+            $this->status = 'processing';
+            $this->exportStarted = true;
+            $this->dispatch('startPollingForExport', $resumeExportId);
+        } elseif (!empty($exportParams) && !$this->exportStarted) {
             $this->startExport($exportParams);
             $this->exportStarted = true;
         }

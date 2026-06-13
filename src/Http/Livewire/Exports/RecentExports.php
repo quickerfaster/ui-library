@@ -87,13 +87,17 @@ class RecentExports extends Component
             ->whereIn('status', ['completed', 'failed'])
             ->get();
 
+
         foreach ($exports as $export) {
-            // Delete physical file if exists
-            if ($export->file_path && Storage::disk('local')->exists($export->file_path)) {
-                Storage::disk('local')->delete($export->file_path);
+            // Delete the directory and its contents
+            $exportDir = "exports/{$export->id}";
+            if (Storage::disk('local')->exists($exportDir)) {
+                Storage::disk('local')->deleteDirectory($exportDir);
             }
             $export->delete();
         }
+
+
 
         $this->loadExports();
         $this->dropdownOpen = false;

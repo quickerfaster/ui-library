@@ -22,6 +22,9 @@ class Export extends Model
         'completed_at',
 
         'file_size',
+        'total_rows',	
+        'chunk_size',	
+        'total_chunks',
     ];
 
     protected $casts = [

@@ -23,7 +23,7 @@ class RecentImports extends Component
 
     ];
 
- 
+
 
 
     public function mount(bool $embedded = false)
@@ -40,7 +40,7 @@ class RecentImports extends Component
 
         // Completed/failed imports (for dropdown list)
         $this->recentImports = Import::where('user_id', $userId)
-            ->whereIn('status', ['completed', 'failed'])
+            ->whereIn('status', ['completed', 'failed', 'cancelled'])
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get();
@@ -114,21 +114,27 @@ class RecentImports extends Component
             return;
         }
 
+
+        // Delete the uploaded file if exists
+        if ($import->file_path && Storage::disk('local')->exists($import->file_path)) {
+            Storage::disk('local')->delete($import->file_path);
+        }
+
+        
+        // Delete any partial error file
+        if ($import->error_file && Storage::disk('local')->exists($import->error_file)) {
+            Storage::disk('local')->delete($import->error_file);
+            $import->update(['error_file' => null]);
+        }
+
+
         // Mark as cancelled
         $import->update([
             'status' => 'cancelled',
             'error_message' => 'Cancelled by user',
         ]);
 
-        // Delete the uploaded file if exists
-        if ($import->file_path && Storage::disk('local')->exists($import->file_path)) {
-            Storage::disk('local')->delete($import->file_path);
-        }
-        // Delete any partial error file
-        if ($import->error_file && Storage::disk('local')->exists($import->error_file)) {
-            Storage::disk('local')->delete($import->error_file);
-            $import->update(['error_file' => null]);
-        }
+
 
         $this->loadImports(); // refresh dropdown
         $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Import cancelled.']);
@@ -159,9 +165,16 @@ class RecentImports extends Component
             if ($import->error_file && Storage::disk('local')->exists($import->error_file)) {
                 Storage::disk('local')->delete($import->error_file);
             }
+            
             if ($import->file_path && Storage::disk('local')->exists($import->file_path)) {
                 Storage::disk('local')->delete($import->file_path);
             }
+
+            $importDir = "imports/{$import->id}";
+            if (Storage::disk('local')->exists($importDir)) {
+                Storage::disk('local')->deleteDirectory($importDir);
+            }
+
             $import->delete();
         }
 

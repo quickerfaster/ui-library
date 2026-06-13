@@ -2242,7 +2242,7 @@ class DataTable extends Component
 
         // PDF limit check
         if ($format === 'pdf') {
-            $totalRows = $this->getTotalRowsCount(); // implement helper
+            $totalRows = count($this->records); //$this->getTotalRowsCount(); // implement helper
             if ($totalRows > 500) {
                 $this->dispatch('showAlert', [
                     'type' => 'warning',
