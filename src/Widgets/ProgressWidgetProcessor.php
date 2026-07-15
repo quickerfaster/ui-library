@@ -20,12 +20,12 @@ class ProgressWidgetProcessor
             $model = $definition['model'] ?? null;
             $aggregate = $definition['aggregate'] ?? 'count';
             $field = $definition['field'] ?? '*';
-            $conditions = $definition['conditions'] ?? [];
+            $conditions = $this->resolveConditions($definition['conditions'] ?? []);
             $target = $definition['target'] ?? null;
             $targetField = $definition['target_field'] ?? null;
             $targetModel = $definition['target_model'] ?? null;
             $targetAggregate = $definition['target_aggregate'] ?? 'count';
-            $targetConditions = $definition['target_conditions'] ?? [];
+            $targetConditions = $this->resolveConditions($definition['target_conditions'] ?? []);
 
             $currentValue = 0;
             $targetValue = 100; // default target

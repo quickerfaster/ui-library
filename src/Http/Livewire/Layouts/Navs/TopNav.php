@@ -67,13 +67,13 @@ class TopNav extends Component
             : ($allCompaniesRoles === '*' || $allCompaniesRoles === ['*'] || $user->hasAnyRole((array) $allCompaniesRoles));
 
         if ($canSeeAll) {
-            $this->companies = \App\Modules\Admin\Models\Company::orderBy('name')->get();
+            $this->companies = \App\Modules\Hr\Models\Company::orderBy('name')->get();
         } else {
             // Show only the user's company.
             // Employee record is the source of truth; fall back to user.company_id.
             $companyId = optional($user->employee)->company_id ?? $user->company_id;
             if ($companyId) {
-                $this->companies = \App\Modules\Admin\Models\Company::where('id', $companyId)->get();
+                $this->companies = \App\Modules\Hr\Models\Company::where('id', $companyId)->get();
             } else {
                 $this->companies = collect();
                 return;
@@ -169,20 +169,29 @@ class TopNav extends Component
         $this->dispatch('contextSelected', $context);
     }
 
-public function logout()
-{
-    // 1. Log the user out using the Auth facade
-    auth()->logout();
+    /**
+     * Open the background jobs drawer.
+     */
 
-    // 2. Invalidate the user's session
-    session()->invalidate();
+    public function openBackgroundJobsDrawer(): void
+    {
+        $this->dispatch('openDrawer', 'qf.background-jobs-panel', [], 'Background Jobs');
+    }
 
-    // 3. Regenerate the CSRF token for security
-    session()->regenerateToken();
+    public function logout()
+    {
+        // 1. Log the user out using the Auth facade
+        auth()->logout();
 
-    // 4. Redirect to the login page or homepage (this is a GET)
-    return redirect('/login');
-}
+        // 2. Invalidate the user's session
+        session()->invalidate();
+
+        // 3. Regenerate the CSRF token for security
+        session()->regenerateToken();
+
+        // 4. Redirect to the login page or homepage (this is a GET)
+        return redirect('/login');
+    }
 
 
     public function render()

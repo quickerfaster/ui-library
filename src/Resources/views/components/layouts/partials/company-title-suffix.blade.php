@@ -6,7 +6,7 @@
     if ($isAllCompanies) {
         $currentCompanyName = 'All Companies';
     } elseif ($companyId) {
-        $currentCompanyName = optional(\App\Modules\Admin\Models\Company::find($companyId))->name;
+        $currentCompanyName = optional(\App\Modules\Hr\Models\Company::find($companyId))->name;
     }
 
     $asBadge = $asBadge ?? false;

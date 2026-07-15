@@ -250,12 +250,20 @@
                     </div>
                 @endif
 
+                {{-- Background Jobs --}}
+                <a href="#" class=" px-2 py-1 my-0 me-1 border-start-lg border-end-lg px-3" 
+                    wire:click.prevent="openBackgroundJobsDrawer" title="Background Jobs">
+                    <i class="fas fa-history"></i>
+                </a>
+
+                                
+
                 {{-- Locale switcher --}}
-                <div class="dropdown me-2" id = "language-switcher">
-                    <button class="btn btn-sm btn-light dropdown-toggle px-3 py-1 my-0" type="button"
-                        data-bs-toggle="dropdown" aria-label="Select Locale">
-                        <i class="fas fa-globe me-1"></i> {{ strtoupper(app()->getLocale()) }}
-                    </button>
+                <div class="dropdown me-1" id="language-switcher">
+                    <a href="#" class=" dropdown-toggle px-2 py-1 my-0"
+                        data-bs-toggle="dropdown" aria-label="Select Locale" title="{{ strtoupper(app()->getLocale()) }}">
+                        <i class="fas fa-globe"></i>
+                    </a>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item {{ app()->getLocale() === 'en' ? 'active' : '' }}"
                                 href="#">English</a></li>
@@ -268,22 +276,25 @@
 
 
                 {{-- Profile / logout --}}
-                <div class="dropdown border-start-lg ms-1 ps-2" wire:ignore id="user-profile-menu">
+                <div class="dropdown ms-1 ps-2" wire:ignore id="user-profile-menu">
                     <a class="d-flex align-items-center text-decoration-none dropdown-toggle" href="#"
-                        data-bs-toggle="dropdown">
+                        data-bs-toggle="dropdown" title="{{ auth()->user()?->name ?: 'Account' }}">
                         @if (auth()->user()?->avatar_url)
                             <img src="{{ auth()->user()->avatar_url }}" alt="Profile"
-                                class="rounded-circle me-md-2" style="width: 32px; height: 32px; object-fit: cover;">
+                                class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
                         @else
-                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-md-2"
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
                                 style="width: 32px; height: 32px;">
                                 <i class="fas fa-user"></i>
                             </div>
                         @endif
-                        <span
-                            class="d-none d-md-inline text-dark fw-medium">{{ auth()->user()?->name ?: 'Account' }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2 mt-2">
+                        <li>
+                            <span class="dropdown-item-text text-dark fw-medium border-bottom mb-1 pb-2">
+                                {{ ucwords(auth()->user()?->name) ?: 'Account' }}
+                            </span>
+                        </li>
                         <li>
                             @auth
                                 <a class="dropdown-item border-radius-md mb-1" href="/hr/my-profile">

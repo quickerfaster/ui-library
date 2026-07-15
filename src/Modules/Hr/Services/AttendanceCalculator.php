@@ -413,7 +413,7 @@ class AttendanceCalculator
 
         // Priority 5: Company policy
         if ($position->department && $position->department->company) {
-            $policy = $this->getPolicyForEntity(\App\Modules\Admin\Models\Company::class, $position->department->company->id, $date);
+            $policy = $this->getPolicyForEntity(\App\Modules\Hr\Models\Company::class, $position->department->company->id, $date);
             if ($policy)
                 return $policy;
         }
