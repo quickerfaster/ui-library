@@ -39,8 +39,11 @@
                             <span class="text-muted small">Modifying record ID: #{{ $recordId }}</span>
                         @else
                             <p class="text-muted small mb-0">Fill in the details below to add a new record to the
-                                system.</p>
+                                system.</p> 
                         @endif
+
+                            @include('qf::components.layouts.partials.company-title-suffix', ['asBadge' => true])
+
                     </div>
                 </div>
             </div>

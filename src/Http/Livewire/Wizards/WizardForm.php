@@ -155,6 +155,16 @@ class WizardForm extends Component
         $this->fieldDefinitions = $resolver->getFieldDefinitions();
         $this->fieldGroups = $resolver->getFieldGroups();
         $this->hiddenFields = $resolver->getHiddenFields();
+
+        // When 'All Companies' mode, show company_id on forms so super_admin can assign it
+        if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0) {
+            foreach (['onNewForm', 'onEditForm', 'onTable'] as $context) {
+                if (isset($this->hiddenFields[$context])) {
+                    $this->hiddenFields[$context] = array_values(array_diff($this->hiddenFields[$context], ['company_id']));
+                }
+            }
+        }
+
         $this->relations = $resolver->getRelations();
     }
 
@@ -298,9 +308,16 @@ class WizardForm extends Component
             }
 
             $formType = $this->isEditMode ? 'onEditForm' : 'onNewForm';
+            $hiddenForForm = $this->hiddenFields[$formType] ?? [];
+
+            // When 'All Companies' mode (0), show company_id on forms so super_admin can assign it
+            if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0) {
+                $hiddenForForm = array_diff($hiddenForForm, ['company_id']);
+            }
+
             $allowedFields = array_diff(
                 array_keys($this->fieldDefinitions),
-                $this->hiddenFields[$formType] ?? [],
+                $hiddenForForm,
                 $this->hiddenFields['onQuery'] ?? []
             );
             $data = array_intersect_key($this->fields, array_flip($allowedFields));
@@ -359,6 +376,14 @@ class WizardForm extends Component
 
     protected function validateFields(): void
     {
+        // When 'All Companies' mode, make company_id required on the form
+        if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0
+            && isset($this->fieldDefinitions['company_id'])
+            && !$this->isEditMode
+        ) {
+            $this->fieldDefinitions['company_id']['validation'] = 'required|integer|exists:companies,id';
+        }
+
         $rules = [];
 
         foreach ($this->fieldDefinitions as $field => $def) {

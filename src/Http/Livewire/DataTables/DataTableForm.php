@@ -143,6 +143,16 @@ class DataTableForm extends Component
         $this->fieldDefinitions = $resolver->getFieldDefinitions();
         $this->fieldGroups = $resolver->getFieldGroups();
         $this->hiddenFields = $resolver->getHiddenFields();
+
+        // When 'All Companies' mode, show company_id on forms so super_admin can assign it
+        if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0) {
+            foreach (['onNewForm', 'onEditForm', 'onTable'] as $context) {
+                if (isset($this->hiddenFields[$context])) {
+                    $this->hiddenFields[$context] = array_values(array_diff($this->hiddenFields[$context], ['company_id']));
+                }
+            }
+        }
+
         $this->relations = $resolver->getRelations();
         $this->columns = array_keys($this->fieldDefinitions);
 
@@ -647,9 +657,16 @@ class DataTableForm extends Component
 
             // Filter fillable fields based on hidden config
             $formType = $this->isEditMode ? 'onEditForm' : 'onNewForm';
+            $hiddenForForm = $this->hiddenFields[$formType] ?? [];
+
+            // When 'All Companies' mode (0), show company_id on forms so super_admin can assign it
+            if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0) {
+                $hiddenForForm = array_diff($hiddenForForm, ['company_id']);
+            }
+
             $allowedFields = array_diff(
                 $this->columns,
-                $this->hiddenFields[$formType] ?? [],
+                $hiddenForForm,
                 $this->hiddenFields['onQuery'] ?? []
             );
 
@@ -869,10 +886,19 @@ class DataTableForm extends Component
 
     protected function validateFields(): void
     {
+        // When 'All Companies' mode, make company_id required on the form
+        $fieldDefs = $this->fieldDefinitions;
+        if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0
+            && isset($fieldDefs['company_id'])
+            && !$this->isEditMode
+        ) {
+            $fieldDefs['company_id']['validation'] = 'required|integer|exists:companies,id';
+        }
+
         $formValidator = app(DataTableFormValidationService::class);
         [$rules, $messages] = $formValidator->getDynamicValidationRules(
             $this->fields,
-            $this->fieldDefinitions,
+            $fieldDefs,
             $this->getFieldFactory(),
             $this->isEditMode,
             null,

@@ -20,6 +20,43 @@ return [
             ],
         ],
     ],
+    /*
+    |--------------------------------------------------------------------------
+    | Multi-Tenancy Configuration
+    |--------------------------------------------------------------------------
+    | Controls company switcher visibility and access.
+    */
+    'multitenancy' => [
+
+        /*
+        |--------------------------------------------------------------------------
+        | Company Switcher Roles
+        |--------------------------------------------------------------------------
+        | Roles that can see the company switcher dropdown in the top nav.
+        | Use '*' to allow all authenticated users.
+        */
+        'switcher_roles' => ['super_admin', 'company_admin'],
+
+        /*
+        |--------------------------------------------------------------------------
+        | All Companies Access
+        |--------------------------------------------------------------------------
+        | Roles that can select "All Companies" to see data across all companies.
+        */
+        'all_companies_roles' => ['super_admin', 'company_admin'],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Default Company Mode
+        |--------------------------------------------------------------------------
+        | When a user has multiple available companies, which one to default to:
+        | - 'first'  : the first company in their list
+        | - 'all'    : "All Companies" mode (0)
+        | - 'none'   : no default (user must pick)
+        */
+        'default_mode' => 'first',
+    ],
+
 ];
 
 

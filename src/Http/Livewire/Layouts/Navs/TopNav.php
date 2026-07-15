@@ -50,15 +50,34 @@ class TopNav extends Component
         }
 
         $user = auth()->user();
+        $config = config('quicker-faster-ui.multitenancy', []);
+        $switcherRoles = $config['switcher_roles'] ?? ['super_admin'];
+        $allCompaniesRoles = $config['all_companies_roles'] ?? ['super_admin'];
+        $isWildcard = ($switcherRoles === '*' || $switcherRoles === ['*']);
 
-        // Super admin sees all companies; company_admin sees only their company
-        if ($user->hasRole('super_admin')) {
-            $this->companies = \App\Modules\Admin\Models\Company::orderBy('name')->get();
-        } elseif ($user->hasRole('company_admin')) {
-            $this->companies = \App\Modules\Admin\Models\Company::where('id', $user->company_id)->get();
-        } else {
+        // Check if user can see the company switcher
+        if (!$isWildcard && !$user->hasAnyRole((array) $switcherRoles)) {
             $this->companies = collect();
             return;
+        }
+
+        // Determine which companies to show
+        $canSeeAll = $isWildcard
+            ? $user->hasAnyRole((array) $allCompaniesRoles)
+            : ($allCompaniesRoles === '*' || $allCompaniesRoles === ['*'] || $user->hasAnyRole((array) $allCompaniesRoles));
+
+        if ($canSeeAll) {
+            $this->companies = \App\Modules\Admin\Models\Company::orderBy('name')->get();
+        } else {
+            // Show only the user's company.
+            // Employee record is the source of truth; fall back to user.company_id.
+            $companyId = optional($user->employee)->company_id ?? $user->company_id;
+            if ($companyId) {
+                $this->companies = \App\Modules\Admin\Models\Company::where('id', $companyId)->get();
+            } else {
+                $this->companies = collect();
+                return;
+            }
         }
 
         // Determine current company from session

@@ -4,6 +4,7 @@
             @if ($layoutConfig['title']['enabled'] ?? true)
                 <h1 class="h3 mb-0">{{ $pageTitle }}</h1>
             @endif
+            @include('qf::components.layouts.partials.company-title-suffix', ['asBadge' => true])
         </div>
 
 
