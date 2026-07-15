@@ -313,6 +313,14 @@ class WizardForm extends Component
                 }
             }
 
+            // Inject company_id from session for multi-tenancy (create mode only)
+            if (!$this->isEditMode) {
+                $companyId = \Illuminate\Support\Facades\Session::get('current_company_id');
+                if ($companyId && \Illuminate\Support\Facades\Schema::hasColumn($record->getTable(), 'company_id')) {
+                    $data['company_id'] = $companyId;
+                }
+            }
+
             if ($this->isEditMode) {
                 $record->update($data);
             } else {

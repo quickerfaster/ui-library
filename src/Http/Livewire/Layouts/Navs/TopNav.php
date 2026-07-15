@@ -3,9 +3,8 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs;
 
 use Livewire\Component;
-
-
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Session;
 
 class TopNav extends Component
 {
@@ -17,6 +16,12 @@ class TopNav extends Component
 
     public array $leftShared = [];
     public array $rightShared = [];
+
+    /** @var \Illuminate\Support\Collection|null */
+    public $companies = null;
+
+    public ?int $currentCompanyId = null;
+    public ?string $currentCompanyName = null;
 
     public function mount(
         array $items,
@@ -30,6 +35,76 @@ class TopNav extends Component
         $this->moduleName = $moduleName;
         $this->leftShared = $leftShared;
         $this->rightShared = $rightShared;
+
+        $this->loadCompanies();
+    }
+
+    /**
+     * Load all companies and set the current selection from session.
+     */
+    protected function loadCompanies(): void
+    {
+        if (!auth()->check()) {
+            $this->companies = collect();
+            return;
+        }
+
+        $user = auth()->user();
+
+        // Super admin sees all companies; company_admin sees only their company
+        if ($user->hasRole('super_admin')) {
+            $this->companies = \App\Modules\Admin\Models\Company::orderBy('name')->get();
+        } elseif ($user->hasRole('company_admin')) {
+            $this->companies = \App\Modules\Admin\Models\Company::where('id', $user->company_id)->get();
+        } else {
+            $this->companies = collect();
+            return;
+        }
+
+        // Determine current company from session, or default to first
+        $sessionCompanyId = Session::get('current_company_id');
+
+        if ($sessionCompanyId && $this->companies->pluck('id')->contains($sessionCompanyId)) {
+            $this->currentCompanyId = $sessionCompanyId;
+        } elseif ($this->companies->isNotEmpty()) {
+            $this->currentCompanyId = $this->companies->first()->id;
+            Session::put('current_company_id', $this->currentCompanyId);
+        }
+
+        $this->updateCurrentCompanyName();
+    }
+
+    /**
+     * Switch the active company and persist to session.
+     */
+    public function switchCompany(int $companyId): void
+    {
+        if (!$this->companies || !$this->companies->pluck('id')->contains($companyId)) {
+            return;
+        }
+
+        $this->currentCompanyId = $companyId;
+        Session::put('current_company_id', $companyId);
+        $this->updateCurrentCompanyName();
+
+        // Dispatch event so other components can react to company change
+        $this->dispatch('companySwitched', companyId: $companyId);
+
+        // Redirect to dashboard to refresh the page context
+        $this->redirect(url('/' . strtolower($this->moduleName) . '/dashboard'));
+    }
+
+    /**
+     * Update the display name for the currently selected company.
+     */
+    protected function updateCurrentCompanyName(): void
+    {
+        if ($this->currentCompanyId && $this->companies) {
+            $company = $this->companies->firstWhere('id', $this->currentCompanyId);
+            $this->currentCompanyName = $company ? $company->name : 'Select Company';
+        } else {
+            $this->currentCompanyName = 'Select Company';
+        }
     }
 
     public function getOverflowDesktopProperty(): Collection

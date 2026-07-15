@@ -449,31 +449,114 @@ class AuthorizationService
     }
 
     /**
+     * Get the effective company ID for the current user.
+     * For company_admin: uses their own company_id.
+     * For super_admin: uses session current_company_id if set.
+     */
+    private function getUserCompanyId(User $user): ?int
+    {
+        if ($user->hasRole('super_admin')) {
+            return session()->get('current_company_id');
+        }
+
+        if ($user->hasRole('company_admin')) {
+            return $user->company_id;
+        }
+
+        // For employee/manager: derive from their employee record
+        if ($user->employee && $user->employee->company_id) {
+            return $user->employee->company_id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if a row/model has a company_id attribute.
+     */
+    private function rowHasCompanyId($row): bool
+    {
+        if (is_array($row)) {
+            return array_key_exists('company_id', $row);
+        }
+
+        if (method_exists($row, 'getAttributes')) {
+            return array_key_exists('company_id', $row->getAttributes());
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a row/model has an employee_id attribute.
+     */
+    private function rowHasEmployeeId($row): bool
+    {
+        if (is_array($row)) {
+            return array_key_exists('employee_id', $row);
+        }
+
+        if (method_exists($row, 'getAttributes')) {
+            return array_key_exists('employee_id', $row->getAttributes());
+        }
+
+        return false;
+    }
+
+    /**
      * Check if a row is within the user's data scope.
+     *
+     * Enforces multi-tenant company scoping:
+     * - super_admin: full access (bypassed earlier in canPerformAction)
+     * - company_admin: scoped to their company (from session or user's company_id)
+     * - manager/employee: scoped to their own data + company context
      */
     private function isInUserScope(User $user, $row): bool
     {
-
-        // Allow user related data such as profile
+        // Allow user to access their own user record
         if (method_exists($row, 'getTable') && $row->getTable() === 'users' && $user->id === $row->id) {
             return true;
         }
 
+        // ---- Multi-Tenant Company Scoping ----
 
-        $employeeId = $row->employee_id ?? $row->id;
+        // Determine the user's effective company ID
+        $userCompanyId = $this->getUserCompanyId($user);
 
-        if ($user->hasRole('employee')) {
-            return $user->employee_id == $employeeId;
+        // If the row has a company_id column, enforce company scope
+        if ($userCompanyId && $this->rowHasCompanyId($row)) {
+            $rowCompanyId = $row->company_id;
+
+            // super_admin with no session company: full access
+            if ($user->hasRole('super_admin') && !session()->has('current_company_id')) {
+                return true;
+            }
+
+            // Must match the user's company scope
+            if ($rowCompanyId !== null && (int) $rowCompanyId !== (int) $userCompanyId) {
+                return false;
+            }
         }
 
-        if ($user->hasRole('manager')) {
-            $managedEmployeeIds = $user->managedEmployees()->pluck('id')->toArray();
-            return in_array($employeeId, $managedEmployeeIds);
+        // ---- Employee/Manager Data Scoping ----
+
+        // For models that have employee_id, apply employee-level scoping
+        if ($this->rowHasEmployeeId($row)) {
+            $employeeId = $row->employee_id ?? $row->id;
+
+            if ($user->hasRole('employee')) {
+                return $user->employee_id == $employeeId;
+            }
+
+            if ($user->hasRole('manager')) {
+                $managedEmployeeIds = $user->managedEmployees()->pluck('id')->toArray();
+                return in_array($employeeId, $managedEmployeeIds);
+            }
         }
 
-        // company_admin and super_admin already bypassed earlier, but if not bypassed,
-        // they are allowed full scope.
-        if ($user->hasAnyRole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES)) {
+        // company_admin and super_admin: if we reached here, allow access
+        // (they were already company-scoped above if the row has company_id)
+        if ($user->hasAnyRole(self::ADMIN_ROLES)) {
             return true;
         }
 
