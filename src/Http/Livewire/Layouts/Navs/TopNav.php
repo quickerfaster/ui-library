@@ -61,12 +61,20 @@ class TopNav extends Component
             return;
         }
 
-        // Determine current company from session, or default to first
+        // Determine current company from session
         $sessionCompanyId = Session::get('current_company_id');
 
-        if ($sessionCompanyId && $this->companies->pluck('id')->contains($sessionCompanyId)) {
+        if ($sessionCompanyId === 0) {
+            // 0 means "All Companies" — no filtering
+            $this->currentCompanyId = 0;
+        } elseif ($sessionCompanyId && $this->companies->pluck('id')->contains($sessionCompanyId)) {
             $this->currentCompanyId = $sessionCompanyId;
+        } elseif ($user->hasRole('super_admin')) {
+            // Super admin defaults to "All Companies" (no pre-selected company)
+            $this->currentCompanyId = 0;
+            Session::put('current_company_id', 0);
         } elseif ($this->companies->isNotEmpty()) {
+            // Company admin defaults to their first company
             $this->currentCompanyId = $this->companies->first()->id;
             Session::put('current_company_id', $this->currentCompanyId);
         }
@@ -79,7 +87,8 @@ class TopNav extends Component
      */
     public function switchCompany(int $companyId): void
     {
-        if (!$this->companies || !$this->companies->pluck('id')->contains($companyId)) {
+        // Allow 0 for "All Companies"; otherwise validate company exists
+        if ($companyId !== 0 && (!$this->companies || !$this->companies->pluck('id')->contains($companyId))) {
             return;
         }
 
@@ -99,7 +108,9 @@ class TopNav extends Component
      */
     protected function updateCurrentCompanyName(): void
     {
-        if ($this->currentCompanyId && $this->companies) {
+        if ($this->currentCompanyId === 0) {
+            $this->currentCompanyName = 'All Companies';
+        } elseif ($this->currentCompanyId && $this->companies) {
             $company = $this->companies->firstWhere('id', $this->currentCompanyId);
             $this->currentCompanyName = $company ? $company->name : 'Select Company';
         } else {

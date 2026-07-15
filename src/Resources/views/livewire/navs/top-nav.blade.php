@@ -205,10 +205,13 @@
 
                 {{-- Company Switcher --}}
                 @if ($companies && $companies->isNotEmpty())
+                    @php
+                        $isAllCompanies = $currentCompanyId === 0;
+                    @endphp
                     <div class="dropdown me-2" id="company-switcher" wire:key="company-switcher">
-                        <button class="btn btn-sm btn-outline-primary dropdown-toggle px-3 py-1 my-0 fw-medium" type="button"
+                        <button class="btn btn-sm {{ $isAllCompanies ? 'btn-outline-info' : 'btn-outline-primary' }} dropdown-toggle px-3 py-1 my-0 fw-medium" type="button"
                             data-bs-toggle="dropdown" aria-label="Switch Company">
-                            <i class="fas fa-building me-1"></i>
+                            <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
                             <span class="d-none d-md-inline">{{ \Illuminate\Support\Str::limit($currentCompanyName, 12) }}</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="max-height: 300px; overflow-y: auto;">
@@ -217,6 +220,19 @@
                                     Switch Company
                                 </h6>
                             </li>
+                            {{-- All Companies option --}}
+                            <li wire:key="company-all">
+                                <a class="dropdown-item border-radius-md d-flex align-items-center {{ $isAllCompanies ? 'bg-info-light text-info fw-bold' : '' }}"
+                                    href="#"
+                                    wire:click.prevent="switchCompany(0)">
+                                    <i class="fas fa-globe me-2 {{ $isAllCompanies ? 'text-info' : 'opacity-6' }}"></i>
+                                    <span>All Companies</span>
+                                    @if ($isAllCompanies)
+                                        <i class="fas fa-check ms-auto text-info"></i>
+                                    @endif
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
                             @foreach ($companies as $company)
                                 <li wire:key="company-{{ $company->id }}">
                                     <a class="dropdown-item border-radius-md d-flex align-items-center {{ $currentCompanyId === $company->id ? 'bg-light text-primary fw-bold' : '' }}"

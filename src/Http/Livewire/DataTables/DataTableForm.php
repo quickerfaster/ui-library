@@ -721,9 +721,10 @@ class DataTableForm extends Component
             }
 
             // Inject company_id from session for multi-tenancy (create mode only)
+            // Skip when 'All Companies' (0) is selected — records get NULL company_id
             if (!$this->isEditMode) {
                 $companyId = \Illuminate\Support\Facades\Session::get('current_company_id');
-                if ($companyId && \Illuminate\Support\Facades\Schema::hasColumn($record->getTable(), 'company_id')) {
+                if ($companyId && $companyId !== 0 && \Illuminate\Support\Facades\Schema::hasColumn($record->getTable(), 'company_id')) {
                     $data['company_id'] = $companyId;
                 }
             }
