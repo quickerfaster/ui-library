@@ -50,9 +50,9 @@ class SettingsManager
 
     protected function getContextHash(): string
     {
-        // Include user ID and module context (e.g., from route or session)
         $userId = auth()->id() ?? 'guest';
         $module = request()->route('module') ?? session('active_module') ?? 'system';
-        return md5($userId . '_' . $module);
+        $companyId = \Illuminate\Support\Facades\Session::get('current_company_id', '0');
+        return md5($userId . '_' . $module . '_' . $companyId);
     }
 }

@@ -15,7 +15,7 @@
     <!-- Settings Content -->
     <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <h4 class="card-title mb-4">{{ $groups[$activeGroup]['label'] ?? '' }}</h4>
+                    <h4 class="card-title mb-4">{{ $this->panelTitle }}</h4>
 
                     @foreach($currentGroupSettings as $setting)
                         @php

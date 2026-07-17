@@ -305,7 +305,7 @@
 
                         <li>
                             @auth
-                                <a class="dropdown-item border-radius-md mb-1" href="/hr/my-preferences" wire:navigate>
+                                <a class="dropdown-item border-radius-md mb-1" href="/hr/my-preferences" target="_blank">
                                     <i class="fas fa-cog me-2 opacity-6 text-sm"></i> My Preferences
                                 </a>
                             @endauth

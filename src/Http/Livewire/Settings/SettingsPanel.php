@@ -4,12 +4,24 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Settings;
 
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
-use App\Models\System;
+use App\Modules\System\Models\System;
 use Illuminate\Support\Facades\Auth;
 
 class SettingsPanel extends Component
 {
-    public string $mode = 'user'; // 'user' or 'system'
+    public string $mode = 'user'; // 'user', 'system', or 'company'
+
+    public function getPanelTitleProperty(): string
+    {
+        if ($this->context) {
+            return $this->groups[$this->activeGroup]['label'] ?? 'Settings';
+        }
+        return match ($this->mode) {
+            'system' => 'General Settings',
+            'company' => 'Company Settings',
+            default => 'My Preferences',
+        };
+    }
     public ?string $context = null;
     public ?string $moduleName = null;
     public string $activeGroup = 'general';
@@ -100,6 +112,10 @@ class SettingsPanel extends Component
     {
         if ($this->mode === 'system') {
             return System::find(1);
+        }
+        if ($this->mode === 'company') {
+            $companyId = \Illuminate\Support\Facades\Session::get('current_company_id') ?? auth()->user()?->company_id;
+            return $companyId ? \App\Modules\Hr\Models\Company::find($companyId) : System::find(1);
         }
         return Auth::user();
     }

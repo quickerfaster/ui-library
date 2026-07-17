@@ -151,26 +151,21 @@ class UILibraryServiceProvider extends ServiceProvider
                 return auth()->user()?->getSetting($key);
             });
 
-            // Priority 2: Context (e.g., module or organization)
-            /*$manager->addResolver('context', function ($key) {
-                $moduleSlug = request()->route('module') ?? session('active_module');
-                if ($moduleSlug) {
-                    $module = \App\Models\Module::where('slug', $moduleSlug)->first();
-                    return $module?->getSetting($key);
-                }
-                // Or organization
-                if (session('organization_id')) {
-                    $org = \App\Models\Organization::find(session('organization_id'));
-                    return $org?->getSetting($key);
+            // Priority 2: Account/Company settings
+            $manager->addResolver('company', function ($key) {
+                $companyId = \Illuminate\Support\Facades\Session::get('current_company_id') ?? auth()->user()?->company_id;
+                if ($companyId) {
+                    $company = \App\Modules\Hr\Models\Company::find($companyId);
+                    return $company?->getSetting($key);
                 }
                 return null;
             });
 
             // Priority 3: System defaults
             $manager->addResolver('system', function ($key) {
-                $system = \App\Models\System::find(1);
+                $system = \App\Modules\System\Models\System::find(1);
                 return $system?->getSetting($key);
-            });*/
+            });
 
             return $manager;
         });

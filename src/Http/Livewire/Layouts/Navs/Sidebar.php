@@ -61,7 +61,7 @@ public function openSettings()
     $this->dispatch('openDrawer',
         component: 'qf.settings-panel',
         params: [
-            'mode' => 'system',
+            'mode' => 'company',
             'context' => $contextKey,
             'moduleName' => $this->moduleName ?? null,
             'initialGroup' => 'auto_generation',
