@@ -305,6 +305,14 @@
 
                         <li>
                             @auth
+                                <a class="dropdown-item border-radius-md mb-1" href="/hr/my-preferences" wire:navigate>
+                                    <i class="fas fa-cog me-2 opacity-6 text-sm"></i> My Preferences
+                                </a>
+                            @endauth
+                        </li>
+
+                        <li>
+                            @auth
                                 <a class="dropdown-item border-radius-md mb-1" href="/hr/my-account">
                                     <i class="fas fa-user-edit me-2 opacity-6 text-sm"></i> Edit My User Account
                                 </a>

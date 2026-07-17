@@ -9,11 +9,15 @@ class ValueGenerator
         $generatorDef = $fieldDef['generator'] ?? [];
         $pattern = $generatorDef['pattern'] ?? $this->defaultPattern($modelClass, $fieldName);
 
+        $now = now();
+
         // Base replacements
         $replacements = [
-            '{year}' => now()->format('Y'),
-            '{month}' => now()->format('m'),
-            '{day}' => now()->format('d'),
+            '{year}' => $now->format('Y'),
+            '{year:2}' => $now->format('y'),
+            '{month}' => $now->format('m'),
+            '{month:short}' => $now->format('M'),
+            '{day}' => $now->format('d'),
             '{id}' => $recordId ?? 'NEW',
         ];
 

@@ -1,6 +1,6 @@
 <div>
 <x-qf::navigation-layout
-    configKey="admin.dashboards.dashboard_company_profile_overview"
+    configKey="admin.dashboards.dashboard_organization_overview"
     context="General Settings"
     moduleName="admin"
     :overrides="[

@@ -9,6 +9,7 @@
                         <i class="fas fa-check-circle text-success fa-4x"></i>
                     </div>
                     <h3 class="fw-bold">{{ $completion['title'] ?? 'Completed!' }}</h3>
+                    @include('qf::components.layouts.partials.company-title-suffix', ['asBadge' => true])
                     <p class="text-muted fs-5">{{ $completion['message'] ?? '' }}</p>
 
                     <div class="mt-4">
@@ -43,11 +44,12 @@
             {{-- Wizard Progress & Step Title --}}
             <div class="mb-4">
                 <div class="d-flex justify-content-between align-items-end mb-2">
-                    <div>
+                    <div class="pb-3">
                         <span class="text-uppercase text-muted fw-bold" style="font-size: 0.75rem;">
                             Step {{ $currentStep + 1 }} of {{ count($steps) }}
                         </span>
                         <h2 class="fw-bold mb-0">{{ $steps[$currentStep]['title'] ?? 'Step' }}</h2>
+                        @include('qf::components.layouts.partials.company-title-suffix', ['asBadge' => true])
                     </div>
                     <div class="text-muted small">
                         {{ round((($currentStep + 1) / count($steps)) * 100) }}% Complete

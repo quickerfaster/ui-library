@@ -10,13 +10,17 @@ class Sidebar extends Component
     public string $state = 'full';
     public array $headerItems = [];
     public array $footerItems = [];
-    public ?string $currentModelName = null;   
+    public ?string $currentModelName = null;
+    public ?string $settingsContext = null;
+    public ?string $moduleName = null;
 
     public bool $allowTypeSwitch = false;
 
-    public function mount(array $items, string $state = 'full', array $headerItems = [], array $footerItems = [], 
+    public function mount(array $items, string $state = 'full', array $headerItems = [], array $footerItems = [],
         bool $allowTypeSwitch = false,
-        ?string $currentModelName = null
+        ?string $currentModelName = null,
+        ?string $settingsContext = null,
+        ?string $moduleName = null
         
         )
     {
@@ -25,7 +29,9 @@ class Sidebar extends Component
         $this->headerItems = $headerItems;
         $this->footerItems = $footerItems;
         $this->allowTypeSwitch = $allowTypeSwitch;
-        $this->currentModelName = $currentModelName;  
+        $this->currentModelName = $currentModelName;
+        $this->settingsContext = $settingsContext;
+        $this->moduleName = $moduleName;
 
     }
 
@@ -46,6 +52,22 @@ public function switchToHorizontal(): void
 {
     session(['context_menu_type' => 'horizontal']);
     $this->dispatch('doReload');
+}
+
+public function openSettings()
+{
+    $contextKey = strtolower($this->settingsContext);
+    $title = ($this->settingsContext ? $this->settingsContext . ' ' : '') . 'Settings';
+    $this->dispatch('openDrawer',
+        component: 'qf.settings-panel',
+        params: [
+            'mode' => 'system',
+            'context' => $contextKey,
+            'moduleName' => $this->moduleName ?? null,
+            'initialGroup' => 'auto_generation',
+        ],
+        title: $title
+    );
 }
 
     public function render()

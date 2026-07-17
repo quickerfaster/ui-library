@@ -69,6 +69,20 @@ public function getSettingsOverrideFieldDefinition(string $field): array
         $def['currency'] = $currency;
     }
 
+    // Override auto-generation pattern from settings
+    if ($def['autoGenerate'] ?? false) {
+        $modelClass = $this->getModel();
+        $modelName = strtolower(class_basename($modelClass));
+        $settingKey = "auto_gen.{$modelName}.{$field}.pattern";
+        $pattern = $this->settingsManager->get($settingKey);
+        
+        if ($pattern) {
+            $def['generator'] = array_merge($def['generator'] ?? [], [
+                'pattern' => $pattern,
+            ]);
+        }
+    }
+
     return $def;
 }
 

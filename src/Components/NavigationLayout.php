@@ -27,6 +27,7 @@ class NavigationLayout extends Component
     public array $sharedTopLeft = [];
     public array $sharedTopRight = [];
     public ?string $currentModelName = null;
+    public ?string $settingsContext = null;
 
     public string $pageTitle;
     public array $breadcrumbItems;
@@ -232,6 +233,19 @@ class NavigationLayout extends Component
 
     public function render()
     {
+        // Determine settings context by checking the module's Config/settings.php
+        $this->settingsContext = null;
+        if ($this->activeContext && $this->moduleName) {
+            $moduleName = ucfirst($this->moduleName);
+            $settingsPath = app_path("Modules/{$moduleName}/Config/settings.php");
+            if (file_exists($settingsPath)) {
+                $moduleSettings = require $settingsPath;
+                $contextKey = strtolower($this->activeContext);
+                $contextSettings = $moduleSettings['contexts'][$contextKey]['groups'] ?? [];
+                $this->settingsContext = (!empty($contextSettings)) ? $this->activeContext : null;
+            }
+        }
+
         return view('qf::components.layouts.navigation-layout', [
             'moduleName' => $this->moduleName,
             'configKey' => $this->configKey,
@@ -252,8 +266,8 @@ class NavigationLayout extends Component
             'layoutConfig' => $this->layoutConfig,
             'configResolver' => $this->configResolver,
             'crudType' => $this->configResolver?->getConfig()['crudType'] ?? 'modal',
-            'currentModelName' => $this->currentModelName,  
-
+            'currentModelName' => $this->currentModelName,
+            'settingsContext' => $this->settingsContext,
 
         ]);
 

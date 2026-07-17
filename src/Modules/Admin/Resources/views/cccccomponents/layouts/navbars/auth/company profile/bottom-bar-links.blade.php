@@ -2,7 +2,7 @@
 
             <button role="link" href="admin/company-profile-overviews" class="btn btn-light flex-shrink-0 text-center" style="min-width:70px;" wire:navigate>
                 <i class=" fas fa-user }} d-block mb-1"></i>
-                <small>Company Profile Overviews</small>
+                <small>Organization Overviews</small>
             </button>
             <button role="link" href="admin/locations" class="btn btn-light flex-shrink-0 text-center" style="min-width:70px;" wire:navigate>
                 <i class=" fas fa-map-marker-alt }} d-block mb-1"></i>

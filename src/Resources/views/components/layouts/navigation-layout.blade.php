@@ -157,6 +157,7 @@
                     @if ($showContextMenu)
                         <livewire:qf.sidebar :items="$contextItems[$activeContext] ?? []" :state="$sidebarState" :headerItems="$sharedHeaderItems" :footerItems="$sharedFooterItems"
                             :currentModelName="$currentModelName" :allowTypeSwitch="$allowMenuTypeSwitch"
+                            :settingsContext="$settingsContext" :moduleName="$moduleName"
                             wire:key="sidebar-menu-{{ $moduleName }}-{{ $activeContext }}" />
                     @endif
 

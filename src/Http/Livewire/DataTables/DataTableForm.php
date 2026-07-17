@@ -624,7 +624,10 @@ class DataTableForm extends Component
     // ---------- Field Helpers ----------
     public function getField(string $name): FieldType
     {
-        return $this->getFieldFactory()->make($name, $this->fieldDefinitions[$name]);
+        return $this->getFieldFactory()->make(
+            $name,
+            $this->getConfigResolver()->getSettingsOverrideFieldDefinition($name)
+        );
     }
 
     public function isFieldHidden(string $field, string $context): bool

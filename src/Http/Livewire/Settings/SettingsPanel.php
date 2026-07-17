@@ -10,11 +10,15 @@ use Illuminate\Support\Facades\Auth;
 class SettingsPanel extends Component
 {
     public string $mode = 'user'; // 'user' or 'system'
+    public ?string $context = null;
+    public ?string $moduleName = null;
     public string $activeGroup = 'general';
     public array $groups = [];
     public array $overrides = [];   // temporary storage for unsaved changes
     public array $effectiveValues = [];
     public array $inheritance = [];
+    public array $patternPreviews = [];
+    public array $settingsMap = [];  // key → setting definition (public for Livewire persistence)
 
     protected SettingsManager $settingsManager;
 
@@ -23,21 +27,50 @@ class SettingsPanel extends Component
         $this->settingsManager = $settingsManager;
     }
 
-    public function mount(string $mode = 'user')
+    public function mount(string $mode = 'user', ?string $context = null, ?string $initialGroup = null, ?string $moduleName = null)
     {
         $this->mode = $mode;
-        $this->loadGroups();
+        $this->context = $context;
+        $this->moduleName = $moduleName;
+        $this->loadGroups($initialGroup);
         $this->loadCurrentValues();
     }
 
-    public function loadGroups(): void
+    public function loadGroups(?string $initialGroup = null): void
     {
-        $this->groups = config('app_general_settings.groups', []);
+        if ($this->context && $this->moduleName) {
+            // Context-specific settings: load from module's Config/settings.php
+            $moduleName = ucfirst($this->moduleName);
+            $settingsPath = app_path("Modules/{$moduleName}/Config/settings.php");
+            if (file_exists($settingsPath)) {
+                $moduleSettings = require $settingsPath;
+                $this->groups = $moduleSettings['contexts'][$this->context]['groups'] ?? [];
+            } else {
+                $this->groups = [];
+            }
+        } else {
+            // User preferences: load global groups only
+            $this->groups = config('app_general_settings.groups', []);
+        }
+
         if (empty($this->groups)) {
             return;
         }
-        $firstGroup = array_key_first($this->groups);
-        $this->activeGroup = $firstGroup;
+
+        // Build flat settings map for lookup by key
+        $this->settingsMap = [];
+        foreach ($this->groups as $group) {
+            foreach ($group['settings'] as $setting) {
+                $this->settingsMap[$setting['key']] = $setting;
+            }
+        }
+
+        if ($initialGroup && isset($this->groups[$initialGroup])) {
+            $this->activeGroup = $initialGroup;
+        } else {
+            $firstGroup = array_key_first($this->groups);
+            $this->activeGroup = $firstGroup;
+        }
     }
 
     public function loadCurrentValues(): void
@@ -100,6 +133,31 @@ class SettingsPanel extends Component
         // We don't save immediately – we'll save only when clicking "Save"
     }
 
+    public function insertPatternPlaceholder(string $key, string $placeholder): void
+    {
+        $current = $this->overrides[$key] ?? '';
+        $this->overrides[$key] = $current . $placeholder;
+    }
+
+    public function previewPattern(string $key): void
+    {
+        $pattern = $this->overrides[$key] ?? '';
+        $now = now();
+
+        $preview = $pattern;
+        $preview = str_replace('{year}', $now->format('Y'), $preview);
+        $preview = str_replace('{year:2}', $now->format('y'), $preview);
+        $preview = str_replace('{month}', $now->format('m'), $preview);
+        $preview = str_replace('{month:short}', $now->format('M'), $preview);
+        $preview = str_replace('{day}', $now->format('d'), $preview);
+        $preview = preg_replace('/\{sequence:(\d+)\}/', '0__SEQ__$1', $preview);
+        $preview = preg_replace_callback('/0__SEQ__(\d+)/', fn($m) => str_repeat('0', (int) $m[1]), $preview);
+        $preview = str_replace('{sequence}', '00000', $preview);
+        $preview = str_replace('{id}', 'NEW', $preview);
+
+        $this->patternPreviews[$key] = $preview;
+    }
+
     public function saveSetting(string $key)
     {
         $newValue = $this->overrides[$key] ?? null;
@@ -107,6 +165,18 @@ class SettingsPanel extends Component
             $this->resetSetting($key);
         } else {
             $this->getSettableModel()->setSetting($key, $newValue);
+
+            // Flush cache for this key so SettingsManager picks up the new value
+            $this->settingsManager->flush($key);
+
+            // Dual-write for pattern settings: also save under the dotted key ConfigResolver expects
+            $settingDef = $this->settingsMap[$key] ?? [];
+            if (($settingDef['pattern_model'] ?? '') && ($settingDef['pattern_field'] ?? '')) {
+                $dottedKey = 'auto_gen.' . $settingDef['pattern_model'] . '.' . $settingDef['pattern_field'] . '.pattern';
+                $this->getSettableModel()->setSetting($dottedKey, $newValue);
+                $this->settingsManager->flush($dottedKey);
+            }
+
             $this->dispatch('setting-updated', $key, $newValue);
             $this->dispatch('showAlert', ['type' => 'success', 'message' => "Setting saved: {$key}"]);
         }
@@ -116,6 +186,16 @@ class SettingsPanel extends Component
     public function resetSetting(string $key)
     {
         $this->getSettableModel()->forgetSetting($key);
+        $this->settingsManager->flush($key);
+
+        // Also reset the dotted key for pattern settings
+        $settingDef = $this->settingsMap[$key] ?? [];
+        if (($settingDef['pattern_model'] ?? '') && ($settingDef['pattern_field'] ?? '')) {
+            $dottedKey = 'auto_gen.' . $settingDef['pattern_model'] . '.' . $settingDef['pattern_field'] . '.pattern';
+            $this->getSettableModel()->forgetSetting($dottedKey);
+            $this->settingsManager->flush($dottedKey);
+        }
+
         $this->dispatch('setting-updated', $key, null);
         $this->dispatch('showAlert', ['type' => 'info', 'message' => "Reset to default"]);
         $this->loadCurrentValues();

@@ -92,6 +92,10 @@ Route::group(['middleware' => 'web'], function () {
     Route::middleware(['auth'])->group(function () {
         Route::get('/my-profile', [\App\Modules\Hr\Http\Controllers\EmployeeProfileController::class, 'show'])
             ->name('hr.employee.profile');
+
+        Route::get('/my-preferences', function () {
+            return view('hr::my-preferences');
+        })->name('my-preferences');
     });
 
 

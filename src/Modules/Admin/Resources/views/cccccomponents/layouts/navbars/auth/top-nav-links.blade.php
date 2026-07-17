@@ -34,12 +34,12 @@
     </a>
 </li>
 <li class="nav-item">
-    <a href="/admin/admin/dashboard-company-profile-overview"
-        class="nav-link @if(request()->is('admin/admin/dashboard-company-profile-overview') || request()->is('admin/admin/dashboard-company-profile-overview/*')) fw-bold text-primary @endif">
-        @if(request()->is('admin/admin/dashboard-company-profile-overview') || request()->is('admin/admin/dashboard-company-profile-overview/*'))
+    <a href="/admin/admin/dashboard-organization-overview"
+        class="nav-link @if(request()->is('admin/admin/dashboard-organization-overview') || request()->is('admin/admin/dashboard-organization-overview/*')) fw-bold text-primary @endif">
+        @if(request()->is('admin/admin/dashboard-organization-overview') || request()->is('admin/admin/dashboard-organization-overview/*'))
             <i class="fas fas fa-building" aria-hidden="true"></i>
         @endif
-        <span>Company Profile</span>
+        <span>Organization</span>
     </a>
 </li>
 

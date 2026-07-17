@@ -9,7 +9,7 @@ trait HasAutoGenerateFields
 {
     public function generateField(string $fieldName)
     {
-        $definition = $this->fieldDefinitions[$fieldName] ?? null;
+        $definition = $this->getConfigResolver()->getSettingsOverrideFieldDefinition($fieldName);
         if (!$definition || !($definition['autoGenerate'] ?? false)) {
             return;
         }
