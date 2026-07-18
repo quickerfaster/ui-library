@@ -31,6 +31,9 @@ class DataTableForm extends Component
 
     // Internal state
     public array $fields = [];
+    public array $fileUploads = [];  // Top-level file upload storage — Livewire's WithFileUploads
+                                    // properly persists TemporaryUploadedFile objects here,
+                                    // unlike nested $fields array where they are lost across requests.
     public bool $isEditMode = false;
 
     // Configuration data (loaded once)
@@ -160,6 +163,16 @@ class DataTableForm extends Component
 
     protected function initializeFields(): void
     {
+        $this->fields = [];
+
+        // 🔍 DIAGNOSTIC: Log what fieldDefinitions we're working with
+        \Log::channel('single')->warning('initializeFields() called', [
+            'configKey' => $this->configKey,
+            'modelClass' => $this->modelClass,
+            'fieldDefinitions_keys' => array_keys($this->fieldDefinitions),
+            'fields_before' => array_keys($this->fields),
+        ]);
+
         foreach ($this->fieldDefinitions as $field => $definition) {
             $default = $definition['default'] ?? null;
 
@@ -199,6 +212,14 @@ class DataTableForm extends Component
             }*/
 
         }
+
+        // 🔍 DIAGNOSTIC: Log resulting fields
+        \Log::channel('single')->warning('initializeFields() result', [
+            'configKey' => $this->configKey,
+            'fields_after' => array_keys($this->fields),
+            'has_document_key' => array_key_exists('document', $this->fields),
+            'document_value' => $this->fields['document'] ?? 'KEY_NOT_PRESENT',
+        ]);
 
     }
 
@@ -889,6 +910,15 @@ class DataTableForm extends Component
 
     protected function validateFields(): void
     {
+        // Merge top-level file uploads into $fields so the validator can see them.
+        // Livewire's WithFileUploads properly persists TemporaryUploadedFile objects
+        // in top-level properties but loses them inside nested arrays like $fields.
+        foreach ($this->fileUploads as $fieldName => $file) {
+            if ($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
+                $this->fields[$fieldName] = $file;
+            }
+        }
+
         // When 'All Companies' mode, make company_id required on the form
         $fieldDefs = $this->fieldDefinitions;
         if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0
@@ -897,6 +927,21 @@ class DataTableForm extends Component
         ) {
             $fieldDefs['company_id']['validation'] = 'required|integer|exists:companies,id';
         }
+
+        // 🔍 DIAGNOSTIC: Log state before validation
+        \Log::channel('single')->warning('validateFields() START', [
+            'configKey' => $this->configKey,
+            'modelClass' => $this->modelClass,
+            'isEditMode' => $this->isEditMode,
+            'fieldDefs_keys' => array_keys($fieldDefs),
+            'fieldDefs_has_document' => array_key_exists('document', $fieldDefs),
+            'document_def' => $fieldDefs['document'] ?? 'NOT_IN_DEFS',
+            'fields_keys' => array_keys($this->fields),
+            'fields_has_document' => array_key_exists('document', $this->fields),
+            'fields_document_value' => $this->fields['document'] ?? 'KEY_NOT_PRESENT',
+            'hiddenFields' => $this->hiddenFields,
+            'allowedGroups' => $this->allowedGroups,
+        ]);
 
         $formValidator = app(DataTableFormValidationService::class);
         [$rules, $messages] = $formValidator->getDynamicValidationRules(
@@ -909,6 +954,54 @@ class DataTableForm extends Component
             $this->hiddenFields,
         );
 
+        // 🔍 DIAGNOSTIC: Log generated rules
+        \Log::channel('single')->warning('validateFields() RULES', [
+            'configKey' => $this->configKey,
+            'rules_keys' => array_keys($rules),
+            'rules_has_document' => array_key_exists('document', $rules),
+            'document_rule' => $rules['document'] ?? 'NOT_IN_RULES',
+        ]);
+
+        // For file fields: ensure file uploads are properly recognized before validation.
+        // The merge above (fileUploads → fields) handles most cases, but we add
+        // belt-and-suspenders logic here for both create and edit modes.
+        foreach ($this->fieldDefinitions as $fieldName => $definition) {
+            if (($definition['field_type'] ?? '') !== 'file') {
+                continue;
+            }
+
+            // CREATE MODE: Ensure file from fileUploads is copied to fields
+            // (belt-and-suspenders — the merge above should already handle this,
+            // but if wire:model binding was delayed, this catches it)
+            if (!$this->isEditMode) {
+                if (isset($this->fileUploads[$fieldName])
+                    && $this->fileUploads[$fieldName] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile
+                ) {
+                    $this->fields[$fieldName] = $this->fileUploads[$fieldName];
+
+                    \Log::channel('single')->info('validateFields(): file field in create mode — copied from fileUploads to fields', [
+                        'field' => $fieldName,
+                    ]);
+                }
+                continue;
+            }
+
+            // EDIT MODE: If no new file is being uploaded, replace validation rules
+            // with 'nullable' since the existing file is kept.
+            // (Livewire does not preserve old file paths across requests, so the field
+            // value will be null — 'file' and 'required' would both fail on null.)
+            $hasNewFile = isset($this->fields[$fieldName])
+                && $this->fields[$fieldName] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+
+            if (!$hasNewFile && isset($rules[$fieldName])) {
+                $rules[$fieldName] = 'nullable';
+
+                \Log::channel('single')->info('validateFields(): file field in edit mode, no new file — set to nullable', [
+                    'field' => $fieldName,
+                ]);
+            }
+        }
+
         // If allowed groups are specified, only validate fields belonging to those groups
         if (!empty($this->allowedGroups)) {
             $groupFields = [];
@@ -918,6 +1011,13 @@ class DataTableForm extends Component
                 }
             }
             $rules = array_intersect_key($rules, array_flip($groupFields));
+
+            // 🔍 DIAGNOSTIC: Log after group filtering
+            \Log::channel('single')->warning('validateFields() AFTER GROUP FILTER', [
+                'configKey' => $this->configKey,
+                'rules_keys' => array_keys($rules),
+                'rules_has_document' => array_key_exists('document', $rules),
+            ]);
         }
 
         // Custom validation for payroll_policy
@@ -929,6 +1029,16 @@ class DataTableForm extends Component
 
         $validator = Validator::make($this->fields, $rules, $messages);
         if ($validator->fails()) {
+            // 🔍 DIAGNOSTIC: Log validation failures
+            \Log::channel('single')->warning('validateFields() FAILED', [
+                'configKey' => $this->configKey,
+                'modelClass' => $this->modelClass,
+                'errors' => $validator->errors()->toArray(),
+                'fields_snapshot' => array_map(function ($v) {
+                    return is_object($v) ? get_class($v) : (is_array($v) ? '(array)' : $v);
+                }, $this->fields),
+            ]);
+
             $this->resetErrorBag();
             foreach ($validator->errors()->messages() as $key => $errors) {
                 foreach ($errors as $error) {
@@ -938,9 +1048,6 @@ class DataTableForm extends Component
             return;
         }
     }
-
-
-
 
     protected function validatePolicyCalculationLogic(): void
     {
@@ -1037,17 +1144,19 @@ class DataTableForm extends Component
             unset($this->croppedImages[$field]);
         }
 
-        // 2. Process normal file uploads
+        // 2. Process normal file uploads — read from $fileUploads (top-level property)
+        //    where Livewire's WithFileUploads properly persists TemporaryUploadedFile objects.
         foreach ($this->fieldDefinitions as $field => $def) {
             $fieldType = $def['field_type'] ?? null;
             if (!in_array($fieldType, ['file', 'image'])) {
                 continue;
             }
-            if (isset($data[$field]) && !($this->fields[$field] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)) {
-                continue;
-            }
-            if (isset($this->fields[$field]) && $this->fields[$field] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
-                $tempFile = $this->fields[$field];
+
+            // Check $fileUploads first (new upload), fall back to $fields (existing path)
+            $uploadedFile = $this->fileUploads[$field] ?? null;
+
+            if ($uploadedFile instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
+                $tempFile = $uploadedFile;
 
                 $disk = 'public';
                 $customFolder = null;
@@ -1075,9 +1184,11 @@ class DataTableForm extends Component
                         \Storage::disk($oldDisk)->delete($record->$field);
                     }
                 }
+                // Clear both the upload store and the fields entry
+                unset($this->fileUploads[$field]);
                 $this->fields[$field] = null;
             } elseif (isset($data[$field]) && is_string($data[$field]) && !empty($data[$field])) {
-                // Keep existing path
+                // Keep existing path (edit mode, no new file selected)
             } else {
                 $data[$field] = null;
             }
@@ -1167,6 +1278,7 @@ class DataTableForm extends Component
     public function resetFields(): void
     {
         $this->fields = [];
+        $this->fileUploads = [];        // clear any pending file uploads
         $this->initializeFields();
         $this->recordId = null;
         $this->isEditMode = false;
@@ -1184,6 +1296,7 @@ class DataTableForm extends Component
     {
         // Reset all form state
         $this->fields = [];
+        $this->fileUploads = [];        // clear any pending file uploads
         $this->recordId = null;
         $this->isEditMode = false;
         $this->selectedLabels = [];

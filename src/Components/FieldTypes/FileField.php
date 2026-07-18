@@ -93,6 +93,8 @@ class FileField implements FieldType
         return [];
     }
 
+    
+
     public function getOptions(): array
     {
         return [];

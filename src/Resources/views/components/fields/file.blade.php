@@ -76,10 +76,16 @@
            {{ $attributes->merge($customAttributes)->merge([
                'class' => 'form-control',
                'id' => $name,
-               'wire:model' => 'fields.' . $name,
+               'wire:model' => 'fileUploads.' . $name,
                'accept' => $accept,
                $multiple ? 'multiple' : '',
            ]) }}
            x-on:change="handleFileSelect($el.files[0])"
     >
+
+
+    @error($name)
+        <div class="text-danger small mt-1">{{ $message }}</div>
+    @enderror
+
 </div>

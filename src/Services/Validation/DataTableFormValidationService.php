@@ -11,8 +11,29 @@ class DataTableFormValidationService
         $rules = [];
         $allMessages = [];
 
+        // 🔍 DIAGNOSTIC: Log incoming field definitions
+        \Log::channel('single')->warning('getDynamicValidationRules() called', [
+            'fieldDefs_keys' => array_keys($fieldDefinitions),
+            'fieldDefs_has_document' => array_key_exists('document', $fieldDefinitions),
+            'fields_keys' => array_keys($fields),
+            'fields_has_document' => array_key_exists('document', $fields),
+            'hiddenFields' => $hiddenFields,
+            'isEditMode' => $isEditMode,
+        ]);
+
         foreach ($fieldDefinitions as $field => $definition) {
-            if (!$this->shouldValidateField($fields, $fieldDefinitions, $field, $isEditMode, $model, $recordId, $hiddenFields)) {
+            $shouldValidate = $this->shouldValidateField($fields, $fieldDefinitions, $field, $isEditMode, $model, $recordId, $hiddenFields);
+
+            // 🔍 DIAGNOSTIC: Log every field's validation decision
+            \Log::channel('single')->info('getDynamicValidationRules() field decision', [
+                'field' => $field,
+                'shouldValidate' => $shouldValidate,
+                'has_validation_key' => isset($definition['validation']),
+                'validation_value' => $definition['validation'] ?? 'NONE',
+                'field_type' => $definition['field_type'] ?? 'NONE',
+            ]);
+
+            if (!$shouldValidate) {
                 continue;
             }
 
@@ -51,6 +72,13 @@ class DataTableFormValidationService
             }
         }
 
+        // 🔍 DIAGNOSTIC: Log final rules
+        \Log::channel('single')->warning('getDynamicValidationRules() RESULT', [
+            'rules_keys' => array_keys($rules),
+            'rules_has_document' => array_key_exists('document', $rules),
+            'document_rule' => $rules['document'] ?? 'NOT_IN_RULES',
+        ]);
+
         return [$rules, $allMessages];
     }
 
@@ -69,21 +97,38 @@ class DataTableFormValidationService
     {
 
         // Always validate file fields if they exist in request
-        if (isset($fieldDefinitions[$field]['type']) && $fieldDefinitions[$field]['type'] === 'file') {
+        if (isset($fieldDefinitions[$field]['field_type']) && $fieldDefinitions[$field]['field_type'] === 'file') {
+            \Log::channel('single')->info('shouldValidateField: file field forced', ['field' => $field]);
             return true;
         }
 
         // If password fiied is changed on edit form validate
         if ($field === 'password' || $field === 'password_confirmation') {
             // $modelClass eg. App\Modules\Admin\Models\User
-            return !$isEditMode || (isset($fields['password']) && !empty($fields['password']));
+            $result = !$isEditMode || (isset($fields['password']) && !empty($fields['password']));
+            \Log::channel('single')->info('shouldValidateField: password field', ['field' => $field, 'result' => $result]);
+            return $result;
 
         }
 
 
 
         $formType = $isEditMode ? 'onEditForm' : 'onNewForm';
-        return !in_array($field, $hiddenFields[$formType] ?? []);
+        $isHidden = in_array($field, $hiddenFields[$formType] ?? []);
+        $result = !$isHidden;
+
+        // 🔍 DIAGNOSTIC: Log hidden field decisions for key fields
+        if ($field === 'document' || $isHidden) {
+            \Log::channel('single')->info('shouldValidateField: hidden check', [
+                'field' => $field,
+                'formType' => $formType,
+                'isHidden' => $isHidden,
+                'result' => $result,
+                'hiddenFields_for_formType' => $hiddenFields[$formType] ?? [],
+            ]);
+        }
+
+        return $result;
     }
 
     protected function adjustUniqueRule($validation, $isEditMode, $recordId)
