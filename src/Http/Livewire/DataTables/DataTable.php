@@ -21,6 +21,8 @@ class DataTable extends Component
 
     // Public properties (persisted in query string)
     public string $configKey;
+    protected array $viewConfig = [];
+
     public string $search = '';
     public array $sort = ['field' => 'id', 'direction' => 'asc'];
     public $perPage = 5;
@@ -1405,6 +1407,10 @@ class DataTable extends Component
             }
         }
 
+        // Also load relations needed by the current view config
+        $viewRelations = $this->getViewConfigRelations();
+        $allowedRelations = array_merge($allowedRelations, $viewRelations);
+
         if (!empty($allowedRelations)) {
             $query->with(array_unique($allowedRelations));
         }
@@ -1476,7 +1482,37 @@ class DataTable extends Component
     }
 
 
+    /**
+     * Extract relation names from the current view configuration.
+     * Returns an array of unique relation names (first segment of dot notation).
+     */
 
+    protected function getViewConfigRelations(): array
+    {
+        $viewConfig = $this->viewConfig ?? [];
+        $fields = [];
+
+        $paths = array_merge(
+            $viewConfig['titleFields'] ?? [],
+            $viewConfig['subtitleFields'] ?? [],
+            $viewConfig['contentFields'] ?? [],
+            isset($viewConfig['badgeField']) ? [$viewConfig['badgeField']] : [],
+            isset($viewConfig['avatarField']) ? [$viewConfig['avatarField']] : [],
+            isset($viewConfig['imageField']) ? [$viewConfig['imageField']] : []
+        );
+
+        foreach ($paths as $path) {
+            if (is_string($path) && str_contains($path, '.')) {
+                $segments = explode('.', $path);
+                $relation = $segments[0];
+                if (!empty($relation)) {
+                    $fields[] = $relation;
+                }
+            }
+        }
+
+        return array_unique($fields);
+    }
 
 
 
@@ -2326,6 +2362,9 @@ class DataTable extends Component
             $viewConfig = $switchViews[$this->viewMode] ?? [];
         }
 
+        $this->viewConfig = $viewConfig;
+
+
         $controls = $resolver->getControls();
         $simpleActions = $resolver->getConfig()['simpleActions'] ?? [];
         $crudType = $resolver->getConfig()['crudType'] ?? false;
@@ -2334,7 +2373,7 @@ class DataTable extends Component
             'records' => $this->records,
             'columns' => $this->columns,
             'allColumns' => $this->allColumns,
-            'viewConfig' => $viewConfig,
+            'viewConfig' => $this->viewConfig,
             'switchViews' => $switchViews,
             'viewMode' => $this->viewMode,
             'crudType' => $crudType,

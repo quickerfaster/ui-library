@@ -14,6 +14,7 @@ use Livewire\Attributes\On;
 
 
 use QuickerFaster\UILibrary\Services\Validation\DataTableFormValidationService;
+use QuickerFaster\UILibrary\Traits\FieldTypes\HasHintField;
 use QuickerFaster\UILibrary\Traits\HasAutoGenerateFields;
 use App\Modules\Admin\Services\AuthorizationService;
 use QuickerFaster\UILibrary\Services\Documents\EmployeeDocumentService;
@@ -22,6 +23,7 @@ class DataTableForm extends Component
 {
     use WithFileUploads;
     use HasAutoGenerateFields;
+    use HasHintField;
 
     // Public properties (config‑driven)
     public string $configKey;
@@ -32,8 +34,8 @@ class DataTableForm extends Component
     // Internal state
     public array $fields = [];
     public array $fileUploads = [];  // Top-level file upload storage — Livewire's WithFileUploads
-                                    // properly persists TemporaryUploadedFile objects here,
-                                    // unlike nested $fields array where they are lost across requests.
+    // properly persists TemporaryUploadedFile objects here,
+    // unlike nested $fields array where they are lost across requests.
     public bool $isEditMode = false;
 
     // Configuration data (loaded once)
@@ -397,8 +399,9 @@ class DataTableForm extends Component
     public function updatedSearches($value, $field)
     {
         $definition = $this->fieldDefinitions[$field] ?? null;
-        if (!$definition)
+        if (!$definition) {
             return;
+        }
 
         $results = [];
 
@@ -408,24 +411,24 @@ class DataTableForm extends Component
             $displayField = $rel['display_field'] ?? 'name';
             $hintField = $rel['hint_field'] ?? ($definition['options']['hintField'] ?? null);
 
-            // Priority: use searchable_fields if provided
+            // Parse hint fields using the trait
+            $hintFields = $this->parseHintFields($hintField);
+
             $searchableFields = $rel['searchable_fields'] ?? null;
 
             $query = $model::query();
 
             if (is_array($searchableFields) && !empty($searchableFields)) {
-                // Use exact searchable fields
                 $query->where(function ($q) use ($searchableFields, $value) {
                     foreach ($searchableFields as $sf) {
                         $q->orWhere($sf, 'LIKE', "%{$value}%");
                     }
                 });
             } else {
-                // Fallback: display field + optional hint field
-                $query->where(function ($q) use ($displayField, $hintField, $value) {
+                $query->where(function ($q) use ($displayField, $hintFields, $value) {
                     $q->where($displayField, 'LIKE', "%{$value}%");
-                    if ($hintField) {
-                        $q->orWhere($hintField, 'LIKE', "%{$value}%");
+                    foreach ($hintFields as $hf) {
+                        $q->orWhere($hf, 'LIKE', "%{$value}%");
                     }
                 });
             }
@@ -433,15 +436,19 @@ class DataTableForm extends Component
             $items = $query->limit(50)->get();
 
             foreach ($items as $item) {
-                // Build combined label (same as before)
                 $label = $item->$displayField;
-                if ($hintField && !empty($item->$hintField)) {
-                    $label .= " ({$item->$hintField})";
+                $hintParts = [];
+                foreach ($hintFields as $hf) {
+                    if (!empty($item->$hf)) {
+                        $hintParts[] = $item->$hf;
+                    }
+                }
+                if (!empty($hintParts)) {
+                    $label .= ' (' . implode(' ', $hintParts) . ')';
                 }
                 $results[$item->id] = $label;
             }
         } elseif (isset($definition['options'])) {
-            // Static options – unchanged
             $options = $definition['options'];
             foreach ($options as $id => $label) {
                 if (stripos($label, $value) !== false) {
@@ -921,7 +928,8 @@ class DataTableForm extends Component
 
         // When 'All Companies' mode, make company_id required on the form
         $fieldDefs = $this->fieldDefinitions;
-        if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0
+        if (
+            \Illuminate\Support\Facades\Session::get('current_company_id') === 0
             && isset($fieldDefs['company_id'])
             && !$this->isEditMode
         ) {
@@ -974,7 +982,8 @@ class DataTableForm extends Component
             // (belt-and-suspenders — the merge above should already handle this,
             // but if wire:model binding was delayed, this catches it)
             if (!$this->isEditMode) {
-                if (isset($this->fileUploads[$fieldName])
+                if (
+                    isset($this->fileUploads[$fieldName])
                     && $this->fileUploads[$fieldName] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile
                 ) {
                     $this->fields[$fieldName] = $this->fileUploads[$fieldName];

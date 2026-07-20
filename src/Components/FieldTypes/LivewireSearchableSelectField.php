@@ -4,10 +4,12 @@ namespace QuickerFaster\UILibrary\Components\FieldTypes;
 
 use QuickerFaster\UILibrary\Contracts\FieldTypes\FieldType;
 use QuickerFaster\UILibrary\Traits\FieldTypes\HasBladeRendering;
+use QuickerFaster\UILibrary\Traits\FieldTypes\HasHintField;
 
 class LivewireSearchableSelectField implements FieldType
 {
     use HasBladeRendering;
+    use HasHintField;
 
     protected string $name;
     protected array $definition;
@@ -20,7 +22,6 @@ class LivewireSearchableSelectField implements FieldType
 
     public function renderForm($value = null): string
     {
-
         return $this->renderBlade('qf::components.fields.livewire-searchable-select', [
             'field' => $this,
             'value' => $value,
@@ -31,9 +32,8 @@ class LivewireSearchableSelectField implements FieldType
         ]);
     }
 
-
     /**
-     * Override getInitialOptions to return combined labels.
+     * Get the initial options for a given value (used for selected labels).
      */
     public function getInitialOptions($value): array
     {
@@ -42,10 +42,7 @@ class LivewireSearchableSelectField implements FieldType
         }
 
         if ($this->isRelationship()) {
-            $rel = $this->definition['relationship'];
-            $modelClass = $rel['model'];
-            $displayField = $this->getDisplayField();
-            $hintField = $this->getHintField();
+            $modelClass = $this->definition['relationship']['model'];
             $multiple = $this->definition['multiSelect'] ?? false;
 
             $query = $modelClass::query();
@@ -62,7 +59,7 @@ class LivewireSearchableSelectField implements FieldType
             }
         }
 
-        // Static options – hint field not applicable
+        // Static options
         if (isset($this->definition['options'])) {
             $options = $this->definition['options'];
             if (is_array($value)) {
@@ -75,23 +72,26 @@ class LivewireSearchableSelectField implements FieldType
         return [];
     }
 
-
     public function renderInlineEditor($value, $record, array $extra = []): string
     {
         return $this->renderComplexFallback($record, $extra, 'Select');
     }
 
-
     /**
-     * Get the hint field name (if any) from the config.
+     * Parse the hint field definition into an array of column names.
+     * Supports: string "first_name,last_name" or array ['first_name','last_name'].
      */
-    protected function getHintField(): ?string
+    protected function getHintFields(): array
     {
-        // First check inside 'relationship' (preferred), then fallback to 'options'
-        if ($this->isRelationship()) {
-            return $this->definition['relationship']['hint_field'] ?? null;
+        $hint = $this->definition['relationship']['hint_field'] ?? $this->definition['options']['hintField'] ?? null;
+        if (empty($hint)) {
+            return [];
         }
-        return $this->definition['options']['hintField'] ?? null;
+        if (is_array($hint)) {
+            return $hint;
+        }
+        // Comma-separated string
+        return array_map('trim', explode(',', $hint));
     }
 
     /**
@@ -106,24 +106,27 @@ class LivewireSearchableSelectField implements FieldType
     }
 
     /**
-     * Build a combined label: "display (hint)" or just "display" if no hint.
+     * Build a combined label: "display (hint1 hint2 ...)" or just "display" if no hints.
      */
-    protected function getCombinedLabel($model, $displayValue = null, $hintValue = null): string
+    protected function getCombinedLabel($model): string
     {
-        if ($model && $this->isRelationship()) {
-            $displayField = $this->getDisplayField();
-            $displayValue = $model->$displayField ?? '';
-            $hintField = $this->getHintField();
-            $hintValue = $hintField ? ($model->$hintField ?? '') : null;
+        $displayField = $this->getDisplayField();
+        $displayValue = $model->$displayField ?? '';
+
+        $hintFields = $this->getHintFields();
+        $hintParts = [];
+        foreach ($hintFields as $hf) {
+            if (!empty($model->$hf)) {
+                $hintParts[] = $model->$hf;
+            }
         }
-        if (!empty($hintValue)) {
-            return "{$displayValue} ({$hintValue})";
+
+        if (!empty($hintParts)) {
+            return $displayValue . ' (' . implode(' ', $hintParts) . ')';
         }
+
         return $displayValue;
     }
-
-
-
 
     /**
      * Whether inline creation of new options is allowed.
@@ -147,11 +150,6 @@ class LivewireSearchableSelectField implements FieldType
         return null;
     }
 
-
-
-
-
-
     /**
      * Render the field for a table cell.
      */
@@ -161,21 +159,21 @@ class LivewireSearchableSelectField implements FieldType
 
         // If it's a many-to-many relationship, show badges
         if ($this->isManyToMany() && $record && $record->relationLoaded($relName)) {
-            $related = $record->{$relName}; // use property, not method
+            $related = $record->{$relName};
 
             if ($related && $related->count() > 0) {
                 $badges = [];
                 foreach ($related as $item) {
                     $color = $item->color ?? 'secondary';
                     $name = $item->{$this->getDisplayField()};
-                    $badges[] = "<span style = \" padding:0.3em 0.4em \" class=\"badge  badge-{$color} bg-gradient-{$color}\">{$name}</span>";
+                    $badges[] = "<span style=\"padding:0.3em 0.4em\" class=\"badge badge-{$color} bg-gradient-{$color}\">{$name}</span>";
                 }
                 return implode(' ', $badges);
             }
             return '';
         }
 
-        // Fallback to the existing label lookup
+        // Fallback to label lookup
         return $this->getLabelForValue($value);
     }
 
@@ -187,8 +185,6 @@ class LivewireSearchableSelectField implements FieldType
         // Same logic as table, but maybe with different styling? Reuse.
         return $this->renderTable($value, $record);
     }
-
-
 
     /**
      * Check if the field represents a many-to-many relationship.
@@ -203,14 +199,8 @@ class LivewireSearchableSelectField implements FieldType
         return in_array($type, ['belongsToMany', 'morphToMany']);
     }
 
-
-
-
-
-
-
     /**
-     * Override getLabelForValue (used in table/detail views).
+     * Get the label for a given value (used in table/detail views).
      */
     protected function getLabelForValue($value): string
     {
@@ -219,10 +209,7 @@ class LivewireSearchableSelectField implements FieldType
         }
 
         if ($this->isRelationship()) {
-            $rel = $this->definition['relationship'];
-            $modelClass = $rel['model'];
-            $displayField = $this->getDisplayField();
-            $hintField = $this->getHintField();
+            $modelClass = $this->definition['relationship']['model'];
             $multiple = $this->definition['multiSelect'] ?? false;
 
             if ($multiple && is_array($value)) {
@@ -252,11 +239,6 @@ class LivewireSearchableSelectField implements FieldType
         return e($value);
     }
 
-
-
-
-
-
     public function getValidationRules(): array
     {
         return isset($this->definition['validation'])
@@ -266,7 +248,6 @@ class LivewireSearchableSelectField implements FieldType
 
     public function getOptions(): array
     {
-        // Return all options? Not needed for this field type.
         return [];
     }
 
