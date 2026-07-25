@@ -44,6 +44,7 @@ class ImportForm extends Component
     public int $successfulRows = 0;
     public int $failedRows = 0;
     public ?string $errorFileUrl = null;
+    
 
     protected $pollingInterval = 2000;
 
@@ -197,6 +198,7 @@ class ImportForm extends Component
             'original_filename' => $this->file->getClientOriginalName(),
             'total_rows' => $this->getTotalRows(),
             'user_id' => auth()->id(),
+            'company_id' => \Illuminate\Support\Facades\Session::get('current_company_id') ?? auth()->user()?->company_id,
             'status' => 'pending',
         ]);
 

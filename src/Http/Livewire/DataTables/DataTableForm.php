@@ -61,6 +61,7 @@ class DataTableForm extends Component
     public array $morphSelectedType = [];   // keyed by field name
     public array $morphSelectedId = [];     // keyed by field name
     public array $morphEntityOptions = [];  // keyed by field name
+    protected int $sessionCompanyId = 0;
 
 
     // Lazy-loaded services
@@ -95,6 +96,9 @@ class DataTableForm extends Component
 
         $this->loadConfiguration();
         $this->initializeFields();
+        $this->sessionCompanyId = session('current_company_id', 0);
+    \Log::info('DataTableForm mount - sessionCompanyId set to ' . $this->sessionCompanyId);
+
 
         if ($this->recordId) {
             app(AuthorizationService::class)->authorizeUpdate(auth()->user(), $this->recordId, $this->modelClass);
@@ -167,13 +171,6 @@ class DataTableForm extends Component
     {
         $this->fields = [];
 
-        // 🔍 DIAGNOSTIC: Log what fieldDefinitions we're working with
-        \Log::channel('single')->warning('initializeFields() called', [
-            'configKey' => $this->configKey,
-            'modelClass' => $this->modelClass,
-            'fieldDefinitions_keys' => array_keys($this->fieldDefinitions),
-            'fields_before' => array_keys($this->fields),
-        ]);
 
         foreach ($this->fieldDefinitions as $field => $definition) {
             $default = $definition['default'] ?? null;
@@ -215,13 +212,7 @@ class DataTableForm extends Component
 
         }
 
-        // 🔍 DIAGNOSTIC: Log resulting fields
-        \Log::channel('single')->warning('initializeFields() result', [
-            'configKey' => $this->configKey,
-            'fields_after' => array_keys($this->fields),
-            'has_document_key' => array_key_exists('document', $this->fields),
-            'document_value' => $this->fields['document'] ?? 'KEY_NOT_PRESENT',
-        ]);
+
 
     }
 
@@ -232,31 +223,26 @@ class DataTableForm extends Component
      */
     public function setMorphType(string $fieldName, string $type): void
     {
-        \Log::info('setMorphType called', ['field' => $fieldName, 'type' => $type, 'before' => $this->fields[$fieldName] ?? null]);
         if (!isset($this->fields[$fieldName]) || !is_array($this->fields[$fieldName])) {
             $this->fields[$fieldName] = ['type' => null, 'id' => null];
         }
         $this->fields[$fieldName]['type'] = $type;
         $this->fields[$fieldName]['id'] = null;
-        \Log::info('after update', ['after' => $this->fields[$fieldName]]);
     }
 
 
 
 
 
-    public function updatedMorphSelectedType($value, $fieldName): void
-    {
-        // When type changes, reset the ID and reload entity options
-        $this->morphSelectedId[$fieldName] = null;
-        $this->loadMorphEntityOptions($fieldName);
-
-        // Update the compound field value
-        $this->fields[$fieldName] = [
-            'type' => $value,
-            'id' => null,
-        ];
-    }
+public function updatedMorphSelectedType($value, $fieldName): void
+{
+    $this->morphSelectedId[$fieldName] = null;
+    $this->loadMorphEntityOptions($fieldName);
+    $this->fields[$fieldName] = [
+        'type' => $value,
+        'id' => null,
+    ];
+}
 
     public function updatedMorphSelectedId($value, $fieldName)
     {
@@ -267,24 +253,31 @@ class DataTableForm extends Component
         ];
     }
 
-    protected function loadMorphEntityOptions(string $fieldName): void
-    {
-        $def = $this->fieldDefinitions[$fieldName] ?? [];
-        $morphMap = $def['morph_map'] ?? [];
-        $displayField = $def['display_field'] ?? 'name';
-        $selectedType = $this->morphSelectedType[$fieldName] ?? null;
+protected function loadMorphEntityOptions(string $fieldName): void
+{
+    $def = $this->fieldDefinitions[$fieldName] ?? [];
+    $morphMap = $def['morph_map'] ?? [];
+    $displayField = $def['display_field'] ?? 'name';
+    $selectedType = $this->morphSelectedType[$fieldName] ?? null;
 
-        $this->morphEntityOptions[$fieldName] = [];
-        if ($selectedType && isset($morphMap[$selectedType])) {
-            $modelClass = $morphMap[$selectedType];
-            $this->morphEntityOptions[$fieldName] = $modelClass::pluck($displayField, 'id')->toArray();
+    $this->morphEntityOptions[$fieldName] = [];
+    if ($selectedType && isset($morphMap[$selectedType])) {
+        $modelClass = $morphMap[$selectedType];
+        $query = $modelClass::query();
+
+        // Restrict Company type when in single‑company mode
+        if ($selectedType === 'company' && $this->sessionCompanyId !== 0) {
+            $query->where('id', $this->sessionCompanyId);
         }
 
-
-
+        $this->morphEntityOptions[$fieldName] = $query->pluck($displayField, 'id')->toArray();
     }
+}
 
-
+public function hydrate()
+{
+    $this->sessionCompanyId = session('current_company_id', 0);
+}
 
 
 
@@ -345,49 +338,42 @@ class DataTableForm extends Component
 
 
 
-    protected function hydrateMorphToSelectFields(): void
-    {
-        foreach ($this->fieldDefinitions as $field => $def) {
-            if (($def['field_type'] ?? '') !== 'morph_to_select') {
-                continue;
-            }
+protected function hydrateMorphToSelectFields(): void
+{
+    foreach ($this->fieldDefinitions as $field => $def) {
+        if (($def['field_type'] ?? '') !== 'morph_to_select') {
+            continue;
+        }
 
-            // Raw values are already in $this->fields from loadRecord()
-            $rawType = $this->fields['assignable_type'] ?? null;
-            $rawId = $this->fields['assignable_id'] ?? null;
+        $rawType = $this->fields['assignable_type'] ?? null;
+        $rawId = $this->fields['assignable_id'] ?? null;
+        $morphMap = $def['morph_map'] ?? [];
+        $typeKey = null;
 
-            $morphMap = $def['morph_map'] ?? [];
-            $displayField = $def['display_field'] ?? 'name';
-            $typeKey = null;
-
-            if ($rawType && $rawId) {
-                $typeKey = array_search($rawType, $morphMap);
-                if ($typeKey !== false) {
-                    // Compound field for save and validation
-                    $this->fields[$field] = ['type' => $typeKey, 'id' => (int) $rawId];
-                    // Reactive properties for Livewire bindings (radio + dropdown)
-                    $this->morphSelectedType[$field] = $typeKey;
-                    $this->morphSelectedId[$field] = (int) $rawId;
-                    // Load entity options for dropdown
-                    $modelClass = $morphMap[$typeKey];
-                    $this->morphEntityOptions[$field] = $modelClass::pluck($displayField, 'id')->toArray();
-                } else {
-                    $this->fields[$field] = null;
-                    $this->morphSelectedType[$field] = null;
-                    $this->morphSelectedId[$field] = null;
-                    $this->morphEntityOptions[$field] = [];
-                }
+        if ($rawType && $rawId) {
+            $typeKey = array_search($rawType, $morphMap);
+            if ($typeKey !== false) {
+                // Compound field for save/validation
+                $this->fields[$field] = ['type' => $typeKey, 'id' => (int) $rawId];
+                // Reactive properties for Livewire bindings
+                $this->morphSelectedType[$field] = $typeKey;
+                $this->morphSelectedId[$field] = (int) $rawId;
+                // Load options via the unified method (which now applies the filter)
+                $this->loadMorphEntityOptions($field);
             } else {
                 $this->fields[$field] = null;
                 $this->morphSelectedType[$field] = null;
                 $this->morphSelectedId[$field] = null;
                 $this->morphEntityOptions[$field] = [];
             }
-
-            // Remove raw fields to avoid duplication (they are not in fieldGroups)
-            // unset($this->fields['assignable_type'], $this->fields['assignable_id']);
+        } else {
+            $this->fields[$field] = null;
+            $this->morphSelectedType[$field] = null;
+            $this->morphSelectedId[$field] = null;
+            $this->morphEntityOptions[$field] = [];
         }
     }
+}
 
 
 

@@ -1,5 +1,4 @@
 <?php
-// QuickerFaster/UILibrary/Jobs/GenerateExport.php
 
 namespace QuickerFaster\UILibrary\Jobs;
 
@@ -8,6 +7,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Services\Exports\DataTableExport;
@@ -15,12 +16,39 @@ use QuickerFaster\UILibrary\Traits\AppliesFilters;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use QuickerFaster\UILibrary\Models\Export;
-use QuickerFaster\UILibrary\Traits\ResolvesExportValues; 
+use QuickerFaster\UILibrary\Traits\ResolvesExportValues;
 
-
+/**
+ * Orchestrate a chunked export by counting rows and dispatching
+ * ExportChunk jobs for each chunk.
+ *
+ * Uses lockForUpdate to atomically check and transition the export
+ * status, preventing double-dispatch.
+ */
 class GenerateExport implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, AppliesFilters, ResolvesExportValues;
+
+    /**
+     * This job only dispatches chunk jobs — it doesn't generate files.
+     * A short timeout is sufficient.
+     */
+    public $timeout = 120;
+
+    /**
+     * No retries — if dispatch fails, the export is marked as failed.
+     */
+    public $tries = 1;
+
+    /**
+     * Mark as failed on timeout.
+     */
+    public $failOnTimeout = true;
+
+    /**
+     * Maximum unhandled exceptions.
+     */
+    public $maxExceptions = 1;
 
     protected int $exportId;
 
@@ -29,168 +57,109 @@ class GenerateExport implements ShouldQueue
         $this->exportId = $exportId;
     }
 
-
-    /*
     public function handle()
     {
-        $export = Export::find($this->exportId);
-        if (!$export)
-            return;
+        // -----------------------------------------------------------------
+        // Atomic status check with lockForUpdate
+        // -----------------------------------------------------------------
+        $export = DB::transaction(function () {
+            $export = Export::where('id', $this->exportId)
+                ->lockForUpdate()
+                ->first();
 
-        // Check if cancelled before doing any work
-        if ($export->status === 'cancelled') {
-            \Log::info("Export {$export->id} was cancelled before processing.");
+            if (!$export) {
+                Log::warning("GenerateExport: Export #{$this->exportId} not found.");
+                return null;
+            }
+
+            if ($export->status === 'cancelled') {
+                Log::info("GenerateExport: Export #{$this->exportId} was cancelled before processing.");
+                return null;
+            }
+
+            // Guard: only process pending exports
+            if ($export->status !== 'pending') {
+                Log::info("GenerateExport: Export #{$this->exportId} already processing (status: {$export->status}). Skipping.");
+                return null;
+            }
+
+            $export->update(['status' => 'processing']);
+            return $export;
+        });
+
+        if (!$export) {
             return;
         }
 
-        $export->update(['status' => 'processing']);
+        // Restore company context from the export record so that
+        // CompanyScope filters correctly in the queue job (no HTTP session).
+        $this->restoreCompanyContext($export);
 
         try {
             $resolver = app(ConfigResolver::class, ['configKey' => $export->config_key]);
             $modelClass = $resolver->getModel();
             $query = $modelClass::query();
 
-            // Optional: eager load relations if needed
-            $relations = array_keys($resolver->getRelations());
-            if (!empty($relations)) {
-                $query->with($relations);
-            }
-
-            // Apply filters (if any)
             if (!empty($export->filters)) {
                 $this->applyActiveFilters($query, $export->filters, $resolver);
             }
 
-            $records = $query->get();
-
-            if ($records->isEmpty()) {
-                throw new \Exception('No records found to export.');
-            }
-
-            $columns = $export->columns ?? [];
-
-            // Generate file and get relative path
-            if ($export->format === 'pdf') {
-                $relativePath = $this->generatePdf($export, $records, $columns, $export->format);
-            } else {
-                $relativePath = $this->generateExcel($export, $records, $columns, $export->format);
-            }
-
-            // Double-check file existence and size
-            $fullPath = Storage::disk('local')->path($relativePath);
-            if (!file_exists($fullPath)) {
-                throw new \Exception("File not found after generation: {$fullPath}");
-            }
-            $size = filesize($fullPath);
-            if ($size === 0) {
-                throw new \Exception("Generated file is empty: {$fullPath}");
-            }
-
-            $fileSize = Storage::disk('local')->size($relativePath);
-            $export->update([
-                'status' => 'completed',
-                'file_path' => $relativePath,
-                'file_size' => $fileSize,
-                'download_token' => \Str::random(64),
-                'expires_at' => now()->addHour(),
-                'completed_at' => now(),
-            ]);
-
-
-            if ($export->fresh()->status === 'cancelled') {
-                // Clean up and exit
-                Storage::disk('local')->delete($relativePath);
+            $totalRows = $query->count();
+            if ($totalRows === 0) {
+                $export->update([
+                    'status' => 'failed',
+                    'error_message' => 'No records to export',
+                ]);
+                Log::warning("GenerateExport: No records for export #{$this->exportId}.");
                 return;
             }
 
+            // Set chunking parameters
+            $chunkSize = $export->chunk_size ?? 100;
+            $totalChunks = (int) ceil($totalRows / $chunkSize);
+
+            $export->update([
+                'total_rows' => $totalRows,
+                'chunk_size' => $chunkSize,
+                'total_chunks' => $totalChunks,
+            ]);
+
+            Log::info("GenerateExport: Dispatching {$totalChunks} chunks for export #{$this->exportId}.", [
+                'total_rows' => $totalRows,
+                'chunk_size' => $chunkSize,
+            ]);
+
+            // Dispatch chunk jobs
+            for ($i = 0; $i < $totalChunks; $i++) {
+                $offset = $i * $chunkSize;
+                ExportChunk::dispatch($export->id, $i, $offset, $chunkSize);
+            }
 
         } catch (\Exception $e) {
             $export->update([
                 'status' => 'failed',
-                'error_message' => $e->getMessage(),
-                'completed_at' => now(),
+                'error_message' => 'Export dispatch failed: ' . substr($e->getMessage(), 0, 500),
             ]);
-            \Log::error('Export generation failed', [
-                'export_id' => $export->id,
+
+            Log::error("GenerateExport: Export #{$this->exportId} failed.", [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
             ]);
+
+            throw $e;
         }
     }
-*/
 
-
-
-
-// Inside GenerateExport::handle() - REPLACE existing logic
-
-public function handle()
-{
-    $export = Export::find($this->exportId);
-    if (!$export || $export->status === 'cancelled') {
-        return;
-    }
-
-
-
-
-    
-
-    $export->update(['status' => 'processing']);
-
-    $resolver = app(ConfigResolver::class, ['configKey' => $export->config_key]);
-    $modelClass = $resolver->getModel();
-    $query = $modelClass::query();
-
-    if (!empty($export->filters)) {
-        $this->applyActiveFilters($query, $export->filters, $resolver);
-    }
-
-    $totalRows = $query->count();
-    if ($totalRows === 0) {
-        $export->update([
-            'status' => 'failed',
-            'error_message' => 'No records to export'
-        ]);
-        return;
-    }
-
-    // --- Set chunking parameters ---
-    $chunkSize = $export->chunk_size ?? 100; // default 100 rows per chunk
-    $totalChunks = (int) ceil($totalRows / $chunkSize);
-
-    $export->update([
-        'total_rows'   => $totalRows,
-        'chunk_size'   => $chunkSize,
-        'total_chunks' => $totalChunks,
-    ]);
-    // -----------------------------
-
-    // Dispatch chunk jobs
-    for ($i = 0; $i < $totalChunks; $i++) {
-        $offset = $i * $chunkSize;
-        ExportChunk::dispatch($export->id, $i, $offset, $chunkSize);
-    }
-}
-
-
-
-
-
-
-
+    /**
+     * Generate a single-file Excel export (non-chunked path, kept for reference).
+     */
     protected function generateExcel(Export $export, $records, array $columns, string $format): string
     {
         $excelExport = new DataTableExport($export->config_key, $records, $columns);
         $relativePath = 'exports/' . uniqid() . '.' . $format;
 
-        // Ensure directory exists
         Storage::disk('local')->makeDirectory('exports');
-
-        // Store the file
         Excel::store($excelExport, $relativePath, 'local');
 
-        // Verify file was created
         if (!Storage::disk('local')->exists($relativePath)) {
             throw new \Exception("Excel file not written: {$relativePath}");
         }
@@ -198,13 +167,14 @@ public function handle()
         return $relativePath;
     }
 
-
+    /**
+     * Generate a single-file PDF export (non-chunked path, kept for reference).
+     */
     protected function generatePdf(Export $export, $records, array $columns, string $format): string
     {
         $resolver = app(ConfigResolver::class, ['configKey' => $export->config_key]);
         $fieldDefinitions = $resolver->getFieldDefinitions();
 
-        // Title
         $title = $resolver->getConfig()['pageTitle'] ?? null;
         if (!$title) {
             $modelName = class_basename($resolver->getModel());
@@ -212,18 +182,15 @@ public function handle()
         }
         $subtitle = $resolver->getConfig()['subtitle'] ?? 'Data Export';
 
-        // Which columns to display
         if (empty($columns)) {
             $columns = array_keys($fieldDefinitions);
         }
 
-        // Headings (labels)
         $headings = [];
         foreach ($columns as $field) {
             $headings[$field] = $fieldDefinitions[$field]['label'] ?? ucfirst($field);
         }
 
-        // Transform records to resolved values
         $transformedRecords = [];
         foreach ($records as $record) {
             $row = [];
@@ -233,7 +200,6 @@ public function handle()
             $transformedRecords[] = $row;
         }
 
-        // PDF view
         $controls = $resolver->getControls();
         $pdfView = $controls['files']['export_pdf_view'] ?? 'qf::exports.default-pdf';
         $options = $export->options ?? [];
@@ -263,4 +229,20 @@ public function handle()
         return $relativePath;
     }
 
+    /**
+     * Restore the company context from the export record into the session.
+     *
+     * Queue jobs run in CLI context with no HTTP session, so CompanyScope's
+     * Session::get('current_company_id') returns null and applies no filter.
+     *
+     * @param Export $export
+     */
+    protected function restoreCompanyContext(Export $export): void
+    {
+        $companyId = $export->company_id ?? null;
+
+        if ($companyId && $companyId !== 0) {
+            session()->put('current_company_id', $companyId);
+        }
+    }
 }

@@ -194,6 +194,7 @@ class ExportController extends Controller
 
         $export = Export::create([
             'user_id' => auth()->id(),
+            'company_id' => \Illuminate\Support\Facades\Session::get('current_company_id') ?? auth()->user()?->company_id,
             'config_key' => $request->configKey,
             'filters' => json_decode($request->filters ?? '[]', true),
             'columns' => $request->has('columns') ? array_values(array_filter(explode(',', $request->columns), fn($c) => trim($c) !== '')) : [],

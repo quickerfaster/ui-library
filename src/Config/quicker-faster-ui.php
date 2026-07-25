@@ -57,6 +57,28 @@ return [
         'default_mode' => 'first',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Feature Flags
+    |--------------------------------------------------------------------------
+    | Toggle in-development or gated features per environment.
+    */
+    'features' => [
+
+        /*
+        |--------------------------------------------------------------------------
+        | Multi-Company Payroll
+        |--------------------------------------------------------------------------
+        | When enabled, super admins in "All Companies" mode can process payroll
+        | for all companies at once. Each company's payslips are generated
+        | independently within a single PayrollRun.
+        |
+        | Set in .env: FEATURE_MULTI_COMPANY_PAYROLL=true
+        */
+        'multi_company_payroll' => env('FEATURE_MULTI_COMPANY_PAYROLL', false),
+
+    ],
+
 ];
 
 
