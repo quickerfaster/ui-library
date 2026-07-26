@@ -1821,20 +1821,21 @@ class DataTable extends Component
 
 
 
-    protected function checkConditions(array $action, $record): bool
-    {
-
-
-        if (empty($action['condition']) || !is_array($action['condition']))
-            return true;
-
-
-        foreach ($action['condition'] as $field => $expected) {
-            if (in_array($record->$field, $expected))
-                return true;
-        }
-        return false;
+/**
+ * Check business conditions for a row action.
+ * Delegates to AuthorizationService for consistent AND/OR evaluation.
+ */
+protected function checkConditions(array $action, $record): bool
+{
+    if (empty($action['condition']) || !is_array($action['condition'])) {
+        return true;
     }
+
+    // Use the same evaluator as AuthorizationService
+    return $this->authService->evaluateConditions($record, $action['condition']);
+}
+
+
 
     protected function replacePlaceholders($value, $record)
     {

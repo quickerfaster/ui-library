@@ -600,7 +600,7 @@ class FilterPanel extends Component
             if ($relation && isset($relation['model'])) {
                 $model = $relation['model'];
                 $displayField = $this->getDisplayField($relation);
-                $hintField = $this->getHintField($relation, $fieldDef);
+                $hintFields = $this->getHintFields($relation, $fieldDef);
                 $searchFields = $this->getSearchableFields($relation, $fieldDef);
 
                 $query = $model::query();
@@ -614,7 +614,7 @@ class FilterPanel extends Component
                     $items = $query->limit(50)->get();
                     $results = [];
                     foreach ($items as $item) {
-                        $label = $this->buildCombinedLabel($item, $displayField, $hintField);
+                        $label = $this->buildCombinedLabel($item, $displayField, $hintFields);
                         $results[$item->id] = $label;
                     }
                     $this->searchResults[$index] = $results;
@@ -725,14 +725,14 @@ class FilterPanel extends Component
                 if ($relation && isset($relation['model'])) {
                     $model = $relation['model'];
                     $displayField = $this->getDisplayField($relation);
-                    $hintField = $this->getHintField($relation, $fieldDef);
+                    $hintFields = $this->getHintFields($relation, $fieldDef);
                     $ids = $isMulti ? (array) $value : [$value];
                     $ids = array_filter($ids);
                     if (!empty($ids)) {
                         $records = $model::whereIn('id', $ids)->get();
                         $labels = [];
                         foreach ($records as $record) {
-                            $label = $this->buildCombinedLabel($record, $displayField, $hintField);
+                            $label = $this->buildCombinedLabel($record, $displayField, $hintFields);
                             $labels[$record->id] = $label;
                         }
                         $this->selectedLabels[$index] = $labels;
@@ -779,16 +779,24 @@ class FilterPanel extends Component
     }
 
     /**
-     * Get the hint field for a relationship-based filter (if any).
+     * Get the hint fields for a relationship-based filter.
+     * Supports comma-separated string, array, or single value.
      * Checks both 'relationship' and 'options' arrays.
      */
-    protected function getHintField(array $relation, array $fieldDef): ?string
+    protected function getHintFields(array $relation, array $fieldDef): array
     {
         // Priority: relationship > options
-        if (!empty($relation['hint_field'])) {
-            return $relation['hint_field'];
+        $hint = $relation['hint_field'] ?? $fieldDef['options']['hintField'] ?? null;
+
+        if (is_array($hint)) {
+            return $hint;
         }
-        return $fieldDef['options']['hintField'] ?? null;
+
+        if (is_string($hint) && !empty($hint)) {
+            return array_filter(array_map('trim', explode(',', $hint)));
+        }
+
+        return [];
     }
 
     /**
@@ -802,26 +810,32 @@ class FilterPanel extends Component
         if (!empty($relation['searchable_fields'])) {
             return $relation['searchable_fields'];
         }
-        // 2. Fallback: display field + optional hint field
+        // 2. Fallback: display field + optional hint fields
         $displayField = $this->getDisplayField($relation);
-        $hintField = $this->getHintField($relation, $fieldDef);
-        $fields = [$displayField];
-        if ($hintField) {
-            $fields[] = $hintField;
-        }
-        return $fields;
+        $hintFields = $this->getHintFields($relation, $fieldDef);
+
+        return array_merge([$displayField], $hintFields);
     }
 
     /**
      * Build a combined label: "display (hint)" or just "display".
      */
-    protected function buildCombinedLabel($model, string $displayField, ?string $hintField = null): string
+    protected function buildCombinedLabel($model, string $displayField, array $hintFields = []): string
     {
-        $displayValue = $model->$displayField ?? '';
-        if ($hintField && !empty($model->$hintField)) {
-            return "{$displayValue} ({$model->$hintField})";
+        $label = $model->{$displayField} ?? '';
+
+        $hintParts = [];
+        foreach ($hintFields as $hintField) {
+            if (!empty($model->{$hintField})) {
+                $hintParts[] = $model->{$hintField};
+            }
         }
-        return $displayValue;
+
+        if (!empty($hintParts)) {
+            $label .= ' (' . implode(' ', $hintParts) . ')';
+        }
+
+        return $label;
     }
 
 

@@ -6,6 +6,14 @@
     $isPage = $crudType === 'pages';
     $user = auth()->user();
     $authService = app(\App\Modules\Admin\Services\AuthorizationService::class);
+
+    // Pre‑filter moreActions to only those the user can perform
+    $visibleMoreActions = [];
+    foreach ($moreActions as $index => $action) {
+        if ($authService->canPerformAction($user, $action, $record)) {
+            $visibleMoreActions[] = ['index' => $index, 'action' => $action];
+        }
+    }
 @endphp
 
 <div class="d-flex justify-content-end align-items-center gap-1 stop-propagation">
@@ -120,43 +128,35 @@
         @endif
     @endif
 
-    {{-- More actions dropdown – filter items by requiredPermission using AuthorizationService --}}
-    @if (!empty($moreActions))
+    {{-- More actions dropdown – only show if there is at least one visible action --}}
+    @if (!empty($visibleMoreActions))
         <div class="dropdown">
             <button class="btn btn-action-icon no-caret" type="button" data-bs-toggle="dropdown">
                 <i class="fas fa-ellipsis-v"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
-                @foreach ($moreActions as $index => $action)
+                @foreach ($visibleMoreActions as $item)
                     @php
-
-
-                        $perm = $action['requiredPermission'] ?? null;
-                        $hasPermission = true;
-                        if ($perm) {
-                            // Build an action array for canPerformAction or just check the permission globally
-                            // For simplicity, we use can() on the permission string; but if you want row scope,
-                            // you would pass the record. For custom actions you may want row-level as well.
-                            // $hasPermission = $user && $user->can($perm);
-                            $hasPermission = $authService->canPerformAction($user, $action, $record);
-                        }
+                        $index = $item['index'];
+                        $action = $item['action'];
                     @endphp
-                    @if ($hasPermission)
-                        <li>
-                            <a class="dropdown-item d-flex align-items-center py-2" href="#"
-                                wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
-                                @if (!empty($action['icon']))
-                                    <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
-                                @endif
-                                <span class="small">{{ $action['title'] }}</span>
-                            </a>
-                        </li>
-                        @if (!empty($action['appendSeparator']))
-                            <li><hr class="dropdown-divider opacity-50"></li>
-                        @endif
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center py-2" href="#"
+                            wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
+                            @if (!empty($action['icon']))
+                                <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
+                            @endif
+                            <span class="small">{{ $action['title'] }}</span>
+                        </a>
+                    </li>
+                    @if (!empty($action['appendSeparator']))
+                        <li><hr class="dropdown-divider opacity-50"></li>
                     @endif
                 @endforeach
             </ul>
         </div>
     @endif
+
+
+
 </div>
