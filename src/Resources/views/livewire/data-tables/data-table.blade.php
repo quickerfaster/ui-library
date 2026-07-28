@@ -373,7 +373,7 @@
                                     $rowKey = 'row_' . $record->id;
                                     $isEditable = $this->editable && ($def['editable'] ?? false);
                                     $isEditing = isset($this->editMode[$rowKey][$name]);
-                                    $cellValue = $this->editedData[$rowKey][$name] ?? $record->$name;
+                                    $cellValue = $this->editedData[$rowKey][$name] ?? $this->getValueFromRecord($record, $name);
                                 @endphp
                                 <td class="{{ $isTrashed ? 'text-decoration-line-through text-muted' : '' }};">
                                     @if ($isEditable && $isEditing)
@@ -401,7 +401,7 @@
                                         <div
                                             @if ($isEditable) wire:dblclick="startEditingCell({{ $record->id }}, '{{ $name }}')" 
                     style="cursor: pointer;" @endif>
-                                            {!! $this->getField($name, $def)->renderTable($record->$name, $record) !!}
+                                            {!! $this->getField($name, $def)->renderTable($this->getValueFromRecord($record, $name), $record) !!}
 
                                             
                                         </div>

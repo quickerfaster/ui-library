@@ -1033,6 +1033,14 @@ class DataTable extends Component
 
         $defaultView = $resolver->getSwitchViews()['default'] ?? 'table';
         $this->viewMode = session("view_preference.{$this->configKey}", $defaultView);
+
+        // Initialize viewConfig early so getViewConfigRelations() can extract
+        // relations for eager-loading before getRecordsProperty() builds the query.
+        $switchViews = $resolver->getSwitchViews();
+        if ($this->viewMode === 'list' || $this->viewMode === 'card') {
+            $this->viewConfig = $switchViews[$this->viewMode] ?? [];
+        }
+
         $this->moreActions = $resolver->getMoreActions();
 
         $controls = $resolver->getControls();
@@ -1317,8 +1325,11 @@ class DataTable extends Component
         }
     }
 
-    protected function getValueFromRecord($record, string $path)
+    public function getValueFromRecord($record, string $path)
     {
+        \Log::debug([$path, $record]);
+        \Log::debug([data_get($record, $path)]);
+
         return data_get($record, $path);
     }
 
@@ -1393,6 +1404,20 @@ class DataTable extends Component
             $columnsToSelect[] = 'deleted_at';
         }
 
+        // ✅ 1b. ENSURE FOREIGN KEYS FOR VIEW CONFIG RELATIONS ARE SELECTED
+        // Without the FK in the SELECT, eager-loading fails because Laravel
+        // can't resolve the relationship (e.g. employee_id for employee.first_name).
+        $viewRelations = $this->getViewConfigRelations();
+        if (!empty($viewRelations)) {
+            $configRelations = $resolver->getRelations();
+            foreach ($viewRelations as $relationName) {
+                $fk = $configRelations[$relationName]['foreignKey'] ?? null;
+                if ($fk && !in_array($fk, $columnsToSelect)) {
+                    $columnsToSelect[] = $fk;
+                }
+            }
+        }
+
         $query->select($columnsToSelect);
 
         // ✅ 2. CONDITIONAL RELATION LOADING
@@ -1408,7 +1433,6 @@ class DataTable extends Component
         }
 
         // Also load relations needed by the current view config
-        $viewRelations = $this->getViewConfigRelations();
         $allowedRelations = array_merge($allowedRelations, $viewRelations);
 
         if (!empty($allowedRelations)) {

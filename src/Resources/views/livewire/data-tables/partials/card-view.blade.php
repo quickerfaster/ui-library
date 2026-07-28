@@ -96,7 +96,7 @@
                                         class="text-muted fw-semibold small text-uppercase">{{ $field }}:</span>
                                     <span class="text-dark fw-medium">
                                         {!! $def
-                                            ? $this->getField($field, $def)->renderTable($record->$field, $record)
+                                            ? $this->getField($field, $def)->renderTable($this->getValueFromRecord($record, $field), $record)
                                             : $this->getValueFromRecord($record, $field) !!}
                                     </span>
                                 </div>
