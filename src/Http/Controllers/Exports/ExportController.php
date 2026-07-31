@@ -214,10 +214,22 @@ class ExportController extends Controller
 
     public function exportStatus($id)
     {
-        $export = Export::findOrFail($id);
-        $fileUrl = $export->status === 'completed' && $export->download_token
-            ? route('export.download', ['token' => $export->download_token])
-            : null;
+        // Scope to the authenticated user
+        $export = Export::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$export) {
+            return response()->json([
+                'status' => 'not_found',
+                'error'  => 'Export not found or you do not have access to it.',
+            ], 404);
+        }
+
+        $fileUrl = null;
+        if ($export->status === 'completed' && $export->download_token) {
+            $fileUrl = route('export.download', ['token' => $export->download_token]);
+        }
 
         // Calculate chunk progress
         $completedChunks = 0;
@@ -446,7 +458,11 @@ class ExportController extends Controller
 
 public function cancelExport($id)
 {
-    $export = Export::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
+    $export = Export::where('id', $id)->where('user_id', auth()->id())->first();
+
+    if (!$export) {
+        return response()->json(['message' => 'Export not found.'], 404);
+    }
 
     if (!in_array($export->status, ['pending', 'processing'])) {
         return response()->json(['message' => 'Cannot cancel export in current status'], 400);

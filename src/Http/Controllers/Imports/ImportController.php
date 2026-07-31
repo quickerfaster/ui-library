@@ -23,7 +23,18 @@ class ImportController extends Controller
 
     public function status($id)
     {
-        $import = Import::findOrFail($id);
+        // Scope to the authenticated user
+        $import = Import::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$import) {
+            return response()->json([
+                'status' => 'not_found',
+                'error'  => 'Import not found or you do not have access to it.',
+            ], 404);
+        }
+
         $completedChunks = ImportChunk::where('import_id', $import->id)->whereIn('status', ['completed', 'failed'])->count();
         $totalChunks = $import->total_chunks ?? 0;
         $errorFileUrl = $import->error_file ? route('import.download-errors', $import) : null;

@@ -6,9 +6,12 @@ use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use App\Modules\Admin\Services\AuthorizationService;
+use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 
 class DataTableDetail extends Component
 {
+    use ResolvesModels;
+
     public string $configKey;
     public int $recordId;
 
@@ -32,8 +35,8 @@ class DataTableDetail extends Component
         $this->loadConfiguration();
         $this->loadRecord();
 
-        $modelClass = app(ConfigResolver::class, ['configKey' => $this->configKey])->getModel();
-        app(AuthorizationService::class)->authorizeView(auth()->user(), $this->recordId, $modelClass);
+        // Pass the already-resolved model to avoid a second findOrFail in AuthorizationService
+        app(AuthorizationService::class)->authorizeView(auth()->user(), $this->record, $this->getConfigResolver()->getModel());
 
     }
 
@@ -65,7 +68,12 @@ class DataTableDetail extends Component
     {
         $modelClass = $this->getConfigResolver()->getModel();
         $relations = array_keys($this->getConfigResolver()->getRelations());
-        $this->record = $modelClass::with($relations)->findOrFail($this->recordId);
+
+        $this->record = $this->resolveModelOrFail($modelClass, $this->recordId);
+
+        if (!empty($relations)) {
+            $this->record->load($relations);
+        }
     }
 
     public function getField(string $name)

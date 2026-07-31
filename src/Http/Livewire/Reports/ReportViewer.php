@@ -31,7 +31,13 @@ class ReportViewer extends Component
             // Load user-saved report from database
             $saved = SavedReport::where('id', $this->savedReportId)
                 ->where('user_id', Auth::id())
-                ->firstOrFail();
+                ->first();
+
+            if (!$saved) {
+                $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Report not found.']);
+                return;
+            }
+
             $this->reportConfig = $saved->configuration;
             $this->reportType = $saved->type;
             $this->reportName = $saved->name;

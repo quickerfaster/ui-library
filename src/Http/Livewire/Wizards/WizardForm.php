@@ -11,11 +11,13 @@ use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Contracts\FieldTypes\FieldType;
 use QuickerFaster\UILibrary\Traits\HasAutoGenerateFields;
+use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 
 class WizardForm extends Component
 {
     use WithFileUploads;
     use HasAutoGenerateFields;
+    use ResolvesModels;
 
     public string $configKey;
     public array $presetData = [];
@@ -78,10 +80,19 @@ class WizardForm extends Component
 
     protected function loadRecord(): void
     {
+        $record = $this->resolveModel($this->modelClass, $this->recordId);
 
-        $record = $this->modelClass::with(array_keys($this->relations))->find($this->recordId);
         if (!$record) {
-            abort(404, 'Record not found');
+            $this->flashAndRedirect(
+                'error',
+                'The record you are trying to edit no longer exists or is not accessible.',
+                'dashboard'
+            );
+            return;
+        }
+
+        if (!empty($this->relations)) {
+            $record->load(array_keys($this->relations));
         }
 
         foreach ($this->fieldDefinitions as $field => $definition) {
@@ -302,7 +313,7 @@ class WizardForm extends Component
 
         DB::transaction(function () {
             if ($this->isEditMode) {
-                $record = $this->modelClass::findOrFail($this->recordId);
+                $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
             } else {
                 $record = new $this->modelClass();
             }

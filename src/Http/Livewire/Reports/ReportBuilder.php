@@ -35,7 +35,12 @@ class ReportBuilder extends Component
         // Load the saved user report
         $saved = SavedReport::where('id', $this->reportId)
             ->where('user_id', Auth::id())
-            ->firstOrFail();
+            ->first();
+
+        if (!$saved) {
+            $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Report not found.']);
+            return;
+        }
 
         $this->mainConfigKey = $saved->configuration['configKey'] ?? $saved->config_key;
         $this->reportName = $saved->name;

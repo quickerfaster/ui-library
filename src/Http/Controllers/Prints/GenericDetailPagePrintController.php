@@ -2,6 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Controllers\Prints;
 
+use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 use Illuminate\Routing\Controller;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
@@ -9,6 +10,8 @@ use Illuminate\Support\Str;
 
 class GenericDetailPagePrintController extends Controller
 {
+    use ResolvesModels;
+
     protected $fieldFactory;
 
     public function __construct(FieldFactory $fieldFactory)
@@ -28,9 +31,30 @@ class GenericDetailPagePrintController extends Controller
 
     public function show($configKey, $id)
     {
-        $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
-        $modelClass = $resolver->getModel();
-        $record = $modelClass::findOrFail($id);
+        // Validate configKey resolves to a valid class
+        try {
+            $resolver = app(ConfigResolver::class, ['configKey' => $configKey]);
+            $modelClass = $resolver->getModel();
+        } catch (\Exception $e) {
+            abort(404, 'Print configuration not found.');
+        }
+
+        // Validate ID is numeric and positive
+        if (!is_numeric($id) || (int) $id <= 0) {
+            abort(404, 'Invalid record identifier.');
+        }
+
+        // Safe resolution
+        $record = $this->resolveModel($modelClass, (int) $id);
+
+        if (!$record) {
+            abort(404, 'The record you are trying to print could not be found.');
+        }
+
+        // Authorization check — ensure the user can view this record
+        if (method_exists($record, 'getPolicy') || \Gate::has('view', $modelClass)) {
+            $this->authorize('view', $record);
+        }
 
         // Load all relations defined in the config
         $relations = array_keys($resolver->getRelations());

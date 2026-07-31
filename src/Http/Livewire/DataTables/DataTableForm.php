@@ -7,6 +7,7 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Contracts\FieldTypes\FieldType;
@@ -18,12 +19,14 @@ use QuickerFaster\UILibrary\Traits\FieldTypes\HasHintField;
 use QuickerFaster\UILibrary\Traits\HasAutoGenerateFields;
 use App\Modules\Admin\Services\AuthorizationService;
 use QuickerFaster\UILibrary\Services\Documents\EmployeeDocumentService;
+use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 
 class DataTableForm extends Component
 {
     use WithFileUploads;
     use HasAutoGenerateFields;
     use HasHintField;
+    use ResolvesModels;
 
     // Public properties (config‑driven)
     public string $configKey;
@@ -101,10 +104,12 @@ class DataTableForm extends Component
 
 
         if ($this->recordId) {
-            app(AuthorizationService::class)->authorizeUpdate(auth()->user(), $this->recordId, $this->modelClass);
+            // Resolve the model once and pass it to authorization to avoid a second findOrFail
+            $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
+            app(AuthorizationService::class)->authorizeUpdate(auth()->user(), $record, $this->modelClass);
 
             $this->isEditMode = true;
-            $this->loadRecord();
+            $this->loadRecord($record);
         } else {
             app(AuthorizationService::class)->authorizeCreate(auth()->user(), $this->modelClass);
             // Apply prefilled data only for new records
@@ -566,12 +571,12 @@ protected function hydrateMorphToSelectFields(): void
 
 
 
-    protected function loadRecord(): void
+    protected function loadRecord(?Model $resolvedRecord = null): void
     {
-        $record = $this->modelClass::with(array_keys($this->relations))->find($this->recordId);
+        $record = $resolvedRecord ?? $this->resolveModelOrFail($this->modelClass, $this->recordId);
 
-        if (!$record) {
-            abort(404, 'Record not found');
+        if (!empty($this->relations)) {
+            $record->load(array_keys($this->relations));
         }
 
         foreach ($this->fieldDefinitions as $field => $definition) {
@@ -669,7 +674,7 @@ protected function hydrateMorphToSelectFields(): void
 
         DB::transaction(function () {
             $record = $this->isEditMode
-                ? $this->modelClass::findOrFail($this->recordId)
+                ? $this->resolveModelOrFail($this->modelClass, $this->recordId)
                 : new $this->modelClass();
 
             // Filter fillable fields based on hidden config

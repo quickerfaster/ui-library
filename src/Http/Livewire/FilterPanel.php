@@ -154,7 +154,13 @@ class FilterPanel extends Component
         if ($filterId) {
             $filter = SavedFilter::where('id', $filterId)
                 ->where('user_id', Auth::id())
-                ->firstOrFail();
+                ->first();
+
+            if (!$filter) {
+                $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Filter not found.']);
+                return;
+            }
+
             $this->filterName = $filter->name;
             $this->filterIsGlobal = $filter->is_global;
             $this->editingFilterId = $filterId;
@@ -193,7 +199,13 @@ class FilterPanel extends Component
         if ($this->editingFilterId) {
             $filter = SavedFilter::where('id', $this->editingFilterId)
                 ->where('user_id', Auth::id())
-                ->firstOrFail();
+                ->first();
+
+            if (!$filter) {
+                $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Filter not found.']);
+                return;
+            }
+
             $filter->update([
                 'name' => $this->filterName,
                 'is_global' => $this->filterIsGlobal,
@@ -569,7 +581,12 @@ class FilterPanel extends Component
                 $q->where('user_id', Auth::id())
                     ->orWhere('is_global', true);
             })
-            ->firstOrFail();
+            ->first();
+
+        if (!$saved) {
+            $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Filter not found.']);
+            return;
+        }
 
         $this->activeFilters = $saved->filters;
         $this->emitFilters();

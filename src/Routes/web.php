@@ -85,8 +85,10 @@ Route::group(['middleware' => 'web'], function () {
 
 
 
-    Route::get('/print/{configKey}/{id}', [GenericDetailPagePrintController::class, 'show'])
-        ->name('generic.print');
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/print/{configKey}/{id}', [GenericDetailPagePrintController::class, 'show'])
+            ->name('generic.print');
+    });
 
 
     Route::middleware(['auth'])->group(function () {

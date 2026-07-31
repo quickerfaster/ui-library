@@ -7,9 +7,12 @@ use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 
 class EmployeeDetail extends Component
 {
+    use ResolvesModels;
+
     public string $configKey;
     public int $recordId;
 
@@ -129,11 +132,25 @@ class EmployeeDetail extends Component
         $resolver = app(ConfigResolver::class, ['configKey' => $this->configKey]);
         $modelClass = $resolver->getModel();
 
+        // Resolve the employee scoped to the current session company.
+        // This prevents accessing employees belonging to a different company.
+        $companyId = (int) session('current_company_id', 0);
+        $this->employee = $this->resolveModelForCompany($modelClass, $this->recordId, $companyId);
+
+        if (!$this->employee) {
+            $this->flashAndRedirect(
+                'error',
+                'Employee not found or you do not have access to this record.',
+                'dashboard'
+            );
+            return;
+        }
+
         // Load employee with the correct relations:
         // - position (hasOne) for current job data
         // - jobHistory (hasMany) for audit trail
         // - profile, workPatterns, etc.
-        $this->employee = $modelClass::with([
+        $this->employee->load([
             'employeeProfile',
             'employeePosition.jobTitle',           // current position
             'employeePosition.department',
@@ -144,7 +161,7 @@ class EmployeeDetail extends Component
             'employeePosition.attendancePolicy',
             'jobHistory',                  // history records (sorted by effective_date desc)
             'employeeWorkPatterns.workPattern',
-        ])->findOrFail($this->recordId);
+        ]);
 
         $this->modelName = $resolver->getModelName();
         $this->moduleName = $resolver->getModuleName();
