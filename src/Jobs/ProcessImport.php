@@ -44,6 +44,14 @@ class ProcessImport implements ShouldQueue
      */
     public $maxExceptions = 1;
 
+    /**
+     * Explicit queue and connection so these jobs always land on the
+     * same queue/connection as payroll jobs, allowing a single worker.sh
+     * to serve both.
+     */
+    public $queue = 'default';
+    public $connection = 'database';
+
     protected int $importId;
     protected array $columnMapping;
     protected bool $hasHeaderRow;
@@ -153,6 +161,18 @@ class ProcessImport implements ShouldQueue
             ]);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Handle a job failure — mark the import as failed so the user
+     * sees the error rather than an indefinitely "processing" status.
+     */
+    public function failed(\Throwable $exception = null): void
+    {
+        if ($this->importId) {
+            Import::where('id', $this->importId)
+                ->update(['status' => 'failed']);
         }
     }
 }

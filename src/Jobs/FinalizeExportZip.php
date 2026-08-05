@@ -46,6 +46,14 @@ class FinalizeExportZip implements ShouldQueue
      */
     public $maxExceptions = 1;
 
+    /**
+     * Explicit queue and connection so these jobs always land on the
+     * same queue/connection as payroll jobs, allowing a single worker.sh
+     * to serve both.
+     */
+    public $queue = 'default';
+    public $connection = 'database';
+
     protected int $exportId;
 
     public function __construct(int $exportId)
@@ -167,6 +175,18 @@ class FinalizeExportZip implements ShouldQueue
             ]);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Handle a job failure — mark the export as failed so the user
+     * sees the error rather than an indefinitely "processing" status.
+     */
+    public function failed(\Throwable $exception = null): void
+    {
+        if ($this->exportId) {
+            Export::where('id', $this->exportId)
+                ->update(['status' => 'failed']);
         }
     }
 }

@@ -50,6 +50,14 @@ class ProcessImportChunk implements ShouldQueue
      */
     public $maxExceptions = 1;
 
+    /**
+     * Explicit queue and connection so these jobs always land on the
+     * same queue/connection as payroll jobs, allowing a single worker.sh
+     * to serve both.
+     */
+    public $queue = 'default';
+    public $connection = 'database';
+
     protected int $importId;
     protected int $chunkId;
     protected array $columnMapping;
@@ -117,6 +125,12 @@ class ProcessImportChunk implements ShouldQueue
         $this->restoreCompanyContext($import);
 
         try {
+            // Check file size before loading to prevent memory exhaustion
+            $fileSize = filesize($import->file_path);
+            if ($fileSize > 50 * 1024 * 1024) { // 50MB limit
+                Log::warning("ProcessImportChunk #{$this->chunkId}: File too large ({$fileSize} bytes), may exhaust memory");
+            }
+
             // Read only the required slice of rows from the file
             $rows = Excel::toArray([], $import->file_path)[0];
 
@@ -310,6 +324,18 @@ class ProcessImportChunk implements ShouldQueue
 
         if ($companyId && $companyId !== 0) {
             session()->put('current_company_id', $companyId);
+        }
+    }
+
+    /**
+     * Handle a job failure — mark the import as failed so the user
+     * sees the error rather than an indefinitely "processing" status.
+     */
+    public function failed(\Throwable $exception = null): void
+    {
+        if ($this->importId) {
+            Import::where('id', $this->importId)
+                ->update(['status' => 'failed']);
         }
     }
 }

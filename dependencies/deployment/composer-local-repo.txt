@@ -71,8 +71,11 @@
     "repositories": [
         {
             "type": "path",
-            "url": "./../packages/quicker-faster/ui-library"
-        },
+            "url": "/Users/mac/Projects/Libraries/ui-library",
+            "options": {
+                "symlink": true
+            }
+        }
 
         {
             "type": "path",

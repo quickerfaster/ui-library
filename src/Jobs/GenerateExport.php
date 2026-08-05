@@ -50,6 +50,14 @@ class GenerateExport implements ShouldQueue
      */
     public $maxExceptions = 1;
 
+    /**
+     * Explicit queue and connection so these jobs always land on the
+     * same queue/connection as payroll jobs, allowing a single worker.sh
+     * to serve both.
+     */
+    public $queue = 'default';
+    public $connection = 'database';
+
     protected int $exportId;
 
     public function __construct(int $exportId)
@@ -243,6 +251,18 @@ class GenerateExport implements ShouldQueue
 
         if ($companyId && $companyId !== 0) {
             session()->put('current_company_id', $companyId);
+        }
+    }
+
+    /**
+     * Handle a job failure — mark the export as failed so the user
+     * sees the error rather than an indefinitely "processing" status.
+     */
+    public function failed(\Throwable $exception = null): void
+    {
+        if ($this->exportId) {
+            Export::where('id', $this->exportId)
+                ->update(['status' => 'failed']);
         }
     }
 }

@@ -51,6 +51,14 @@ class ExportChunk implements ShouldQueue
      */
     public $maxExceptions = 1;
 
+    /**
+     * Explicit queue and connection so these jobs always land on the
+     * same queue/connection as payroll jobs, allowing a single worker.sh
+     * to serve both.
+     */
+    public $queue = 'default';
+    public $connection = 'database';
+
     protected int $exportId;
     protected int $chunkIndex;
     protected int $offset;
@@ -294,5 +302,17 @@ class ExportChunk implements ShouldQueue
             session()->put('current_company_id', $companyId);
         }
         // If 0 or null, leave session empty so CompanyScope applies no filter.
+    }
+
+    /**
+     * Handle a job failure — mark the export as failed so the user
+     * sees the error rather than an indefinitely "processing" status.
+     */
+    public function failed(\Throwable $exception = null): void
+    {
+        if ($this->exportId) {
+            Export::where('id', $this->exportId)
+                ->update(['status' => 'failed']);
+        }
     }
 }
