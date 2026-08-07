@@ -44,7 +44,6 @@ public function removeRow(int $index): void
 
 public function updatedRows($value)
 {
-    \Log::debug('Repeater rows updated', ['rows' => $value]);
     $this->dispatch('repeaterUpdated', $value);
 }
 

@@ -1,0 +1,91 @@
+i have been working on hr saas app. in the process i understand that i can create a reusable ui library that can solve not only the hr saas app problems but all the future projects.
+this makes me make the arichitecure (laravel, livewire, bootstrap 5, font awesome 7) as follows:
+1)
+    a) reusable ui library as a generic foundation of any future projects /Users/mac/Projects/Libraries/ui-library/src/* while, the business code is intended to be in /Users/mac/Projects/LaravelProjects/quick-hr/app/Modules/*.
+    b) the library tends to ensure that the entire code is well structured into folders e.g. commands, models, traits, resource, jobs, http etc.
+    c) it tends to come with ready to use scalfols with the login, register, forget password, permission, onboradint etc with the help of the packages
+        inside of the /Users/mac/Projects/Libraries/ui-library/composer.json
+    d) it comes with a layout (/Users/mac/Projects/Libraries/ui-library/src/Components/NavigationLayout.php) that includes top navigation bar, side navigation bar (iconifyable) and buttom navigation bar (mobile only) /Users/mac/Projects/Libraries/ui-library/src/Http/Livewire/Layouts/Navs/*.
+    e) It tends to provide an automatic catch all routing (of all blade files in app/Modules/*/Resources/views) to reduce the need to add a conventional routing definition. this is defined in /Users/mac/Projects/LaravelProjects/quick-hr/app/Modules/System/Routes/web.php at Route::get('/{module}/{view}/{id?}', function ($module, $view, $id = null) { ... }. and is registered by the service provider  /Users/mac/Projects/Libraries/ui-library/src/Providers/ModuleServiceProvider.php
+    f) it tends to make use of reusable components both livewire 3 at /Users/mac/Projects/Libraries/ui-library/src/Http/Livewire and standard lararvel component at /Users/mac/Projects/Libraries/ui-library/src/Components. these components are registered in the service provider located in /Users/mac/Projects/Libraries/ui-library/src/Providers
+    g) it invest a lot in data table located in /Users/mac/Projects/Libraries/ui-library/src/Http/Livewire/DataTables/*. the DataTable uses  config files located in the business layer app/Modules/*/Data/* to render the data and provide data manuplation tools (for searching, data import/exports, add new record etc.)  /Users/mac/Projects/Libraries/ui-library/src/Resources/views/livewire/data-tables/data-table.blade.php
+    h) it also invest a lot in data table form located in /Users/mac/Projects/Libraries/ui-library/src/Http/Livewire/DataTables/*. the DataTableForm uses the same config files located in the business layer app/Modules/*/Data/* to render the form fields, to group the fields, to handle validation, to save and retrieve data. the form fields are to be reusable automatically rendered /Users/mac/Projects/Libraries/ui-library/src/Components/FieldTypes/*,
+
+    i) to show the detail of record data, it uses DataTableDetail using the same config files as the DataTable and the DataTableForm.
+
+    j) it tends to make every component a config driven with the help of config resolver services located in /Users/mac/Projects/Libraries/ui-library/src/Services/Config/*. /Users/mac/Projects/Libraries/ui-library/src/Factories/FieldTypes/FieldFactory.php, /Users/mac/Projects/Libraries/ui-library/src/Contracts/FieldTypes/*, /Users/mac/Projects/Libraries/ui-library/src/Http/Livewire/Custom/*,
+
+    k) it has other reusable componets such as dashbords, wizards, widgets etc. /Users/mac/Projects/Libraries/ui-library/src/Http/Livewire/Wizards/*, src/Http/Livewire/Dashboards/Dashboard.php,
+
+    j) other important components are /Users/mac/Projects/Libraries/ui-library/src/Http/Livewire/AccessControls/*,
+
+
+    2)
+    a) a business logic is expected to be located in app/Modules/ e.g. /Users/mac/Projects/LaravelProjects/quick-hr/app/Modules/Hr, /Users/mac/Projects/LaravelProjects/quick-hr/app/Modules/Admin etc
+    b) the folders are expected to structurally house its code follwing a certain convention eg. app/Modules/*/Databases, app/Modules/*/Models etc., so the the libraries servies providers can locate them and register them or in case of any other manuplation.
+    c) folders may overide the libraries all catch route in /Users/mac/Projects/LaravelProjects/quick-hr/app/Modules/*/Routes/*.
+
+
+your responsibility is to Generate a comprehensive, AI-optimized documentation architecture for a Laravel + Livewire + Bootstrap 5 reusable UI library and its consuming business modules. The documentation must be structured so any AI agent can instantly understand the library's purpose, architecture, extension points, and conventions without ambiguity.
+
+Analyze the described system and identify missing architectural elements, undocumented conventions, implicit assumptions, and potential integration gaps. Then produce a detailed documentation blueprint that covers:
+
+1. **System Overview & Philosophy**
+   - Core mission of the UI library as a generic, config-driven foundation for any SaaS project.
+   - Separation of concerns between the reusable UI library (`ui-library/src`) and business modules (`app/Modules`).
+   - Design principles: convention over configuration, config-driven rendering, catch-all routing, and scaffolded auth/permissions.
+
+2. **Directory Map & File Purpose Index**
+   - Exhaustive tree of the UI library with one-line descriptions of every directory and key file.
+   - Exhaustive tree of a canonical business module with one-line descriptions of every expected subdirectory and file type.
+   - Visual mapping of how library components resolve business module assets (configs, models, routes, views).
+
+3. **Architecture Decision Records (ADR)**
+   - Why catch-all routing instead of explicit route definitions.
+   - Why config-driven DataTables, DataTableForms, and DataTableDetails and other livewire components share a single config source.
+   - Why Livewire 3 for interactive components and standard Laravel components for static/render-only elements.
+   - Why a FieldFactory with contracts instead of inline field definitions.
+   - Why a single NavigationLayout with top, side, and mobile bottom navs.
+
+4. **Component Catalog & Contract Definitions**
+   - Every reusable component categorized by type (Livewire, Blade, Service, Factory, Contract).
+   - For each component: its purpose, its expected inputs (props/params/config keys), its output/behavior, its extension points, and its location.
+   - Explicit interfaces/contracts for FieldTypes, ConfigResolvers, and DataTable configs.
+   - Lifecycle hooks or events that business modules can tap into.
+
+5. **Config-Driven Architecture Deep Dive**
+   - Schema definition for DataTable/DataTableForm/DataTableDetail config files (every possible key, type, default, and effect).
+   - How ConfigResolver services locate, merge, and validate business module configs.
+   - How FieldFactory maps config types to FieldType contracts and renders them.
+   - How configs drive validation rules, grouping, import/export mappings, and action buttons.
+
+6. **Module Conventions & Registration Protocol**
+   - Mandatory folder structure for any business module (Databases, Models, Routes, Data, Views, etc.).
+   - How ModuleServiceProvider auto-discovers and registers modules.
+   - How a module can override the catch-all route with its own route definitions.
+   - Naming conventions for modules, views, configs, and Livewire components to avoid collisions.
+   - Expected namespace patterns and PSR-4 mappings.
+
+7. **Extension & Customization Guide**
+   - Step-by-step recipe for adding a new FieldType (implement contract, register in factory, provide Blade view).
+   - Step-by-step recipe for creating a new business module (folders, configs, routes, models, migrations).
+   - Step-by-step recipe for overriding a library component (e.g., custom DataTable, custom Nav).
+   - Step-by-step recipe for adding a new reusable component to the library (Wizard, Dashboard, Widget, AccessControl).
+   - How to extend the NavigationLayout (adding nav items, iconifying, permission-based visibility).
+
+8. **Integration & Dependency Map**
+   - Composer dependencies and their roles (Bootstrap 5, Font Awesome 7, Livewire 3, Laravel packages).
+   - How the library's service providers wire everything together.
+   - Inter-package communication: events, service bindings, and config merges.
+   - Database assumptions (if any) for scaffolds like permissions, onboarding, user management.
+
+9. **AI Agent Quick-Start Protocol**
+   - A deterministic decision tree for an AI to answer: "Given task X, which files do I touch?"
+   - A lookup table mapping common development tasks to exact file paths and modification steps.
+   - A troubleshooting guide for common integration failures (config not found, component not rendering, route conflict).
+
+10. **Identified Gaps & Recommendations**
+    - Explicitly list what is missing from the current description (e.g., error handling strategy, testing architecture, asset compilation, state management for wizards, API vs. web context handling, accessibility standards, internationalization, caching strategy, security hardening for catch-all routes).
+    - Provide concrete recommendations to fill each gap with file locations and implementation patterns consistent with the existing architecture.
+
+The final output must be a single, structured markdown document with a table of contents, using consistent terminology, absolute paths where relevant, and code snippets for critical contracts and config schemas. The document should serve as the single source of truth for both human developers and AI coding agents.

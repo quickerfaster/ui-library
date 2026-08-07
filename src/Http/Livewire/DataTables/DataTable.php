@@ -1327,8 +1327,7 @@ class DataTable extends Component
 
     public function getValueFromRecord($record, string $path)
     {
-        \Log::debug([$path, $record]);
-        \Log::debug([data_get($record, $path)]);
+
 
         return data_get($record, $path);
     }
