@@ -2,10 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Services\Approvals;
 
-use App\Modules\System\Models\ApprovalRequest;
-use App\Modules\System\Models\ApprovalTier;
-use App\Modules\System\Models\ApprovalLog;
-use App\Modules\System\Models\ApprovalTierApproval;
+use QuickerFaster\UILibrary\Contracts\Approvals\ApprovalModelResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use QuickerFaster\UILibrary\Services\Config\Approvals\ApprovalConfigResolver;
@@ -14,21 +11,28 @@ use QuickerFaster\UILibrary\Services\Config\Approvals\ApprovalConfigResolver;
 class ApprovalEngine
 {
     protected ApprovalConfigResolver $configResolver;
+    protected ApprovalModelResolver $modelResolver;
 
-    public function __construct(ApprovalConfigResolver $configResolver)
+    public function __construct(ApprovalConfigResolver $configResolver, ApprovalModelResolver $modelResolver)
     {
         $this->configResolver = $configResolver;
+        $this->modelResolver = $modelResolver;
     }
+
+    private function requestModel(): string { return $this->modelResolver->resolveRequestModel(); }
+    private function tierModel(): string { return $this->modelResolver->resolveTierModel(); }
+    private function logModel(): string { return $this->modelResolver->resolveLogModel(); }
+    private function tierApprovalModel(): string { return $this->modelResolver->resolveTierApprovalModel(); }
 
     /**
      * Start a new approval request for the given model.
      *
      * @param mixed $approvable The model instance (must have an 'id')
      * @param \App\Models\User|null $submitter
-     * @return ApprovalRequest
+     * @return mixed
      * @throws \Exception
      */
-    public function startApproval($approvable, $submitter = null): ApprovalRequest
+    public function startApproval($approvable, $submitter = null)
     {
         if (!$submitter) {
             $submitter = Auth::user();
@@ -41,7 +45,7 @@ class ApprovalEngine
 
         DB::transaction(function () use ($approvable, $submitter, &$request) {
             // Create the approval request
-            $request = ApprovalRequest::create([
+            $request = ($this->requestModel())::create([
                 'approvable_type' => get_class($approvable),
                 'approvable_id'   => $approvable->id,
                 'status'          => 'pending',
@@ -55,7 +59,7 @@ class ApprovalEngine
             $previousTierId = null;
 
             foreach ($tiers as $tierConfig) {
-                $tier = ApprovalTier::create([
+                $tier = ($this->tierModel())::create([
                     'approval_request_id' => $request->id,
                     'tier_type'           => $tierConfig['type'],
                     'sequence'            => $sequence++,
@@ -82,13 +86,13 @@ class ApprovalEngine
     /**
      * Approve the current tier of an approval request.
      *
-     * @param ApprovalRequest $request
+     * @param mixed $request
      * @param \App\Models\User|null $approver
      * @param string|null $comments
      * @return void
      * @throws \Exception
      */
-    public function approve(ApprovalRequest $request, $approver = null, ?string $comments = null): void
+    public function approve($request, $approver = null, ?string $comments = null): void
     {
         if (!$approver) {
             $approver = Auth::user();
@@ -109,7 +113,7 @@ class ApprovalEngine
         DB::transaction(function () use ($request, $currentTier, $approver, $comments) {
             if ($currentTier->approval_mode === 'all') {
                 // Record this approver's approval
-                ApprovalTierApproval::updateOrCreate(
+                ($this->tierApprovalModel())::updateOrCreate(
                     ['tier_id' => $currentTier->id, 'user_id' => $approver->id],
                     ['comments' => $comments, 'approved_at' => now()]
                 );
@@ -140,13 +144,13 @@ class ApprovalEngine
     /**
      * Reject the approval request.
      *
-     * @param ApprovalRequest $request
+     * @param mixed $request
      * @param \App\Models\User|null $rejecter
      * @param string|null $comments
      * @return void
      * @throws \Exception
      */
-    public function reject(ApprovalRequest $request, $rejecter = null, ?string $comments = null): void
+    public function reject($request, $rejecter = null, ?string $comments = null): void
     {
         if (!$rejecter) {
             $rejecter = Auth::user();
@@ -170,12 +174,12 @@ class ApprovalEngine
     /**
      * Recall (cancel) an approval request before completion.
      *
-     * @param ApprovalRequest $request
+     * @param mixed $request
      * @param \App\Models\User|null $initiator
      * @return void
      * @throws \Exception
      */
-    public function recall(ApprovalRequest $request, $initiator = null): void
+    public function recall($request, $initiator = null): void
     {
         if (!$initiator) {
             $initiator = Auth::user();
@@ -209,7 +213,7 @@ class ApprovalEngine
      */
     protected function hasActiveApproval($approvable): bool
     {
-        return ApprovalRequest::where('approvable_type', get_class($approvable))
+        return ($this->requestModel())::where('approvable_type', get_class($approvable))
             ->where('approvable_id', $approvable->id)
             ->whereIn('status', ['draft', 'pending'])
             ->exists();
@@ -218,10 +222,10 @@ class ApprovalEngine
     /**
      * Advance to the next pending tier after a tier is approved.
      *
-     * @param ApprovalRequest $request
+     * @param mixed $request
      * @return void
      */
-    protected function advanceToNextTier(ApprovalRequest $request): void
+    protected function advanceToNextTier($request): void
     {
         $nextTier = $request->tiers()
             ->where('status', 'pending')
@@ -244,7 +248,7 @@ class ApprovalEngine
     /**
      * Log an approval action.
      *
-     * @param ApprovalRequest $request
+     * @param mixed $request
      * @param \App\Models\User|null $user
      * @param string $action
      * @param int|null $tierId
@@ -252,9 +256,9 @@ class ApprovalEngine
      * @param string|null $oldStatus
      * @param string|null $newStatus
      */
-    protected function log(ApprovalRequest $request, $user, string $action, ?int $tierId, ?string $comments, ?string $oldStatus, ?string $newStatus): void
+    protected function log($request, $user, string $action, ?int $tierId, ?string $comments, ?string $oldStatus, ?string $newStatus): void
     {
-        ApprovalLog::create([
+        ($this->logModel())::create([
             'approval_request_id' => $request->id,
             'user_id'             => $user?->id,
             'action'              => $action,

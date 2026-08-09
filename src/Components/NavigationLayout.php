@@ -101,10 +101,9 @@ class NavigationLayout extends Component
 
     protected function loadNavigationConfig(): void
     {
-        $moduleName = ucfirst($this->moduleName);
-        $configPath = app_path("Modules/{$moduleName}/Config/navigation.php");
+        $configPath = $this->resolveNavigationConfigPath($this->moduleName);
 
-        if (!file_exists($configPath)) {
+        if (!$configPath || !file_exists($configPath)) {
             $this->layoutConfig = [
                 'top_bar' => ['enabled' => true],
                 'context_menu' => ['type' => 'sidebar', 'position' => 'left'],
@@ -236,9 +235,12 @@ class NavigationLayout extends Component
         // Determine settings context by checking the module's Config/settings.php
         $this->settingsContext = null;
         if ($this->activeContext && $this->moduleName) {
-            $moduleName = ucfirst($this->moduleName);
-            $settingsPath = app_path("Modules/{$moduleName}/Config/settings.php");
-            if (file_exists($settingsPath)) {
+            $settingsPath = $this->resolveNavigationConfigPath($this->moduleName);
+            // For settings, look in the same directory as navigation
+            if ($settingsPath) {
+                $settingsPath = dirname($settingsPath) . '/settings.php';
+            }
+            if ($settingsPath && file_exists($settingsPath)) {
                 $moduleSettings = require $settingsPath;
                 $contextKey = strtolower($this->activeContext);
                 $contextSettings = $moduleSettings['contexts'][$contextKey]['groups'] ?? [];
@@ -271,5 +273,31 @@ class NavigationLayout extends Component
 
         ]);
 
+    }
+    protected function resolveNavigationConfigPath(string $moduleName): ?string
+    {
+        // 1. Check if module is a Core module
+        $corePath = base_path(
+            "vendor/quicker-faster/ui-library/src/Core/" . ucfirst($moduleName) . "/Config/navigation.php"
+        );
+        if (file_exists($corePath)) {
+            return $corePath;
+        }
+
+        // 2. Check if module is a Business module
+        $businessPath = app_path("Modules/" . ucfirst($moduleName) . "/Config/navigation.php");
+        if (file_exists($businessPath)) {
+            return $businessPath;
+        }
+
+        // 3. Check published override
+        $publishedPath = resource_path(
+            "views/vendor/ui-library/core/" . strtolower($moduleName) . "/Config/navigation.php"
+        );
+        if (file_exists($publishedPath)) {
+            return $publishedPath;
+        }
+
+        return null;
     }
 }

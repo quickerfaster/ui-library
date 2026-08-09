@@ -5,6 +5,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs;
 use Livewire\Component;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
+use QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider;
 
 class TopNav extends Component
 {
@@ -23,18 +24,23 @@ class TopNav extends Component
     public ?int $currentCompanyId = null;
     public ?string $currentCompanyName = null;
 
+    protected CompanyProvider $companyProvider;
+
     public function mount(
         array $items,
         string $activeContext,
         string $moduleName,
         array $leftShared = [],
-        array $rightShared = []
+        array $rightShared = [],
+        CompanyProvider $companyProvider = null
     ): void {
         $this->items = $items;
         $this->activeContext = $activeContext;
         $this->moduleName = $moduleName;
         $this->leftShared = $leftShared;
         $this->rightShared = $rightShared;
+
+        $this->companyProvider = $companyProvider ?? app(CompanyProvider::class);
 
         $this->loadCompanies();
     }
@@ -50,50 +56,36 @@ class TopNav extends Component
         }
 
         $user = auth()->user();
+
+        // Check if company switcher is enabled in config
+        if (!config('ui-library.navigation.show_company_switcher', false)) {
+            $this->companies = collect();
+            return;
+        }
+
         $config = config('quicker-faster-ui.multitenancy', []);
         $switcherRoles = $config['switcher_roles'] ?? ['super_admin'];
-        $allCompaniesRoles = $config['all_companies_roles'] ?? ['super_admin'];
         $isWildcard = ($switcherRoles === '*' || $switcherRoles === ['*']);
 
-        // Check if user can see the company switcher
         if (!$isWildcard && !$user->hasAnyRole((array) $switcherRoles)) {
             $this->companies = collect();
             return;
         }
 
-        // Determine which companies to show
-        $canSeeAll = $isWildcard
-            ? $user->hasAnyRole((array) $allCompaniesRoles)
-            : ($allCompaniesRoles === '*' || $allCompaniesRoles === ['*'] || $user->hasAnyRole((array) $allCompaniesRoles));
-
-        if ($canSeeAll) {
-            $this->companies = \App\Modules\Hr\Models\Company::orderBy('name')->get();
-        } else {
-            // Show only the user's company.
-            // Employee record is the source of truth; fall back to user.company_id.
-            $companyId = optional($user->employee)->company_id ?? $user->company_id;
-            if ($companyId) {
-                $this->companies = \App\Modules\Hr\Models\Company::where('id', $companyId)->get();
-            } else {
-                $this->companies = collect();
-                return;
-            }
-        }
+        $this->companies = $this->companyProvider->getCompanies($user);
 
         // Determine current company from session
         $sessionCompanyId = Session::get('current_company_id');
+        $providerCompanyId = $this->companyProvider->getCurrentCompanyId($user);
 
         if ($sessionCompanyId === 0) {
-            // 0 means "All Companies" — no filtering
             $this->currentCompanyId = 0;
         } elseif ($sessionCompanyId && $this->companies->pluck('id')->contains($sessionCompanyId)) {
             $this->currentCompanyId = $sessionCompanyId;
-        } elseif ($user->hasRole('super_admin')) {
-            // Super admin defaults to "All Companies" (no pre-selected company)
-            $this->currentCompanyId = 0;
-            Session::put('current_company_id', 0);
+        } elseif ($providerCompanyId) {
+            $this->currentCompanyId = $providerCompanyId;
+            Session::put('current_company_id', $providerCompanyId);
         } elseif ($this->companies->isNotEmpty()) {
-            // Company admin defaults to their first company
             $this->currentCompanyId = $this->companies->first()->id;
             Session::put('current_company_id', $this->currentCompanyId);
         }

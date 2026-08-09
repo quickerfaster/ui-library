@@ -177,6 +177,7 @@ class ComposerStaticInitdbad16e74bccb2c9b476ca240dc811e0
         ),
         'Q' => 
         array (
+            'QuickerFaster\\UILibrary\\Core\\' => 29,
             'QuickerFaster\\UILibrary\\' => 24,
         ),
         'P' => 
@@ -412,6 +413,10 @@ class ComposerStaticInitdbad16e74bccb2c9b476ca240dc811e0
         'Ramsey\\Collection\\' => 
         array (
             0 => __DIR__ . '/..' . '/ramsey/collection/src',
+        ),
+        'QuickerFaster\\UILibrary\\Core\\' => 
+        array (
+            0 => __DIR__ . '/../..' . '/src/Core',
         ),
         'QuickerFaster\\UILibrary\\' => 
         array (

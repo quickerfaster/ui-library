@@ -4,6 +4,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Settings;
 
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
+use QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider;
 use App\Modules\System\Models\System;
 use Illuminate\Support\Facades\Auth;
 
@@ -33,10 +34,12 @@ class SettingsPanel extends Component
     public array $settingsMap = [];  // key → setting definition (public for Livewire persistence)
 
     protected SettingsManager $settingsManager;
+    protected CompanyProvider $companyProvider;
 
-    public function boot(SettingsManager $settingsManager)
+    public function boot(SettingsManager $settingsManager, CompanyProvider $companyProvider)
     {
         $this->settingsManager = $settingsManager;
+        $this->companyProvider = $companyProvider;
     }
 
     public function mount(string $mode = 'user', ?string $context = null, ?string $initialGroup = null, ?string $moduleName = null)
@@ -114,8 +117,12 @@ class SettingsPanel extends Component
             return System::find(1);
         }
         if ($this->mode === 'company') {
-            $companyId = \Illuminate\Support\Facades\Session::get('current_company_id') ?? auth()->user()?->company_id;
-            return $companyId ? \App\Modules\Hr\Models\Company::find($companyId) : System::find(1);
+            $companyId = $this->companyProvider->getCurrentCompanyId(auth()->user());
+            if ($companyId) {
+                $company = $this->companyProvider->getCompanies(auth()->user())->firstWhere('id', $companyId);
+                return $company ?? System::find(1);
+            }
+            return System::find(1);
         }
         return Auth::user();
     }

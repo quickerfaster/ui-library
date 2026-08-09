@@ -18,7 +18,6 @@ use QuickerFaster\UILibrary\Services\Validation\DataTableFormValidationService;
 use QuickerFaster\UILibrary\Traits\FieldTypes\HasHintField;
 use QuickerFaster\UILibrary\Traits\HasAutoGenerateFields;
 use App\Modules\Admin\Services\AuthorizationService;
-use QuickerFaster\UILibrary\Services\Documents\EmployeeDocumentService;
 use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 
 class DataTableForm extends Component
@@ -851,7 +850,6 @@ protected function hydrateMorphToSelectFields(): void
 
         // Get max limit from config or default to 10
         $max = $this->fieldDefinitions['document']['maxDocumentsPerEmployee'] ?? 3;
-        $service = new EmployeeDocumentService($max);
 
         $isCreating = !$this->isEditMode;
         $isChangingEmployee = false;
@@ -867,7 +865,11 @@ protected function hydrateMorphToSelectFields(): void
 
         if ($shouldCheck) {
             $excludeDocumentId = ($this->isEditMode && $isChangingEmployee) ? $this->recordId : null;
-            if (!$service->canUpload($employee, $excludeDocumentId)) {
+            $currentCount = $this->modelClass::where('employee_id', $employeeId);
+            if ($excludeDocumentId) {
+                $currentCount->where('id', '!=', $excludeDocumentId);
+            }
+            if ($currentCount->count() >= $max) {
                 $this->dispatch('showAlert', [
                     'type' => 'error',
                     'message' => "This employee already has the maximum allowed documents ({$max}). Cannot add another document.",
@@ -1167,8 +1169,7 @@ protected function hydrateMorphToSelectFields(): void
                     if ($employeeId) {
                         $employee = \App\Modules\Hr\Models\Employee::find($employeeId);
                         if ($employee) {
-                            $service = new EmployeeDocumentService();
-                            $customFolder = $service->getStorageFolder($employee);
+                            $customFolder = 'documents/employee_' . $employee->id;
                             $disk = 'documents';
                         }
                     }

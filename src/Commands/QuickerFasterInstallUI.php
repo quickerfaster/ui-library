@@ -31,139 +31,97 @@ class QuickerFasterInstallUI extends Command
         $this->force = $this->option('force');
 
         if (app()->runningInConsole()) {
-
-            // 1. Publish vendor files
             $this->publishVendorFiles();
-            $this->overrideTheDependencyFiles();
-
-            // 2. Run migrations
-            // $this->runMigrations();
-
-            // 3. Run seeders
-            // $this->runSeeders();
-
-            // 4. Create symbolic link
+            $this->runMigrations();
+            $this->seedRoles();
+            $this->createSuperAdmin();
             $this->createStorageLink();
-
-            // 5. Clear and cache
-            // $this->optimizeApplication();
-
-            // 6. Generate application key if not exists
             $this->generateAppKey();
+            $this->clearCaches();
         }
 
         $this->info('✅ QuickerFaster installation completed successfully!');
+        $this->info('📧 Super Admin: ' . env('SUPER_ADMIN_EMAIL', 'admin@example.com'));
+        $this->info('🔑 You can now log in at: ' . url('/login'));
     }
 
-    /**
-     * Publish vendor files
-     */
     protected function publishVendorFiles()
     {
         $this->info('📁 Publishing vendor files...');
 
-        $this->publishProviders();
-        // Quicker faster publish
-        Artisan::call('vendor:publish --tag=qf-modules');
-        Artisan::call('vendor:publish --tag=qf-public-assets');
+        // Publish package assets
+        Artisan::call('vendor:publish', ['--tag' => 'ui-library-assets', '--force' => true]);
+        Artisan::call('vendor:publish', ['--tag' => 'ui-library-config', '--force' => true]);
 
         // Livewire publish
-        Artisan::call('vendor:publish', ['--tag' => 'livewire:assets']);
-        Artisan::call('vendor:publish', ['--tag' => 'livewire:config']);
+        Artisan::call('vendor:publish', ['--tag' => 'livewire:assets', '--force' => true]);
+        Artisan::call('vendor:publish', ['--tag' => 'livewire:config', '--force' => true]);
 
+        // Fortify
+        Artisan::call('vendor:publish', ['--provider' => 'Laravel\Fortify\FortifyServiceProvider']);
 
-        // Stancl/tenancy publish
-        // Artisan::call('tenancy:install');
-        // Override tenancy config
+        // Spatie Permission
+        Artisan::call('vendor:publish', ['--provider' => 'Spatie\Permission\PermissionServiceProvider']);
 
-
-        ///$this->overrideTheDependencyFiles();
         $this->info('✅ Vendor files published successfully!');
     }
 
-
-
-    protected function publishProviders()
-    {
-        $providers = [
-            'Spatie\Activitylog\ActivitylogServiceProvider' => [
-                '--tag' => ['activitylog-migrations', 'activitylog-config']
-            ],
-
-            'Laravel\Fortify\FortifyServiceProvider' => [],
-            // Add more providers as needed
-        ];
-
-
-        foreach ($providers as $provider => $options) {
-            try {
-                $command = array_merge([
-                    '--provider' => $provider
-                ], $options);
-
-                if ($this->force) {
-                    $command['--force'] = true;
-                }
-
-                Artisan::call('vendor:publish', $command);
-                $this->info("Published: {$provider} with tags: " . implode(', ', (array) $options['--tag']));
-            } catch (\Exception $e) {
-                $this->warn("Failed to publish {$provider}: " . $e->getMessage());
-            }
-        }
-
-    }
-
-
-
-
-    /**
-     * Run migrations
-     */
     protected function runMigrations()
     {
         $this->info('🗃️ Running migrations...');
 
         try {
-            Artisan::call('migrate');
-            $this->info(Artisan::output());
+            Artisan::call('migrate', ['--force' => true]);
+            $this->info('✅ Migrations completed.');
         } catch (\Exception $e) {
             $this->error('Migration failed: ' . $e->getMessage());
-            return false;
         }
-
-        return true;
     }
 
-    /**
-     * Run seeders
-     */
-    protected function runSeeders()
+    protected function seedRoles()
     {
-        if ($this->confirm('Do you want to run database seeders?', true)) {
-            $this->info('🌱 Running database seeders...');
+        $this->info('👥 Seeding default roles...');
 
-            $seeders = [
-                'Database\\Seeders\\DatabaseSeeder',
-                // Add your specific seeders here
-                // 'Database\\Seeders\\UserSeeder',
-                // 'Database\\Seeders\\RoleSeeder',
-            ];
-
-            foreach ($seeders as $seeder) {
-                try {
-                    Artisan::call('db:seed', ['--class' => $seeder]);
-                    $this->info("Seeded: {$seeder}");
-                } catch (\Exception $e) {
-                    $this->warn("Seeder {$seeder} failed: " . $e->getMessage());
-                }
-            }
+        try {
+            Artisan::call('db:seed', ['--class' => 'QuickerFaster\\UILibrary\\Core\\Admin\\Database\\Seeders\\RoleSeeder']);
+            $this->info('✅ Roles seeded: super_admin, admin, user');
+        } catch (\Exception $e) {
+            $this->warn('Role seeding failed: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Create storage link
-     */
+    protected function createSuperAdmin()
+    {
+        $this->info('👤 Creating super admin user...');
+
+        $email = $this->ask('Super admin email', env('SUPER_ADMIN_EMAIL', 'admin@example.com'));
+        $password = $this->secret('Super admin password (min 8 chars)');
+
+        if (strlen($password) < 8) {
+            $this->error('Password must be at least 8 characters.');
+            return;
+        }
+
+        try {
+            $user = \App\Models\User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name' => 'Super Admin',
+                    'password' => bcrypt($password),
+                    'email_verified_at' => now(),
+                ]
+            );
+
+            if (!$user->hasRole('super_admin')) {
+                $user->assignRole('super_admin');
+            }
+
+            $this->info("✅ Super admin created: {$email}");
+        } catch (\Exception $e) {
+            $this->error('Failed to create super admin: ' . $e->getMessage());
+        }
+    }
+
     protected function createStorageLink()
     {
         $this->info('🔗 Creating storage link...');
@@ -175,239 +133,37 @@ class QuickerFasterInstallUI extends Command
 
         try {
             Artisan::call('storage:link');
-            $this->info('✅ Storage link created successfully!');
+            $this->info('✅ Storage link created.');
         } catch (\Exception $e) {
             $this->error('Failed to create storage link: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Optimize application
-     */
-    protected function optimizeApplication()
-    {
-        $this->info('⚡ Optimizing application...');
-
-        $commands = [
-            'cache:clear',
-            'config:clear',
-            'route:clear',
-            'view:clear',
-            'config:cache',
-            'route:cache',
-            'view:cache',
-        ];
-
-        foreach ($commands as $command) {
-            try {
-                Artisan::call($command);
-                $this->info("Executed: {$command}");
-            } catch (\Exception $e) {
-                $this->warn("Command {$command} failed: " . $e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * Generate application key
-     */
     protected function generateAppKey()
     {
         if (empty(config('app.key'))) {
             $this->info('🔑 Generating application key...');
             Artisan::call('key:generate');
-            $this->info('✅ Application key generated!');
+            $this->info('✅ Application key generated.');
         }
     }
 
-
-
-
-    /****************************** Oride the dependency files ********************************/
-
-    protected function overrideTheDependencyFiles()
+    protected function clearCaches()
     {
-        
-        $this->overrideModelFiles();
-        $this->overrideDatabaseMigrationFiles();
-        $this->overrideDatabaseSeederFiles();
+        $this->info('🧹 Clearing caches...');
 
-        // $this->overrideTenancyPackageConfigFiles();
-        // $this->overrideTenancyPackageRouteFiles();
-        // $this->overrideRouteFiles();
-        // $this->overrideAssetFiles();
-        // $this->overridMiddlewareFiles();
-        // $this->overridProviderFiles();
+        $commands = ['cache:clear', 'config:clear', 'route:clear', 'view:clear'];
 
-        // $this->copyCpanelDeploymentFile();
-    }
-
-
-
-    private function overrideRouteFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/routes';
-        $destination = base_path('routes');
-
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Routes copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Routes Copy failed");
-            return 1;
+        foreach ($commands as $command) {
+            try {
+                Artisan::call($command);
+            } catch (\Exception $e) {
+                // Silently continue
+            }
         }
+
+        $this->info('✅ Caches cleared.');
     }
-
-
-
-    private function overrideTenancyPackageConfigFiles()
-    {
-
-        $source = __DIR__ . '/../../dependencies/tenancy/config';
-        $destination = base_path('config');
-
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ config copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ config Copy failed");
-            return 1;
-        }
-    }
-
-    private function overrideDatabaseSeederFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/database/seeders';
-        $destination = database_path('seeders');
-
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Seeder copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Seeder Copy failed");
-            return 1;
-        }
-    }
-
-
-
-    private function overrideDatabaseMigrationFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/database/migrations';
-        $destination = database_path('migrations');
-
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Migrations copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Migrations Copy failed");
-            return 1;
-        }
-    }
-
-
-
-    private function overrideTenancyPackageRouteFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/tenancy/routes';
-        $destination = base_path('routes');
-
-        // Then copy
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Route copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Route Copy failed");
-            return 1;
-        }
-    }
-
-
-    private function overrideModelFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/Models';
-        $destination = app_path('Models');
-
-        // Then copy
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Models copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Models Copy failed");
-            return 1;
-        }
-    }
-
-
-    private function overrideAssetFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/tenancy/tenancy';
-        $destination = public_path('tenancy');
-
-        // Then copy
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Assets copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Assets Copy failed");
-            return 1;
-        }
-    }
-
-
-
-    private function overridMiddlewareFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/Middleware';
-        $destination = app_path("Http/Middleware");// Then copy');
-
-        // Then copy
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Middleware copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Middleware Copy failed");
-            return 1;
-        }
-    }
-
-
-
-    private function overridProviderFiles()
-    {
-        $source = __DIR__ . '/../../dependencies/tenancy/Providers';
-        $destination = app_path("Providers");// Then copy');
-
-        // Then copy
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Providers override successfully");
-            return 0;
-        } else {
-            $this->error("❌ Providers override failed");
-            return 1;
-        }
-    }
-
-
-
-    private function copyCpanelDeploymentFile()
-    {
-        $source = __DIR__ . '/../../dependencies/deployment';
-        $destination = base_path("/");
-
-        // Then copy
-        if ($this->copyDirectory($source, $destination)) {
-            $this->info("✅ Cpanel Deployment File copied successfully");
-            return 0;
-        } else {
-            $this->error("❌ Cpanel Deployment File Copy failed");
-            return 1;
-        }
-    }
-
-
-
-
 
     public function copyDirectory($source, $destination)
     {
@@ -437,10 +193,4 @@ class QuickerFasterInstallUI extends Command
         closedir($dir);
         return true;
     }
-
-
-
-
-
-
 }

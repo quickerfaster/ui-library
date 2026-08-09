@@ -6,7 +6,7 @@
 > **View Namespace**: `qf`  
 > **Blade Component Alias**: `qf` → `QuickerFaster\UILibrary\Components`  
 > **Livewire Prefix**: `qf.`  
-> **Last Updated**: 2026-08-07  
+> **Last Updated**: 2026-08-09
 
 ---
 
@@ -141,14 +141,34 @@ src/
 │   └── quicker-faster-ui.php              # Socialite, multitenancy, feature flags
 │
 ├── Console/                               # Console kernel
-│   └── Kernel.php                         # Registers package commands
+│   ├── Kernel.php                         # Registers package commands
+│   └── Commands/
+│       └── GenerateScheduledReports.php   # Artisan command for scheduled reports
 │
 ├── Contracts/                             # Interfaces and contracts
 │   ├── OnboardingCondition.php            # Contract for onboarding step completion checks
+│   ├── Approvals/
+│   │   └── ApprovalModelResolver.php      # Contract for approval model resolution
 │   ├── FieldTypes/
 │   │   └── FieldType.php                  # Contract for field type implementations
-│   └── Widgets/
-│       └── Widget.php                     # Contract for widget processors
+│   ├── Modules/
+│   │   └── ModuleContract.php             # Contract for module metadata
+│   ├── Navigation/
+│   │   ├── CompanyProvider.php            # Contract for company resolution (multi-tenant)
+│   │   └── NavigationProvider.php         # Contract for navigation item provision
+│   ├── Settings/
+│   │   └── SettingsProvider.php           # Contract for settings resolution
+│   ├── Widgets/
+│   │   └── Widget.php                     # Contract for widget processors
+│   ├── Documents/
+│   │   └── Documentable.php               # Polymorphic document contract
+│   ├── Notifications/
+│   │   ├── Notifiable.php                  # Polymorphic notification receiver contract
+│   │   └── NotificationChannel.php         # Channel abstraction contract (send method)
+│   ├── Reports/
+│   │   └── Reportable.php                 # Scheduled report contract
+│   └── Workflow/
+│       └── Workflowable.php               # Contract for workflow-enabled models
 │
 ├── Exceptions/                            # Library-specific exceptions
 │   └── RecordNotAccessibleException.php   # Thrown when record access is denied
@@ -196,10 +216,6 @@ src/
 │       │   ├── ToggleButton.php           # Single toggle button
 │       │   ├── ToggleButtonGroup.php      # Group of toggle buttons
 │       │   └── Toggle.php                 # Toggle switch
-│       ├── Custom/                        # Business-specific components
-│       │   ├── EmployeeDetail.php         # Employee detail card
-│       │   ├── SearchableEmployeeDropdown.php # Employee search/select
-│       │   └── TaxBandsRepeater.php       # Tax bands repeater field
 │       ├── DataTables/                    # Core data table components
 │       │   ├── DataTable.php              # Paginated, searchable, sortable table
 │       │   ├── DataTableForm.php          # Create/edit form from config
@@ -242,7 +258,8 @@ src/
 │   ├── FinalizeExportZip.php              # Assembles export chunks into ZIP
 │   ├── GenerateExport.php                 # Orchestrates full export generation
 │   ├── ProcessImport.php                  # Orchestrates full import processing
-│   └── ProcessImportChunk.php             # Processes one chunk of an import
+│   ├── ProcessImportChunk.php             # Processes one chunk of an import
+│   └── GenerateReportJob.php              # Queueable report generation job
 │
 ├── Models/                                # Library-owned Eloquent models
 │   ├── Export.php                         # Export job record
@@ -252,7 +269,16 @@ src/
 │   ├── SavedFilter.php                    # User-saved filter preset
 │   ├── SavedReport.php                    # User-saved report
 │   ├── System.php                         # System singleton model
-│   └── SystemSetting.php                  # Polymorphic settings (user/company/system)
+│   ├── SystemSetting.php                  # Polymorphic settings (user/company/system)
+│   ├── Document.php                       # Polymorphic document model with soft deletes
+│   ├── Workflow.php                       # Workflow instance (polymorphic, multi-step)
+│   ├── WorkflowStep.php                   # Workflow step (role-based, sequential)
+│   ├── WorkflowAction.php                 # Workflow action audit trail
+│   ├── Notification.php                   # Polymorphic notification (notifiable_type/id)
+│   ├── NotificationTemplate.php           # Template model (type, channel, locale)
+│   ├── NotificationPreference.php         # Per-user channel preference toggle
+│   ├── NotificationLog.php                # Notification dispatch audit trail
+│   └── ReportSchedule.php                 # Report schedule model
 │
 ├── Providers/                             # Service providers
 │   ├── UILibraryServiceProvider.php       # Main provider: registers everything
@@ -317,7 +343,6 @@ src/
 │       │   ├── access-controls/
 │       │   ├── approvals/
 │       │   ├── buttons/
-│       │   ├── custom/
 │       │   ├── dashboards/
 │       │   ├── data-tables/               # DataTable, DataTableForm, DataTableDetail views
 │       │   │   └── partials/              # card-view, list-view, row-actions
@@ -351,7 +376,8 @@ src/
 │   ├── AccessControl/
 │   │   └── AccessControlPermissionService.php  # Permission CRUD operations
 │   ├── Approvals/
-│   │   └── ApprovalEngine.php             # Approval workflow engine
+│   │   ├── ApprovalEngine.php             # Legacy approval workflow engine (deprecated — prefer WorkflowEngine)
+│   │   └── ApprovalModelResolver.php      # Config-driven approval model resolution
 │   ├── BankFiles/                         # Bank file generators
 │   │   ├── BankFileGenerator.php          # Interface/contract for generators
 │   │   ├── BankFileGeneratorFactory.php   # Factory for bank file generators
@@ -368,8 +394,6 @@ src/
 │   │   │   └── DashboardResolver.php      # Dashboard config resolution
 │   │   └── Wizards/
 │   │       └── WizardConfigResolver.php   # Wizard config resolution
-│   ├── Documents/
-│   │   └── EmployeeDocumentService.php    # Employee document management
 │   ├── Exports/                           # Export infrastructure
 │   │   ├── DataTableExport.php            # Excel/CSV export from DataTable config
 │   │   ├── TemplateExport.php             # Import template generation
@@ -380,6 +404,8 @@ src/
 │   │   └── FilterService.php              # Filter application logic
 │   ├── Imports/
 │   │   └── ImportProcessor.php            # Import file processing (singleton)
+│   ├── Navigation/
+│   │   └── NullCompanyProvider.php        # Default no-op company provider (returns empty)
 │   ├── Search/
 │   │   └── SearchEngine.php               # Global search across modules
 │   ├── Settings/
@@ -388,8 +414,29 @@ src/
 │   │   └── ApplicationInfo.php            # Application metadata service
 │   ├── Validation/
 │   │   └── DataTableFormValidationService.php  # Dynamic validation rule generation
-│   └── Widgets/
-│       └── WidgetProcessor.php            # Maps widget type strings to processor classes
+│   ├── Widgets/
+│   │   └── WidgetProcessor.php            # Maps widget type strings to processor classes
+│   ├── Documents/
+│   │   └── DocumentEngine.php             # Generic document engine (upload, generatePdf, generateExcel)
+│   ├── Notifications/
+│   │   ├── NotificationService.php         # Dispatch, getUnread, channel registration, template resolution
+│   │   └── Channels/
+│   │       ├── DatabaseChannel.php         # In-app (database) notification channel
+│   │       └── MailChannel.php             # Email notification channel
+│   ├── Reports/
+│   │   └── ReportEngine.php               # Scheduled report engine
+│   └── Workflow/
+│       └── WorkflowEngine.php             # Generic workflow engine (supersedes ApprovalEngine)
+│
+├── Events/                                # Library events
+│   ├── ModuleBooted.php                   # Fires after module boot sequence completes
+│   ├── ModuleRegistered.php               # Fires when a business module is auto-discovered
+│   ├── NavigationBuilding.php             # Fires during navigation construction
+│   └── Notifications/
+│       └── NotificationDispatched.php     # Fires after each notification dispatch
+│
+├── Listeners/                             # Library event subscribers
+│   └── NotificationEventSubscriber.php    # Logs dispatched notifications to NotificationLog
 │
 ├── Traits/                                # Reusable traits
 │   ├── AppliesFilters.php                 # Filter application (root level)
@@ -436,6 +483,37 @@ src/
     ├── HeadcountVsBudgetWidgetProcessor.php    # HR: headcount vs budget
     ├── DiversityIndexWidgetProcessor.php       # HR: diversity index
     └── OfferAcceptanceRateWidgetProcessor.php  # HR: offer acceptance rate
+```
+
+**Package-level Database/Migrations/** (loaded via `loadMigrationsFrom()` in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php)):
+
+```
+Database/Migrations/
+├── 2026_1_create_exports_table.php                # Export job tracking
+├── 2026_1_create_imports_table.php                # Import job tracking
+├── 2026_2_create_export_chunks_table.php          # Export chunk file tracking
+├── 2026_2_create_import_chunks_table.php          # Import chunk tracking
+├── 2026_08_08_000001_create_workflow_tables.php   # Workflow, WorkflowStep, WorkflowAction
+├── 2026_08_08_000002_create_documents_table.php   # Polymorphic documents table
+├── 2026_08_08_000003_create_notification_tables.php # Notifications, templates, preferences, logs
+├── add_create_jobs_table.php                      # Laravel jobs table
+├── create_saved_filters_table.php                 # User-saved filter presets
+├── create_saved_reports_table.php                 # User-saved reports
+├── create_system_settings_table.php               # Polymorphic system settings
+└── 2026_08_09_000001_create_report_schedules_table.php  # Report schedules table
+```
+
+**Package-level Core Seeders** (in [`src/Core/`](src/Core/)):
+
+```
+src/Core/
+├── Admin/Database/Seeders/
+│   ├── RoleSeeder.php                             # Default roles and permissions
+│   └── SuperAdminSeeder.php                       # Super admin user creation
+├── Common/Database/Seeders/
+│   └── NotificationTemplateSeeder.php             # 5 default notification templates
+└── System/Database/Seeders/
+    └── SystemSettingsSeeder.php                   # Default system settings
 ```
 
 ### 2.2 Canonical Business Module Directory Map
@@ -701,14 +779,6 @@ All components are registered in [`UILibraryServiceProvider::registerLivewireCom
 | RecentExports | `qf.recent-exports` | `RecentExports` | Recent exports list |
 | RecentImports | `qf.recent-imports` | `RecentImports` | Recent imports list |
 
-#### Custom (Business-Specific)
-
-| Component | Alias | Class | Purpose |
-|-----------|-------|-------|---------|
-| EmployeeDetail | `qf.employee-detail` | `EmployeeDetail` | Employee detail card |
-| SearchableEmployeeDropdown | `qf.searchable-employee-dropdown` | `SearchableEmployeeDropdown` | Employee search/select |
-| TaxBandsRepeater | `qf.tax-bands-repeater` | `TaxBandsRepeater` | Tax bands repeater field |
-
 #### Conditional (HR Module — Registered Only If Files Exist)
 
 These are registered conditionally in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php:299) by checking `app_path()` for file existence:
@@ -743,16 +813,154 @@ These are registered conditionally in [`UILibraryServiceProvider`](src/Providers
 | ImportProcessor | [`src/Services/Imports/ImportProcessor.php`](src/Services/Imports/ImportProcessor.php) | Import file processing (singleton) |
 | DataTableExport | [`src/Services/Exports/DataTableExport.php`](src/Services/Exports/DataTableExport.php) | Excel/CSV export from DataTable config |
 | TemplateExport | [`src/Services/Exports/TemplateExport.php`](src/Services/Exports/TemplateExport.php) | Import template generation with LookupSheet, OptionsReferenceSheet, TemplateDataSheet |
-| ApprovalEngine | [`src/Services/Approvals/ApprovalEngine.php`](src/Services/Approvals/ApprovalEngine.php) | Approval workflow engine |
+| **DocumentEngine** | [`src/Services/Documents/DocumentEngine.php`](src/Services/Documents/DocumentEngine.php:13) | **NEW** — Generic document engine. API: `upload()`, `generatePdf()`, `generateExcel()`, `getDocuments()`, `delete()`. Polymorphic, config-driven. |
+| **WorkflowEngine** | [`src/Services/Workflow/WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php:12) | **NEW** — Generic workflow engine. API: `start()`, `approve()`, `reject()`, `recall()`, `getDefinition()`, `hasActiveWorkflow()`. Supersedes ApprovalEngine. |
+| ApprovalEngine | [`src/Services/Approvals/ApprovalEngine.php`](src/Services/Approvals/ApprovalEngine.php:11) | ⚠️ **DEPRECATED** — Legacy approval workflow engine. Maintained for backward compatibility. Prefer [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) for new workflow-enabled features. |
+| ApprovalModelResolver | [`src/Services/Approvals/ApprovalModelResolver.php`](src/Services/Approvals/ApprovalModelResolver.php:7) | Config-driven approval model resolution (implements [`ApprovalModelResolver`](src/Contracts/Approvals/ApprovalModelResolver.php) contract) |
+| NullCompanyProvider | [`src/Services/Navigation/NullCompanyProvider.php`](src/Services/Navigation/NullCompanyProvider.php:9) | Default no-op [`CompanyProvider`](src/Contracts/Navigation/CompanyProvider.php) implementation — returns empty collection/null |
 | SearchEngine | [`src/Services/Search/SearchEngine.php`](src/Services/Search/SearchEngine.php) | Global search across modules |
 | FilterService | [`src/Services/Filters/FilterService.php`](src/Services/Filters/FilterService.php) | Filter application logic |
 | ValueGenerator | [`src/Services/ValueGenerator.php`](src/Services/ValueGenerator.php) | Auto-generates field values from patterns |
 | ApplicationInfo | [`src/Services/System/ApplicationInfo.php`](src/Services/System/ApplicationInfo.php) | Application metadata |
-| EmployeeDocumentService | [`src/Services/Documents/EmployeeDocumentService.php`](src/Services/Documents/EmployeeDocumentService.php) | Employee document management |
 | AccessControlPermissionService | [`src/Services/AccessControl/AccessControlPermissionService.php`](src/Services/AccessControl/AccessControlPermissionService.php) | Permission CRUD operations |
 | BankFileGeneratorFactory | [`src/Services/BankFiles/BankFileGeneratorFactory.php`](src/Services/BankFiles/BankFileGeneratorFactory.php) | Factory for BACS/NACHA/NIBSS/SEPA generators |
+| **NotificationService** | [`src/Services/Notifications/NotificationService.php`](src/Services/Notifications/NotificationService.php) | **NEW** — Polymorphic notification dispatch engine. API: `dispatch()`, `getUnread()`, `registerChannel()`, `resolveTemplate()`. Supports `{placeholder}` replacement in templates. |
+| **DatabaseChannel** | [`src/Services/Notifications/Channels/DatabaseChannel.php`](src/Services/Notifications/Channels/DatabaseChannel.php) | **NEW** — In-app notification channel (no-op; notifications already persisted by NotificationService) |
+| **MailChannel** | [`src/Services/Notifications/Channels/MailChannel.php`](src/Services/Notifications/Channels/MailChannel.php) | **NEW** — Email notification channel via `Mail::raw()` |
+| **ReportEngine** | [`src/Services/Reports/ReportEngine.php`](src/Services/Reports/ReportEngine.php) | **NEW** — Scheduled report engine. API: `process(ReportSchedule)`. Integrates [`DocumentEngine`](src/Services/Documents/DocumentEngine.php) for PDF/Excel generation and [`NotificationService`](src/Services/Notifications/NotificationService.php) for recipient delivery. |
+
+### 4.3a Models
+
+| Model | Location | Purpose |
+|-------|----------|---------|
+| Export | [`src/Models/Export.php`](src/Models/Export.php) | Export job tracking record |
+| ExportChunk | [`src/Models/ExportChunk.php`](src/Models/ExportChunk.php) | Export chunk file record |
+| Import | [`src/Models/Import.php`](src/Models/Import.php) | Import job tracking record |
+| ImportChunk | [`src/Models/ImportChunk.php`](src/Models/ImportChunk.php) | Import chunk record |
+| SavedFilter | [`src/Models/SavedFilter.php`](src/Models/SavedFilter.php) | User-saved filter preset |
+| SavedReport | [`src/Models/SavedReport.php`](src/Models/SavedReport.php) | User-saved report |
+| System | [`src/Models/System.php`](src/Models/System.php) | System singleton model (id=1) |
+| SystemSetting | [`src/Models/SystemSetting.php`](src/Models/SystemSetting.php) | Polymorphic settings (user/company/system) |
+| Document | [`src/Models/Document.php`](src/Models/Document.php) | Polymorphic document with soft deletes |
+| Workflow | [`src/Models/Workflow.php`](src/Models/Workflow.php) | Workflow instance (polymorphic, multi-step) |
+| WorkflowStep | [`src/Models/WorkflowStep.php`](src/Models/WorkflowStep.php) | Workflow step (role-based, sequential) |
+| WorkflowAction | [`src/Models/WorkflowAction.php`](src/Models/WorkflowAction.php) | Workflow action audit trail |
+| **Notification** | [`src/Models/Notification.php`](src/Models/Notification.php) | **NEW** — Polymorphic notification (notifiable_type/id) |
+| **NotificationTemplate** | [`src/Models/NotificationTemplate.php`](src/Models/NotificationTemplate.php) | **NEW** — Template model (type, channel, locale) |
+| **NotificationPreference** | [`src/Models/NotificationPreference.php`](src/Models/NotificationPreference.php) | **NEW** — Per-user channel preference toggle |
+| **NotificationLog** | [`src/Models/NotificationLog.php`](src/Models/NotificationLog.php) | **NEW** — Notification dispatch audit trail |
+| **ReportSchedule** | [`src/Models/ReportSchedule.php`](src/Models/ReportSchedule.php) | **NEW** — Report schedule model (frequency, time, timezone, recipients, status, next_run_at) |
 
 ### 4.4 Contracts (Interfaces)
+
+#### Workflowable Contract
+
+**Location**: [`src/Contracts/Workflow/Workflowable.php`](src/Contracts/Workflow/Workflowable.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Workflow;
+
+interface Workflowable
+{
+    /** Get the unique identifier for this workflowable entity. */
+    public function getWorkflowableId(): int|string;
+
+    /** Get the workflow definition key (e.g., 'leave_request', 'expense_claim'). */
+    public function getWorkflowDefinitionKey(): string;
+
+    /** Get additional context data for workflow routing decisions. */
+    public function getWorkflowContext(): array;
+}
+```
+
+Any Eloquent model implements this contract to become workflow-enabled. The [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) uses these methods to start, advance, and complete workflows.
+
+#### ApprovalModelResolver Contract
+
+**Location**: [`src/Contracts/Approvals/ApprovalModelResolver.php`](src/Contracts/Approvals/ApprovalModelResolver.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Approvals;
+
+interface ApprovalModelResolver
+{
+    public function resolveRequestModel(): string;
+    public function resolveTierModel(): string;
+    public function resolveLogModel(): string;
+    public function resolveTierApprovalModel(): string;
+}
+```
+
+Abstracts model class resolution for approval workflows. The default implementation ([`src/Services/Approvals/ApprovalModelResolver.php`](src/Services/Approvals/ApprovalModelResolver.php)) reads from `config('ui-library.approvals.models')`.
+
+#### CompanyProvider Contract
+
+**Location**: [`src/Contracts/Navigation/CompanyProvider.php`](src/Contracts/Navigation/CompanyProvider.php:8)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Navigation;
+
+use Illuminate\Support\Collection;
+use Illuminate\Foundation\Auth\User;
+
+interface CompanyProvider
+{
+    public function getCompanies(?User $user): Collection;
+    public function getCurrentCompanyId(?User $user): ?int;
+}
+```
+
+Abstracts company resolution for multi-tenant navigation. The default implementation is [`NullCompanyProvider`](src/Services/Navigation/NullCompanyProvider.php:9) (returns empty collection/null). Consuming apps bind their own implementation in `AppServiceProvider`.
+
+#### ModuleContract
+
+**Location**: [`src/Contracts/Modules/ModuleContract.php`](src/Contracts/Modules/ModuleContract.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Modules;
+
+interface ModuleContract
+{
+    public function getKey(): string;
+    public function getLabel(): string;
+    public function getIcon(): string;
+    public function getRoute(): string;
+    public function getOrder(): int;
+    public function getRoles(): array;
+    public function isCore(): bool;
+    public function getPath(): string;
+}
+```
+
+Defines the contract for module metadata used by the module registry and navigation system.
+
+#### NavigationProvider Contract
+
+**Location**: [`src/Contracts/Navigation/NavigationProvider.php`](src/Contracts/Navigation/NavigationProvider.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Navigation;
+
+interface NavigationProvider
+{
+    public function getNavigationItems(string $module, ?string $context = null): array;
+    public function getContextGroups(string $module): array;
+    public function getSharedItems(string $module, string $section): array;
+}
+```
+
+#### SettingsProvider Contract
+
+**Location**: [`src/Contracts/Settings/SettingsProvider.php`](src/Contracts/Settings/SettingsProvider.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Settings;
+
+interface SettingsProvider
+{
+    public function resolve(string $key): mixed;
+}
+```
 
 #### FieldType Contract
 
@@ -817,6 +1025,31 @@ interface Widget
 }
 ```
 
+#### Documentable Contract
+
+**Location**: [`src/Contracts/Documents/Documentable.php`](src/Contracts/Documents/Documentable.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Documents;
+
+interface Documentable
+{
+    /** Get the unique identifier for this documentable entity. */
+    public function getDocumentableId(): int|string;
+
+    /** Get the document type key (e.g., 'employee_contract', 'payslip'). */
+    public function getDocumentType(): string;
+
+    /** Get the storage folder path relative to the configured disk. */
+    public function getDocumentStoragePath(): string;
+
+    /** Get template data for document generation. */
+    public function getDocumentTemplateData(): array;
+}
+```
+
+Any Eloquent model implements this contract to become document-enabled. The [`DocumentEngine`](src/Services/Documents/DocumentEngine.php) uses these methods to store, generate, and retrieve documents.
+
 #### OnboardingCondition Contract
 
 **Location**: [`src/Contracts/OnboardingCondition.php`](src/Contracts/OnboardingCondition.php:5)
@@ -830,6 +1063,71 @@ interface OnboardingCondition
     public function __invoke($user): bool;
 }
 ```
+
+#### Notifiable Contract
+
+**Location**: [`src/Contracts/Notifications/Notifiable.php`](src/Contracts/Notifications/Notifiable.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Notifications;
+
+interface Notifiable
+{
+    /** Get the unique identifier for this notifiable entity. */
+    public function getNotifiableId(): int|string;
+
+    /** Get the email address for mail channel delivery. */
+    public function getNotificationEmail(): ?string;
+
+    /** Get additional context data for template variable replacement. */
+    public function getNotificationContext(): array;
+}
+```
+
+Any Eloquent model implements this contract to receive notifications. The [`NotificationService`](src/Services/Notifications/NotificationService.php) uses these methods to resolve recipients and template data.
+
+#### NotificationChannel Contract
+
+**Location**: [`src/Contracts/Notifications/NotificationChannel.php`](src/Contracts/Notifications/NotificationChannel.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Notifications;
+
+use QuickerFaster\UILibrary\Models\Notification;
+
+interface NotificationChannel
+{
+    /** Send a notification through this channel. */
+    public function send(Notification $notification): bool;
+
+    /** Get the channel identifier (e.g., 'database', 'mail'). */
+    public function getChannel(): string;
+}
+```
+
+Channel implementations are registered with [`NotificationService::registerChannel()`](src/Services/Notifications/NotificationService.php). Built-in channels: [`DatabaseChannel`](src/Services/Notifications/Channels/DatabaseChannel.php) (in-app), [`MailChannel`](src/Services/Notifications/Channels/MailChannel.php) (email).
+
+#### Reportable Contract
+
+**Location**: [`src/Contracts/Reports/Reportable.php`](src/Contracts/Reports/Reportable.php:5)
+
+```php
+namespace QuickerFaster\UILibrary\Contracts\Reports;
+
+interface Reportable
+{
+    /** Generate the report and return a Document. */
+    public function generate(array $parameters = []): \QuickerFaster\UILibrary\Models\Document;
+
+    /** Get the list of user IDs who should receive this report. */
+    public function recipients(): array;
+
+    /** Get the report type key (e.g., 'payroll', 'headcount'). */
+    public function getReportType(): string;
+}
+```
+
+Any class implementing this contract can be registered as a report type in `config('ui-library.reports.report_types')`. The [`ReportEngine`](src/Services/Reports/ReportEngine.php) resolves the implementation from config, calls [`generate()`](src/Contracts/Reports/Reportable.php:10) to produce a [`Document`](src/Models/Document.php), and delivers it to [`recipients()`](src/Contracts/Reports/Reportable.php:15) via [`NotificationService`](src/Services/Notifications/NotificationService.php).
 
 ### 4.5 FieldFactory Mapping
 
@@ -930,6 +1228,25 @@ Business modules can tap into the following extension points:
 5. **Field Type Extension** — Add new field types by implementing [`FieldType`](src/Contracts/FieldTypes/FieldType.php:5) and registering in [`FieldFactory::$map`](src/Factories/FieldTypes/FieldFactory.php:25).
 
 6. **Widget Extension** — Add new widget types by creating a processor class and registering in [`WidgetProcessor::$map`](src/Services/Widgets/WidgetProcessor.php:27).
+
+### 4.9 Library Events
+
+The library dispatches the following events that business modules can listen to:
+
+| Event | Location | Fires When | Payload |
+|-------|----------|------------|---------|
+| `ModuleRegistered` | [`src/Events/ModuleRegistered.php`](src/Events/ModuleRegistered.php:7) | A business module is auto-discovered and registered by [`ModuleServiceProvider`](src/Providers/ModuleServiceProvider.php) | `name` (string), `path` (string) |
+| `ModuleBooted` | [`src/Events/ModuleBooted.php`](src/Events/ModuleBooted.php:7) | A module has completed its boot sequence | (no payload — use as signal) |
+| `NavigationBuilding` | [`src/Events/NavigationBuilding.php`](src/Events/NavigationBuilding.php:7) | During navigation construction, before rendering | `modules` (array — modifiable by listeners) |
+| **`NotificationDispatched`** | [`src/Events/Notifications/NotificationDispatched.php`](src/Events/Notifications/NotificationDispatched.php) | **NEW** — After each notification is dispatched | `notification` (Notification model) |
+
+**Usage**: Business modules create listeners in `app/Modules/{Module}/Listeners/` with a `handle()` method type-hinted to the event class. Listeners are auto-discovered via reflection — no manual registration needed.
+
+### 4.9a Library Listeners
+
+Listener | Location | Purpose |
+|----------|----------|---------|
+**NotificationEventSubscriber** | [`src/Listeners/NotificationEventSubscriber.php`](src/Listeners/NotificationEventSubscriber.php) | **NEW** — Listens for [`NotificationDispatched`](src/Events/Notifications/NotificationDispatched.php) and logs each dispatch to [`NotificationLog`](src/Models/NotificationLog.php) |
 
 ---
 
@@ -1142,6 +1459,94 @@ The [`DataTableFormValidationService`](src/Services/Validation/DataTableFormVali
 - **Import Template**: [`TemplateExport`](src/Services/Exports/TemplateExport.php) generates Excel templates with [`LookupSheet`](src/Services/Exports/LookupSheet.php) (relationship options), [`OptionsReferenceSheet`](src/Services/Exports/OptionsReferenceSheet.php) (field options), and [`TemplateDataSheet`](src/Services/Exports/TemplateDataSheet.php) (data entry columns)
 - **Import Processing**: [`ImportProcessor`](src/Services/Imports/ImportProcessor.php) (singleton) processes uploaded files, maps columns, and creates/updates records
 
+### 5.7 Library Configuration (`config('ui-library')`)
+
+The library's own configuration is defined in [`src/Config/ui-library.php`](src/Config/ui-library.php). Key sections:
+
+#### Module Paths
+
+```php
+'module_paths' => [
+    'core'     => null,                    // Set by UILibraryServiceProvider at boot
+    'business' => base_path('app/Modules'), // Business module discovery path
+],
+```
+
+#### Navigation
+
+```php
+'navigation' => [
+    'company_provider'      => \QuickerFaster\UILibrary\Services\Navigation\NullCompanyProvider::class,
+    'show_company_switcher' => false,
+    'top_bar' => ['enabled' => true, 'show_module_switcher' => true, 'show_company_switcher' => false],
+    'sidebar' => ['initial_state' => 'full'],
+    'bottom_bar' => ['enabled' => true],
+],
+```
+
+#### Approvals
+
+```php
+'approvals' => [
+    'models' => [
+        'request'       => \QuickerFaster\UILibrary\Models\ApprovalRequest::class,
+        'tier'          => \QuickerFaster\UILibrary\Models\ApprovalTier::class,
+        'log'           => \QuickerFaster\UILibrary\Models\ApprovalLog::class,
+        'tier_approval' => \QuickerFaster\UILibrary\Models\ApprovalTierApproval::class,
+    ],
+],
+```
+
+These are library-owned model defaults. Consuming apps can override them by publishing the config. The [`ApprovalModelResolver`](src/Services/Approvals/ApprovalModelResolver.php) reads from these keys.
+
+#### Workflows
+
+```php
+'workflows' => [
+    'definitions' => [
+        // Business modules merge their workflow definitions here
+        // 'leave_request' => [
+        //     'label' => 'Leave Request Approval',
+        //     'steps' => [
+        //         ['name' => 'Manager Approval', 'step_type' => 'approval', 'approval_mode' => 'any', 'roles' => ['manager']],
+        //         ['name' => 'HR Review', 'step_type' => 'approval', 'approval_mode' => 'any', 'roles' => ['hr']],
+        //     ],
+        // ],
+    ],
+],
+```
+The [`WorkflowEngine::getDefinition()`](src/Services/Workflow/WorkflowEngine.php:136) reads from `config("ui-library.workflows.definitions.{$key}")`. Business modules merge their definitions via their service providers.
+
+#### Documents
+
+```php
+'documents' => [
+    'disk'           => env('UI_LIBRARY_DOCUMENT_DISK', 'public'),
+    'max_file_size'  => env('UI_LIBRARY_MAX_FILE_SIZE', 10240), // KB
+    'allowed_types'  => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt', 'csv'],
+],
+```
+
+The [`DocumentEngine`](src/Services/Documents/DocumentEngine.php:13) reads `disk` from `config('ui-library.documents.disk')`. The `max_file_size` and `allowed_types` are used for upload validation. All values are environment-configurable via the `UI_LIBRARY_*` env prefix.
+
+#### Reports
+
+```php
+'reports' => [
+    'default_frequency'      => 'daily',
+    'available_frequencies'  => ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    'report_types'           => [
+        // Business modules register their report implementations here
+        // 'payroll' => \App\Modules\Hr\Reports\PayrollReport::class,
+    ],
+    'notification_channels'  => ['database', 'mail'],
+    'queue_connection'       => env('UI_LIBRARY_REPORT_QUEUE', 'database'),
+],
+```
+
+The [`ReportEngine`](src/Services/Reports/ReportEngine.php) resolves report implementations from `config('ui-library.reports.report_types.{type}')`. The `notification_channels` key controls which channels are used for report delivery. The `queue_connection` key determines which queue connection [`GenerateReportJob`](src/Jobs/GenerateReportJob.php) dispatches to.
+
+
 ---
 
 ## 6. Module Conventions & Registration Protocol
@@ -1206,7 +1611,7 @@ Usage: `view('hr::dashboard')`, `view('admin::users.index')`
 
 The route loading order in [`registerModuleRoutes()`](src/Providers/ModuleServiceProvider.php:246) is critical:
 
-1. **Library routes** — [`src/Routes/web.php`](src/Routes/web.php) and `src/Routes/api.php`
+1. **Library routes** — [`src/Routes/web.php`](src/Routes/web.php)
 2. **Non-system module web routes** — `app/Modules/*/Routes/web.php` (excluding 'system')
 3. **Non-system module API routes** — `app/Modules/*/Routes/api.php` (excluding 'system')
 4. **System module web routes** — `app/Modules/System/Routes/web.php` (catch-all, loaded LAST)
@@ -1944,7 +2349,7 @@ TASK: "I need to..."
 
 ## Final Architectural Summary
 
-The QuickerFaster UI Library is a **layered architecture** with three core responsibilities:
+The QuickerFaster UI Library is a **layered architecture** with seven core responsibilities:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -1968,8 +2373,47 @@ The QuickerFaster UI Library is a **layered architecture** with three core respo
 │     • FieldFactory: field_type string → FieldType class      │
 │     • WidgetProcessor: widget type → processor class         │
 │     • SettingsManager: user → company → system cascade       │
+├──────────────────────────────────────────────────────────────┤
+│  4. WORKFLOW ENGINE                                          │
+│     • WorkflowEngine: generic, contract-based, multi-step    │
+│     • Workflowable contract: any Eloquent model can opt in   │
+│     • ApprovalEngine: legacy, maintained for backward compat │
+│     • ApprovalModelResolver: config-driven model resolution  │
+│     • CompanyProvider: multi-tenant navigation abstraction   │
+├──────────────────────────────────────────────────────────────┤
+│  5. DOCUMENT ENGINE                                          │
+│     • DocumentEngine: polymorphic, config-driven             │
+│     • Documentable contract: any Eloquent model can opt in   │
+│     • Document model: polymorphic, soft deletes, auto cleanup│
+│     • PDF + Excel generation via barryvdh/dompdf + maatwebsite/excel │
+│     • Full stack: Contract → Model → Service → Controller →  │
+│       Livewire → Views → Migration                           │
+├──────────────────────────────────────────────────────────────┤
+│  6. NOTIFICATION ENGINE                                      │
+│     • NotificationService: polymorphic, channel-based        │
+│     • Notifiable contract: any Eloquent model can opt in     │
+│     • NotificationChannel contract: channel abstraction      │
+│     • Channels: DatabaseChannel (in-app), MailChannel (email)│
+│     • Template-based rendering with {placeholder} replacement│
+│     • User preferences and audit logging                     │
+├──────────────────────────────────────────────────────────────┤
+│  7. SCHEDULED REPORTS ENGINE                                 │
+│     • ReportEngine: config-driven, integrates DocumentEngine │
+│       and NotificationService                                │
+│     • Reportable contract: any class can define a report     │
+│     • ReportSchedule model: frequency, time, recipients      │
+│     • GenerateReportJob: queueable per-schedule processing   │
+│     • reports:generate-scheduled: Artisan cron command       │
+│     • Config: ui-library.reports — report_types registry     │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+**Completed Phases**:
+- **Phase 2.5**: Decoupling (CompanyProvider, ApprovalModelResolver, migration relocation, HR-specific code removal)
+- **Phase 3.1**: Workflow Engine ([`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) + [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract)
+- **Phase 3.2**: Document Engine ([`DocumentEngine`](src/Services/Documents/DocumentEngine.php) + [`Documentable`](src/Contracts/Documents/Documentable.php) contract)
+- **Phase 3.3**: Notification Engine ([`NotificationService`](src/Services/Notifications/NotificationService.php) + [`Notifiable`](src/Contracts/Notifications/Notifiable.php) + [`NotificationChannel`](src/Contracts/Notifications/NotificationChannel.php) contracts)
+- **Phase 3.4**: Scheduled Reports Engine ([`ReportEngine`](src/Services/Reports/ReportEngine.php) + [`Reportable`](src/Contracts/Reports/Reportable.php) contract + [`ReportSchedule`](src/Models/ReportSchedule.php) model + [`GenerateReportJob`](src/Jobs/GenerateReportJob.php) + [`reports:generate-scheduled`](src/Console/Commands/GenerateScheduledReports.php) command)
 
 **Key architectural invariants**:
 - The library never imports from `App\Modules\*` (except in the service provider for conditional component registration)
@@ -1977,5 +2421,467 @@ The QuickerFaster UI Library is a **layered architecture** with three core respo
 - All UI behavior is configurable through PHP config files
 - The `qf` prefix is used consistently across all namespaces (views, Blade, Livewire, translations)
 - The System module catch-all route is always loaded last
+- Workflow definitions are config-driven via `ui-library.workflows.definitions`
+- Document storage is config-driven via `ui-library.documents`
+- Notification channels and templates are config-driven via `ui-library.notifications`
+- All cross-cutting contracts live in `src/Contracts/` with default implementations in `src/Services/`
+- Notification dispatch is event-driven: [`NotificationDispatched`](src/Events/Notifications/NotificationDispatched.php) fires after each dispatch, logged by [`NotificationEventSubscriber`](src/Listeners/NotificationEventSubscriber.php)
+- Report types are config-driven via `ui-library.reports.report_types`
+- Report generation is queue-driven via [`GenerateReportJob`](src/Jobs/GenerateReportJob.php) dispatched by [`reports:generate-scheduled`](src/Console/Commands/GenerateScheduledReports.php)
+- Report delivery integrates Document Engine and Notification Engine through [`ReportEngine`](src/Services/Reports/ReportEngine.php)
 
 If this blueprint is followed consistently, both human developers and AI agents will be able to understand where to add new functionality, how to extend the system, and how to preserve the intended separation of concerns.
+
+---
+
+## 12. Phase 3.1: Workflow Engine
+
+### 12.1 Overview
+
+Config-driven, contract-based generic workflow engine that supersedes the legacy [`ApprovalEngine`](src/Services/Approvals/ApprovalEngine.php). Any Eloquent model can become workflow-enabled by implementing the [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract.
+
+### 12.2 Architecture
+
+- **Contract**: [`Workflowable`](src/Contracts/Workflow/Workflowable.php:5) interface — any Eloquent model implements to become workflow-enabled. Methods: [`getWorkflowableId()`](src/Contracts/Workflow/Workflowable.php:10), [`getWorkflowDefinitionKey()`](src/Contracts/Workflow/Workflowable.php:16), [`getWorkflowContext()`](src/Contracts/Workflow/Workflowable.php:21).
+- **Engine**: [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php:12) — transactional, multi-step, sequential advancement. API: [`start()`](src/Services/Workflow/WorkflowEngine.php:17), [`approve()`](src/Services/Workflow/WorkflowEngine.php:66), [`reject()`](src/Services/Workflow/WorkflowEngine.php:93), [`recall()`](src/Services/Workflow/WorkflowEngine.php:117), [`getDefinition()`](src/Services/Workflow/WorkflowEngine.php:136), [`hasActiveWorkflow()`](src/Services/Workflow/WorkflowEngine.php:144).
+- **Models**: [`Workflow`](src/Models/Workflow.php) (polymorphic via `workflowable_type`/`workflowable_id`), [`WorkflowStep`](src/Models/WorkflowStep.php) (role-based, sequential with `approval_mode`: `any` or `all`), [`WorkflowAction`](src/Models/WorkflowAction.php) (audit trail of all actions).
+- **Config**: `ui-library.workflows.definitions` — business modules merge their workflow definitions via service providers.
+
+### 12.3 Integration
+
+- Registered as singleton in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php)
+- Migration at [`Database/Migrations/2026_08_08_000001_create_workflow_tables.php`](Database/Migrations/2026_08_08_000001_create_workflow_tables.php)
+- Zero `App\Modules` references — fully decoupled
+- Legacy [`ApprovalEngine`](src/Services/Approvals/ApprovalEngine.php) still exists for backward compatibility with existing approval workflows
+- **No dedicated Controller, Livewire component, or Blade views** — workflow is dispatched programmatically; UI is provided by the legacy [`ApprovalActions`](src/Http/Livewire/Approvals/ApprovalActions.php) and [`ApprovalHistoryTimeline`](src/Http/Livewire/Approvals/ApprovalHistoryTimeline.php) Livewire components
+
+### 12.4 Usage Example
+
+```php
+use QuickerFaster\UILibrary\Contracts\Workflow\Workflowable;
+use QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine;
+
+class LeaveRequest extends Model implements Workflowable
+{
+    public function getWorkflowableId(): int|string
+    {
+        return $this->id;
+    }
+
+    public function getWorkflowDefinitionKey(): string
+    {
+        return 'leave_request';
+    }
+
+    public function getWorkflowContext(): array
+    {
+        return [
+            'department_id' => $this->employee->department_id,
+            'days' => $this->total_days,
+        ];
+    }
+}
+
+// Starting a workflow
+$engine = app(WorkflowEngine::class);
+$workflow = $engine->start($leaveRequest);
+
+// Approving the current step
+$engine->approve($workflow, 'Approved by manager');
+
+// Rejecting
+$engine->reject($workflow, 'Insufficient leave balance');
+
+// Recalling (by submitter)
+$engine->recall($workflow);
+
+// Checking for active workflows
+if ($engine->hasActiveWorkflow($leaveRequest)) {
+    // Already has a pending workflow
+}
+```
+
+### 12.5 Workflow Definition Schema
+
+```php
+// In config/ui-library.php or merged by a business module:
+'workflows' => [
+    'definitions' => [
+        'leave_request' => [
+            'label' => 'Leave Request Approval',
+            'steps' => [
+                [
+                    'name'          => 'Manager Approval',
+                    'step_type'     => 'approval',
+                    'approval_mode' => 'any',       // 'any' or 'all'
+                    'roles'         => ['manager', 'admin'],
+                ],
+                [
+                    'name'          => 'HR Review',
+                    'step_type'     => 'approval',
+                    'approval_mode' => 'any',
+                    'roles'         => ['hr', 'super_admin'],
+                ],
+            ],
+        ],
+    ],
+],
+```
+
+### 12.6 Relationship to Legacy ApprovalEngine
+
+| Aspect | WorkflowEngine (NEW) | ApprovalEngine (LEGACY) |
+|--------|---------------------|------------------------|
+| Contract | [`Workflowable`](src/Contracts/Workflow/Workflowable.php) | None (ad-hoc) |
+| Models | [`Workflow`](src/Models/Workflow.php), [`WorkflowStep`](src/Models/WorkflowStep.php), [`WorkflowAction`](src/Models/WorkflowAction.php) | ApprovalRequest, ApprovalTier, ApprovalLog, ApprovalTierApproval |
+| Config | `ui-library.workflows.definitions` | ApprovalConfigResolver |
+| Decoupling | Zero `App\Modules` references | Uses ApprovalModelResolver contract |
+| Status | **Preferred for new features** | Maintained for backward compatibility |
+
+## 11. Phase 2.5 Decoupling Status
+
+### 11.1 Overview
+
+Phase 2.5 targeted the most impactful hard-coded couplings between the UI library and consuming-business-layer code. The goal was to replace direct `\App\Modules\*` references with contracts and dependency injection, enabling the library to operate independently without requiring specific business modules to be present.
+
+**5 targeted couplings addressed; ~50 broader references remain for later phases.**
+
+### 11.2 Completed Items
+
+| # | Gap Ref | File | Original Coupling | Resolution |
+|---|---------|------|-------------------|------------|
+| 1 | 2.4.2 | [`src/Resources/views/components/layouts/partials/company-title-suffix.blade.php`](src/Resources/views/components/layouts/partials/company-title-suffix.blade.php:9) | `\App\Modules\Hr\Models\Company::find($companyId)` | Replaced with [`CompanyProvider`](src/Contracts/Navigation/CompanyProvider.php) contract via `app()` helper → `getCompanies(auth()->user())->firstWhere('id', $companyId)` |
+| 2 | 2.4.2 | [`src/Http/Livewire/Settings/SettingsPanel.php`](src/Http/Livewire/Settings/SettingsPanel.php:118) | `\App\Modules\Hr\Models\Company::find($companyId)` in `getSettableModel()` | Injected [`CompanyProvider`](src/Contracts/Navigation/CompanyProvider.php) via `boot()`, replaced with `$this->companyProvider->getCurrentCompanyId()` + `getCompanies()` |
+| 3 | 2.4.4 | [`src/Http/Livewire/Custom/`](src/Http/Livewire/Custom/) | HR-specific Livewire components (EmployeeDetail, SearchableEmployeeDropdown, TaxBandsRepeater) | Directory deleted. Components belong in business modules, not the library. |
+| 4 | 2.4.4 | [`src/Resources/views/livewire/custom/`](src/Resources/views/livewire/custom/) | HR-specific Livewire views | Directory deleted. Views belong in business modules, not the library. |
+| 5 | 2.1.2 | [`src/Services/Documents/EmployeeDocumentService.php`](src/Services/Documents/EmployeeDocumentService.php) | HR-specific document service (deleted in Phase 2.5) | ✅ Resolved — Phase 3.2 Document Engine ([`DocumentEngine`](src/Services/Documents/DocumentEngine.php) + [`Documentable`](src/Contracts/Documents/Documentable.php) contract) |
+
+### 11.3 New Contracts & Implementations Added
+
+| Layer | Name | Location | Purpose |
+|-------|------|----------|---------|
+| **Contract** | `CompanyProvider` | [`src/Contracts/Navigation/CompanyProvider.php`](src/Contracts/Navigation/CompanyProvider.php:8) | Abstracts company resolution for multi-tenant navigation. Methods: `getCompanies(?User)`, `getCurrentCompanyId(?User)`. |
+| **Contract** | `ApprovalModelResolver` | [`src/Contracts/Approvals/ApprovalModelResolver.php`](src/Contracts/Approvals/ApprovalModelResolver.php) | Abstracts model class resolution for approval workflows. Config-driven implementation maps model keys to FQCNs. |
+| **Implementation** | `ApprovalModelResolver` | [`src/Services/Approvals/ApprovalModelResolver.php`](src/Services/Approvals/ApprovalModelResolver.php) | Config-driven resolver: reads `ui-library.approvals.model_map` to resolve model keys to fully-qualified class names. |
+| **Implementation** | `NullCompanyProvider` | [`src/Services/Navigation/NullCompanyProvider.php`](src/Services/Navigation/NullCompanyProvider.php:9) | Default no-op implementation: returns empty collection and null company ID. Used when no consuming app provider is configured. |
+
+### 11.4 Migration Relocation
+
+| Count | Source | Destination | Reason |
+|-------|--------|-------------|--------|
+| 8 migrations | `src/Database/Migrations/` (shared) | [`Database/Migrations/`](Database/Migrations/) at package root | Standard Laravel package convention; loaded via `loadMigrationsFrom()` in service provider |
+| 1 migration | `src/Core/System/Database/Migrations/` | Retained at [`src/Core/System/Database/Migrations/2026_07_17_000000_create_systems_table.php`](src/Core/System/Database/Migrations/2026_07_17_000000_create_systems_table.php) | Core system module migration stays within the module structure |
+
+### 11.5 New Events
+
+| Event | Location | Purpose |
+|-------|----------|---------|
+| `ModuleRegistered` | [`src/Events/ModuleRegistered.php`](src/Events/ModuleRegistered.php) | Fired when a business module is auto-discovered and registered by [`ModuleServiceProvider`](src/Providers/ModuleServiceProvider.php). Payload: module name, path. |
+| `ModuleBooted` | [`src/Events/ModuleBooted.php`](src/Events/ModuleBooted.php) | Fired after a module has completed its boot sequence. Payload: module name. |
+| `NavigationBuilding` | [`src/Events/NavigationBuilding.php`](src/Events/NavigationBuilding.php) | Fired during navigation construction, allowing listeners to modify nav items before rendering. Payload: navigation collection. |
+
+### 11.6 Service Provider Updates
+
+**UILibraryServiceProvider** ([`src/Providers/UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php)):
+
+| Change | Detail |
+|--------|--------|
+| **Contract bindings** | `CompanyProvider` → configurable implementation (default: `NullCompanyProvider`); `ApprovalModelResolver` → singleton binding |
+| **Shared migration loading** | Added `loadMigrationsFrom(__DIR__.'/../../Database/Migrations/')` for 8 shared migrations (exports, imports, saved filters, etc.) |
+| **Core namespace autoloading** | `composer.json` PSR-4 updated: `"QuickerFaster\\UILibrary\\Core\\": "src/Core/"` for Admin, Common, and System module namespaces within the library |
+| **Event imports** | Added `use` statements for `ModuleRegistered` and `ModuleBooted` events |
+
+### 11.7 Deleted Items
+
+| Item | Type | Reason |
+|------|------|--------|
+| [`src/Services/Documents/EmployeeDocumentService.php`](src/Services/Documents/EmployeeDocumentService.php) | Service class | HR-specific business logic; belongs in the Hr module, not the library |
+| [`src/Http/Livewire/Custom/`](src/Http/Livewire/Custom/) (directory) | Livewire components | Contained HR-specific components (`EmployeeDetail`, `SearchableEmployeeDropdown`, `TaxBandsRepeater`) |
+| [`src/Resources/views/livewire/custom/`](src/Resources/views/livewire/custom/) (directory) | Blade views | Contained HR-specific Livewire component views |
+
+### 11.8 Remaining for Later Phases
+
+Approximately **50 broader references** remain across the codebase, primarily in widget processors (HR KPI calculators like [`TurnoverRateWidgetProcessor`](src/Widgets/TurnoverRateWidgetProcessor.php), [`ENPSWidgetProcessor`](src/Widgets/ENPSWidgetProcessor.php), etc.) and bank file generators. These will be addressed in future phases as they require more extensive architectural refactoring (introducing data-source contracts, report-engine abstractions, etc.).
+
+| Category | Estimated Count | Planned Phase |
+|----------|----------------|---------------|
+| HR-specific widget processors | 9 | Phase 3 |
+| Bank file generators (country-specific) | 4 | Phase 3 |
+| Conditional Livewire registrations in UILibraryServiceProvider | 6 | Phase 3 |
+| Navigation/config references to HR models | ~15 | Phase 4 |
+| View/Blade references to HR entities | ~16 | Phase 4 |
+
+---
+
+## 13. Phase 3.2: Document Engine
+
+### 13.1 Overview
+
+Polymorphic, config-driven document management engine. Replaces the deleted HR-specific [`EmployeeDocumentService`](src/Services/Documents/EmployeeDocumentService.php). Any Eloquent model can become document-enabled by implementing the [`Documentable`](src/Contracts/Documents/Documentable.php) contract.
+
+### 13.2 Architecture
+
+- **Contract**: [`Documentable`](src/Contracts/Documents/Documentable.php:5) — models implement to receive documents. Methods: [`getDocumentableId()`](src/Contracts/Documents/Documentable.php:10), [`getDocumentType()`](src/Contracts/Documents/Documentable.php:15), [`getDocumentStoragePath()`](src/Contracts/Documents/Documentable.php:20), [`getDocumentTemplateData()`](src/Contracts/Documents/Documentable.php:25).
+- **Engine**: [`DocumentEngine`](src/Services/Documents/DocumentEngine.php:13) — singleton service. API: [`upload()`](src/Services/Documents/DocumentEngine.php:25), [`generatePdf()`](src/Services/Documents/DocumentEngine.php:45), [`generateExcel()`](src/Services/Documents/DocumentEngine.php:71), [`getDocuments()`](src/Services/Documents/DocumentEngine.php:94), [`delete()`](src/Services/Documents/DocumentEngine.php:105).
+- **Model**: [`Document`](src/Models/Document.php:9) — polymorphic (morphs `documentable`), soft deletes via `SoftDeletes` trait, auto file cleanup on delete via [`deleteFile()`](src/Models/Document.php:46).
+- **Config**: `ui-library.documents` — `disk` (default: `public`), `max_file_size` (default: 10240 KB), `allowed_types` (array of extensions). All values environment-configurable via `UI_LIBRARY_*` env prefix.
+
+### 13.3 Integration
+
+- Registered as singleton in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php)
+- Migration at [`Database/Migrations/2026_08_08_000002_create_documents_table.php`](Database/Migrations/2026_08_08_000002_create_documents_table.php)
+- Zero `App\Modules` references — fully decoupled
+- Uses existing composer dependencies: `barryvdh/laravel-dompdf` (PDF generation via [`generatePdf()`](src/Services/Documents/DocumentEngine.php:45)), `maatwebsite/excel` (Excel generation via [`generateExcel()`](src/Services/Documents/DocumentEngine.php:71))
+- **Full stack**: Contract ([`Documentable`](src/Contracts/Documents/Documentable.php)) → Model ([`Document`](src/Models/Document.php)) → Service ([`DocumentEngine`](src/Services/Documents/DocumentEngine.php)) → Controller ([`DocumentController`](src/Http/Controllers/Documents/DocumentController.php)) → Livewire ([`DocumentPreview`](src/Http/Livewire/DocumentPreview.php), [`DocumentPreviewModal`](src/Http/Livewire/Modals/DocumentPreviewModal.php)) → Views (5 preview partials in [`src/Resources/views/livewire/documents/`](src/Resources/views/livewire/documents/)) → Migration ([`2026_08_08_000002_create_documents_table.php`](Database/Migrations/2026_08_08_000002_create_documents_table.php))
+- **No dedicated Event or Listener** — document operations are synchronous; no event is dispatched on upload/generate/delete
+
+### 13.4 Usage Example
+
+```php
+use QuickerFaster\UILibrary\Contracts\Documents\Documentable;
+use QuickerFaster\UILibrary\Services\Documents\DocumentEngine;
+
+class Employee extends Model implements Documentable
+{
+    public function getDocumentableId(): int|string
+    {
+        return $this->id;
+    }
+
+    public function getDocumentType(): string
+    {
+        return 'employee_document';
+    }
+
+    public function getDocumentStoragePath(): string
+    {
+        return 'employees/' . $this->id;
+    }
+
+    public function getDocumentTemplateData(): array
+    {
+        return [
+            'employee_name' => $this->full_name,
+            'company_name'  => config('app.name'),
+        ];
+    }
+}
+
+// Upload a file
+$engine = app(DocumentEngine::class);
+$engine->upload($employee, $request->file('document'));
+
+// Generate a PDF from a Blade template
+$engine->generatePdf($employee, 'hr::documents.contract', 'contract.pdf', $data);
+
+// Generate an Excel document
+$engine->generateExcel($employee, new PayrollExport($employee), 'payslip.xlsx');
+
+// Get all documents for an entity
+$documents = $engine->getDocuments($employee);
+
+// Delete a document (also removes the file from storage)
+$engine->delete($document);
+```
+
+### 13.5 Document Model Schema
+
+The [`documents`](Database/Migrations/2026_08_08_000002_create_documents_table.php) table:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `documentable_type` | string | Polymorphic morph type |
+| `documentable_id` | bigint | Polymorphic morph ID |
+| `name` | string | Display name |
+| `file_path` | string | Storage path relative to disk |
+| `file_name` | string | Original filename |
+| `mime_type` | string | File MIME type |
+| `size` | bigint | File size in bytes |
+| `document_type` | string | Category key (e.g., `employee_contract`) |
+| `disk` | string | Storage disk name |
+| `metadata` | json | Arbitrary metadata |
+| `deleted_at` | timestamp | Soft delete support |
+
+---
+
+## 14. Phase 3.3: Notification Engine
+
+### 14.1 Overview
+
+Polymorphic, channel-based notification engine. Supports database (in-app) and mail channels with template-based rendering, user preferences, and audit logging.
+
+### 14.2 Architecture
+
+- **Contracts**: [`Notifiable`](src/Contracts/Notifications/Notifiable.php) (any model can receive notifications), [`NotificationChannel`](src/Contracts/Notifications/NotificationChannel.php) (channel abstraction with `send()` and `getChannel()`)
+- **Models**: [`Notification`](src/Models/Notification.php) (polymorphic via `notifiable_type`/`notifiable_id`), [`NotificationTemplate`](src/Models/NotificationTemplate.php) (type, channel, locale with `{placeholder}` support), [`NotificationPreference`](src/Models/NotificationPreference.php) (per-user channel toggle), [`NotificationLog`](src/Models/NotificationLog.php) (audit trail of all dispatches)
+- **Service**: [`NotificationService`](src/Services/Notifications/NotificationService.php) — `dispatch()`, `getUnread()`, `registerChannel()`, template resolution with `{placeholder}` replacement
+- **Channels**: [`DatabaseChannel`](src/Services/Notifications/Channels/DatabaseChannel.php) (no-op; notification already persisted by NotificationService), [`MailChannel`](src/Services/Notifications/Channels/MailChannel.php) (`Mail::raw()` delivery)
+- **Event**: [`NotificationDispatched`](src/Events/Notifications/NotificationDispatched.php) — fires after each dispatch with the Notification model as payload
+- **Listener**: [`NotificationEventSubscriber`](src/Listeners/NotificationEventSubscriber.php) — logs dispatched notifications to [`NotificationLog`](src/Models/NotificationLog.php)
+- **Config**: `ui-library.notifications` — `default_channels`, `queue_connection`
+- **Migration**: [`2026_08_08_000003_create_notification_tables.php`](Database/Migrations/2026_08_08_000003_create_notification_tables.php) — 4 tables (notifications, notification_templates, notification_preferences, notification_logs)
+- **Seeder**: [`NotificationTemplateSeeder`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php) — 5 default templates for `document_generated`, `report_ready`, `workflow_stage_changed`, and more
+
+### 14.3 Integration
+
+- Registered as singleton in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php) with database and mail channels pre-registered
+- Zero `App\Modules` references — fully decoupled
+- **No dedicated Controller or Livewire UI** — notifications are dispatched programmatically; consuming apps build their own notification UI
+
+### 14.4 Usage Example
+
+```php
+use QuickerFaster\UILibrary\Contracts\Notifications\Notifiable;
+use QuickerFaster\UILibrary\Services\Notifications\NotificationService;
+
+class User extends Model implements Notifiable
+{
+    public function getNotifiableId(): int|string
+    {
+        return $this->id;
+    }
+
+    public function getNotificationEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function getNotificationContext(): array
+    {
+        return [
+            'user_name' => $this->name,
+            'company_name' => config('app.name'),
+        ];
+    }
+}
+
+$service = app(NotificationService::class);
+$service->dispatch($user, 'document_generated', ['name' => 'Contract.pdf']);
+$unread = $service->getUnread($user);
+```
+
+### 14.5 Notification Tables Schema
+
+The [`notification_tables`](Database/Migrations/2026_08_08_000003_create_notification_tables.php) migration creates 4 tables:
+
+**notifications**:
+| Column | Type | Purpose |
+|--------|------|---------|
+| `notifiable_type` | string | Polymorphic morph type |
+| `notifiable_id` | bigint | Polymorphic morph ID |
+| `type` | string | Notification type key (e.g., `document_generated`) |
+| `channel` | string | Delivery channel (`database`, `mail`) |
+| `subject` | string | Notification subject line |
+| `body` | text | Rendered notification body |
+| `data` | json | Arbitrary payload data |
+| `read_at` | timestamp | Nullable read timestamp |
+
+**notification_templates**:
+| Column | Type | Purpose |
+|--------|------|---------|
+| `type` | string | Notification type key |
+| `channel` | string | Target channel |
+| `locale` | string | Language locale |
+| `subject` | string | Template subject with `{placeholders}` |
+| `body` | text | Template body with `{placeholders}` |
+
+**notification_preferences**:
+| Column | Type | Purpose |
+|--------|------|---------|
+| `user_id` | bigint | User FK |
+| `notification_type` | string | Type key |
+| `channel` | string | Channel name |
+| `enabled` | boolean | Whether this channel is enabled |
+
+**notification_logs**:
+| Column | Type | Purpose |
+|--------|------|---------|
+| `notification_id` | bigint | FK to notifications table |
+| `channel` | string | Channel used |
+| `status` | string | `sent`, `failed` |
+| `error` | text | Nullable error message |
+
+---
+
+## 15. Phase 3.4: Scheduled Reports Engine
+
+### 15.1 Overview
+
+Config-driven scheduled report generation engine. Integrates with Document Engine for PDF/Excel generation and Notification Engine for recipient delivery.
+
+### 15.2 Architecture
+
+- **Contract**: [`Reportable`](src/Contracts/Reports/Reportable.php) — any report definition implements [`generate()`](src/Contracts/Reports/Reportable.php:10), [`recipients()`](src/Contracts/Reports/Reportable.php:15), [`getReportType()`](src/Contracts/Reports/Reportable.php:20)
+- **Model**: [`ReportSchedule`](src/Models/ReportSchedule.php) — frequency, time, timezone, recipients, status, next_run_at calculation
+- **Engine**: [`ReportEngine`](src/Services/Reports/ReportEngine.php) — resolves [`Reportable`](src/Contracts/Reports/Reportable.php) from config, generates via [`DocumentEngine`](src/Services/Documents/DocumentEngine.php), notifies via [`NotificationService`](src/Services/Notifications/NotificationService.php)
+- **Job**: [`GenerateReportJob`](src/Jobs/GenerateReportJob.php) — queueable, processes a single schedule
+- **Command**: [`reports:generate-scheduled`](src/Console/Commands/GenerateScheduledReports.php) — dispatches jobs for all due schedules
+- **Config**: `ui-library.reports` — `report_types` registry, `notification_channels`, `queue_connection`
+- **Migration**: [`2026_08_09_000001_create_report_schedules_table.php`](Database/Migrations/2026_08_09_000001_create_report_schedules_table.php)
+
+### 15.3 Integration
+
+- [`ReportEngine`](src/Services/Reports/ReportEngine.php) injects [`DocumentEngine`](src/Services/Documents/DocumentEngine.php) and [`NotificationService`](src/Services/Notifications/NotificationService.php)
+- Report types registered via `config('ui-library.reports.report_types.{type}')`
+- Cron: `* * * * * php artisan reports:generate-scheduled`
+- Zero `App\Modules` references — fully decoupled
+
+### 15.4 Usage Example
+
+```php
+use QuickerFaster\UILibrary\Contracts\Reports\Reportable;
+use QuickerFaster\UILibrary\Models\Document;
+use QuickerFaster\UILibrary\Services\Documents\DocumentEngine;
+
+class PayrollReport implements Reportable
+{
+    public function generate(array $parameters = []): Document
+    {
+        return app(DocumentEngine::class)->generatePdf(
+            $this,
+            'reports::payroll',
+            'payroll.pdf',
+            $parameters
+        );
+    }
+
+    public function recipients(): array
+    {
+        return [1, 2, 3];
+    }
+
+    public function getReportType(): string
+    {
+        return 'payroll';
+    }
+}
+
+// Register in config
+config()->set('ui-library.reports.report_types.payroll', PayrollReport::class);
+
+// Schedule it
+ReportSchedule::create([
+    'name' => 'Monthly Payroll',
+    'report_type' => 'payroll',
+    'frequency' => 'monthly',
+    'time' => '06:00',
+    'recipients' => [1, 2],
+]);
+```
+
+### 15.5 Report Schedules Table Schema
+
+The [`report_schedules`](Database/Migrations/2026_08_09_000001_create_report_schedules_table.php) table:
+
+Column | Type | Purpose |
+|--------|------|---------|
+`name` | string | Display name for the schedule |
+`report_type` | string | Key matching `config('ui-library.reports.report_types.{type}')` |
+`frequency` | string | `daily`, `weekly`, `monthly`, `quarterly`, `yearly` |
+`time` | time | Scheduled execution time |
+`timezone` | string | Timezone for schedule calculation |
+`recipients` | json | Array of user IDs to receive the report |
+`parameters` | json | Optional parameters passed to `Reportable::generate()` |
+`status` | string | `active`, `paused`, `completed` |
+`last_run_at` | timestamp | Last successful execution |
+`next_run_at` | timestamp | Calculated next execution time |

@@ -1,44 +1,23 @@
-
-<div class="row g-2">
-    @hasanyrole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES)
-
-        <!-- Scope Selection Dropdown -->
-        <div class="input-group col-12 w-100 col-sm-auto w-sm-auto">
-            <select id="scopeSelect" wire:model.live.500ms="selectedScopeId"  class="form-select rounded-pill p-1 ps-3 pe-sm-5 px-sm-4 m-0 small-control"  >
-                <option value="">Select {{strtolower($selectedScopeName)}}...</option>
-                @foreach($scopeNames as $id => $scopeName)
-                    <option value="{{ $id }}">{{ $scopeName }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Module Selection Dropdown (Conditional) -->
-        @if (!$isUrlAccess)
-            <div  class="input-group col-12 w-100 col-sm-auto w-sm-auto" >
-                <select id="moduleSelect" wire:model.live.500ms="selectedModule" class="form-select rounded-pill p-1 ps-3 pe-sm-5 px-sm-4 m-0 small-control">
-                    <option value="">Select module...</option>
-                    @foreach($moduleNames as $moduleName)
-                        <option value="{{ strtolower($moduleName) }}">{{ $moduleName }}</option>
-                    @endforeach
-                </select>
-            </div>
-        @endif
-
-
-        <!-- Navigation Button -->
-        <div x-data class="col-12 w-100 col-sm-auto w-sm-auto" style="height: 2em" >
-            <button
-                style="height: 2.5em"
-                wire:click="manageAccessControl"
-                :class="$wire.selectedScopeId && $wire.selectedModule? 'btn-primary': 'btn-secondary'"
-                class="btn rounded-pill py-0 small-control"
-                :disabled="!$wire.selectedScopeId || !$wire.selectedModule">
-                OK
-            </button>
-        </div>
-
-    @endhasanyrole
+<div class="module-selector">
+    <h6 class="text-uppercase text-body text-xs font-weight-bolder mb-3">
+        {{ __('qf::nav.modules') }}
+    </h6>
+    <ul class="list-group list-group-flush">
+        @foreach($modules as $key => $module)
+            <li class="list-group-item border-0 px-0">
+                <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0">
+                    <label class="form-check-label mb-0 ms-2" for="module-{{ $key }}">
+                        <i class="fas {{ $module['icon'] ?? 'fa-cube' }} me-2"></i>
+                        {{ $module['label'] ?? ucfirst($key) }}
+                    </label>
+                    <input
+                        class="form-check-input ms-auto"
+                        type="checkbox"
+                        id="module-{{ $key }}"
+                        wire:model.live="moduleStates.{{ $key }}"
+                    >
+                </div>
+            </li>
+        @endforeach
+    </ul>
 </div>
-
-
-
