@@ -4,6 +4,7 @@ namespace QuickerFaster\UILibrary\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\View;
 use Livewire\Livewire;
 use Laravel\Fortify\Fortify;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
@@ -17,12 +18,6 @@ class UILibraryServiceProvider extends ServiceProvider
     {
         // Merge default config
         $this->mergeConfigFrom(__DIR__ . '/../Config/ui-library.php', 'ui-library');
-
-        // Also merge legacy config for backward compatibility
-        $legacyConfigPath = __DIR__ . '/../Config/quicker-faster-ui.php';
-        if (file_exists($legacyConfigPath)) {
-            $this->mergeConfigFrom($legacyConfigPath, 'quicker-faster-ui');
-        }
 
         // Bind core services
         $this->app->singleton(SettingsManager::class, function ($app) {
@@ -62,10 +57,28 @@ class UILibraryServiceProvider extends ServiceProvider
             \QuickerFaster\UILibrary\Services\ReferenceData\ReferenceDataService::class
         );
 
+        // Phase 4.5: NavigationManager singleton for config-driven sidebar
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Navigation\NavigationManager::class);
+
+        // Workspace context resolver (multi-tenant / role-based navigation filtering)
+        $this->app->singleton(
+            \QuickerFaster\UILibrary\Contracts\Navigation\WorkspaceResolver::class,
+            \QuickerFaster\UILibrary\Services\Navigation\NullWorkspaceResolver::class
+        );
+
         $this->app->bind(
             \QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider::class,
             config('ui-library.navigation.company_provider', \QuickerFaster\UILibrary\Services\Navigation\NullCompanyProvider::class)
         );
+
+        // Bind DataTable authorization provider (configurable, defaults to Spatie Permission-based)
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\DataTables\DataTableAuthorizationProvider::class,
+            config('ui-library.datatables.authorization_provider', \QuickerFaster\UILibrary\Services\DataTables\DefaultAuthorizationProvider::class)
+        );
+
+        // Bind ModelDiscovery service for access control model scanning
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\AccessControl\ModelDiscovery::class);
 
         // Bind public path for shared hosting compatibility
         $this->app->bind('path.public', function () {
@@ -82,18 +95,37 @@ class UILibraryServiceProvider extends ServiceProvider
         // Set Core module path in config
         config()->set('ui-library.module_paths.core', __DIR__ . '/../Core');
 
+        // Load shared library routes (export, import, print, etc.)
+        $sharedRoutesPath = __DIR__ . '/../Routes/web.php';
+        if (file_exists($sharedRoutesPath)) {
+            $this->loadRoutesFrom($sharedRoutesPath);
+        }
+
         // Load shared library migrations
         $sharedMigrationsPath = __DIR__ . '/../../Database/Migrations';
         if (is_dir($sharedMigrationsPath)) {
             $this->loadMigrationsFrom($sharedMigrationsPath);
         }
 
+        // Phase 4.4: Register view composers
+        $this->registerViewComposers();
+
         // 1. Boot Core modules (Admin, System)
         $this->bootCoreModules();
 
         // 2. Fire ModuleRegistered for each Core module
-        event(new ModuleRegistered('admin', __DIR__ . '/../Core/Admin'));
-        event(new ModuleRegistered('system', __DIR__ . '/../Core/System'));
+        event(new ModuleRegistered('admin', __DIR__ . '/../Core/Admin',
+            userFacing: config('ui-library.modules.admin.user_facing', true),
+            dependsOn: config('ui-library.modules.admin.depends_on', []),
+        ));
+        event(new ModuleRegistered('system', __DIR__ . '/../Core/System',
+            userFacing: config('ui-library.modules.system.user_facing', true),
+            dependsOn: config('ui-library.modules.system.depends_on', []),
+        ));
+        event(new ModuleRegistered('organization', __DIR__ . '/../Core/Organization',
+            userFacing: config('ui-library.modules.organization.user_facing', true),
+            dependsOn: config('ui-library.modules.organization.depends_on', []),
+        ));
 
         // 3. Fire ModuleBooted
         event(new ModuleBooted());
@@ -114,14 +146,21 @@ class UILibraryServiceProvider extends ServiceProvider
     {
         $corePath = __DIR__ . '/../Core';
 
-        foreach (['Admin', 'System'] as $module) {
+        $first = true;
+        foreach (['Admin', 'System', 'Organization'] as $module) {
             $moduleLower = strtolower($module);
             $modulePath = "{$corePath}/{$module}";
 
-            // Register views
+            // Register views under single 'qf-core' namespace
+            // Routes use view('qf-core::admin.dashboard') → namespace qf-core, view admin/dashboard
             $viewPath = "{$modulePath}/Resources/views";
             if (is_dir($viewPath)) {
-                $this->loadViewsFrom($viewPath, "qf-core::{$moduleLower}");
+                if ($first) {
+                    $this->loadViewsFrom($viewPath, 'qf-core');
+                    $first = false;
+                } else {
+                    $this->app['view']->addNamespace('qf-core', $viewPath);
+                }
                 $this->publishes([
                     $viewPath => resource_path("views/vendor/ui-library/core/{$moduleLower}"),
                 ], 'ui-library-core-views');
@@ -240,6 +279,7 @@ class UILibraryServiceProvider extends ServiceProvider
                 \QuickerFaster\UILibrary\Commands\CleanExports::class,
                 \QuickerFaster\UILibrary\Commands\CleanImportErrors::class,
                 \QuickerFaster\UILibrary\Console\Commands\GenerateScheduledReports::class,
+                \QuickerFaster\UILibrary\Console\Commands\InstallCommand::class,
             ]);
         }
     }
@@ -291,6 +331,18 @@ class UILibraryServiceProvider extends ServiceProvider
         Blade::directive('setting', function ($expression) {
             return "<?php echo app(\\QuickerFaster\\UILibrary\\Services\\Settings\\SettingsManager::class)->get({$expression}); ?>";
         });
+    }
+
+    /**
+     * Phase 4.4: Register view composers for injecting data into views.
+     */
+    private function registerViewComposers(): void
+    {
+        // Attach SidebarComposer to the sidebar Livewire view
+        View::composer(
+            'qf::livewire.navs.sidebar',
+            \QuickerFaster\UILibrary\Http\ViewComposers\SidebarComposer::class
+        );
     }
 
     private function registerTranslations(): void

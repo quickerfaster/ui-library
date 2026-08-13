@@ -2,7 +2,6 @@
 
 namespace QuickerFaster\UILibrary\Services\BankFiles;
 
-use App\Modules\Hr\Models\PayrollRun;
 use Illuminate\Support\Facades\DB;
 
 class NACHAGenerator implements BankFileGenerator
@@ -12,7 +11,7 @@ class NACHAGenerator implements BankFileGenerator
     protected string $originRouting = '021000021';     // TODO: from company bank account
     protected string $originId = '123456789';          // TODO: from company
 
-    public function generate(PayrollRun $run): string
+    public function generate($run): string
     {
         $lines = [];
 
@@ -56,7 +55,7 @@ class NACHAGenerator implements BankFileGenerator
         );
     }
 
-    protected function formatBatchHeader(PayrollRun $run): string
+    protected function formatBatchHeader($run): string
     {
         return sprintf(
             "5 %s %-16s %-20s %-16s %-10s %-10s %-8s %-10s %-10s %-10s %-10s %-10s %-10s",
@@ -81,7 +80,7 @@ class NACHAGenerator implements BankFileGenerator
         $amount = (int) round($payslip->net_pay * 100); // cents
         $routing = str_pad($profile->bank_routing_number, 9, '0', STR_PAD_LEFT);
         $account = str_pad($profile->bank_account_number, 17, ' ', STR_PAD_RIGHT);
-        $name = str_pad(substr($profile->bank_account_name ?? $employee->full_name, 0, 22), 22, ' ');
+        $name = str_pad(substr($profile->bank_account_name ?? $payslip->employee->full_name, 0, 22), 22, ' ');
 
         return sprintf(
             "6 %s %s %s %s %-22s %-15s %-10s %-10s %-8s %-10s %-10s",
@@ -99,7 +98,7 @@ class NACHAGenerator implements BankFileGenerator
         );
     }
 
-    protected function formatBatchControl(PayrollRun $run): string
+    protected function formatBatchControl($run): string
     {
         $totalAmount = (int) round($run->total_cash_required * 100);
         $entryCount = $run->payslips->count();
@@ -116,7 +115,7 @@ class NACHAGenerator implements BankFileGenerator
         );
     }
 
-    protected function formatFileControl(PayrollRun $run): string
+    protected function formatFileControl($run): string
     {
         $totalAmount = (int) round($run->total_cash_required * 100);
         $entryCount = $run->payslips->count();
@@ -131,7 +130,7 @@ class NACHAGenerator implements BankFileGenerator
         );
     }
 
-    public function getFileName(PayrollRun $run): string
+    public function getFileName($run): string
     {
         return "nacha_{$run->id}_{$run->period_end->format('Ymd')}.ach";
     }

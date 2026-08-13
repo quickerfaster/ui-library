@@ -1,5 +1,20 @@
+
 @php
     $isActive = false;
+    
+    // Resolve the URL for this item, handling both named routes and URL paths.
+    // Named routes (no slashes, e.g. "admin.users") use Laravel's route() helper.
+    // URL paths (contain slashes, e.g. "/module/resource" or "module/resource") use url().
+    $isNamedRoute = isset($item['route']) && !str_contains($item['route'], '/');
+    if ($isNamedRoute) {
+        $itemUrl = route($item['route']);
+    } elseif (isset($item['route'])) {
+        $itemUrl = url($item['route']);
+    } elseif (isset($item['url'])) {
+        $itemUrl = url($item['url']);
+    } else {
+        $itemUrl = '#';
+    }
     
     // 1. Try route/URL matching
     if (isset($item['route'])) {
@@ -19,7 +34,7 @@
         $itemKey = $item['key'] ?? '';
         $itemLabel = $item['label'] ?? '';
         
-        // Normalize model name: "EmployeeWorkPattern" -> "employee_work_pattern"
+        // Normalize model name: "SomeModelName" -> "some_model_name"
         $normalizedModel = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $currentModelName));
         
         // Compare with item key (already snake_case) or label (case-insensitive)
@@ -27,22 +42,29 @@
     }
 
 
-    $splittedUrl = explode('/', $item['route']);
-    $viewName = count($splittedUrl) > 0 ? $splittedUrl[count($splittedUrl) - 1] : '';
-    // $viewName = str_replace("dashboard-", "", $viewName);
-    $hasPermission = app(App\Modules\Admin\Services\AuthorizationService::class)
-        ->canAccessView( auth()->user(), $viewName);
+    // Use explicit permission from config if available (config-driven pattern),
+    // otherwise derive from URL with Str::singular() fallback
+    $hasPermission = true;
+    if (!empty($item['permission'])) {
+        $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+    } elseif (isset($item['route'])) {
+        $segments = explode('/', $item['route']);
+        $viewName = last($segments);
+        $viewName = str_replace('dashboard-', '', $viewName);
+        $permission = 'view_' . \Illuminate\Support\Str::singular(str_replace('-', '_', $viewName));
+        $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($permission);
+    }
         
 @endphp
 
 @if ($hasPermission)
     <li class="nav-item text-nowrap" wire:key="sidebar-item-{{ $item['key'] ?? $item['label'] }}">
-        <a href="{{ $item['route'] ?? '#' }}" 
+        <a href="{{ $itemUrl }}"
         class="nav-link d-flex align-items-center {{ $isActive ? 'active fw-bold text-primary' : 'text-dark' }}"
         data-bs-toggle="tooltip"
         data-bs-placement="right"
         title="{{ $item['label'] }}">
-            <i class="{{ $item['icon'] ?? 'fas fa-circle' }} me-2"></i>
+            <i class="fa {{ $item['icon'] ?? 'fa-circle' }} me-2"></i>
             @if ($state === 'full')
                 <span>{{ $item['label'] }}</span>
             @endif

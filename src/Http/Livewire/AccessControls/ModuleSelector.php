@@ -3,7 +3,7 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\AccessControls;
 
 use Livewire\Component;
-use App\Modules\Admin\Models\Role;
+use QuickerFaster\UILibrary\Models\Role;
 use Illuminate\Support\Facades\File;
 
 class ModuleSelector extends Component
@@ -29,15 +29,26 @@ class ModuleSelector extends Component
 
     private function getModuleNames() {
         $moduleNames = [];
-        // Get all module directories
-        $modules = File::directories(base_path('app/Modules'));
 
-        // Loop through each module to load views, routes, and config files dynamically
-        foreach ($modules as $module) {
-            $moduleNames[] = basename($module); // Get the module name from the directory
+        // Scan business modules path from config
+        $businessPath = config('ui-library.module_paths.business', base_path('app/Modules'));
+        if (is_dir($businessPath)) {
+            $modules = File::directories($businessPath);
+            foreach ($modules as $module) {
+                $moduleNames[] = basename($module);
+            }
         }
 
-        return $moduleNames;
+        // Also scan core modules path
+        $corePath = config('ui-library.module_paths.core');
+        if ($corePath && is_dir($corePath)) {
+            $coreModules = File::directories($corePath);
+            foreach ($coreModules as $module) {
+                $moduleNames[] = basename($module);
+            }
+        }
+
+        return array_unique($moduleNames);
     }
 
 

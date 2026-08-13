@@ -8,7 +8,7 @@ use QuickerFaster\UILibrary\Services\Config\Wizards\WizardConfigResolver;
 
 class Wizard extends Component
 {
-    public string $configKey;           // e.g. "hr.employee_onboarding"
+    public string $configKey;           // e.g. "module.wizard_name"
     public string $wizardId;             // unique per user/session
     public array $steps = [];
     public array $models = [];
@@ -256,7 +256,7 @@ class Wizard extends Component
 
     /**
      * Convert a model class to a config key that ConfigResolver understands.
-     * Assumes models are in App\Modules\{Module}\Models and config keys are like "hr.employee".
+     * Assumes models are in App\Modules\{Module}\Models and config keys are like "module.resource".
      */
     protected function getModelConfigKey(string $modelClass): string
     {

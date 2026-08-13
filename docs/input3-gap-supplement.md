@@ -1,7 +1,8 @@
 # Input3.txt Further Analysis — Gap Supplement
 
-> Cross-referencing [`src/input3.txt`](src/input3.txt) (~5800 lines) against [`docs/gap-analysis.md`](docs/gap-analysis.md) and Phases 1 & 2 implementation  
+> Cross-referencing [`src/input3.txt`](src/input3.txt) (~5800 lines) against [`docs/gap-analysis.md`](docs/gap-analysis.md) and Phases 1 & 2 implementation
 > Date: 2026-08-07
+> **Update 2026-08-09**: Phases 2.5 through 4.5 are now complete. The navigation gaps identified below (N1-N6) have been addressed in Phases 4.2-4.5. See [`docs/implementation-plan.md`](docs/implementation-plan.md) for current completion status.
 
 ---
 
@@ -96,22 +97,22 @@ These comprehensive navigation trees are entirely new — `input.txt` only had h
 
 | Gap ID | Gap Description | input3.txt Contribution | Status |
 |---|---|---|---|
-| G-2.3.1 | Application → Workspace → Sidebar hierarchy not implemented | Full specification of the hierarchy with Section level added. Detailed navigation trees for all 7 applications. | ✅ **Designed** — Implementation still needed |
-| G-2.1.1 | Generic Workflow Engine missing | Confirms Leave should use Workflow Engine for approvals. Specifies: Leave Request → Workflow Definition → Workflow Instance → Approvals → Completed | ✅ **Validated** — Strengthens case for Phase 3 |
-| G-2.1.5 | Reference Data module not started | System module design includes Currency, Language, Country, State, Timezone as System-level data | ✅ **Partially addressed** — System could house reference data |
-| C4 | Application Switcher vs Module Switcher mismatch | Explicitly recommends dropdown-style app switcher labeled with current app name. "I would NOT put every installed module there... hide framework internals." | ✅ **Validated** — UX change needed |
-| C5 | Platform vs UI Library naming | Strongly reinforces "Application Platform" mindset. "That is much more than a UI library." Navigation philosophy reflects this. | ✅ **Validated** — Rename still deferred |
+| G-2.3.1 | Application → Workspace → Sidebar hierarchy not implemented | Full specification of the hierarchy with Section level added. Detailed navigation trees for all 7 applications. | ✅ **Implemented** — Phase 4.3 (Section sidebar) + Phase 4.5 (Navigation metadata) |
+| G-2.1.1 | Generic Workflow Engine missing | Confirms Leave should use Workflow Engine for approvals. | ✅ **Implemented** — Phase 3.1 [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) |
+| G-2.1.5 | Reference Data module not started | System module design includes Currency, Language, Country, State, Timezone as System-level data | ✅ **Implemented** — Phase 3.5 [`ReferenceDataService`](src/Services/ReferenceData/ReferenceDataService.php) |
+| C4 | Application Switcher vs Module Switcher mismatch | Explicitly recommends dropdown-style app switcher. | ✅ **Implemented** — Phase 4.4 Dropdown Application Switcher |
+| C5 | Platform vs UI Library naming | Strongly reinforces "Application Platform" mindset. | ✅ **Validated** — Rename still deferred (P5) |
 
-### 3.2 New UI Library Gaps Identified
+### 3.2 New UI Library Gaps Identified — ALL ADDRESSED ✅
 
-| # | New Gap | Description | Priority |
-|---|---|---|---|
-| N1 | **Section-based sidebar rendering** | Current sidebar renders flat items. input3.txt calls for section headers (Employment, Organization, Configuration) when items exceed 8-10. | P2 |
-| N2 | **Config-driven navigation metadata structure** | Current nav config has `context_groups` and `contexts`. input3.txt proposes a richer `Module → workspaces() → pages() → actions()` metadata model that the UI library reads to render all navigation. | P1 |
-| N3 | **Application switcher dropdown UX** | Current ModuleSwitcher uses icon buttons. input3.txt wants a dropdown showing application names. | P2 |
-| N4 | **Infrastructure module filtering** | ModuleSwitcher currently shows all modules. input3.txt says hide Workflow, Notifications, Audit, Files — only show user-facing applications. | P2 |
-| N5 | **Workspace tabs in TopNav** | Current TopNav shows context items. input3.txt wants workspace names as top-center tabs. | P3 |
-| N6 | **5-level breadcrumb support** | Current supports Application → Workspace → Page. input3.txt adds Section level. | P3 |
+| # | New Gap | Description | Priority | Status |
+|---|---|---|---|---|
+| N1 | **Section-based sidebar rendering** | Current sidebar renders flat items. input3.txt calls for section headers. | P2 | ✅ Phase 4.3 |
+| N2 | **Config-driven navigation metadata structure** | `Module → workspaces() → pages() → actions()` metadata model. | P1 | ✅ Phase 4.5 |
+| N3 | **Application switcher dropdown UX** | Current ModuleSwitcher uses icon buttons. input3.txt wants a dropdown. | P2 | ✅ Phase 4.4 |
+| N4 | **Infrastructure module filtering** | Hide Workflow, Notifications, Audit, Files — only show user-facing applications. | P2 | ✅ Phase 4.2 (`user_facing` flag) |
+| N5 | **Workspace tabs in TopNav** | Current TopNav shows context items. input3.txt wants workspace names as top-center tabs. | P3 | ✅ Phase 4.5 |
+| N6 | **5-level breadcrumb support** | Current supports Application → Workspace → Page. input3.txt adds Section level. | P3 | ✅ Phase 4.5 |
 
 ---
 

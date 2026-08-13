@@ -2,7 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\DataTables;
 
-use App\Modules\Admin\Services\ActivityLogger;
+use QuickerFaster\UILibrary\Services\ActivityLogger;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Validator;
@@ -17,7 +17,7 @@ use Livewire\Attributes\On;
 use QuickerFaster\UILibrary\Services\Validation\DataTableFormValidationService;
 use QuickerFaster\UILibrary\Traits\FieldTypes\HasHintField;
 use QuickerFaster\UILibrary\Traits\HasAutoGenerateFields;
-use App\Modules\Admin\Services\AuthorizationService;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 
 class DataTableForm extends Component
@@ -158,7 +158,7 @@ class DataTableForm extends Component
         $this->hiddenFields = $resolver->getHiddenFields();
 
         // When 'All Companies' mode, show company_id on forms so super_admin can assign it
-        if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0) {
+        if ($this->isAllCompaniesMode()) {
             foreach (['onNewForm', 'onEditForm', 'onTable'] as $context) {
                 if (isset($this->hiddenFields[$context])) {
                     $this->hiddenFields[$context] = array_values(array_diff($this->hiddenFields[$context], ['company_id']));
@@ -281,6 +281,20 @@ protected function loadMorphEntityOptions(string $fieldName): void
 public function hydrate()
 {
     $this->sessionCompanyId = session('current_company_id', 0);
+}
+
+/**
+ * Determine whether the current session is in "All Companies" mode.
+ *
+ * The company switcher stores the selected company ID in the session.
+ * "All Companies" is represented by 0, null, or an empty value, while a
+ * specific company is a positive integer.
+ */
+protected function isAllCompaniesMode(): bool
+{
+    $companyId = \Illuminate\Support\Facades\Session::get('current_company_id');
+
+    return empty($companyId) || (int) $companyId === 0;
 }
 
 
@@ -575,7 +589,16 @@ protected function hydrateMorphToSelectFields(): void
         $record = $resolvedRecord ?? $this->resolveModelOrFail($this->modelClass, $this->recordId);
 
         if (!empty($this->relations)) {
-            $record->load(array_keys($this->relations));
+            // Only eager-load relations that actually exist on the model.
+            // This prevents crashes when a config defines a relation (e.g. a
+            // module-specific relation like HR's 'profile') that the underlying
+            // model class doesn't implement.
+            $validRelations = array_filter($this->relations, function ($relationConfig, $relationName) use ($record) {
+                return method_exists($record, $relationName);
+            }, ARRAY_FILTER_USE_BOTH);
+            if (!empty($validRelations)) {
+                $record->load(array_keys($validRelations));
+            }
         }
 
         foreach ($this->fieldDefinitions as $field => $definition) {
@@ -592,6 +615,12 @@ protected function hydrateMorphToSelectFields(): void
                         // It's a single model (belongsTo, hasOne)
                         $this->fields[$field] = $relationResult->id ?? null;
                     }
+                } elseif (($rel['type'] ?? '') === 'belongsTo' && isset($rel['foreign_key'])) {
+                    // Fallback: when the related model can't be loaded (e.g. due to
+                    // global scopes in multi-tenant mode), read the foreign key
+                    // value directly from the record so the select dropdown still
+                    // shows the correct pre-selected value.
+                    $this->fields[$field] = $record->{$rel['foreign_key']} ?? null;
                 } else {
                     $this->fields[$field] = null;
                 }
@@ -681,7 +710,7 @@ protected function hydrateMorphToSelectFields(): void
             $hiddenForForm = $this->hiddenFields[$formType] ?? [];
 
             // When 'All Companies' mode (0), show company_id on forms so super_admin can assign it
-            if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0) {
+            if ($this->isAllCompaniesMode()) {
                 $hiddenForForm = array_diff($hiddenForForm, ['company_id']);
             }
 
@@ -777,7 +806,7 @@ protected function hydrateMorphToSelectFields(): void
 
 
             //Add the Audit trail to ActivityLogger
-            $logName = $this->configKey; // e.g., 'hr.attendance'
+            $logName = $this->configKey; // e.g., 'module.resource'
 
             if ($this->isEditMode) {
                 $original = $record->getOriginal();
@@ -796,6 +825,12 @@ protected function hydrateMorphToSelectFields(): void
             // Emit success event
             $this->dispatch('formSaved', $this->recordId, $this->isEditMode);
             $this->dispatch('refreshDataTable');
+
+            // Show success feedback to user
+            $this->dispatch('showAlert', [
+                'type' => 'success',
+                'message' => $this->isEditMode ? 'Record updated successfully.' : 'Record created successfully.',
+            ]);
 
             // Refresh record globally
             $refreshEventName = "refresh" . \Str::plural($this->getConfigResolver()->getModelName());
@@ -833,7 +868,7 @@ protected function hydrateMorphToSelectFields(): void
     private function checkDocumentLimit(): bool
     {
         // Only applies to Document model
-        if ($this->modelClass !== \App\Modules\Hr\Models\Document::class) {
+        if ($this->modelClass !== \QuickerFaster\UILibrary\Models\Document::class) {
             return true;
         }
 
@@ -843,7 +878,7 @@ protected function hydrateMorphToSelectFields(): void
             return true;
         }
 
-        $employee = \App\Modules\Hr\Models\Employee::find($employeeId);
+        $employee = $this->resolveRelatedModel('employee', $employeeId);
         if (!$employee) {
             return true;
         }
@@ -882,6 +917,36 @@ protected function hydrateMorphToSelectFields(): void
         return true;
     }
 
+    /**
+     * Resolve a related model instance dynamically.
+     *
+     * This replaces hardcoded App\Modules references (e.g., \App\Modules\Hr\Models\Employee)
+     * with config-driven model resolution. The consuming application should configure
+     * the related model mapping in their ui-library config.
+     *
+     * @param string $relation The relation name (e.g., 'employee')
+     * @param mixed $id The model ID to find
+     * @return \Illuminate\Database\Eloquent\Model|null
+     */
+    protected function resolveRelatedModel(string $relation, $id): ?\Illuminate\Database\Eloquent\Model
+    {
+        // Try to resolve from the config resolver's relations first
+        $relations = $this->getConfigResolver()->getRelations() ?? [];
+        if (isset($relations[$relation])) {
+            $modelClass = $relations[$relation]['model'] ?? null;
+            if ($modelClass && class_exists($modelClass)) {
+                return $modelClass::find($id);
+            }
+        }
+
+        // Fallback: try the model class from the config resolver
+        $modelClass = $this->getConfigResolver()->getModel();
+        if ($modelClass && class_exists($modelClass)) {
+            return $modelClass::find($id);
+        }
+
+        return null;
+    }
 
 
 
@@ -922,7 +987,7 @@ protected function hydrateMorphToSelectFields(): void
         // When 'All Companies' mode, make company_id required on the form
         $fieldDefs = $this->fieldDefinitions;
         if (
-            \Illuminate\Support\Facades\Session::get('current_company_id') === 0
+            $this->isAllCompaniesMode()
             && isset($fieldDefs['company_id'])
             && !$this->isEditMode
         ) {
@@ -1022,8 +1087,9 @@ protected function hydrateMorphToSelectFields(): void
             ]);
         }
 
-        // Custom validation for payroll_policy
-        if ($this->configKey === 'hr.payroll_policy') {
+        // Custom validation for policy calculation logic
+        // Triggered when the model config has a 'calculation_logic' field
+        if (isset($this->fieldDefinitions['calculation_logic'])) {
             $this->validatePolicyCalculationLogic();
         }
 
@@ -1164,10 +1230,10 @@ protected function hydrateMorphToSelectFields(): void
                 $customFolder = null;
 
                 // Override for Document model's 'document' field
-                if ($this->modelClass === \App\Modules\Hr\Models\Document::class && $field === 'document') {
+                if ($this->modelClass === \QuickerFaster\UILibrary\Models\Document::class && $field === 'document') {
                     $employeeId = $data['employee_id'] ?? $this->fields['employee_id'] ?? null;
                     if ($employeeId) {
-                        $employee = \App\Modules\Hr\Models\Employee::find($employeeId);
+                        $employee = $this->resolveRelatedModel('employee', $employeeId);
                         if ($employee) {
                             $customFolder = 'documents/employee_' . $employee->id;
                             $disk = 'documents';
@@ -1181,7 +1247,7 @@ protected function hydrateMorphToSelectFields(): void
                 if ($storedPath) {
                     $data[$field] = $storedPath;
                     if ($this->isEditMode && !empty($record->$field)) {
-                        $oldDisk = ($this->modelClass === \App\Modules\Hr\Models\Document::class && $field === 'document') ? 'documents' : 'public';
+                        $oldDisk = ($this->modelClass === \QuickerFaster\UILibrary\Models\Document::class && $field === 'document') ? 'documents' : 'public';
                         \Storage::disk($oldDisk)->delete($record->$field);
                     }
                 }

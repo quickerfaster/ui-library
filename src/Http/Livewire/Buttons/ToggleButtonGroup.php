@@ -2,7 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\Buttons;
 
-use App\Modules\Admin\Events\ToggleButtonEvent;
+use QuickerFaster\UILibrary\Events\ToggleButtonEvent;
 use Livewire\Component;
 use Illuminate\Support\Facades\Log;
 use QuickerFaster\UILibrary\Traits\Buttons\HandlesToggleState;

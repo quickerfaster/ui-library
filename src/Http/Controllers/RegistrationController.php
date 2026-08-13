@@ -2,18 +2,22 @@
 
 namespace QuickerFaster\UILibrary\Http\Controllers;
 
-use App\Modules\Admin\Models\Company;
-use App\Modules\Admin\Models\Location;
-use App\Modules\Admin\Models\Department;
-use App\Modules\Admin\Models\Shift;
-use App\Modules\Hr\Models\AttendancePolicy;
-use App\Modules\Hr\Models\WorkPattern;
-use App\Modules\Hr\Models\PolicyAssignment;
+use QuickerFaster\UILibrary\Core\Organization\Models\Company;
+use QuickerFaster\UILibrary\Core\Organization\Models\Location;
+use QuickerFaster\UILibrary\Core\Organization\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-
-// THIS WILL BE IMPLEMENTED LATER WHEN SAAS MULTITENEANCY IS BEEN IMPLEMENTED
+/**
+ * Company registration controller for multi-tenant SaaS setups.
+ *
+ * This controller creates a new company with default organizational structure.
+ * Domain-specific defaults (shifts, attendance policies, work patterns, etc.)
+ * should be provided by the consuming application via event listeners or by
+ * extending this controller.
+ *
+ * TODO: Implement fully when SaaS multi-tenancy is ready.
+ */
 class RegistrationController extends Controller
 {
     public function register(Request $request)
@@ -27,49 +31,7 @@ class RegistrationController extends Controller
                 // Add other required fields as per your model
             ]);
 
-            // 2. Create a default shift (is_default = true)
-            $defaultShift = Shift::create([
-                'company_id' => $company->id,
-                'name' => 'Day Shift',
-                'code' => 'DAY',
-                'is_default' => true,
-                'is_active' => true,
-                'start_time' => '09:00',
-                'end_time' => '17:00',
-                'duration_hours' => 8,
-                'is_overnight' => false,
-            ]);
-
-            // 3. Create a default attendance policy (is_default = true)
-            $defaultPolicy = AttendancePolicy::create([
-                'company_id' => $company->id,
-                'name' => 'Default Attendance Policy',
-                'code' => 'DEFAULT_POLICY',
-                'is_default' => true,
-                'is_active' => true,
-                'effective_date' => now(),
-                'grace_period_minutes' => 5,
-                'early_departure_grace_minutes' => 5,
-                'overtime_daily_threshold_hours' => 8,
-                'overtime_weekly_threshold_hours' => 40,
-                'overtime_multiplier' => 1.5,
-                // Add other fields with sensible defaults
-            ]);
-
-            // 4. Create a default work pattern (is_default = true)
-            $defaultWorkPattern = WorkPattern::create([
-                'company_id' => $company->id,
-                'name' => 'Standard 9-5',
-                'code' => 'STANDARD_9_5',
-                'is_default' => true,
-                'is_active' => true,
-                'effective_date' => now(),
-                'shift_id' => $defaultShift->id,
-                'applicable_days' => '1,2,3,4,5', // Monday to Friday
-                // override times left null
-            ]);
-
-            // 5. Optional: Create a default location and department
+            // 2. Create a default location and department
             $defaultLocation = Location::create([
                 'company_id' => $company->id,
                 'name' => 'Headquarters',
@@ -88,14 +50,9 @@ class RegistrationController extends Controller
                 'is_active' => true,
             ]);
 
-            // 6. Optionally assign the default policy to the company
-            // This ensures a company-specific policy fallback.
-            // If you want to rely solely on the system default (is_default=true), you can skip this.
-            PolicyAssignment::create([
-                'company_id' => $company->id,
-                'attendance_policy_id' => $defaultPolicy->id,
-                'priority' => 0,
-            ]);
+            // Dispatch an event so consuming applications can hook in
+            // and create domain-specific defaults (shifts, policies, etc.)
+            event(new \QuickerFaster\UILibrary\Events\CompanyRegistered($company));
         });
 
         // Return appropriate response (e.g., redirect to dashboard)

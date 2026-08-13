@@ -1,14 +1,140 @@
 <div
     class="sidebar-container bg-light border-end d-flex flex-column align-items-stretch
             @if ($state === 'full') sidebar-full
-            @else sidebar-icon @endif">
+            @else sidebar-icon @endif"
+    x-data="{
+        expandedSections: {{ Js::from($expandedSections) }},
+        toggle(key) {
+            if (this.expandedSections[key]) {
+                delete this.expandedSections[key];
+            } else {
+                this.expandedSections[key] = true;
+            }
+        },
+        isExpanded(key) {
+            return this.expandedSections[key] === true;
+        }
+    }">
+
+    {{-- Phase 4.4: Application/Organization Switcher --}}
+    @include('qf::components.application-switcher', [
+        'currentOrganization' => $currentOrganization ?? null,
+        'userOrganizations' => $userOrganizations ?? collect(),
+    ])
+
     <ul class="nav flex-column mt-3">
         @foreach ($headerItems as $item)
             @include('qf::livewire.navs.partials.sidebar-item', ['item' => $item])
         @endforeach
-        @foreach ($items as $item)
-            @include('qf::livewire.navs.partials.sidebar-item', ['item' => $item])
-        @endforeach
+
+        {{--
+            Priority chain for sidebar rendering (descending):
+            1. Context-specific items from NavigationLayout (when $activeContext is set + $items not empty)
+            2. Module sections from NavigationManager/buildModuleSections() (Phase 4.3/4.5)
+            3. Config-driven sections from SidebarComposer (Phase 4.5)
+            4. Flat $items list (backward-compatible fallback)
+            5. Debug message (when everything is empty)
+        --}}
+        @php
+            $hasContextItems = !empty($activeContext) && !empty($items);
+            $hasModuleSections = !empty($moduleSections);
+            $hasSidebarSections = !empty($sidebarSections);
+        @endphp
+
+        @if ($hasContextItems)
+            {{-- Priority 1: Context-specific items from NavigationLayout --}}
+            {{-- Read sidebar rendering options from the context group's 'sidebar' config key. --}}
+            @php
+                $sidebarConfig = $contextGroupConfig['sidebar'] ?? [];
+                $sectionLabel = $sidebarConfig['section_label'] ?? null;
+
+                // If section_label not explicitly set, use the context group label
+                if ($sectionLabel === null) {
+                    $sectionLabel = $contextGroupLabel ?? $activeContext;
+                }
+                // false means no section header at all
+                $showSectionHeader = $sectionLabel !== false;
+
+                $isCollapsible = $sidebarConfig['collapsible'] ?? true;
+                $sectionIcon = $contextGroupIcon ?? 'fa-folder';
+                $sectionKey = 'context-' . $activeContext;
+            @endphp
+
+            @if ($showSectionHeader && $isCollapsible)
+                {{-- Collapsible section: delegate to sidebar-section partial --}}
+                @include('qf::livewire.navs.partials.sidebar-section', [
+                    'section' => [
+                        'key' => $sectionKey,
+                        'label' => $sectionLabel,
+                        'icon' => $sectionIcon,
+                        'items' => $items,
+                        'has_active' => true,
+                        'collapsible' => true,
+                    ],
+                    'state' => $state,
+                    'currentModelName' => $currentModelName,
+                ])
+            @elseif ($showSectionHeader && !$isCollapsible)
+                {{-- Static label above items, no toggle --}}
+                <li class="nav-item mb-1" wire:key="sidebar-section-{{ $sectionKey }}">
+                    <div class="sidebar-section-label small fw-semibold text-muted text-uppercase
+                                {{ $state === 'icon' ? 'px-0 py-1 d-flex justify-content-center' : 'px-3 py-2' }}"
+                         style="font-size: 0.7rem; letter-spacing: 0.05em;">
+                        @if ($state === 'full')
+                            <i class="fa {{ $sectionIcon }} me-2 text-muted" style="font-size: 0.85rem;" aria-hidden="true"></i>
+                            {{ $sectionLabel }}
+                        @else
+                            <i class="fa {{ $sectionIcon }} text-muted" style="font-size: 0.85rem;"
+                               data-bs-toggle="tooltip" data-bs-placement="right" title="{{ $sectionLabel }}"
+                               aria-hidden="true"></i>
+                        @endif
+                    </div>
+                    <ul class="nav flex-column">
+                        @foreach ($items as $item)
+                            @include('qf::livewire.navs.partials.sidebar-item', ['item' => $item])
+                        @endforeach
+                    </ul>
+                </li>
+            @else
+                {{-- No section header: render items directly --}}
+                @foreach ($items as $item)
+                    @include('qf::livewire.navs.partials.sidebar-item', ['item' => $item])
+                @endforeach
+            @endif
+        @elseif ($hasModuleSections)
+            {{-- Priority 2: Module sections (Phase 4.3 collapsible) --}}
+            @foreach ($moduleSections as $section)
+                @include('qf::livewire.navs.partials.sidebar-section', [
+                    'section' => $section,
+                    'state' => $state,
+                    'currentModelName' => $currentModelName,
+                ])
+            @endforeach
+        @elseif ($hasSidebarSections)
+            {{-- Priority 3: Config-driven sections from SidebarComposer (Phase 4.5) --}}
+            @foreach ($sidebarSections as $section)
+                @include('qf::livewire.navs.partials.sidebar-section', [
+                    'section' => $section,
+                    'state' => $state,
+                    'currentModelName' => $currentModelName,
+                ])
+            @endforeach
+        @elseif (!empty($items))
+            {{-- Priority 4: Flat $items list (backward-compatible fallback) --}}
+            @foreach ($items as $item)
+                @include('qf::livewire.navs.partials.sidebar-item', ['item' => $item])
+            @endforeach
+        @else
+            {{-- Priority 5: Everything empty — show debug message in debug mode --}}
+            @if (config('app.debug'))
+                <li class="nav-item px-3 py-2">
+                    <span class="text-muted small fst-italic">
+                        <i class="fas fa-info-circle me-1"></i> No navigation items available
+                    </span>
+                </li>
+            @endif
+        @endif
+
         @foreach ($footerItems as $item)
             @include('qf::livewire.navs.partials.sidebar-item', ['item' => $item])
         @endforeach
@@ -87,6 +213,82 @@
 
         .rotated-right {
             transform: rotate(180deg);
+        }
+
+        /* Phase 4.3: Section header styles */
+        .sidebar-section-header {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+            border-radius: 0.375rem;
+            margin: 0 0.5rem;
+        }
+
+        .sidebar-section-header:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        .sidebar-section-header.active-section {
+            background-color: rgba(13, 110, 253, 0.08);
+        }
+
+        /* Icon mode: collapse section header to icon-only */
+        .sidebar-icon .sidebar-section-header {
+            margin: 0 0.25rem;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            padding: 0 !important;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Expand indicator for icon mode section headers */
+        .sidebar-icon .section-expand-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 8px;
+            opacity: 0.5;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .sidebar-icon .sidebar-section-header:hover .section-expand-indicator {
+            opacity: 1;
+        }
+
+        .sidebar-icon .sidebar-section-label {
+            padding: 0.25rem 0 !important;
+        }
+
+        .sidebar-section-chevron {
+            transition: transform 0.25s ease;
+            font-size: 0.7rem;
+        }
+
+        .sidebar-section-chevron.expanded {
+            transform: rotate(90deg);
+        }
+
+        /* Phase 4.3: Section body transition */
+        .sidebar-section-body {
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.25s ease;
+        }
+
+        /* Phase 4.3: Indent child items slightly */
+        .sidebar-section-body .nav-item .nav-link {
+            padding-left: 2.5rem;
+        }
+
+        .sidebar-icon .sidebar-section-header span {
+            display: none !important;
+        }
+
+        /* Remove child-item indentation in icon mode */
+        .sidebar-icon .sidebar-section-body .nav-item .nav-link {
+            padding-left: 0 !important;
+            justify-content: center;
         }
     </style>
 </div>

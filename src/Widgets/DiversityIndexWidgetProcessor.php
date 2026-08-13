@@ -11,8 +11,8 @@ class DiversityIndexWidgetProcessor
         $groups = $definition['groups'] ?? ['gender', 'ethnicity']; // fields to analyze
         $weights = $definition['weights'] ?? ['gender' => 0.5, 'ethnicity' => 0.5];
 
-        // $total = DB::table('employees')->where('status', 'Active')->count();
-        $total = DB::table('employees')->count();
+        $table = $definition['table'] ?? config('ui-library.widgets.diversity_table', 'employees');
+        $total = DB::table($table)->count();
         if ($total === 0) {
             return [
                 'type'  => 'stat',
@@ -26,8 +26,7 @@ class DiversityIndexWidgetProcessor
         foreach ($groups as $group) {
             // Calculate percentage of minority groups (non-majority)
             // For simplicity, assume majority is the most common value
-            $distribution = DB::table('employees')
-                //->where('status', 'Active')
+            $distribution = DB::table($table)
                 ->select($group, DB::raw('count(*) as count'))
                 ->groupBy($group)
                 ->get();

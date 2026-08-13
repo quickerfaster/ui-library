@@ -9,13 +9,14 @@ class TurnoverRateWidgetProcessor
 {
     public function process(array $definition): array
     {
+        $table = $definition['table'] ?? config('ui-library.widgets.turnover_table', 'employees');
         $type = $definition['turnover_type'] ?? 'voluntary'; // 'voluntary', 'involuntary', 'total'
         $months = $definition['months'] ?? 12;
         $endDate = $definition['end_date'] ? Carbon::parse($definition['end_date']) : now();
         $startDate = $endDate->copy()->subMonths($months)->startOfMonth();
 
         // Get terminations count of the specified type
-        $terminationsQuery = DB::table('employees')
+        $terminationsQuery = DB::table($table)
             ->whereNotNull('termination_date')
             ->whereBetween('termination_date', [$startDate, $endDate]);
 
@@ -28,8 +29,7 @@ class TurnoverRateWidgetProcessor
         $terminations = $terminationsQuery->count();
 
         // Calculate average headcount over the period
-        $avgHeadcount = DB::table('employees')
-            // ->where('status', 'Active')
+        $avgHeadcount = DB::table($table)
             ->where('hire_date', '<=', $endDate)
             ->count(); // Simplified; more accurate would be monthly average
 

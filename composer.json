@@ -34,5 +34,10 @@
         "phpunit/phpunit": "^10.0"
     },
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "scripts": {
+        "install-ui-library": [
+            "@php artisan ui-library:install"
+        ]
+    }
 }

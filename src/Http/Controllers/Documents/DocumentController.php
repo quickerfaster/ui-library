@@ -3,16 +3,21 @@
 namespace QuickerFaster\UILibrary\Http\Controllers\Documents;
 
 
-
-use App\Modules\Hr\Models\Document;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Routing\Controller;
-use App\Modules\Admin\Services\AuthorizationService;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 
+/**
+ * Generic document download controller.
+ *
+ * The $document parameter should be an Eloquent model instance with:
+ * - $document->document (string file path)
+ * - $document->name (string display name)
+ */
 class DocumentController extends Controller
 {
-    public function download(Document $document): StreamedResponse
+    public function download($document): StreamedResponse
     {
         if (!app(AuthorizationService::class)->canPerformAction(auth()->user(), ["view_document"], $document))
             abort(403, 'You do not have permission to download this file.');

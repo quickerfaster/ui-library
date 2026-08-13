@@ -15,7 +15,7 @@ class SocialiteController extends Controller
      */
     public function redirect($provider)
     {
-        if (!config("quicker-faster-ui.socialite.providers.{$provider}.enabled", false)) {
+        if (!config("ui-library.socialite.providers.{$provider}.enabled", false)) {
             abort(404);
         }
 

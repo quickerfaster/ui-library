@@ -21,10 +21,17 @@ Route::middleware(['web', 'auth'])->group(function () {
             return view($viewName, ['id' => $id]);
         }
 
-        // Fallback: try qf-core namespace
+        // Fallback: try qf-core namespace (with hyphens)
         $coreViewName = "qf-core::{$module}.{$view}";
         if (view()->exists($coreViewName)) {
             return view($coreViewName, ['id' => $id]);
+        }
+
+        // Fallback: try with underscores instead of hyphens
+        $underscoreView = str_replace('-', '_', $view);
+        $coreViewNameUnderscore = "qf-core::{$module}.{$underscoreView}";
+        if (view()->exists($coreViewNameUnderscore)) {
+            return view($coreViewNameUnderscore, ['id' => $id]);
         }
 
         abort(404, "View [{$viewName}] not found.");

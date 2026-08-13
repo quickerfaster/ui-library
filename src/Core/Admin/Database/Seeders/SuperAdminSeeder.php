@@ -3,7 +3,6 @@
 namespace QuickerFaster\UILibrary\Core\Admin\Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\User;
 
 class SuperAdminSeeder extends Seeder
 {
@@ -12,7 +11,11 @@ class SuperAdminSeeder extends Seeder
         $email = env('SUPER_ADMIN_EMAIL', 'admin@example.com');
         $password = env('SUPER_ADMIN_PASSWORD', 'password');
 
-        $user = User::firstOrCreate(
+        $userModel = config('ui-library.user.model')
+            ?? config('auth.providers.users.model')
+            ?? 'App\\Models\\User';
+
+        $user = $userModel::firstOrCreate(
             ['email' => $email],
             [
                 'name' => 'Super Admin',
@@ -21,8 +24,14 @@ class SuperAdminSeeder extends Seeder
             ]
         );
 
-        if (!$user->hasRole('super_admin')) {
-            $user->assignRole('super_admin');
+        // The InstallCommand ensures the User model has the HasRoles trait
+        // before seeders run. The try-catch is a safety net for edge cases.
+        try {
+            if (!$user->hasRole('super_admin')) {
+                $user->assignRole('super_admin');
+            }
+        } catch (\Exception $e) {
+            $this->command->warn('   ⚠️  SuperAdmin role assignment failed: ' . $e->getMessage());
         }
     }
 }

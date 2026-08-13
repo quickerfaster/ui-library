@@ -42,10 +42,10 @@ Route::group(['middleware' => 'web'], function () {
         ->name('socialite.callback')
         ->where('provider', 'google|github');
 
-    // for now let default to he main dashboard
+    // Home / Dashboard — polished welcome page from the library
     Route::get('/home', function () {
         return view(config('ui-library.home_view', 'qf::home'));
-    });
+    })->name('home');
 
     Route::get('/export/data', [ExportController::class, 'export'])->name('export.data');
     Route::get('/export/all', [ExportController::class, 'exportAll'])->name('export.all');
@@ -88,6 +88,13 @@ Route::group(['middleware' => 'web'], function () {
             ->name('generic.print');
     });
 
+    // Phase 4.4: Organization/Company switching
+    Route::middleware(['auth'])->group(function () {
+        Route::post('/switch-company/{company}',
+            [\QuickerFaster\UILibrary\Http\Controllers\OrganizationSwitchController::class, '__invoke'])
+            ->name('company.switch')
+            ->where('company', '[0-9]+');
+    });
 
     Route::middleware(['auth'])->group(function () {
         Route::get('/my-profile', function () {
@@ -95,8 +102,12 @@ Route::group(['middleware' => 'web'], function () {
         })->name('profile');
 
         Route::get('/my-preferences', function () {
-            return view('qf::home');
+            return view('qf::my-preferences');
         })->name('my-preferences');
+
+        Route::get('/my-account', function () {
+            return view('qf::my-account');
+        })->name('my-account');
     });
 
 

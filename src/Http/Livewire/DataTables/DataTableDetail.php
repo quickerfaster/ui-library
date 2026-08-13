@@ -5,7 +5,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\DataTables;
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
-use App\Modules\Admin\Services\AuthorizationService;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 use QuickerFaster\UILibrary\Concerns\ResolvesModels;
 
 class DataTableDetail extends Component
@@ -67,12 +67,21 @@ class DataTableDetail extends Component
     protected function loadRecord(): void
     {
         $modelClass = $this->getConfigResolver()->getModel();
-        $relations = array_keys($this->getConfigResolver()->getRelations());
+        $relationConfigs = $this->getConfigResolver()->getRelations();
 
         $this->record = $this->resolveModelOrFail($modelClass, $this->recordId);
 
-        if (!empty($relations)) {
-            $this->record->load($relations);
+        if (!empty($relationConfigs)) {
+            // Only eager-load relations that actually exist on the model.
+            // This prevents crashes when a config defines a relation (e.g. a
+            // module-specific relation like HR's 'profile') that the underlying
+            // model class doesn't implement.
+            $validRelations = array_filter($relationConfigs, function ($config, $name) {
+                return method_exists($this->record, $name);
+            }, ARRAY_FILTER_USE_BOTH);
+            if (!empty($validRelations)) {
+                $this->record->load(array_keys($validRelations));
+            }
         }
     }
 

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('system_settings', function (Blueprint $table) {
             $table->id();
-            $table->morphs('settingable');          // settingable_type, settingable_id
+            $table->nullableMorphs('settingable');          // settingable_type, settingable_id
             $table->string('key');
             $table->json('value')->nullable();
             $table->string('group')->nullable();

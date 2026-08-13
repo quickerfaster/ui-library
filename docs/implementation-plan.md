@@ -1,8 +1,438 @@
 # QuickerFaster Application Platform — Implementation Plan
 
-> **Status**: Planning Complete  
-> **Date**: 2026-08-07  
+> **Status**: ✅ Phases 2.5–4.5 Complete | ✅ Phase 2 (Cross-Context Dropdowns) Complete | ✅ All 14 Bug Fix & Audit Categories Complete | ✅ 19 New Items (User Model, Config & Nav Polish) Complete | ✅ 4 Home Page & Runtime Polish Items Complete | Phase 5+ pending
+> **Date**: 2026-08-07 (Updated 2026-08-13)
 > **Source Documents**: [`gap-analysis.md`](docs/gap-analysis.md), [`input3-gap-supplement.md`](docs/input3-gap-supplement.md), [`input3.txt`](src/input3.txt)
+
+---
+
+## 0. Completed Work Summary (2026-08-13)
+
+The following 37 categories of work were completed across all phases, subtasks, and audit passes. Each entry summarizes the problem, the fix, and the files affected.
+
+### 0.1–0.14 — Original 14 Fix & Audit Categories (2026-08-12)
+
+The first 14 categories (Sidebar URL Generation Fix through Config-Doc Alignment) were completed on 2026-08-12. See below for details.
+
+### 0.15–0.33 — User Model, Config & Navigation Polish (2026-08-13)
+
+The following 19 additional items were completed on 2026-08-13, covering config consolidation, user model unification, authorization fixes, navigation enhancements, and feedback improvements.
+
+### 0.34–0.37 — Home Page & Runtime Polish (2026-08-13)
+
+The following 4 items were completed on 2026-08-13, covering the polished home page dashboard and runtime null-safety fixes for navigation components.
+
+### 0.1 Sidebar URL Generation Fix
+
+**Problem**: Module name was duplicated in sidebar URLs (e.g., `admin/admin/users`), caused by `NavigationLayout` prepending the module prefix onto already-prefixed route values.
+
+**Fix**: Updated route resolution logic in [`NavigationLayout`](src/Components/NavigationLayout.php) and [`Sidebar`](src/Http/Livewire/Layouts/Navs/Sidebar.php) to detect when a route already contains the module prefix and avoid double-prefixing. Added normalization in [`NavigationManager`](src/Services/Navigation/NavigationManager.php).
+
+**Files**: 5 modified — `NavigationLayout.php`, `Sidebar.php`, `sidebar-item.blade.php`, `NavigationManager.php`, `top-nav-item.blade.php`
+
+---
+
+### 0.2 Sidebar ↔ Horizontal Toggle Button Fix
+
+**Problem**: Config resolution for the "Switch to Sidebar/Horizontal" toggle button had a priority inversion — session state was checked *before* the navigation config's `allow_switch` setting, causing the toggle to appear or disappear inconsistently.
+
+**Fix**: Reordered the resolution chain in [`NavigationLayout`](src/Components/NavigationLayout.php) and [`HorizontalContextMenu`](src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php): config `allow_switch` is now the authoritative gate, with session only consulted after config permits the switch.
+
+**Files**: 7 modified — `NavigationLayout.php`, `HorizontalContextMenu.php`, `horizontal-context-menu.blade.php`, `navigation-layout.blade.php`, `top-nav.blade.php`, `MenuRenderer.php`, `sidebar.blade.php`
+
+---
+
+### 0.3 Phase 1 Overflow "More" Dropdown
+
+**Problem**: The TopNav overflow mechanism needed verification that `max_visible_items: 6` correctly pushes items 7+ into a "More" dropdown on desktop, and that the hamburger menu works on mobile.
+
+**Fix**: Verified the existing [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php) overflow logic. Fixed a regression where overflow items would navigate to incorrect URLs when `route` was null but `url` was set. Added explicit `wire:navigate` attributes for SPA-like transitions on overflow items.
+
+**Files**: 3 reviewed/modified — `TopNav.php`, `top-nav.blade.php`, `top-nav-item.blade.php`
+
+---
+
+### 0.4 UX Analysis: Horizontal Bar Sections
+
+**Problem**: Needed to evaluate how section headers (grouped navigation items) should render in the horizontal context menu bar — a UX pattern not yet implemented.
+
+**Fix**: Evaluated 6 strategies (inline labels, icon-only, dropdown sections, expandable groups, color-coded, breadcrumb-style) and produced a design document with trade-off analysis. Recommended approach: section headers as muted inline labels with icon + text, non-collapsible in horizontal mode.
+
+**Artifact**: [`plans/horizontal-bar-sections-ux-analysis.md`](plans/horizontal-bar-sections-ux-analysis.md)
+
+---
+
+### 0.5 Phase 1 HorizontalContextMenu Overflow
+
+**Problem**: The `HorizontalContextMenu` needed its own overflow handling independent of TopNav — when horizontal mode is active, context items should show visible items + "More" dropdown, identical to TopNav's overflow pattern but scoped to the active context group.
+
+**Fix**: Added `getVisibleItems()` and `getOverflowItems()` methods to [`HorizontalContextMenu`](src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php), reading `max_visible_items` from the layout config. Active item promotion works: if the active page is in overflow, it's promoted to visible. Added section header support in the overflow sub-dropdown.
+
+**Files**: 4 modified — `HorizontalContextMenu.php`, `horizontal-context-menu.blade.php`, `navigation-layout.blade.php`, `sidebar-section.blade.php`
+
+---
+
+### 0.6 Phase 2 Cross-Context Dropdowns
+
+**Problem**: Phase 1 only showed items for the *active* context group. Users needed to see all context groups simultaneously as dropdown triggers, with items listed inside each dropdown.
+
+**Fix**: Added two new config keys (`show_all_contexts`, `hide_topnav_contexts`) under `layout.context_menu`. When `show_all_contexts: true`, every `context_groups` entry becomes a Bootstrap dropdown in the horizontal bar. Each dropdown independently applies Phase 1 overflow. When `hide_topnav_contexts` is also true, TopNav's context tabs are hidden. Full ARIA attributes and keyboard navigation included.
+
+**Files**: 8 modified + 1 new doc — `HorizontalContextMenu.php`, `horizontal-context-menu.blade.php`, `TopNav.php`, `top-nav.blade.php`, `NavigationLayout.php`, `navigation-layout.blade.php`, 3 nav config stubs
+
+**Docs**: [`docs/navigation-cross-context-dropdowns.md`](docs/navigation-cross-context-dropdowns.md)
+
+---
+
+### 0.7 Icon Rendering Fix
+
+**Problem**: Font Awesome icons were rendering as empty squares because the required `fa` base class was missing from `<i>` tags. Only the style prefix (`fas`, `far`) was present.
+
+**Fix**: Added `fa` class to all `<i>` tags across top nav and sidebar Blade partials. Changed e.g., `<i class="fas fa-home">` → `<i class="fas fa-home fa">`.
+
+**Files**: 3 modified — `top-nav.blade.php` (3 icons), `top-nav-item.blade.php` (2 icons), `sidebar-item.blade.php` (1 icon), `sidebar-section.blade.php` (1 icon)
+
+---
+
+### 0.8 Audit & Reconciliation
+
+**Problem**: After the decoupling migration, Core modules (Admin, System, Organization, Common) had config structures that differed from the original HR patterns — missing keys, different route formats, inconsistent field presence.
+
+**Fix**: Audited all 31 navigation config and data config files across Admin, System, Organization, and Common modules. Aligned structures to the original Quick-HR patterns: added `key`, `permission`, `page_title` fields where missing; normalized route formats to support both URL paths and named routes; ensured all items have `order` for sorting.
+
+**Files**: 31 reviewed/updated — all navigation and data configs in `src/Core/Admin/`, `src/Core/System/`, `src/Core/Organization/`, `src/Core/Common/`
+
+---
+
+### 0.9 PHP 8.4 TypeError Fix
+
+**Problem**: PHP 8.4 raised deprecation warnings for implicitly nullable typed properties. Livewire components with `public ?string $prop;` without explicit `= null` default caused TypeError on mount.
+
+**Fix**: Added explicit `= null` defaults to all nullable typed properties in Livewire component classes. Applied to all components in `src/Http/Livewire/Layouts/Navs/` and `src/Http/Livewire/DataTables/`.
+
+**Files**: 4 modified — `Sidebar.php`, `TopNav.php`, `HorizontalContextMenu.php`, `DataTable.php`
+
+---
+
+### 0.10 Dual-Location Config Resolution
+
+**Problem**: [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php) only scanned `app/Modules/` for Data configs. Core modules in `src/Core/` had no way to use `<livewire:qf.data-table config-key="organization.company" />` because the repository couldn't find `src/Core/Organization/Data/company.php`.
+
+**Fix**: Added progressive path fallback to `ModelConfigRepository::loadFromFile()`: first try `app/Modules/{Module}/Data/{file}.php` (business modules), then fall back to `src/Core/{Module}/Data/{file}.php` (core modules). Resolution is transparent — config keys like `admin.user` resolve to `src/Core/Admin/Data/user.php`.
+
+**Files**: 1 modified — `ModelConfigRepository.php`
+
+**Design Doc**: [`docs/architecture-discrepancy-analysis.md`](docs/architecture-discrepancy-analysis.md) §4.5, §8.1
+
+---
+
+### 0.11 Context Group Overview Views & Configs
+
+**Problem**: Context groups in navigation configs had `route: null` with only a `url` fallback, meaning the top-nav tabs weren't clickable. Each context group needed an "Overview" page as its landing destination.
+
+**Fix**: Created 16 new Data config files for overview/dashboard pages across all context groups. Updated 3 navigation configs (Admin, System, Organization) to add overview items as the first entry in each context group. Each overview config provides a dashboard page with summary widgets.
+
+**Files**: 16 new + 3 updated — `src/Core/Admin/Data/`, `src/Core/System/Data/`, `src/Core/Organization/Data/`; `src/Core/Admin/Config/navigation.php`, `src/Core/System/Config/navigation.php`, `src/Core/Organization/Config/navigation.php`
+
+---
+
+### 0.12 HR Decoupling Audit
+
+**Problem**: After Phases 2.5–4.5, residual `App\Modules\Hr\*` and `App\Modules\Admin\*` references remained in the library, violating the architectural invariant: "the library never imports from `App\Modules\*`".
+
+**Fix**: Conducted a comprehensive `grep` audit across the entire `src/` directory. Removed or abstracted all HR-specific references:
+- Replaced `App\Modules\Hr\Models\Company` with `CompanyProvider` contract
+- Replaced `App\Modules\Admin\Services\*` with library-level service classes
+- Deleted HR-specific Livewire components (`EmployeeDetail`, `SearchableEmployeeDropdown`, `TaxBandsRepeater`)
+- Moved `EmployeeDocumentService` to HR app
+- Extracted bank file generators behind a `PayrollDataProvider` contract
+
+**Files**: 30+ reviewed/modified across `src/`
+
+**Remaining**: 7 hardcoded imports documented as known gaps (§11 of this plan)
+
+---
+
+### 0.13 Company Switcher Fix
+
+**Problem**: Three blockers prevented the company switcher dropdown from functioning:
+1. **Role gate**: `show_company_switcher` config defaulted to `false`, and a `super_admin` role check further blocked it
+2. **Empty data**: `NullCompanyProvider` returned empty collection, so the dropdown had no companies
+3. **Fragile default**: No fallback when `current_company_id` session key was missing
+
+**Fix**:
+1. Made `show_company_switcher` gate solely config-driven (removed hardcoded role check)
+2. Updated [`TopNav::loadCompanies()`](src/Http/Livewire/Layouts/Navs/TopNav.php) to gracefully handle empty company lists
+3. Added default selection logic: if session `current_company_id` is missing, auto-select the first company from the provider
+
+**Files**: 3 modified — `TopNav.php`, `top-nav.blade.php`, `ui-library.php`
+
+---
+
+### 0.14 Config-Doc Alignment
+
+**Problem**: Navigation config documentation referenced keys that didn't exist in actual configs, and actual configs had keys not documented. 5 keys were missing from the navigation config stubs.
+
+**Fix**: Added the 5 missing keys to 3 navigation configs:
+- `layout.context_menu.max_visible_items` (default: 6)
+- `layout.context_menu.promote_active_item` (default: true)
+- `layout.context_menu.show_all_contexts` (default: false)
+- `layout.context_menu.hide_topnav_contexts` (default: false)
+- `layout.breadcrumb.enabled` (default: true)
+
+Updated [`docs/navigation-cross-context-dropdowns.md`](docs/navigation-cross-context-dropdowns.md) to reflect actual config values.
+
+**Files**: 3 navigation configs updated — `src/Core/Admin/Config/navigation.php`, `src/Core/System/Config/navigation.php`, `src/Core/Organization/Config/navigation.php`
+
+---
+
+### 0.15 Config Consolidation
+
+**Problem**: Two separate config files (`quicker-faster-ui.php` and `ui-library.php`) caused confusion about which config keys belonged where. The `quicker-faster-ui.php` config was a legacy artifact from before the library rename.
+
+**Fix**: Removed `quicker-faster-ui.php` entirely. All config keys merged into [`ui-library.php`](src/Config/ui-library.php) as the single source of truth. Updated all references across the codebase.
+
+**Files**: [`ui-library.php`](src/Config/ui-library.php), all service providers and components referencing the old config file
+
+---
+
+### 0.16 User Profile Dropdown Menu
+
+**Problem**: The TopNav user profile area had no dropdown menu — clicking the user avatar did nothing. Users had no quick access to profile, account settings, or preferences.
+
+**Fix**: Added a config-driven `user_menu` section to [`ui-library.php`](src/Config/ui-library.php) with three default entries: "My Profile", "My Account", "My Preferences". The [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php) renders these as a Bootstrap dropdown from the user avatar. Each menu item supports `route`, `url`, `icon`, and `permission` keys. Menu is fully customizable per application.
+
+**Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php), [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php), [`ui-library.php`](src/Config/ui-library.php)
+
+---
+
+### 0.17 My Account & My Preferences Views
+
+**Problem**: "My Account" and "My Preferences" pages existed only in the HR application. These are generic user-facing pages that belong in the library.
+
+**Fix**: Migrated both views from the HR app to the library:
+- **My Account**: Profile editing (name, email, avatar), password change, account status
+- **My Preferences**: Notification preferences, language, timezone, date format, theme
+
+Both views use the standard DataTableForm pattern with config-driven field definitions.
+
+**Files**: New views at `src/Resources/views/profile/account.blade.php` and `src/Resources/views/profile/preferences.blade.php`; new Data configs at `src/Core/Admin/Data/`
+
+---
+
+### 0.18 `withoutCompanyScope()` Fix
+
+**Problem**: [`ResolvesModels.php`](src/Traits/ResolvesModels.php) called `withoutCompanyScope()` on models that may not have that scope, causing `BadMethodCallException` for models without multi-tenant scoping.
+
+**Fix**: Added `method_exists()` guard before calling `withoutCompanyScope()`. Models without the scope are resolved normally. Models with the scope have it temporarily removed during resolution.
+
+**Files**: [`ResolvesModels.php`](src/Traits/ResolvesModels.php)
+
+---
+
+### 0.19 Missing Authorization Methods
+
+**Problem**: [`AuthorizationService`](src/Services/AuthorizationService.php) was missing `authorizeView()`, `authorizeCreate()`, and `authorizeUpdate()` methods. The DataTable and DataTableForm components called these methods but they didn't exist, causing fatal errors.
+
+**Fix**: Added the three missing authorization methods to [`AuthorizationService`](src/Services/AuthorizationService.php). Each method checks the corresponding Spatie permission (`view_{entity}`, `create_{entity}`, `update_{entity}`) and throws a 403 if denied. Methods accept an optional `$model` parameter for record-level authorization.
+
+**Files**: [`AuthorizationService.php`](src/Services/AuthorizationService.php)
+
+---
+
+### 0.20 Missing `profile` Relation Fix
+
+**Problem**: The [`user.php`](src/Core/Admin/Data/user.php) Data config referenced a `profile` relation on the User model that didn't exist. Four eager-loading locations also referenced this non-existent relation, causing errors when loading user records.
+
+**Fix**: Removed the `profile` relation reference from the user Data config. Added `method_exists()` or `relationLoaded()` guards in 4 eager-loading locations to safely skip the relation when it doesn't exist on the resolved User model.
+
+**Files**: [`user.php`](src/Core/Admin/Data/user.php), 4 eager-loading locations in DataTable/Form components
+
+---
+
+### 0.21 Missing ActivityLogger Methods
+
+**Problem**: [`ActivityLogger`](src/Services/ActivityLogger.php) was missing `created()` and `updated()` static convenience methods. DataTableForm called `ActivityLogger::created()` and `ActivityLogger::updated()` after save operations, causing fatal errors.
+
+**Fix**: Added `created(string $model, int $id, ?User $user = null)` and `updated(string $model, int $id, ?User $user = null)` static methods to [`ActivityLogger`](src/Services/ActivityLogger.php). Both methods log the action with the model name, record ID, and acting user.
+
+**Files**: [`ActivityLogger.php`](src/Services/ActivityLogger.php)
+
+---
+
+### 0.22 `company_id` & `status` Not Saving
+
+**Problem**: The `company_id` and `status` fields were in the `hiddenFields` array in DataTableForm, preventing them from being submitted. Additionally, the User model's `$fillable` array didn't include these fields, so even when submitted they were silently discarded by Eloquent's mass-assignment protection.
+
+**Fix**:
+1. Removed `company_id` and `status` from `hiddenFields` in [`DataTableForm`](src/Http/Livewire/DataTables/DataTableForm.php)
+2. Added `$fillable` auto-merge via the [`HasUILibraryUser`](src/Traits/HasUILibraryUser.php) trait to ensure `company_id` and `status` are always fillable
+
+**Files**: [`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php), [`HasUILibraryUser.php`](src/Traits/HasUILibraryUser.php)
+
+---
+
+### 0.23 User Model Unification
+
+**Problem**: The library had no standard User model. Each consuming application used its own User model (`App\Models\User`, `App\Modules\Admin\Models\User`, etc.), making it impossible for the library to reference users consistently. The install command had no way to inject library traits into the application's User model.
+
+**Fix**: Comprehensive user model unification:
+1. Created [`HasUILibraryUser`](src/Traits/HasUILibraryUser.php) trait with `$fillable` auto-merge, `profile()` relation (with safe fallback), and library-required accessors
+2. Added config-driven model resolution via `ui-library.models.user` config key — the library resolves the User model class from config, never hardcoding an FQCN
+3. Enhanced [`InstallCommand`](src/Console/Commands/InstallCommand.php) to automatically inject `HasUILibraryUser` into the application's User model using token-based injection
+
+**Files**: [`HasUILibraryUser.php`](src/Traits/HasUILibraryUser.php) (new), [`ui-library.php`](src/Config/ui-library.php), [`InstallCommand.php`](src/Console/Commands/InstallCommand.php), [`UserModelTraitInjector.php`](src/Services/UserModelTraitInjector.php) (new)
+
+---
+
+### 0.24 Company Dropdown Behavior
+
+**Problem**: The company dropdown in TopNav showed users instead of companies, and the hide/show logic was inverted — the dropdown was hidden when it should be visible and vice versa.
+
+**Fix**:
+1. Restored correct hide/show logic: dropdown visible when `show_company_switcher` config is `true` AND the `CompanyProvider` returns companies
+2. Fixed the company list to show companies (not users) by correcting the data source in [`TopNav::loadCompanies()`](src/Http/Livewire/Layouts/Navs/TopNav.php)
+
+**Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php), [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php)
+
+---
+
+### 0.25 Missing `status` & `company_id` Columns
+
+**Problem**: The users table migration didn't include `status` and `company_id` columns, but the Data config and form expected them. New user creation failed because these columns didn't exist.
+
+**Fix**: Added a new migration adding `status` (string, default 'active') and `company_id` (nullable foreign key) columns to the users table. The migration is published as part of the install command.
+
+**Files**: New migration in `src/Core/Admin/Database/Migrations/`
+
+---
+
+### 0.26 `$fillable` Auto-Merge
+
+**Problem**: The `HasUILibraryUser` trait added `$fillable` properties, but if the consuming app's User model already defined `$fillable`, the trait's values would be overwritten (or vice versa depending on trait boot order).
+
+**Fix**: Added `initializeHasUILibraryUser()` boot hook to the trait. This hook merges the library-required fillable fields (`status`, `company_id`) with any existing `$fillable` array on the model, ensuring both the application's and library's fillable fields are respected.
+
+**Files**: [`HasUILibraryUser.php`](src/Traits/HasUILibraryUser.php)
+
+---
+
+### 0.27 Install Command Trait Injection Fix
+
+**Problem**: The install command's User model trait injection used fragile regex patterns that could corrupt the User model file if it had complex syntax (multi-line class declarations, existing traits, etc.).
+
+**Fix**: Replaced regex-based injection with a token-based [`UserModelTraitInjector`](src/Services/UserModelTraitInjector.php) that:
+1. Parses the PHP file into tokens using `token_get_all()`
+2. Locates the class declaration and its opening brace
+3. Inserts the `use HasUILibraryUser;` statement at the correct position inside the class body
+4. Adds the import statement to the top of the file if not already present
+5. Writes the modified file back, preserving all formatting
+
+**Files**: [`UserModelTraitInjector.php`](src/Services/UserModelTraitInjector.php) (new), [`InstallCommand.php`](src/Console/Commands/InstallCommand.php)
+
+---
+
+### 0.28 Company Dropdown Pre-Selection Fix
+
+**Problem**: When editing a user record, the company dropdown was not pre-selecting the user's current company. The `loadRecord()` method in DataTableForm only used the primary key for lookups, ignoring foreign key relationships.
+
+**Fix**: Added foreign key fallback logic to [`DataTableForm::loadRecord()`](src/Http/Livewire/DataTables/DataTableForm.php). When loading a record for editing, the method now checks the Data config's `belongsTo` relationships and pre-selects the corresponding foreign key values in dropdown fields.
+
+**Files**: [`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php)
+
+---
+
+### 0.29 Success Feedback Messages
+
+**Problem**: After saving a record in DataTableForm or completing a wizard in WizardForm, there was no visual feedback. Users had no confirmation that their action succeeded.
+
+**Fix**: Added `$this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record saved successfully.'])` calls in both [`DataTableForm`](src/Http/Livewire/DataTables/DataTableForm.php) and [`WizardForm`](src/Http/Livewire/Wizards/WizardForm.php) after successful save/complete operations. The alert is rendered by a global Alpine.js listener in the layout.
+
+**Files**: [`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php), [`WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php)
+
+---
+
+### 0.30 Self-Edit Authorization Bypass
+
+**Problem**: Users could not edit their own profile if they lacked the `update_user` permission. The authorization check in DataTableForm treated all edits equally, preventing self-service profile updates.
+
+**Fix**: Added a self-edit bypass in [`AuthorizationService::authorizeUpdate()`](src/Services/AuthorizationService.php). When the record being edited is the currently authenticated user (`$model->id === auth()->id()`), the authorization check is skipped. Users can always edit their own record regardless of permission settings.
+
+**Files**: [`AuthorizationService.php`](src/Services/AuthorizationService.php)
+
+---
+
+### 0.31 Module Switcher Config
+
+**Problem**: The module switcher dropdown showed all modules to all users. There was no way to restrict which modules appear for which roles.
+
+**Fix**: Added flexible role-based configuration to the module switcher. Each module entry in [`ui-library.php`](src/Config/ui-library.php) now supports a `roles` array. The [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php) filters modules based on the authenticated user's roles before rendering the switcher dropdown. Modules with empty `roles` are visible to all authenticated users.
+
+**Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php), [`ui-library.php`](src/Config/ui-library.php)
+
+---
+
+### 0.32 Background Jobs Config
+
+**Problem**: The background jobs widget in the dashboard was hardcoded to show all job statuses to all users. There was no role-based filtering for sensitive job information.
+
+**Fix**: Added flexible role-based configuration for background jobs visibility. The `background_jobs` config key in [`ui-library.php`](src/Config/ui-library.php) now supports a `roles` array controlling who can view job statuses, and a `visible_statuses` array controlling which job statuses are displayed.
+
+**Files**: [`ui-library.php`](src/Config/ui-library.php), dashboard widget processors
+
+---
+
+### 0.33 Notification Icon
+
+**Problem**: The TopNav had no notification bell icon. Users had no way to see in-app notifications without navigating to a dedicated notifications page.
+
+**Fix**: Added a notification bell icon to the TopNav with flexible configuration:
+- `notifications.enabled` — toggle the icon entirely
+- `notifications.polling_interval` — Livewire polling interval in seconds (default: 30)
+- `notifications.max_display` — maximum unread count to show before displaying "99+"
+- The icon shows an unread count badge and opens a dropdown with recent notifications
+
+**Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php), [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php), [`ui-library.php`](src/Config/ui-library.php)
+
+---
+
+### 0.34 Polished Home Page
+
+**Problem**: The default Laravel `/home` route rendered a generic, unstyled page. The library had no welcome dashboard to orient new users after login.
+
+**Fix**: Replaced the default `/home` view with a full welcome dashboard featuring a hero section, key statistics (users, roles, modules), module cards with icons and descriptions, and a "Getting Started" guide section. The dashboard is rendered via a dedicated Livewire component and Blade view, both config-driven.
+
+**Files**: New [`HomePage.php`](src/Http/Livewire/Pages/HomePage.php) Livewire component, new [`home-page.blade.php`](src/Resources/views/livewire/pages/home-page.blade.php) view, updated [`web.php`](src/Core/Admin/Routes/web.php) route registration
+
+---
+
+### 0.35 `roles.deleted_at` Fix
+
+**Problem**: The home page dashboard queried roles using a SoftDeletes-enabled Role model, but the `roles` table (standard Spatie `spatie/laravel-permission`) does not include a `deleted_at` column. This caused a `SQLSTATE[42S22]: Column not found` error when the dashboard tried to count roles.
+
+**Fix**: Switched to the standard Spatie `Spatie\Permission\Models\Role` model (which does not use SoftDeletes) for all role queries on the home page. Additionally wrapped role-related queries in `rescue()` calls to gracefully degrade if the roles table or Spatie package is not available.
+
+**Files**: [`HomePage.php`](src/Http/Livewire/Pages/HomePage.php)
+
+---
+
+### 0.36 `$activeContext` Null Fix
+
+**Problem**: [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php) and [`MenuRenderer`](src/Http/Livewire/Layouts/Navs/MenuRenderer.php) had `mount()` signatures with non-nullable `$activeContext` parameters. When no context was active (e.g., on the home page or pages without a context group), Livewire threw a type error because `null` was passed.
+
+**Fix**: Made the `$activeContext` parameter nullable in both `TopNav::mount()` and `MenuRenderer::mount()` by adding `?string $activeContext = null`. Both components now handle a null active context gracefully — no context tab is highlighted, and the horizontal bar renders without an active indicator.
+
+**Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php), [`MenuRenderer.php`](src/Http/Livewire/Layouts/Navs/MenuRenderer.php)
+
+---
+
+### 0.37 `getControls()` on Null Fix
+
+**Problem**: [`page-header.blade.php`](src/Resources/views/components/layouts/partials/page-header.blade.php) called `$configResolver->getControls()` without first checking if `$configResolver` was null. On pages where no Data config was resolved (e.g., the home page dashboard), this caused a `Call to a member function getControls() on null` error.
+
+**Fix**: Added a null guard around the `$configResolver->getControls()` call. When `$configResolver` is null, the page header renders without action buttons (create, export, etc.), which is the correct behavior for non-CRUD pages like the dashboard.
+
+**Files**: [`page-header.blade.php`](src/Resources/views/components/layouts/partials/page-header.blade.php)
 
 ---
 
@@ -735,7 +1165,7 @@ src/Core/ReferenceData/
 | 3.2 | Generic Document Engine | Medium | Phase 2.5 |
 | 3.3 | Generic Notification Engine | Large | None |
 | 3.4 | Scheduled Reports | Small | 3.2, 3.3 |
-| 3.5 | Reference Data module | Medium | None |
+| 3.5 | Reference Data module | Medium | None | ✅ Complete |
 | **Total** | | **~19 days** | |
 
 ---
@@ -1193,148 +1623,1282 @@ class OrganizationNavigationMetadata implements NavigationMetadata
 
 ### Phase 4 Summary
 
-| Task | Description | Effort | Depends On |
+| Task | Description | Effort | Depends On | Status |
+|---|---|---|---|---|
+| 4.1 | Extract Organization into Core | Medium | Phase 2.5 | ✅ Complete |
+| 4.2 | Add `user_facing` + `depends_on` to module registry | Tiny | None | ✅ Complete |
+| 4.3 | Section-based sidebar rendering | Medium | 4.2 | ✅ Complete |
+| 4.4 | Dropdown application switcher | Small | 4.2 | ✅ Complete |
+| 4.5 | Config-driven navigation metadata | Large | 4.2, 4.3 | ✅ Complete |
+| 4.6 | Architecture blueprint document | Small | None | 🔄 In Progress |
+| **Total** | | **~15 days** | | **✅ Complete** |
+
+**4.4 Completion notes** (resolved 2026-08-11):
+- ✅ **Module Switcher → Bootstrap Dropdown**: Replaced the [`ModuleSwitcher`](src/Http/Livewire/Layouts/Navs/ModuleSwitcher.php) Livewire component with an inline Bootstrap dropdown in [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php). Eliminated 42 lines of custom JavaScript. Deleted the ModuleSwitcher component entirely — application switching is now a pure Bootstrap 5 dropdown in the top bar, with `user_facing: true` modules listed and the active module checked.
+- ✅ **Top Nav fix**: Fixed [`TopNav::determineModuleName()`](src/Http/Livewire/Layouts/Navs/TopNav.php) bug that overwrote an explicitly passed `moduleName` prop with the derived module name. Top Nav now correctly renders `context_groups` tabs for the active module.
+- ✅ **Icons fixed**: 7 `<i>` tags missing the `fa` base class fixed across top nav and sidebar Blade partials.
+- ✅ **Workspace support**: [`WorkspaceResolver`](src/Contracts/Navigation/WorkspaceResolver.php) contract + [`NullWorkspaceResolver`](src/Services/Navigation/NullWorkspaceResolver.php) + [`WorkspaceFilter`](src/Services/Navigation/WorkspaceFilter.php) for feature-gated and role-scoped navigation filtering. Integrated in both [`NavigationLayout::loadNavigationConfig()`](src/Components/NavigationLayout.php) and [`NavigationManager::loadModuleNavItems()`](src/Services/Navigation/NavigationManager.php).
+
+**4.5 Completion notes** (resolved 2026-08-11):
+- ✅ **Sidebar Grouping Customization**: New `sidebar` config key in `navigation.php` with `section_label`, `collapsible`, `expanded_default`. Three rendering modes: context-driven (items from NavigationLayout), NavigationManager sections (Phase 4.5 config-driven), and module registry fallback (Phase 4.3).
+- ✅ **Icon Mode Complete**: Section headers collapse to compact icons in iconized mode. Removed empty section body CSS bug. Added proper indentation fix for iconized sections. Added expand indicator chevron on collapsible sections.
+- ✅ **Context Groups → Sidebar Linkage**: [`Sidebar::mount()`](src/Http/Livewire/Layouts/Navs/Sidebar.php) now accepts `$activeContext` parameter. When context-specific items are passed from [`NavigationLayout`](src/Components/NavigationLayout.php), the sidebar renders them directly — enabling the full `context_groups → sidebar` pattern used by Quick-HR.
+- ❌ **Deferred**: The `NavigationMetadata` contract (proposed in §4.5 of this plan) has not been created — current implementation uses direct config arrays rather than a formal contract. Breadcrumb resolution from metadata is deferred to Phase 5.2.
+
+
+> **Installation**: The library now provides a single-command installation via `php artisan ui-library:install` ([`InstallCommand`](src/Console/Commands/InstallCommand.php)). This command handles config publishing, view publishing, migration publishing, asset publishing, vendor provider publishing (Livewire, Fortify, Spatie Permission), database migrations, seeding, auth scaffolding (Breeze), storage linking, app key generation, and cache clearing — all in one step.
+
+## 5. Phase 2 (Navigation): Cross-Context Dropdowns
+
+> **Status**: ✅ Complete (2026-08-12) | **Design Doc**: [`plans/horizontal-bar-group-design.md`](plans/horizontal-bar-group-design.md)
+
+**Goal**: When `show_all_contexts: true` is set in a module's `navigation.php` config, every context group becomes a Bootstrap dropdown trigger in the horizontal bar — merging TopNav's context tabs and [`HorizontalContextMenu`](src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php)'s item listing into a single component.
+
+### 5.1 Config Keys
+
+Two new config keys in `layout.context_menu`:
+
+| Key | Type | Default | Description |
 |---|---|---|---|
-| 4.1 | Extract Organization into Core | Medium | Phase 2.5 |
-| 4.2 | Add `user_facing` + `depends_on` to module registry | Tiny | None |
-| 4.3 | Section-based sidebar rendering | Medium | 4.2 |
-| 4.4 | Dropdown application switcher | Small | 4.2 |
-| 4.5 | Config-driven navigation metadata | Large | 4.2, 4.3 |
-| 4.6 | Architecture blueprint document | Small | None |
-| **Total** | | **~15 days** | |
+| `show_all_contexts` | bool | `false` | When true, renders all context groups as dropdowns in the horizontal bar |
+| `hide_topnav_contexts` | bool | `false` | When true + `show_all_contexts`, hides context tabs in TopNav |
 
----
-
-## 5. Phase 5: Navigation & UX Polish (P3 — Lower Priority)
-
-> **Goal**: Complete the navigation vision from input3.txt — workspace tabs, 5-level breadcrumbs, infrastructure filtering, AlpineJS documentation.
-
-### 5.1 Workspace Tabs in TopNav
-
-**Current State**: [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php) renders items from its `$items` array (passed from `NavigationLayout`). These are currently context groups.
-
-**Target State**: TopNav shows workspace names from the active application's `NavigationMetadata` as top-center tabs. The active workspace is highlighted. Switching tabs changes the sidebar.
+### 5.2 Implementation Summary
 
 **Files Modified**:
 
-| File | Changes |
+| File | Change |
 |---|---|
-| [`src/Http/Livewire/Layouts/Navs/TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php) | Accept workspace data from metadata. Render as tabs. |
-| [`src/Components/NavigationLayout.php`](src/Components/NavigationLayout.php) | Resolve workspace tabs from `NavigationMetadata` and pass to TopNav |
-| [`src/Resources/views/livewire/layouts/navs/top-nav.blade.php`](src/Resources/views/livewire/layouts/navs/) | Tab-style rendering |
+| [`HorizontalContextMenu.php`](src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php) | Added `$contextGroups`, `$contextItems`, `$activeContext`, `$showAllContexts` properties. Added `getVisibleItemsForContext()` and `getOverflowItemsForContext()` per-group splitting methods |
+| [`horizontal-context-menu.blade.php`](src/Resources/views/livewire/navs/horizontal-context-menu.blade.php) | Added conditional branch: when `$showAllContexts`, renders context group dropdowns with Phase 1 overflow applied internally. When false, existing Phase 1 layout unchanged |
+| [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php) | Added `$hideTopnavContexts` property |
+| [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) | Wrapped desktop visible/overflow + mobile context tab rendering in `@if (!$hideTopnavContexts)` |
+| [`NavigationLayout.php`](src/Components/NavigationLayout.php) | Reads `show_all_contexts` and `hide_topnav_contexts` from config, passes to view |
+| [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php) | Wires `:contextGroups`, `:contextItems`, `:activeContext`, `:showAllContexts` to horizontal-context-menu; wires `:hideTopnavContexts` to top-nav |
+| Three nav config stubs | Commented-out `show_all_contexts` and `hide_topnav_contexts` entries added |
 
-**UX Specification**:
+**Backward Compatibility**: When `show_all_contexts` is `false` (default), behavior is identical to Phase 1. The sidebar is completely independent and unaffected.
 
+### 5.3 Behavior
+
+When `show_all_contexts` is enabled:
+- Each `context_groups` entry becomes a `<li class="nav-item dropdown">` in the horizontal bar
+- The dropdown trigger shows the context group label + icon (e.g., "People", "Payroll")
+- The dropdown menu lists that group's `contexts` items
+- Within each dropdown, Phase 1 overflow applies: visible items shown directly, overflow items in a nested "More" sub-dropdown
+- The active context group's trigger gets `.active.fw-bold.text-primary` class
+
+When `hide_topnav_contexts` is also enabled:
+- TopNav's desktop context tabs (visible + overflow "More") are hidden
+- TopNav's mobile scrollable context tabs are hidden
+- All other TopNav elements (module switcher, company switcher, profile, etc.) remain visible
+
+### 5.4 Documentation
+
+Full documentation at [`docs/navigation-cross-context-dropdowns.md`](docs/navigation-cross-context-dropdowns.md).
+
+---
+
+## 6. Phase 5: Navigation & UX Polish — Vanilla JS + Livewire 3 (P3)
+
+> **Status**: Planning complete | **Stack**: Laravel Livewire 3 + Vanilla JavaScript + Bootstrap 5 | **No Alpine.js, no build tools**
+> **Replaces**: Original Phase 5 Vue.js/Alpine.js assumptions
+> **Reference**: Full detailed plan at [`docs/phase-5-livewire-plan.md`](docs/phase-5-livewire-plan.md) (Alpine.js version — this plan replaces Alpine.js patterns with vanilla JS)
+
+### 5.0 JavaScript Architecture — Single File, No Build Tools
+
+All Phase 5 client-side interactivity lives in one file: [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js). This is an IIFE-style script with no ES modules, no npm, no webpack/vite. It is loaded once in the layout and re-initializes after every Livewire DOM update via `Livewire.hook('morph.updated', ...)`.
+
+```javascript
+// public/assets/js/quicker-faster.js — Single entry point for all vanilla JS
+// Uses IIFE pattern, no modules, no build tools
+(function() {
+    'use strict';
+
+    /* ------------------------------------------------------------------ */
+    /*  Utilities                                                          */
+    /* ------------------------------------------------------------------ */
+
+    function debounce(fn, delay) {
+        var timer;
+        return function() {
+            var context = this, args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(function() { fn.apply(context, args); }, delay);
+        };
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Livewire Integration — re-init after every morph                   */
+    /* ------------------------------------------------------------------ */
+
+    document.addEventListener('livewire:initialized', function() {
+        Livewire.hook('morph.updated', function(args) {
+            var el = args.component && args.component.el;
+            initWorkspaceTabs(el);
+            initSidebarFilter(el);
+        });
+    });
+
+    /* ------------------------------------------------------------------ */
+    /*  5.1 Workspace Tabs                                                 */
+    /* ------------------------------------------------------------------ */
+
+    function initWorkspaceTabs(root) {
+        var container = (root || document).querySelector('.workspace-tabs-container');
+        if (!container) return;
+
+        initTabClickHandlers(container);
+        initTabCloseButtons(container);
+        initTabOverflow(container);
+        initTabContextMenu(container);
+        initTabMiddleClickClose(container);
+    }
+
+    function initTabClickHandlers(container) { /* see §5.1.5 */ }
+    function initTabCloseButtons(container) { /* see §5.1.5 */ }
+    function initTabOverflow(container) { /* see §5.1.5 */ }
+    function initTabContextMenu(container) { /* see §5.1.5 */ }
+    function initTabMiddleClickClose(container) { /* see §5.1.5 */ }
+
+    /* ------------------------------------------------------------------ */
+    /*  5.1 Global Keyboard Shortcuts                                      */
+    /* ------------------------------------------------------------------ */
+
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+W / Cmd+W — close active tab
+        if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+            e.preventDefault();
+            Livewire.dispatch('close-active-tab');
+        }
+        // Ctrl+Shift+T / Cmd+Shift+T — reopen last closed tab
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+            e.preventDefault();
+            Livewire.dispatch('reopen-last-closed-tab');
+        }
+        // Ctrl+K / Cmd+K — focus sidebar filter (see §5.3)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            var filterInput = document.querySelector('[data-sidebar-filter]');
+            if (filterInput) filterInput.focus();
+        }
+    });
+
+    /* ------------------------------------------------------------------ */
+    /*  5.3 Sidebar Filter                                                 */
+    /* ------------------------------------------------------------------ */
+
+    function initSidebarFilter(root) { /* see §5.3 */ }
+
+})();
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ [ HR ▼ ]   [Dashboard] [People] [Time] [Leave] [Reports]    │
-│                                              Company  User   │
-├───────────────┬──────────────────────────────────────────────┤
+
+**Design decisions**:
+- **IIFE** — no global namespace pollution, runs immediately
+- **`Livewire.hook('morph.updated')`** — re-runs initializers after every Livewire DOM update (replaces Alpine's `$watch`/`x-init`)
+- **`Livewire.dispatch()`** — communicates from JS to Livewire PHP components (replaces Alpine's `$wire.method()`)
+- **`data-*` attributes** — state stored on DOM elements, read via `element.dataset` (replaces Alpine's `x-data`)
+- **No `x-show`, `x-model`, `x-transition`** — all visibility/model/transition handled with vanilla `el.style.display`, `addEventListener('input')`, CSS `classList`
+
+### Alpine.js → Vanilla JS Pattern Reference
+
+| Alpine.js | Vanilla JS + Livewire |
+|-----------|----------------------|
+| `x-data="{ open: false }"` | `element.dataset.open = 'false'` read via `element.dataset` |
+| `x-show="open"` | `element.style.display = condition ? '' : 'none'` triggered on `Livewire.hook('morph.updated')` or event listener |
+| `@click="open = !open"` | `el.addEventListener('click', function() { Livewire.dispatch('toggle', { id: el.dataset.id }); })` |
+| `@click.away` | `document.addEventListener('click', function(e) { if (!el.contains(e.target)) close(); })` |
+| `x-on:keydown.escape` | `addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); })` |
+| `x-model.debounce.150ms` | `addEventListener('input', debounce(handler, 150))` with custom `debounce()` utility |
+| `x-transition` | CSS `transition: opacity 0.2s` class + `classList.add/remove` with `requestAnimationFrame` |
+| `x-collapse` | Manual height animation: read `scrollHeight`, set `el.style.height`, listen to `transitionend` |
+| `x-init` | `Livewire.hook('morph.updated', ...)` or an inline `<script>` at the bottom of the Blade view |
+| `$wire.method()` | `Livewire.dispatch('event-name', { ...data })` — handled by `#[On('event-name')]` in PHP |
+| `$dispatch()` | `Livewire.dispatch('event-name', { ...data })` |
+| `$watch('prop', fn)` | `Livewire.hook('propertyChanged', ...)` or custom `MutationObserver` |
+
+---
+
+### 5.1 Workspace Tabs (Livewire + Vanilla JS)
+
+#### 5.1.1 Overview
+
+A browser-style tab system letting users keep multiple pages open simultaneously. Tabs persist in PHP session, survive page refreshes, and are managed entirely through Livewire server state + vanilla JS client interactions.
+
+#### 5.1.2 File Inventory
+
+| Role | Path | Type |
+|---|---|---|
+| **Livewire component** | [`src/Http/Livewire/Layouts/Navs/WorkspaceTabs.php`](src/Http/Livewire/Layouts/Navs/WorkspaceTabs.php) | New |
+| **Blade view** | [`src/Resources/views/livewire/navs/workspace-tabs.blade.php`](src/Resources/views/livewire/navs/workspace-tabs.blade.php) | New (no Alpine) |
+| **Vanilla JS** | [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js) | Extend existing |
+| **Integration** | [`src/Resources/views/components/layouts/navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php:148) | Render `<livewire:qf.workspace-tabs>` |
+| **CSS** | [`public/assets/css/quicker-faster.css`](public/assets/css/quicker-faster.css) | Tab-specific styles |
+
+#### 5.1.3 Livewire Component Class
+
+```php
+// src/Http/Livewire/Layouts/Navs/WorkspaceTabs.php
+namespace QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs;
+
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class WorkspaceTabs extends Component
+{
+    /** @var array<int, array{id: string, label: string, url: string, icon: string|null, context: string|null}> */
+    public array $openTabs = [];
+
+    /** @var string|null */
+    public ?string $activeTabId = null;
+
+    /** @var array<int, array{id: string, label: string, url: string}> */
+    public array $recentlyClosed = [];
+
+    public int $maxTabs = 15;
+
+    public function mount(): void
+    {
+        $this->openTabs = session('workspace_tabs', []);
+        $this->activeTabId = session('workspace_active_tab', null);
+        $this->recentlyClosed = session('workspace_recently_closed', []);
+    }
+
+    public function openTab(string $label, string $url, ?string $icon = null, ?string $context = null): void
+    {
+        foreach ($this->openTabs as $tab) {
+            if ($tab['url'] === $url) {
+                $this->activeTabId = $tab['id'];
+                $this->persist();
+                return;
+            }
+        }
+        if (count($this->openTabs) >= $this->maxTabs) {
+            array_shift($this->openTabs);
+        }
+        $id = uniqid('tab_', true);
+        $this->openTabs[] = compact('id', 'label', 'url', 'icon', 'context');
+        $this->activeTabId = $id;
+        $this->persist();
+    }
+
+    public function closeTab(string $tabId): void
+    {
+        $tab = collect($this->openTabs)->firstWhere('id', $tabId);
+        if ($tab) {
+            $this->recentlyClosed[] = $tab;
+            if (count($this->recentlyClosed) > 10) array_shift($this->recentlyClosed);
+        }
+        $this->openTabs = array_values(array_filter($this->openTabs, fn($t) => $t['id'] !== $tabId));
+        if ($this->activeTabId === $tabId) {
+            $this->activeTabId = !empty($this->openTabs) ? $this->openTabs[count($this->openTabs) - 1]['id'] : null;
+        }
+        $this->persist();
+    }
+
+    #[On('close-active-tab')]
+    public function closeActiveTab(): void
+    {
+        if ($this->activeTabId) $this->closeTab($this->activeTabId);
+    }
+
+    #[On('reopen-last-closed-tab')]
+    public function reopenLastClosed(): void
+    {
+        if (empty($this->recentlyClosed)) return;
+        $tab = array_pop($this->recentlyClosed);
+        $this->openTabs[] = $tab;
+        $this->activeTabId = $tab['id'];
+        $this->persist();
+    }
+
+    #[On('switch-tab')]
+    public function switchTab(string $tabId): void { $this->activeTabId = $tabId; $this->persist(); }
+
+    public function closeOthers(string $keepTabId): void
+    {
+        $this->openTabs = array_values(array_filter($this->openTabs, fn($t) => $t['id'] === $keepTabId));
+        $this->activeTabId = $keepTabId;
+        $this->persist();
+    }
+
+    public function closeAllToRight(string $anchorTabId): void
+    {
+        $anchorIndex = collect($this->openTabs)->search(fn($t) => $t['id'] === $anchorTabId);
+        if ($anchorIndex === false) return;
+        $this->openTabs = array_slice($this->openTabs, 0, $anchorIndex + 1);
+        if (!collect($this->openTabs)->firstWhere('id', $this->activeTabId)) {
+            $this->activeTabId = $anchorTabId;
+        }
+        $this->persist();
+    }
+
+    public function closeAll(): void
+    {
+        $this->recentlyClosed = array_merge($this->recentlyClosed, $this->openTabs);
+        if (count($this->recentlyClosed) > 10) $this->recentlyClosed = array_slice($this->recentlyClosed, -10);
+        $this->openTabs = [];
+        $this->activeTabId = null;
+        $this->persist();
+    }
+
+    #[On('openWorkspaceTab')]
+    public function handleOpenTabEvent(array $data): void
+    {
+        $this->openTab(
+            label: $data['label'],
+            url: $data['url'],
+            icon: $data['icon'] ?? null,
+            context: $data['context'] ?? null,
+        );
+    }
+
+    protected function persist(): void
+    {
+        session([
+            'workspace_tabs'            => $this->openTabs,
+            'workspace_active_tab'      => $this->activeTabId,
+            'workspace_recently_closed' => $this->recentlyClosed,
+        ]);
+    }
+
+    public function render()
+    {
+        return view('qf::livewire.navs.workspace-tabs');
+    }
+}
 ```
 
-- Selected tab has accent underline/background
-- Clicking a tab updates sidebar via Livewire event
-- Overflow tabs collapse into "More ▼" dropdown
-- Mobile: tabs collapse into hamburger or scroll horizontally
+#### 5.1.4 Blade View — No Alpine
 
-**Verification**:
-- Switching applications changes tab set
-- Clicking "People" tab shows People sidebar
-- Active tab persists across page navigations (Livewire state)
+```blade
+{{-- workspace-tabs.blade.php — Vanilla JS only, no x-data, no x-show --}}
+<div class="workspace-tabs-container border-bottom bg-light"
+     data-tab-container>
+    <div class="d-flex align-items-center" style="overflow: hidden; height: 36px;"
+         data-tab-strip>
+        @foreach ($openTabs as $index => $tab)
+            <div class="workspace-tab d-flex align-items-center px-3 py-1
+                        {{ $tab['id'] === $activeTabId ? 'active bg-white border-top border-primary border-2' : 'text-muted' }}"
+                 style="cursor: pointer; white-space: nowrap; font-size: 0.8rem; max-width: 180px; user-select: none;"
+                 data-tab-item
+                 data-tab-id="{{ $tab['id'] }}"
+                 data-tab-url="{{ $tab['url'] }}"
+                 title="{{ $tab['label'] }} — {{ $tab['url'] }}">
+                @if ($tab['icon'])
+                    <i class="{{ $tab['icon'] }} me-1 opacity-6" style="font-size: 0.7rem;"></i>
+                @endif
+                <span class="text-truncate">{{ $tab['label'] }}</span>
+                <button class="btn-close ms-2" style="font-size: 0.45rem;"
+                        data-tab-close
+                        data-tab-id="{{ $tab['id'] }}"
+                        aria-label="Close tab"></button>
+            </div>
+        @endforeach
+
+        {{-- Overflow Chevron (shown/hidden by JS) --}}
+        <div data-tab-overflow class="dropdown" style="flex-shrink: 0; display: none;">
+            <button class="btn btn-sm btn-link text-muted px-2"
+                    data-bs-toggle="dropdown"
+                    aria-label="More tabs">
+                <i class="fas fa-chevron-down" style="font-size: 0.7rem;"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow" data-tab-overflow-menu>
+                {{-- Populated by JS from hidden tabs --}}
+            </ul>
+        </div>
+    </div>
+
+    {{-- Right-Click Context Menu (hidden by default, positioned by JS) --}}
+    <div data-tab-context-menu
+         class="position-fixed bg-white border rounded shadow-sm py-1"
+         style="z-index: 9999; min-width: 180px; display: none;">
+        <a class="dropdown-item" href="#" data-action="close-others">
+            <i class="fas fa-times-circle me-2 opacity-6"></i> Close Others
+        </a>
+        <a class="dropdown-item" href="#" data-action="close-all-to-right">
+            <i class="fas fa-arrow-right me-2 opacity-6"></i> Close All to Right
+        </a>
+        <a class="dropdown-item" href="#" data-action="close-all">
+            <i class="fas fa-trash me-2 opacity-6"></i> Close All
+        </a>
+        @if (!empty($recentlyClosed))
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item" href="#" data-action="reopen-last-closed">
+                <i class="fas fa-undo me-2 opacity-6"></i> Reopen Closed Tab
+            </a>
+        @endif
+    </div>
+</div>
+```
+
+#### 5.1.5 Vanilla JS — Tab Interactions
+
+The following functions live in [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js) inside `initWorkspaceTabs()`:
+
+**Tab Click → `Livewire.dispatch('switch-tab')`**:
+```javascript
+function initTabClickHandlers(container) {
+    container.querySelectorAll('[data-tab-item]').forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            // Ignore clicks on close button
+            if (e.target.closest('[data-tab-close]')) return;
+            var tabId = this.dataset.tabId;
+            Livewire.dispatch('switch-tab', { tabId: tabId });
+        });
+    });
+}
+```
+
+**Close Button → `Livewire.dispatch('close-tab')`**:
+```javascript
+function initTabCloseButtons(container) {
+    container.querySelectorAll('[data-tab-close]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var tabId = this.dataset.tabId;
+            Livewire.dispatch('close-tab', { tabId: tabId });
+        });
+    });
+}
+```
+
+**Middle-Click Close**:
+```javascript
+function initTabMiddleClickClose(container) {
+    container.querySelectorAll('[data-tab-item]').forEach(function(tab) {
+        tab.addEventListener('auxclick', function(e) {
+            if (e.button === 1) { // middle button
+                e.preventDefault();
+                var tabId = this.dataset.tabId;
+                Livewire.dispatch('close-tab', { tabId: tabId });
+            }
+        });
+    });
+}
+```
+
+**Overflow Detection via ResizeObserver**:
+```javascript
+function initTabOverflow(container) {
+    var strip = container.querySelector('[data-tab-strip]');
+    var overflowBtn = container.querySelector('[data-tab-overflow]');
+    var overflowMenu = container.querySelector('[data-tab-overflow-menu]');
+    if (!strip || !overflowBtn) return;
+
+    function calculate() {
+        var tabs = strip.querySelectorAll('[data-tab-item]');
+        var containerWidth = strip.clientWidth - 40; // reserve for chevron
+        var totalWidth = 0;
+        var hiddenTabs = [];
+
+        tabs.forEach(function(tab) {
+            totalWidth += tab.offsetWidth;
+            if (totalWidth > containerWidth) {
+                tab.style.display = 'none';
+                hiddenTabs.push(tab);
+            } else {
+                tab.style.display = '';
+            }
+        });
+
+        overflowBtn.style.display = hiddenTabs.length > 0 ? '' : 'none';
+
+        // Populate overflow dropdown
+        if (overflowMenu && hiddenTabs.length > 0) {
+            overflowMenu.innerHTML = hiddenTabs.map(function(tab) {
+                var id = tab.dataset.tabId;
+                var label = tab.querySelector('span').textContent;
+                return '<li><a class="dropdown-item" href="#" data-overflow-tab="' + id + '">'
+                    + label + '</a></li>';
+            }).join('');
+
+            overflowMenu.querySelectorAll('[data-overflow-tab]').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    Livewire.dispatch('switch-tab', { tabId: this.dataset.overflowTab });
+                });
+            });
+        }
+    }
+
+    // Observe resize
+    if (window.ResizeObserver) {
+        new ResizeObserver(function() { calculate(); }).observe(strip);
+    }
+
+    // Initial calculation (deferred for paint)
+    requestAnimationFrame(function() { calculate(); });
+    window.addEventListener('resize', function() { calculate(); });
+}
+```
+
+**Right-Click Context Menu**:
+```javascript
+function initTabContextMenu(container) {
+    var contextMenu = container.querySelector('[data-tab-context-menu]');
+    if (!contextMenu) return;
+
+    var currentTabId = null;
+
+    container.querySelectorAll('[data-tab-item]').forEach(function(tab) {
+        tab.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            currentTabId = this.dataset.tabId;
+            contextMenu.style.display = '';
+            contextMenu.style.left = e.clientX + 'px';
+            contextMenu.style.top = e.clientY + 'px';
+        });
+    });
+
+    // Click outside → close
+    document.addEventListener('click', function(e) {
+        if (!contextMenu.contains(e.target)) {
+            contextMenu.style.display = 'none';
+            currentTabId = null;
+        }
+    });
+
+    // Escape → close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            contextMenu.style.display = 'none';
+            currentTabId = null;
+        }
+    });
+
+    // Menu actions
+    contextMenu.addEventListener('click', function(e) {
+        var action = e.target.closest('[data-action]');
+        if (!action) return;
+        e.preventDefault();
+        var act = action.dataset.action;
+        if (act === 'close-others' && currentTabId) {
+            Livewire.dispatch('close-others', { keepTabId: currentTabId });
+        } else if (act === 'close-all-to-right' && currentTabId) {
+            Livewire.dispatch('close-all-to-right', { anchorTabId: currentTabId });
+        } else if (act === 'close-all') {
+            Livewire.dispatch('close-all');
+        } else if (act === 'reopen-last-closed') {
+            Livewire.dispatch('reopen-last-closed-tab');
+        }
+        contextMenu.style.display = 'none';
+        currentTabId = null;
+    });
+}
+```
+
+#### 5.1.6 Integration with Sidebar
+
+Sidebar nav items dispatch `openWorkspaceTab` events instead of navigating directly when `config('ui-library.navigation.open_in_tabs')` is true:
+
+```blade
+{{-- In sidebar-item.blade.php --}}
+<a href="{{ $item['route'] ?? '#' }}"
+   class="nav-link ..."
+   @if(config('ui-library.navigation.open_in_tabs', false))
+       {{-- Vanilla JS: data-workspace-tab attribute triggers tab open --}}
+       data-workspace-tab
+       data-tab-label="{{ $item['label'] }}"
+       data-tab-url="{{ url($item['route']) }}"
+       data-tab-icon="{{ $item['icon'] ?? 'fas fa-circle' }}"
+       data-tab-context="{{ $activeContext ?? '' }}"
+   @endif
+>
+```
+
+Vanilla JS handler in `quicker-faster.js`:
+```javascript
+document.addEventListener('click', function(e) {
+    var link = e.target.closest('[data-workspace-tab]');
+    if (!link) return;
+    e.preventDefault();
+    Livewire.dispatch('openWorkspaceTab', {
+        label: link.dataset.tabLabel,
+        url: link.dataset.tabUrl,
+        icon: link.dataset.tabIcon,
+        context: link.dataset.tabContext,
+    });
+});
+```
+
+#### 5.1.7 Keyboard Shortcuts Summary
+
+| Shortcut | Action | Implementation |
+|---|---|---|
+| Ctrl+W / Cmd+W | Close active tab | `document.addEventListener('keydown')` → `Livewire.dispatch('close-active-tab')` |
+| Ctrl+Shift+T / Cmd+Shift+T | Reopen last closed tab | `document.addEventListener('keydown')` → `Livewire.dispatch('reopen-last-closed-tab')` |
+| Middle-click tab | Close tab | `el.addEventListener('auxclick', ...)` with `e.button === 1` |
+| Right-click tab | Open context menu | `el.addEventListener('contextmenu', ...)` |
+| Click tab | Switch to tab | `el.addEventListener('click')` → `Livewire.dispatch('switch-tab')` |
+
+#### 5.1.8 Edge Cases
+
+| Edge Case | Behavior |
+|---|---|
+| Max tabs exceeded (15) | Remove least-recently-used tab (first in array) |
+| All tabs closed | Show empty tab strip; next sidebar click opens new tab |
+| Tab URL already open | Focus existing tab instead of duplicating |
+| Session timeout | Tabs restored from `session()` on next mount via `mount()` |
+| Browser refresh | Tabs survive because state is in PHP session |
+| Very long tab labels | CSS `text-truncate` + `max-width: 180px` |
+| Tab overflow (narrow screen) | `ResizeObserver`-calculated chevron dropdown |
 
 **Dependencies**: Phase 4.5 (NavigationMetadata)
-**Estimated Effort**: Medium
+**Effort**: Medium
 
 ---
 
-### 5.2 5-Level Breadcrumb Support
+### 5.2 Breadcrumbs (Blade Component + Minimal Vanilla JS)
 
-**Current State**: Breadcrumbs in [`NavigationLayout`](src/Components/NavigationLayout.php) support: Application → Page.
+#### 5.2.1 Overview
 
-**Target State**: `Application → Workspace → Section → Page → Record` per N6.
+A server-rendered Blade component supporting up to 5 levels: `Application → Workspace → Section → Page → Record`. Truncation logic is in PHP/Blade. Middle-segment "..." dropdown uses a tiny inline `<script>` tag for the toggle.
 
-**Files Modified**:
+#### 5.2.2 File Inventory
 
-| File | Changes |
-|---|---|
-| [`src/Components/NavigationLayout.php`](src/Components/NavigationLayout.php) | Accept Section level from `NavigationMetadata`. Build 5-segment breadcrumbs. |
-| [`src/Resources/views/components/navigation-layout.blade.php`](src/Resources/views/) | Render 5-segment breadcrumb trail |
+| Role | Path | Type |
+|---|---|---|
+| **Component class** | [`src/Components/Breadcrumbs.php`](src/Components/Breadcrumbs.php) | New |
+| **Blade view** | [`src/Resources/views/components/breadcrumbs.blade.php`](src/Resources/views/components/breadcrumbs.blade.php) | New |
+| **Data source** | [`src/Components/NavigationLayout.php`](src/Components/NavigationLayout.php:213-227) | Enhanced `getBreadcrumbItems()` |
+| **Integration** | [`src/Resources/views/components/layouts/partials/page-header.blade.php`](src/Resources/views/components/layouts/partials/page-header.blade.php:120-122) | Replace `<x-breadcrumb>` with `<x-breadcrumbs>` |
 
-**Breadcrumb Example**:
+#### 5.2.3 Component Class
 
-```text
-HR > People > Employment > Employees > John Doe
+```php
+// src/Components/Breadcrumbs.php
+namespace QuickerFaster\UILibrary\Components;
+
+use Illuminate\View\Component;
+
+class Breadcrumbs extends Component
+{
+    public function __construct(
+        public array $segments = [],
+        public int $maxVisible = 4,
+        public bool $showHome = true,
+    ) {}
+
+    public function allSegments(): array
+    {
+        $items = $this->segments;
+        if ($this->showHome && config('quicker-faster-ui.breadcrumb.show_home', true)) {
+            array_unshift($items, ['label' => __('Home'), 'url' => url('/')]);
+        }
+        return $items;
+    }
+
+    public function shouldCollapse(): bool
+    {
+        return count($this->allSegments()) > $this->maxVisible;
+    }
+
+    public function visibleSegments(): array
+    {
+        $all = $this->allSegments();
+        if (!$this->shouldCollapse()) return $all;
+        // Show first segment + "..." + last 2 segments
+        return array_merge([reset($all)], array_slice($all, -2));
+    }
+
+    public function hiddenSegments(): array
+    {
+        if (!$this->shouldCollapse()) return [];
+        return array_slice($this->allSegments(), 1, -2);
+    }
+
+    public function render()
+    {
+        return view('qf::components.breadcrumbs');
+    }
+}
+```
+
+#### 5.2.4 Blade View — Inline Script for "..." Dropdown
+
+```blade
+{{-- breadcrumbs.blade.php — Server-rendered, no Alpine --}}
+@php
+    $allSegments = $segments;
+    if ($showHome && config('quicker-faster-ui.breadcrumb.show_home', true)) {
+        array_unshift($allSegments, ['label' => __('Home'), 'url' => url('/')]);
+    }
+    $shouldCollapse = count($allSegments) > $maxVisible;
+    $visibleSegments = $shouldCollapse
+        ? array_merge([reset($allSegments)], array_slice($allSegments, -2))
+        : $allSegments;
+    $hiddenSegments = $shouldCollapse ? array_slice($allSegments, 1, -2) : [];
+@endphp
+
+<nav aria-label="breadcrumb" {{ $attributes->merge(['class' => '']) }}>
+    <ol class="breadcrumb mb-0" itemscope itemtype="https://schema.org/BreadcrumbList">
+        {{-- Mobile: show only last segment with back arrow --}}
+        <li class="breadcrumb-item d-md-none">
+            @php
+                $backIndex = count($visibleSegments) - 2;
+            @endphp
+            <a href="{{ $visibleSegments[$backIndex >= 0 ? $backIndex : 0]['url'] ?? '#' }}"
+               class="text-decoration-none">
+                <i class="fas fa-arrow-left me-1"></i>
+                <span>{{ $visibleSegments[$backIndex >= 0 ? $backIndex : 0]['label'] ?? __('Back') }}</span>
+            </a>
+        </li>
+
+        @php $position = 1; @endphp
+        @foreach ($visibleSegments as $index => $segment)
+            <li class="breadcrumb-item d-none d-md-flex align-items-center
+                       {{ $loop->last ? 'active fw-semibold' : '' }}"
+                @if ($loop->last) aria-current="page" @endif
+                itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+
+                @if ($index === 1 && $shouldCollapse)
+                    {{-- "..." dropdown with inline vanilla JS --}}
+                    <div class="dropdown"
+                         data-breadcrumb-dropdown>
+                        <a class="text-muted text-decoration-none dropdown-toggle"
+                           href="#" role="button"
+                           data-breadcrumb-toggle
+                           aria-label="{{ __('Show more breadcrumbs') }}">
+                            <i class="fas fa-ellipsis-h"></i>
+                        </a>
+                        <ul class="dropdown-menu shadow"
+                            data-breadcrumb-menu
+                            style="display: none;">
+                            @foreach ($hiddenSegments as $hidden)
+                                <li>
+                                    <a class="dropdown-item" href="{{ $hidden['url'] ?? '#' }}">
+                                        {{ $hidden['label'] }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @if (!$loop->last)
+                    <a href="{{ $segment['url'] ?? '#' }}"
+                       class="text-muted text-decoration-none"
+                       itemprop="item">
+                        <span itemprop="name">{{ $segment['label'] }}</span>
+                    </a>
+                    <meta itemprop="position" content="{{ $position++ }}">
+                @else
+                    <span itemprop="name">{{ $segment['label'] }}</span>
+                    <meta itemprop="position" content="{{ $position++ }}">
+                @endif
+            </li>
+        @endforeach
+    </ol>
+</nav>
+
+{{-- Inline vanilla JS for "..." dropdown toggle --}}
+<script>
+(function() {
+    var dropdowns = document.querySelectorAll('[data-breadcrumb-dropdown]');
+    dropdowns.forEach(function(dropdown) {
+        var toggle = dropdown.querySelector('[data-breadcrumb-toggle]');
+        var menu = dropdown.querySelector('[data-breadcrumb-menu]');
+        if (!toggle || !menu) return;
+
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            menu.style.display = menu.style.display === 'none' ? '' : 'none';
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+    });
+})();
+</script>
+```
+
+#### 5.2.5 Data Flow from NavigationLayout
+
+Update [`NavigationLayout::getBreadcrumbItems()`](src/Components/NavigationLayout.php:213-227) to build up to 5 levels:
+
+```php
+public function getBreadcrumbItems(): array
+{
+    $items = [];
+    if (config('quicker-faster-ui.breadcrumb.show_home', true)) {
+        $items[] = ['label' => __('Home'), 'url' => url('/')];
+    }
+    // Level 2: Application
+    $items[] = [
+        'label' => $this->moduleName,
+        'url'   => url('/' . strtolower($this->moduleName) . '/dashboard'),
+    ];
+    // Level 3: Workspace (active context group)
+    if ($this->activeContext && isset($this->contextGroups[$this->activeContext])) {
+        $group = $this->contextGroups[$this->activeContext];
+        $items[] = [
+            'label' => $group['label'],
+            'url'   => $group['route']
+                ? (str_contains($group['route'], '/') ? url($group['route']) : route($group['route']))
+                : ($group['url'] ?? null),
+        ];
+    }
+    // Level 4: Section
+    $section = $this->resolveCurrentSection();
+    if ($section) $items[] = ['label' => $section['label'], 'url' => null];
+    // Level 5: Page/Record
+    if ($this->currentContextItem) {
+        $items[] = [
+            'label' => $this->currentContextItem['page_title'] ?? $this->currentContextItem['label'],
+            'url'   => null,
+        ];
+    }
+    return $items;
+}
 ```
 
 **Verification**:
-- Record-level breadcrumbs show when viewing a specific record
-- Section-level breadcrumbs show when Section is defined in metadata
-- Backward compatible: workspaces without sections still show 3-level breadcrumbs
+- 2-level page → 2 visible segments, no collapse
+- 5-level page → first + "..." + last 2, collapse working
+- "..." dropdown toggles via vanilla JS
+- Mobile viewport → back arrow + current page
 
 **Dependencies**: Phase 4.3 (Section sidebar), Phase 4.5 (NavigationMetadata)
-**Estimated Effort**: Small
+**Effort**: Small
 
 ---
 
-### 5.3 Infrastructure Module Filtering in ModuleSwitcher
+### 5.3 Sidebar Module Filtering (Vanilla JS in existing sidebar)
 
-**Already handled by Phase 4.2** — the `user_facing` flag on modules, combined with the Phase 4.4 dropdown switcher, hides non-user-facing modules.
+#### 5.3.1 Overview
 
-**Additional**: Ensure the "Applications" management page in the System module (U10 workspace 5) distinguishes between user-facing and infrastructure modules.
+Add a real-time search/filter input to the existing [`sidebar.blade.php`](src/Resources/views/livewire/navs/sidebar.blade.php). No new component — this enhances the existing sidebar with a `data-sidebar-filter` input and vanilla JS filter logic. No Alpine `x-data`, `x-model`, or `x-show`.
 
-**Files Modified**:
+#### 5.3.2 File Inventory
 
-| File | Changes |
+| File | Change |
 |---|---|
-| [`src/Core/System/Resources/views/dashboard.blade.php`](src/Core/System/Resources/views/) | If an "Installed Applications" view exists, show `user_facing` status |
+| [`src/Resources/views/livewire/navs/sidebar.blade.php`](src/Resources/views/livewire/navs/sidebar.blade.php) | Add search input with `data-sidebar-filter` attribute |
+| [`src/Resources/views/livewire/navs/partials/sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php) | Add `data-filterable` and `data-filter-text` attributes |
+| [`src/Resources/views/livewire/navs/partials/sidebar-section.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-section.blade.php) | Add `data-filterable` on section headers |
+| [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js) | Add `initSidebarFilter()` function |
+| [`public/lang/en/nav.php`](public/lang/en/nav.php) | Add `filter_modules`, `no_results` keys |
+| [`public/lang/es/nav.php`](public/lang/es/nav.php) | Spanish equivalents |
+
+#### 5.3.3 Blade: Search Input in sidebar.blade.php
+
+Insert after the opening `<div class="sidebar-container ...">` and before `<ul class="nav flex-column mt-3">`:
+
+```blade
+{{-- Phase 5.3: Search/Filter Bar (vanilla JS, no Alpine) --}}
+<div class="px-3 pt-2 pb-1">
+    <div class="input-group input-group-sm" data-sidebar-filter-group>
+        <span class="input-group-text bg-transparent border-end-0">
+            <i class="fas fa-search text-muted" style="font-size: 0.75rem;"
+               data-sidebar-filter-icon></i>
+        </span>
+        <input type="text"
+               data-sidebar-filter
+               class="form-control border-start-0 ps-0"
+               placeholder="{{ __('qf::nav.filter_modules') }}"
+               aria-label="{{ __('Filter navigation') }}"
+               style="font-size: 0.78rem;">
+        <button data-sidebar-filter-clear
+                class="btn btn-sm btn-link text-muted p-0 px-1"
+                style="font-size: 0.6rem; display: none;"
+                type="button"
+                aria-label="{{ __('Clear filter') }}">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div data-sidebar-filter-no-results
+         class="text-muted small text-center py-3"
+         style="display: none;">
+        <i class="fas fa-search-minus me-1"></i>
+        {{ __('qf::nav.no_results') }}
+    </div>
+</div>
+```
+
+#### 5.3.4 Data Attributes on Items
+
+In [`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php):
+```blade
+<li class="nav-item text-nowrap"
+    wire:key="sidebar-item-{{ $item['key'] ?? $item['label'] }}"
+    data-filterable
+    data-filter-text="{{ $item['label'] }} {{ $item['key'] ?? '' }} {{ $activeContext ?? '' }}">
+```
+
+In [`sidebar-section.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-section.blade.php):
+```blade
+<li class="nav-item mb-1" wire:key="sidebar-section-{{ $sectionKey }}"
+    data-filterable
+    data-filter-text="{{ $sectionLabel }}">
+```
+
+#### 5.3.5 Vanilla JS — Filter Logic
+
+Added to `initSidebarFilter()` in [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js):
+
+```javascript
+function initSidebarFilter(root) {
+    var filterInput = (root || document).querySelector('[data-sidebar-filter]');
+    if (!filterInput || filterInput.dataset.filterInitialized) return;
+    filterInput.dataset.filterInitialized = '1';
+
+    var clearBtn = document.querySelector('[data-sidebar-filter-clear]');
+    var noResults = document.querySelector('[data-sidebar-filter-no-results]');
+    var filterIcon = document.querySelector('[data-sidebar-filter-icon]');
+    var allItems = [];
+
+    function collectItems() {
+        allItems = Array.from(document.querySelectorAll('[data-filterable]'));
+    }
+
+    // Simple case-insensitive word-based match (fuzzy-like, no library)
+    function matchesFilter(item, query) {
+        if (!query) return true;
+        var text = (item.dataset.filterText || '').toLowerCase();
+        var words = query.toLowerCase().split(/\s+/);
+        return words.every(function(w) { return text.indexOf(w) !== -1; });
+    }
+
+    // Debounced filter application
+    var applyFilter = debounce(function() {
+        var query = filterInput.value.trim();
+        var visibleCount = 0;
+
+        allItems.forEach(function(item) {
+            var match = matchesFilter(item, query);
+            item.style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        });
+
+        // Show/hide clear button
+        if (clearBtn) clearBtn.style.display = query.length > 0 ? '' : 'none';
+
+        // Show/hide "no results" message
+        if (noResults) noResults.style.display = (query.length > 0 && visibleCount === 0) ? '' : 'none';
+
+        // Highlight filter icon when focused/has content
+        if (filterIcon) {
+            filterIcon.classList.toggle('text-primary', query.length > 0 || document.activeElement === filterInput);
+        }
+    }, 150);
+
+    // Input event
+    filterInput.addEventListener('input', function() { applyFilter(); });
+
+    // Focus/blur for icon styling
+    filterInput.addEventListener('focus', function() {
+        if (filterIcon) filterIcon.classList.add('text-primary');
+    });
+    filterInput.addEventListener('blur', function() {
+        if (!filterInput.value.trim() && filterIcon) filterIcon.classList.remove('text-primary');
+    });
+
+    // Clear button
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            filterInput.value = '';
+            applyFilter();
+            filterInput.focus();
+        });
+    }
+
+    // Keyboard navigation within filtered results
+    filterInput.addEventListener('keydown', function(e) {
+        var visibleItems = allItems.filter(function(el) { return el.style.display !== 'none'; });
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            var idx = visibleItems.indexOf(document.activeElement && document.activeElement.closest('[data-filterable]'));
+            var next = visibleItems[Math.min(idx + 1, visibleItems.length - 1)];
+            if (next) { var link = next.querySelector('a'); if (link) link.focus(); }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            var idx = visibleItems.indexOf(document.activeElement && document.activeElement.closest('[data-filterable]'));
+            var prev = visibleItems[Math.max(idx - 1, 0)];
+            if (prev) { var link = prev.querySelector('a'); if (link) link.focus(); }
+        } else if (e.key === 'Enter') {
+            var focused = document.activeElement;
+            if (focused && focused.closest('[data-filterable]')) {
+                e.preventDefault();
+                var link = focused.closest('[data-filterable]').querySelector('a');
+                if (link) link.click();
+            }
+        } else if (e.key === 'Escape') {
+            filterInput.value = '';
+            applyFilter();
+            filterInput.blur();
+        }
+    });
+
+    // Initial collection
+    collectItems();
+
+    // Re-collect after Livewire updates (handled by morph.updated hook in init)
+}
+```
+
+#### 5.3.6 Global Keyboard Shortcut
+
+Ctrl+K / Cmd+K is handled in the global `keydown` listener in [`quicker-faster.js`](public/assets/js/quicker-faster.js) (see §5.0). It focuses the `[data-sidebar-filter]` input from anywhere on the page.
+
+#### 5.3.7 Fuzzy Matching Strategy
+
+Simple word-based match. Each word in the query must appear somewhere in the item's `data-filter-text` (label + key + context). Case-insensitive.
+
+```
+Query: "emp loc"
+Matches: "Employee Locations" (both words found)
+Matches: "Employment Location"
+No match: "Employees" (only one word found)
+```
 
 **Verification**:
-- Infrastructure modules not visible in ModuleSwitcher
-- Infrastructure modules visible in System → Applications management page
+- Type "emp" → only items containing "emp" visible
+- Type "emp loc" → only items containing both words visible
+- Escape → search cleared, all items restored
+- Arrow keys → navigate among visible items
+- Enter → navigate to focused item
+- Ctrl+K → focuses search from anywhere
+- No results message when query matches nothing
+- Clearing search restores all items
 
-**Dependencies**: Phase 4.2
-**Estimated Effort**: Tiny
+**Dependencies**: None (enhances existing sidebar)
+**Effort**: Small
 
 ---
 
-### 5.4 Document AlpineJS/Livewire 3 Constraint
+### 5.4 Documentation & Blueprint Update
 
-**Why**: G9/C1 — input.txt says "No AlpineJS" but Livewire 3 ships it. Per gap-analysis, the resolution is: document that AlpineJS is a Livewire 3 dependency, the constraint refers to not writing custom AlpineJS code, and all interactivity should go through Livewire events.
+#### 5.4.1 Create Architecture Doc
 
-**Files**:
+**File**: [`docs/architecture/phase-5-navigation-ux.md`](docs/architecture/phase-5-navigation-ux.md):
+1. **Vanilla JS Architecture**: IIFE pattern, `Livewire.hook('morph.updated')` re-initialization, `data-*` attribute conventions
+2. **Livewire ↔ JS Communication**: `Livewire.dispatch()` from JS → PHP `#[On]` handlers, event naming conventions
+3. **WorkspaceTabs Pattern**: Livewire state via `session()`, ResizeObserver overflow, vanilla context menus
+4. **Breadcrumb Pattern**: Server-rendered with inline script for dropdown, 5-level segment model
+5. **Sidebar Filter Pattern**: `data-filterable` + `data-filter-text` convention, debounced input handler
 
-| File | Purpose |
+#### 5.4.2 Create Component READMEs
+
+| File | Content |
 |---|---|
-| [`docs/architecture/application-platform-blueprint.md`](docs/architecture/) (§10) | AlpineJS Policy section |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | (if exists) Add AlpineJS guidance |
-| [`README.md`](README.md) | (if exists) Mention Livewire 3 + AlpineJS in tech stack |
+| [`docs/components/workspace-tabs.md`](docs/components/workspace-tabs.md) | API reference, JS integration points, keyboard shortcuts, session model |
+| [`docs/components/breadcrumbs.md`](docs/components/breadcrumbs.md) | Blade component API, collapse logic, mobile behavior, Schema.org notes |
+| [`docs/components/sidebar-filter.md`](docs/components/sidebar-filter.md) | `data-filterable` convention, fuzzy matching, keyboard reference |
 
-**Policy Text**:
+#### 5.4.3 Update Architecture Blueprint
 
-> **AlpineJS Policy**: Livewire 3 ships AlpineJS as a runtime dependency used internally for DOM diffing and reactivity. AlpineJS is available in the global scope and can be used, but the project convention is:
-> - **All component interactivity should use Livewire events and properties**, not custom AlpineJS `x-data` directives.
-> - AlpineJS may be used sparingly for trivial UI concerns (dropdown toggles, transition effects) where a full Livewire roundtrip is unnecessary.
-> - Custom AlpineJS components that manage business state are prohibited.
-> - This policy ensures consistency with the platform's event-driven architecture.
+Update [`docs/architecture/00-index.md`](docs/architecture/00-index.md):
+- Replace any remaining Vue references in navigation section with Livewire + vanilla JS patterns
+- Add WorkspaceTabs to component inventory
+- Document the vanilla JS policy: **All client-side interactivity uses vanilla JS via `data-*` attributes and `Livewire.dispatch()`. Alpine.js is used only internally by Livewire 3 for DOM diffing. No custom Alpine.js `x-data` directives are written.**
 
-**Verification**: Document section exists and is clear.
+#### 5.4.4 Language File Updates
 
-**Dependencies**: Phase 4.6 (Blueprint document)
-**Estimated Effort**: Tiny
+Add to [`public/lang/en/nav.php`](public/lang/en/nav.php):
+```php
+'filter_modules' => 'Filter modules...',
+'no_results' => 'No matching items',
+'more_tabs' => 'More tabs',
+'close_others' => 'Close Others',
+'close_all_to_right' => 'Close All to Right',
+'close_all' => 'Close All',
+'reopen_closed_tab' => 'Reopen Closed Tab',
+```
+
+And Spanish equivalents in [`public/lang/es/nav.php`](public/lang/es/nav.php).
+
+**Dependencies**: Steps 1-4 (documents the implemented components)
+**Effort**: Small
 
 ---
+
+### Implementation Sequence
+
+The tasks are ordered by dependency. Each step is self-contained and can be verified independently.
+
+#### Step 1: Create WorkspaceTabs Livewire Component
+
+**Create**:
+1. [`src/Http/Livewire/Layouts/Navs/WorkspaceTabs.php`](src/Http/Livewire/Layouts/Navs/WorkspaceTabs.php) — full Livewire component (see §5.1.3)
+2. [`src/Resources/views/livewire/navs/workspace-tabs.blade.php`](src/Resources/views/livewire/navs/workspace-tabs.blade.php) — Blade view, no Alpine (see §5.1.4)
+
+**Modify**:
+3. [`src/Resources/views/components/layouts/navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php:148) — register `<livewire:qf.workspace-tabs>` between TopNav and main content
+4. [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js) — add `initWorkspaceTabs()` and global keyboard shortcuts (see §5.0, §5.1.5)
+5. [`public/assets/css/quicker-faster.css`](public/assets/css/quicker-faster.css) — tab styles (active highlight, hover, overflow)
+6. [`public/lang/en/nav.php`](public/lang/en/nav.php) + [`public/lang/es/nav.php`](public/lang/es/nav.php) — tab-related translation keys
+
+**Depends on**: Nothing (standalone component)
+
+**Verification**:
+- Tab strip renders below TopNav (empty by default)
+- Sidebar click → tab opens, active highlighted
+- Close button → tab removed, adjacent activated
+- Ctrl+W → active tab closes
+- Ctrl+Shift+T → last closed reopens
+- Right-click → context menu (Close Others / Close All / Close All to Right)
+- Narrow browser → overflow chevron for excess tabs
+- Refresh → tabs restored from session
+- Close all → strip empty, no errors
+
+#### Step 2: Enhance Breadcrumbs Blade Component
+
+**Create**:
+1. [`src/Components/Breadcrumbs.php`](src/Components/Breadcrumbs.php) — component class with collapse logic (see §5.2.3)
+2. [`src/Resources/views/components/breadcrumbs.blade.php`](src/Resources/views/components/breadcrumbs.blade.php) — view with inline vanilla JS (see §5.2.4)
+
+**Modify**:
+3. [`src/Components/NavigationLayout.php`](src/Components/NavigationLayout.php:213-227) — enhance `getBreadcrumbItems()` to 5 levels
+4. [`src/Components/NavigationLayout.php`](src/Components/NavigationLayout.php) — add `resolveCurrentSection()`
+5. [`src/Resources/views/components/layouts/partials/page-header.blade.php`](src/Resources/views/components/layouts/partials/page-header.blade.php:120-122) — use `<x-breadcrumbs>`
+
+**Deprecate** (keep for backward compat):
+6. [`src/Resources/views/components/breadcrumb.blade.php`](src/Resources/views/components/breadcrumb.blade.php)
+
+**Depends on**: Step 1 (no direct dependency, but breadcrumbs sit in same page header area)
+
+**Verification**:
+- 2-level page → 2 segments, no collapse
+- 4-level → 4 segments, no collapse
+- 5-level → first + "..." + last 2
+- "..." click → dropdown with hidden middle segments
+- Mobile viewport → back arrow + current label
+- Schema.org structured data present
+
+#### Step 3: Add Sidebar Module Filtering
+
+**Modify**:
+1. [`src/Resources/views/livewire/navs/sidebar.blade.php`](src/Resources/views/livewire/navs/sidebar.blade.php) — add search input with `data-sidebar-filter` (see §5.3.3)
+2. [`src/Resources/views/livewire/navs/partials/sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php) — add `data-filterable` and `data-filter-text`
+3. [`src/Resources/views/livewire/navs/partials/sidebar-section.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-section.blade.php) — add `data-filterable` on section headers
+4. [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js) — add `initSidebarFilter()` (see §5.3.5)
+5. [`public/lang/en/nav.php`](public/lang/en/nav.php) + [`public/lang/es/nav.php`](public/lang/es/nav.php) — `filter_modules` and `no_results` keys
+
+**Depends on**: Step 1 (sidebar items will eventually dispatch `openWorkspaceTab` events)
+
+**Verification**:
+- Search bar renders at top of sidebar
+- Typing filters items in real time (150ms debounce)
+- Multi-word fuzzy matching works
+- Escape → clears and blurs
+- Arrow keys → navigate results
+- Enter → navigates to focused item
+- Ctrl+K → focuses search from anywhere
+- "No results" message when nothing matches
+- Clear button appears when input has content
+
+#### Step 4: Wire WorkspaceTabs to Sidebar
+
+**Modify**:
+1. [`src/Resources/views/livewire/navs/partials/sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php) — add `data-workspace-tab` attributes when `open_in_tabs` config is true
+2. [`public/assets/js/quicker-faster.js`](public/assets/js/quicker-faster.js) — add click delegate for `[data-workspace-tab]` → `Livewire.dispatch('openWorkspaceTab')`
+3. [`src/Config/ui-library.php`](src/Config/ui-library.php) — add `navigation.open_in_tabs` key (default: `false`)
+
+**Depends on**: Steps 1 + 2 + 3
+
+**Verification**:
+- `open_in_tabs: true` → sidebar clicks open/switch tabs
+- `open_in_tabs: false` → sidebar clicks navigate normally
+- Tab opened → WorkspaceTabs updates, active tab highlighted
+
+#### Step 5: Create Documentation
+
+**Create**:
+1. [`docs/architecture/phase-5-navigation-ux.md`](docs/architecture/phase-5-navigation-ux.md) — Vanilla JS architecture doc
+2. [`docs/components/workspace-tabs.md`](docs/components/workspace-tabs.md) — Component README
+3. [`docs/components/breadcrumbs.md`](docs/components/breadcrumbs.md) — Component README
+4. [`docs/components/sidebar-filter.md`](docs/components/sidebar-filter.md) — Component README
+
+**Update**:
+5. [`docs/architecture/00-index.md`](docs/architecture/00-index.md) — Update navigation section with vanilla JS patterns
+6. This file — already done
+
+**Depends on**: Steps 1-4 (documents the implemented components)
+
+**Verification**:
+- All docs reference correct file paths
+- No Alpine.js references in Phase 5 implementation (existing older views with Alpine are separate migration concern)
+- Vanilla JS policy clearly documented in blueprint
 
 ### Phase 5 Summary
 
-| Task | Description | Effort |
-|---|---|---|
-| 5.1 | Workspace tabs in TopNav | Medium |
-| 5.2 | 5-level breadcrumb support | Small |
-| 5.3 | Infrastructure module filtering | Tiny |
-| 5.4 | AlpineJS/Livewire 3 documentation | Tiny |
-| **Total** | | **~5 days** |
+```mermaid
+flowchart LR
+    S1["Step 1\nWorkspaceTabs\nLivewire + Vanilla JS"] --> S2["Step 2\nBreadcrumbs\nBlade + Inline JS"]
+    S1 --> S3["Step 3\nSidebar Filter\nVanilla JS"]
+    S2 --> S4["Step 4\nIntegration\nSidebar to Tabs"]
+    S3 --> S4
+    S1 --> S5["Step 5\nDocumentation"]
+    S2 --> S5
+    S3 --> S5
+    S4 --> S5
+```
 
----
+| Step | Task | New Files | Modified Files | Depends On | Complexity |
+|---|---|---|---|---|---|
+| 1 | WorkspaceTabs Livewire + Vanilla JS | 2 | 4 | None | **Medium** — Most code volume |
+| 2 | Breadcrumbs enhancement | 2 | 4 | None | **Small** — Data flow + inline JS |
+| 3 | Sidebar vanilla JS filtering | 0 | 6 | None | **Small** — JS additions only |
+| 4 | Sidebar → Tabs integration | 0 | 3 | Steps 1+2+3 | **Tiny** — Event wiring |
+| 5 | Documentation | 4 | 2 | Steps 1–4 | **Small** — Writing only |
+
+### JavaScript Architecture Diagram
+
+```mermaid
+flowchart TD
+    subgraph JS["public/assets/js/quicker-faster.js"]
+        IIFE["IIFE - no globals"]
+        LB["Livewire hook\nmorph.updated"]
+        WT["initWorkspaceTabs\nclick/overflow/context menu"]
+        SF["initSidebarFilter\ndebounced input/keyboard nav"]
+        KS["Global keyboard shortcuts\nCtrl+W, Ctrl+Shift+T, Ctrl+K"]
+    end
+
+    subgraph Livewire["Livewire PHP Components"]
+        WTC["WorkspaceTabs\n#[On] handlers"]
+        SB["Sidebar\ntoggleSection etc."]
+    end
+
+    subgraph DOM["DOM State"]
+        DATA["data-tab-id, data-filterable\ndata-filter-text, data-workspace-tab"]
+        CSS["CSS transitions\nclassList.add/remove"]
+    end
+
+    IIFE --> LB
+    LB --> WT
+    LB --> SF
+    KS -->|Livewire.dispatch| WTC
+    WT -->|Livewire.dispatch| WTC
+    SF -->|reads/writes| DATA
+    WT -->|reads/writes| DATA
+    WT -->|manages| CSS
+```
+
+### Config Keys Reference
+
+| Config Key | Default | Phase | Description |
+|---|---|---|---|
+| `ui-library.navigation.open_in_tabs` | `false` | 5.1/5.4 | Whether sidebar clicks open workspace tabs |
+| `ui-library.layout.workspace_tabs.enabled` | `true` | 5.1 | Whether tab strip renders |
+| `quicker-faster-ui.breadcrumb.show_home` | `true` | 5.2 | Whether breadcrumbs start with "Home" |
+| `quicker-faster-ui.breadcrumb.max_visible` | `4` | 5.2 | Max segments before collapsing middle |
+
+### Session Keys Reference
+
+| Session Key | Scope | Phase | Content |
+|---|---|---|---|
+| `workspace_tabs` | Per-user | 5.1 | Array of open tab objects |
+| `workspace_active_tab` | Per-user | 5.1 | Currently active tab ID |
+| `workspace_recently_closed` | Per-user | 5.1 | Last 10 closed tabs for restore |
+
+**Total Complexity: Medium** — Approximately 5 implementation days.
+
+> **Note on Alpine.js**: The existing Alpine.js in older views ([`sidebar.blade.php`](src/Resources/views/livewire/navs/sidebar.blade.php) section toggles, [`application-switcher.blade.php`](src/Resources/views/components/application-switcher.blade.php) dropdown) is NOT modified in Phase 5. Those are separate migration concerns. Phase 5 focuses on NEW features only, all built with vanilla JS.
 
 ## 6. Phase 6: Business Application Navigation Configs (P4 — Future)
 
@@ -1524,10 +3088,10 @@ graph TD
     end
 
     subgraph "Phase 5 P3"
-        D5.1["5.1 Workspace Tabs"]
-        D5.2["5.2 5-Level Breadcrumb"]
-        D5.3["5.3 Infrastructure Filtering"]
-        D5.4["5.4 AlpineJS Doc"]
+        D5.1["5.1 Workspace Tabs\nLivewire + Vanilla JS"]
+        D5.2["5.2 5-Level Breadcrumb\nBlade + Inline JS"]
+        D5.3["5.3 Sidebar Filter\nVanilla JS"]
+        D5.4["5.4 Documentation\nBlueprint Update"]
     end
 
     subgraph "Phase 6 P4"
@@ -1642,25 +3206,29 @@ Several tasks can run in parallel:
 
 | # | Task | Priority | Phase | Effort | Depends On | Status |
 |---|---|---|---|---|---|---|
-| 2.5.1 | Decouple ApprovalEngine | P0 | 2.5 | Medium | — | ⬜ Not Started |
-| 2.5.2 | Decouple TopNav (CompanyProvider) | P0 | 2.5 | Small | — | ⬜ Not Started |
-| 2.5.3 | Move EmployeeDocumentService to HR app | P0 | 2.5 | Small | — | ⬜ Not Started |
-| 2.5.4 | Delete HR Custom Livewire components | P0 | 2.5 | Small | — | ⬜ Not Started |
-| 3.1 | Generic Workflow Engine | P1 | 3 | Large | 2.5.1 | ⬜ Not Started |
-| 3.2 | Generic Document Engine | P1 | 3 | Medium | 2.5.3 | ⬜ Not Started |
-| 3.3 | Generic Notification Engine | P1 | 3 | Large | — | ⬜ Not Started |
-| 3.4 | Scheduled Reports | P1 | 3 | Small | 3.2, 3.3 | ⬜ Not Started |
-| 3.5 | Reference Data module | P1 | 3 | Medium | — | ⬜ Not Started |
-| 4.1 | Extract Organization into Core | P2 | 4 | Medium | 2.5 | ⬜ Not Started |
-| 4.2 | Add `user_facing` + `depends_on` to module registry | P2 | 4 | Tiny | — | ⬜ Not Started |
-| 4.3 | Section-based sidebar rendering | P2 | 4 | Medium | 4.2 | ⬜ Not Started |
-| 4.4 | Dropdown application switcher | P2 | 4 | Small | 4.2 | ⬜ Not Started |
-| 4.5 | Config-driven navigation metadata | P2 | 4 | Large | 4.2, 4.3 | ⬜ Not Started |
-| 4.6 | Architecture blueprint document | P2 | 4 | Small | — | ⬜ Not Started |
-| 5.1 | Workspace tabs in TopNav | P3 | 5 | Medium | 4.5 | ⬜ Not Started |
-| 5.2 | 5-level breadcrumb support | P3 | 5 | Small | 4.3, 4.5 | ⬜ Not Started |
-| 5.3 | Infrastructure module filtering | P3 | 5 | Tiny | 4.2 | ⬜ Not Started |
-| 5.4 | Document AlpineJS/Livewire 3 constraint | P3 | 5 | Tiny | 4.6 | ⬜ Not Started |
+| 2.5.1 | Decouple ApprovalEngine | P0 | 2.5 | Medium | — | ✅ Complete |
+| 2.5.2 | Decouple TopNav (CompanyProvider) | P0 | 2.5 | Small | — | ✅ Complete |
+| 2.5.3 | Move EmployeeDocumentService to HR app | P0 | 2.5 | Small | — | ✅ Complete |
+| 2.5.4 | Delete HR Custom Livewire components | P0 | 2.5 | Small | — | ✅ Complete |
+| 3.1 | Generic Workflow Engine | P1 | 3 | Large | 2.5.1 | ✅ Complete |
+| 3.2 | Generic Document Engine | P1 | 3 | Medium | 2.5.3 | ✅ Complete |
+| 3.3 | Generic Notification Engine | P1 | 3 | Large | — | ✅ Complete |
+| 3.4 | Scheduled Reports | P1 | 3 | Small | 3.2, 3.3 | ✅ Complete |
+| 3.5 | Reference Data module | P1 | 3 | Medium | — | ✅ Complete |
+| 4.1 | Extract Organization into Core | P2 | 4 | Medium | 2.5 | ✅ Complete |
+| 4.2 | Add `user_facing` + `depends_on` to module registry | P2 | 4 | Tiny | — | ✅ Complete |
+| 4.3 | Section-based sidebar rendering | P2 | 4 | Medium | 4.2 | ✅ Complete |
+| 4.4 | Dropdown application switcher | P2 | 4 | Small | 4.2 | ✅ Complete |
+| 4.5 | Config-driven navigation metadata | P2 | 4 | Large | 4.2, 4.3 | ✅ Complete |
+| 4.6 | Architecture blueprint document | P2 | 4 | Small | — | ✅ Complete |
+| 0.34 | Polished Home Page | P2 | — | Small | — | ✅ Complete |
+| 0.35 | `roles.deleted_at` Fix | P0 | — | Tiny | — | ✅ Complete |
+| 0.36 | `$activeContext` Null Fix | P0 | — | Tiny | — | ✅ Complete |
+| 0.37 | `getControls()` on Null Fix | P0 | — | Tiny | — | ✅ Complete |
+| 5.1 | Workspace tabs (Livewire + Vanilla JS) | P3 | 5 | Medium | 4.5 | ⬜ Not Started |
+| 5.2 | 5-level breadcrumb (Blade + inline JS) | P3 | 5 | Small | 4.3, 4.5 | ⬜ Not Started |
+| 5.3 | Sidebar module filtering (Vanilla JS) | P3 | 5 | Small | — | ⬜ Not Started |
+| 5.4 | Documentation & blueprint update | P3 | 5 | Small | 4.6 | ⬜ Not Started |
 | 6.1 | System navigation config (update) | P4 | 6 | Small | 4.1, 4.5 | ⬜ Not Started |
 | 6.2 | Administration navigation config (update) | P4 | 6 | Small | 4.1, 4.5 | ⬜ Not Started |
 | 6.3 | Organization navigation config | P4 | 6 | (in 4.1) | 4.1, 4.5 | ⬜ Not Started |
@@ -1671,5 +3239,66 @@ Several tasks can run in parallel:
 
 ---
 
-> **Document Version**: 1.0  
-> **Next Step**: Review and approval → switch to Code mode for Phase 2.5 implementation
+> **Document Version**: 1.5
+> **Last Updated**: 2026-08-13 — Added §0.34–0.37 "Completed Work Summary" covering 4 new items (Home Page & Runtime Polish); total now 37 completed categories
+> **Next Step**: Phase 5 (Navigation polish: Workspace Tabs, Breadcrumbs, Sidebar Filter), Phase 6 (Business app nav configs)
+
+---
+
+## 11. Known Remaining `App\Modules\*` References
+
+As of 2026-08-09, after completing Phases 2.5, 3.1–3.5, and 4.1–4.5, the following `App\Modules\*` references remain in the library. These are categorized by severity and whether they block functionality.
+
+### 11.1 Hardcoded Imports (Actual Coupling — Needs Resolution)
+
+These files contain `use App\Modules\*` import statements that will cause PHP fatal errors if the referenced consuming-app module is not present.
+
+| # | File | Reference | Why It Remains | Blocks Functionality? |
+|---|------|-----------|----------------|----------------------|
+| 1 | [`src/Http/Livewire/Wizards/WizardForm.php:5`](src/Http/Livewire/Wizards/WizardForm.php:5) | `use App\Modules\Admin\Services\ActivityLogger;` | ActivityLogger was moved to [`src/Services/ActivityLogger.php`](src/Services/ActivityLogger.php) but the WizardForm still imports from the old namespace. Needs import path update. | **Yes** — WizardForm will fail if Admin module is absent |
+| 2 | [`src/Http/Controllers/RegistrationController.php:8-11`](src/Http/Controllers/RegistrationController.php:8) | `use App\Modules\Admin\Models\Shift;`<br>`use App\Modules\Hr\Models\AttendancePolicy;`<br>`use App\Modules\Hr\Models\WorkPattern;`<br>`use App\Modules\Hr\Models\PolicyAssignment;` | Registration flow references HR-specific models for onboarding. These are consuming-app domain models that the library should not know about. Needs a RegistrationDataProvider contract. | **Yes** — Registration will fail without HR module |
+| 3 | [`src/Http/Controllers/Documents/DocumentController.php:7`](src/Http/Controllers/Documents/DocumentController.php:7) | `use App\Modules\Hr\Models\Document;` | DocumentController was not updated when DocumentEngine was built in Phase 3.2. Should use the `Documentable` contract instead. | **Yes** — Document download/serve will fail without HR module |
+| 4 | [`src/Services/BankFiles/BankFileGenerator.php:5`](src/Services/BankFiles/BankFileGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | Bank file generators (BACS, NACH, NIBSS, SEPA) are payroll-specific. These should be extracted to a Payroll business module or use a PayrollDataProvider contract. | **Yes** — Bank file generation will fail without HR module |
+| 5 | [`src/Services/BankFiles/NIBSSGenerator.php:5`](src/Services/BankFiles/NIBSSGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | Same as above — NIBSS generator depends on PayrollRun model. | **Yes** |
+| 6 | [`src/Services/BankFiles/NACHAGenerator.php:5`](src/Services/BankFiles/NACHAGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | Same as above — NACH generator depends on PayrollRun model. | **Yes** |
+| 7 | [`src/Widgets/ActivityLogWidgetProcessor.php:5`](src/Widgets/ActivityLogWidgetProcessor.php:5) | `use App\Modules\Admin\Models\ActivityLog;` | Widget processor references consuming-app ActivityLog model. Needs an ActivityLogProvider contract or should be moved to the Admin business module. | **Yes** — Activity Log widget will fail without Admin module |
+
+### 11.2 Config References (Expected — Consuming App Provides Models)
+
+These are data config files that reference consuming-app model FQCNs. This is by design — data configs define which Eloquent model backs a DataTable/Form/Detail.
+
+| # | File | Reference | Why It Remains | Blocks Functionality? |
+|---|------|-----------|----------------|----------------------|
+| 8 | [`src/Core/Admin/Data/user.php:53,61`](src/Core/Admin/Data/user.php:53) | `'model' => 'App\Modules\Hr\Models\Company'` | The `user` data config defines a `company_id` field with a select/dropdown sourced from the Company model. This is a consuming-app concern — the library's Core Admin module provides a reference user config that consuming apps override. | **No** — Consuming apps override this config with their own model |
+| 9 | [`src/Core/Admin/Data/user.php:250`](src/Core/Admin/Data/user.php:250) | `'model' => 'App\Modules\Hr\Models\Employee'` | Same as above — the `employee_id` field references the Employee model. Consuming apps override this. | **No** — Consuming apps override this config |
+
+### 11.3 Hardcoded in Blade Views
+
+| # | File | Reference | Why It Remains | Blocks Functionality? |
+|---|------|-----------|----------------|----------------------|
+| 10 | [`src/Resources/views/components/dashboards/dashboard-control.blade.php:30`](src/Resources/views/components/dashboards/dashboard-control.blade.php:30) | `App\Modules\Production\Models\ProductionProcess::all()` | Hardcoded Eloquent call in a Blade view. This is a production/manufacturing-specific reference that should not be in the library. Needs removal or abstraction. | **Yes** — Dashboard control will fail without Production module |
+
+### 11.4 Comment-Only References (No Functional Impact)
+
+These files contain `App\Modules\*` only in comments or docblocks. They do not affect functionality.
+
+| # | File | Nature |
+|---|------|--------|
+| — | [`src/Models/Role.php:15`](src/Models/Role.php:15) | Docblock: "This replaces the App\Modules\Admin\Models\Role reference" |
+| — | [`src/Models/ApprovalRequest.php:12`](src/Models/ApprovalRequest.php:12) | Docblock: "This replaces the App\Modules\System\Models\ApprovalRequest reference" |
+| — | [`src/Http/Livewire/DataTables/DataTableForm.php:888`](src/Http/Livewire/DataTables/DataTableForm.php:888) | Docblock: "This replaces hardcoded App\Modules references" |
+| — | [`src/Http/Livewire/Wizards/Wizard.php:259`](src/Http/Livewire/Wizards/Wizard.php:259) | Docblock: "Assumes models are in App\Modules\{Module}\Models" |
+| — | [`src/Events/ToggleButtonEvent.php:11`](src/Events/ToggleButtonEvent.php:11) | Docblock: "This replaces the App\Modules\Admin\Events\ToggleButtonEvent reference" |
+| — | [`src/Services/ActivityLogger.php:8`](src/Services/ActivityLogger.php:8) | Docblock: "This replaces the App\Modules\Admin\Services\ActivityLogger reference" |
+| — | [`src/Services/Validation/DataTableFormValidationService.php:107`](src/Services/Validation/DataTableFormValidationService.php:107) | Comment: "// $modelClass eg. App\Modules\Admin\Models\User" |
+
+### 11.5 Summary
+
+| Category | Count | Blocks Functionality |
+|----------|-------|---------------------|
+| Hardcoded imports (actual coupling) | 7 files | **Yes** — 7 files |
+| Config references (by design) | 1 file (3 occurrences) | No |
+| Hardcoded in Blade | 1 file | **Yes** |
+| Comment-only | 7 files | No |
+
+**Recommended next phase**: Phase 5.5 — Resolve remaining hardcoded imports by introducing contracts (`RegistrationDataProvider`, `PayrollDataProvider`, `ActivityLogProvider`) or extracting bank file generators and HR-specific widgets to business modules.

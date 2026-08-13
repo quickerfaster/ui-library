@@ -1,12 +1,15 @@
 # QuickerFaster UI Library — AI-Optimized Architecture Blueprint
 
-> **Package**: `quicker-faster/ui-library`  
-> **Namespace**: `QuickerFaster\UILibrary\`  
-> **PSR-4 Root**: `src/`  
-> **View Namespace**: `qf`  
-> **Blade Component Alias**: `qf` → `QuickerFaster\UILibrary\Components`  
-> **Livewire Prefix**: `qf.`  
-> **Last Updated**: 2026-08-09
+> **Package**: `quicker-faster/ui-library`
+> **Namespace**: `QuickerFaster\UILibrary\`
+> **PSR-4 Root**: `src/`
+> **View Namespace**: `qf`
+> **Blade Component Alias**: `qf` → `QuickerFaster\UILibrary\Components`
+> **Livewire Prefix**: `qf.`
+> **Last Updated**: 2026-08-10
+
+> **📋 Note**: The 17-file topic split under [`docs/architecture/`](docs/architecture/) (Phase 4.6) is the next documentation task. Until the split is complete, this blueprint remains the single source of truth. See [`docs/architecture/00-index.md`](docs/architecture/00-index.md) for the authoritative index.
+
 
 ---
 
@@ -112,6 +115,12 @@ src/
 │   ├── CleanImportErrors.php              # Cleans stale import error files
 │   └── QuickerFasterInstallUI.php         # Scaffolds UI assets into consuming app
 │
+├── Console/                               # Console kernel + commands
+│   ├── Kernel.php                         # Registers package commands
+│   └── Commands/
+│       ├── InstallCommand.php             # Single-command install: `php artisan ui-library:install`
+│       └── GenerateScheduledReports.php   # Artisan command for scheduled reports
+│
 ├── Components/                            # Standard Blade components (static/render-only)
 │   ├── NavigationLayout.php               # Main app shell: top nav + sidebar + bottom bar
 │   └── FieldTypes/                        # Field rendering components (one per type)
@@ -143,7 +152,8 @@ src/
 ├── Console/                               # Console kernel
 │   ├── Kernel.php                         # Registers package commands
 │   └── Commands/
-│       └── GenerateScheduledReports.php   # Artisan command for scheduled reports
+│       ├── InstallCommand.php             # `ui-library:install` — single-command setup (config, views, migrations, assets, vendors, seed, auth, storage, cache)
+│       └── GenerateScheduledReports.php   # `reports:generate-scheduled` — cron command for scheduled report generation
 │
 ├── Contracts/                             # Interfaces and contracts
 │   ├── OnboardingCondition.php            # Contract for onboarding step completion checks
@@ -155,7 +165,8 @@ src/
 │   │   └── ModuleContract.php             # Contract for module metadata
 │   ├── Navigation/
 │   │   ├── CompanyProvider.php            # Contract for company resolution (multi-tenant)
-│   │   └── NavigationProvider.php         # Contract for navigation item provision
+│   │   ├── NavigationProvider.php         # Contract for navigation item provision
+│   │   └── WorkspaceResolver.php          # Contract for workspace context resolution (multi-tenant/role-based nav filtering)
 │   ├── Settings/
 │   │   └── SettingsProvider.php           # Contract for settings resolution
 │   ├── Widgets/
@@ -188,9 +199,13 @@ src/
 │   │   │   └── ExportController.php       # Export queue, download, template, cancel
 │   │   ├── Imports/
 │   │   │   └── ImportController.php       # Import status, error download
+│   │   ├── OrganizationSwitchController.php  # ⚠️ Half done — Organization switching; works standalone, Breeze/Jetstream integration deferred
 │   │   └── Prints/
 │   │       ├── GenericTablePrintController.php    # Print-friendly table view
 │   │       └── GenericDetailPagePrintController.php # Print-friendly detail view
+│   │
+│   ├── ViewComposers/                      # View composition
+│   │   └── SidebarComposer.php            # ⚠️ Half done — Composes sidebar data for views; registered in UILibraryServiceProvider
 │   │
 │   └── Livewire/                          # Livewire 3 components
 │       ├── ColumnManager.php              # Column visibility toggling for data tables
@@ -232,7 +247,7 @@ src/
 │       │       ├── Sidebar.php            # Collapsible sidebar
 │       │       ├── BottomBar.php          # Mobile bottom navigation
 │       │       ├── HorizontalContextMenu.php # Context-sensitive horizontal menu
-│       │       └── MenuRenderer.php       # Dynamic menu renderer
+│       │       ├── MenuRenderer.php       # Dynamic menu renderer
 │       ├── Modals/                        # Modal components
 │       │   ├── FormModal.php              # Modal wrapper for forms
 │       │   ├── DetailModal.php            # Modal wrapper for detail views
@@ -405,7 +420,10 @@ src/
 │   ├── Imports/
 │   │   └── ImportProcessor.php            # Import file processing (singleton)
 │   ├── Navigation/
-│   │   └── NullCompanyProvider.php        # Default no-op company provider (returns empty)
+│   │   ├── NavigationManager.php           # Config-driven navigation: getSections(), 5-tier priority chain, context_groups
+│   │   ├── NullCompanyProvider.php        # Default no-op company provider (returns empty)
+│   │   ├── NullWorkspaceResolver.php      # Default no-op workspace resolver (returns empty context)
+│   │   └── WorkspaceFilter.php            # Workspace-scoped navigation item filtering (feature gates, role constraints)
 │   ├── Search/
 │   │   └── SearchEngine.php               # Global search across modules
 │   ├── Settings/
@@ -818,6 +836,9 @@ These are registered conditionally in [`UILibraryServiceProvider`](src/Providers
 | ApprovalEngine | [`src/Services/Approvals/ApprovalEngine.php`](src/Services/Approvals/ApprovalEngine.php:11) | ⚠️ **DEPRECATED** — Legacy approval workflow engine. Maintained for backward compatibility. Prefer [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) for new workflow-enabled features. |
 | ApprovalModelResolver | [`src/Services/Approvals/ApprovalModelResolver.php`](src/Services/Approvals/ApprovalModelResolver.php:7) | Config-driven approval model resolution (implements [`ApprovalModelResolver`](src/Contracts/Approvals/ApprovalModelResolver.php) contract) |
 | NullCompanyProvider | [`src/Services/Navigation/NullCompanyProvider.php`](src/Services/Navigation/NullCompanyProvider.php:9) | Default no-op [`CompanyProvider`](src/Contracts/Navigation/CompanyProvider.php) implementation — returns empty collection/null |
+| **NavigationManager** | [`src/Services/Navigation/NavigationManager.php`](src/Services/Navigation/NavigationManager.php) | Config-driven navigation manager: `getSections()`, 5-tier priority chain, context_groups |
+| **WorkspaceFilter** | [`src/Services/Navigation/WorkspaceFilter.php`](src/Services/Navigation/WorkspaceFilter.php) | **NEW** — Workspace-scoped navigation filtering: `filterContextGroups()` (feature gates), `filterContextItems()` (role/department constraints) |
+| **NullWorkspaceResolver** | [`src/Services/Navigation/NullWorkspaceResolver.php`](src/Services/Navigation/NullWorkspaceResolver.php) | **NEW** — Default no-op [`WorkspaceResolver`](src/Contracts/Navigation/WorkspaceResolver.php) — returns empty context |
 | SearchEngine | [`src/Services/Search/SearchEngine.php`](src/Services/Search/SearchEngine.php) | Global search across modules |
 | FilterService | [`src/Services/Filters/FilterService.php`](src/Services/Filters/FilterService.php) | Filter application logic |
 | ValueGenerator | [`src/Services/ValueGenerator.php`](src/Services/ValueGenerator.php) | Auto-generates field values from patterns |
@@ -1481,6 +1502,12 @@ The library's own configuration is defined in [`src/Config/ui-library.php`](src/
     'top_bar' => ['enabled' => true, 'show_module_switcher' => true, 'show_company_switcher' => false],
     'sidebar' => ['initial_state' => 'full'],
     'bottom_bar' => ['enabled' => true],
+    // Sidebar grouping customization (per navigation.php):
+    // 'sidebar' => [
+    //     'section_label' => 'string',       // Custom section header label
+    //     'collapsible'   => true|false,     // Enable collapse toggle on section headers
+    //     'expanded_default' => true|false,  // Whether sections start expanded
+    // ],
 ],
 ```
 
@@ -2409,19 +2436,28 @@ The QuickerFaster UI Library is a **layered architecture** with seven core respo
 ```
 
 **Completed Phases**:
-- **Phase 2.5**: Decoupling (CompanyProvider, ApprovalModelResolver, migration relocation, HR-specific code removal)
-- **Phase 3.1**: Workflow Engine ([`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) + [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract)
-- **Phase 3.2**: Document Engine ([`DocumentEngine`](src/Services/Documents/DocumentEngine.php) + [`Documentable`](src/Contracts/Documents/Documentable.php) contract)
-- **Phase 3.3**: Notification Engine ([`NotificationService`](src/Services/Notifications/NotificationService.php) + [`Notifiable`](src/Contracts/Notifications/Notifiable.php) + [`NotificationChannel`](src/Contracts/Notifications/NotificationChannel.php) contracts)
-- **Phase 3.4**: Scheduled Reports Engine ([`ReportEngine`](src/Services/Reports/ReportEngine.php) + [`Reportable`](src/Contracts/Reports/Reportable.php) contract + [`ReportSchedule`](src/Models/ReportSchedule.php) model + [`GenerateReportJob`](src/Jobs/GenerateReportJob.php) + [`reports:generate-scheduled`](src/Console/Commands/GenerateScheduledReports.php) command)
+- **Phase 2.5**: ✅ Decoupling (CompanyProvider, ApprovalModelResolver, migration relocation, HR-specific code removal)
+- **Phase 3.1**: ✅ Workflow Engine ([`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) + [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract)
+- **Phase 3.2**: ✅ Document Engine ([`DocumentEngine`](src/Services/Documents/DocumentEngine.php) + [`Documentable`](src/Contracts/Documents/Documentable.php) contract)
+- **Phase 3.3**: ✅ Notification Engine ([`NotificationService`](src/Services/Notifications/NotificationService.php) + [`Notifiable`](src/Contracts/Notifications/Notifiable.php) + [`NotificationChannel`](src/Contracts/Notifications/NotificationChannel.php) contracts)
+- **Phase 3.4**: ✅ Scheduled Reports Engine ([`ReportEngine`](src/Services/Reports/ReportEngine.php) + [`Reportable`](src/Contracts/Reports/Reportable.php) contract + [`ReportSchedule`](src/Models/ReportSchedule.php) model + [`GenerateReportJob`](src/Jobs/GenerateReportJob.php) + [`reports:generate-scheduled`](src/Console/Commands/GenerateScheduledReports.php) command)
+- **Phase 3.5**: ✅ Reference Data Engine ([`ReferenceDataService`](src/Services/ReferenceData/ReferenceDataService.php) + [`ReferenceDataProvider`](src/Contracts/ReferenceData/ReferenceDataProvider.php) contract + [`ReferenceDataItem`](src/Models/ReferenceDataItem.php) model)
+- **Phase 4.1**: ✅ Organization Extraction — Organization module extracted to [`src/Core/Organization/`](src/Core/) with routes, views, navigation config, and seeders
+- **Phase 4.2**: ✅ Module Registry Enhancement — `user_facing` and `depends_on` flags added to module registry for infrastructure filtering
+- **Phase 4.3**: ✅ Section-Based Sidebar — [`Sidebar`](src/Http/Livewire/Layouts/Navs/Sidebar.php) and [`MenuRenderer`](src/Http/Livewire/Layouts/Navs/MenuRenderer.php) support `sections` key in navigation config for grouped sidebar rendering. Sidebar `sidebar` config key supports `section_label`, `collapsible`, and `expanded_default` customization.
+- **Phase 4.4**: ✅ Dropdown Application Switcher — Replaced [`ModuleSwitcher`](src/Http/Livewire/Layouts/Navs/ModuleSwitcher.php) Livewire component with inline Bootstrap 5 dropdown in [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php). Eliminated 42 lines custom JS. ModuleSwitcher component deleted. Application switching via Bootstrap dropdown showing `user_facing: true` modules. Fixed [`TopNav::determineModuleName()`](src/Http/Livewire/Layouts/Navs/TopNav.php) prop-overwrite bug. 7 missing `fa` icon base classes fixed.
+- **Phase 4.5**: ✅ Config-Driven Navigation Metadata — [`NavigationManager::getSections()`](src/Services/Navigation/NavigationManager.php) works with 5-tier priority chain; [`SidebarComposer`](src/Http/ViewComposers/SidebarComposer.php) registered; config structure with `type` annotations done. Context Groups → Sidebar linkage with `$activeContext` parameter on Sidebar. Icon mode complete with proper indentation, chevron expand indicators, and empty section body fix. Workspace parameter support via [`WorkspaceResolver`](src/Contracts/Navigation/WorkspaceResolver.php) contract + [`WorkspaceFilter`](src/Services/Navigation/WorkspaceFilter.php). `NavigationMetadata` contract deferred.
+- **Phase 4.6**: 🔄 In Progress — Architecture Blueprint Restructure. [`00-index.md`](docs/architecture/00-index.md) created as authoritative index; 16 topic files deferred. This blueprint remains single source of truth.
 
 **Key architectural invariants**:
-- The library never imports from `App\Modules\*` (except in the service provider for conditional component registration)
+- The library has 7 known `App\Modules\*` hardcoded imports + 2 config references + 1 Blade hardcode (see §10.5 [Known Gaps](#105-known-gaps--remaining-appmodules-references)). Zero are in DataTable.php — all are documented with resolution paths.
 - Business modules never modify library source files
 - All UI behavior is configurable through PHP config files
 - The `qf` prefix is used consistently across all namespaces (views, Blade, Livewire, translations)
 - The System module catch-all route is always loaded last
 - Workflow definitions are config-driven via `ui-library.workflows.definitions`
+- Reference data types are config-driven via `ui-library.reference_data.types`
+- Reference data is cache-backed with configurable TTL via `ui-library.reference_data.cache_ttl`
 - Document storage is config-driven via `ui-library.documents`
 - Notification channels and templates are config-driven via `ui-library.notifications`
 - All cross-cutting contracts live in `src/Contracts/` with default implementations in `src/Services/`
@@ -2431,6 +2467,36 @@ The QuickerFaster UI Library is a **layered architecture** with seven core respo
 - Report delivery integrates Document Engine and Notification Engine through [`ReportEngine`](src/Services/Reports/ReportEngine.php)
 
 If this blueprint is followed consistently, both human developers and AI agents will be able to understand where to add new functionality, how to extend the system, and how to preserve the intended separation of concerns.
+
+---
+
+## 10.5 Known Gaps — Remaining `App\Modules\*` References
+
+As of 2026-08-09, after completing Phases 2.5 through 4.5, the following `App\Modules\*` references remain. See [`docs/implementation-plan.md`](docs/implementation-plan.md#11-known-remaining-appmodules-references) for the full detailed table.
+
+### Hardcoded Imports (7 files — Block Functionality)
+
+| File | Reference | Resolution Path |
+|------|-----------|-----------------|
+| [`src/Http/Livewire/Wizards/WizardForm.php:5`](src/Http/Livewire/Wizards/WizardForm.php:5) | `App\Modules\Admin\Services\ActivityLogger` | Update import to [`src/Services/ActivityLogger.php`](src/Services/ActivityLogger.php) |
+| [`src/Http/Controllers/RegistrationController.php:8-11`](src/Http/Controllers/RegistrationController.php:8) | `App\Modules\Admin\Models\Shift`, `App\Modules\Hr\Models\*` | Introduce `RegistrationDataProvider` contract |
+| [`src/Http/Controllers/Documents/DocumentController.php:7`](src/Http/Controllers/Documents/DocumentController.php:7) | `App\Modules\Hr\Models\Document` | Use `Documentable` contract from Phase 3.2 |
+| [`src/Services/BankFiles/BankFileGenerator.php:5`](src/Services/BankFiles/BankFileGenerator.php:5) | `App\Modules\Hr\Models\PayrollRun` | Extract to Payroll business module or introduce `PayrollDataProvider` |
+| [`src/Services/BankFiles/NIBSSGenerator.php:5`](src/Services/BankFiles/NIBSSGenerator.php:5) | `App\Modules\Hr\Models\PayrollRun` | Same as above |
+| [`src/Services/BankFiles/NACHAGenerator.php:5`](src/Services/BankFiles/NACHAGenerator.php:5) | `App\Modules\Hr\Models\PayrollRun` | Same as above |
+| [`src/Widgets/ActivityLogWidgetProcessor.php:5`](src/Widgets/ActivityLogWidgetProcessor.php:5) | `App\Modules\Admin\Models\ActivityLog` | Introduce `ActivityLogProvider` contract or move to Admin business module |
+
+### Config References (By Design — Not Blocking)
+
+- [`src/Core/Admin/Data/user.php`](src/Core/Admin/Data/user.php:53) — `'model' => 'App\Modules\Hr\Models\Company'` and `'model' => 'App\Modules\Hr\Models\Employee'` are reference configs that consuming apps override.
+
+### Hardcoded in Blade (1 file — Blocks Functionality)
+
+- [`src/Resources/views/components/dashboards/dashboard-control.blade.php:30`](src/Resources/views/components/dashboards/dashboard-control.blade.php:30) — `App\Modules\Production\Models\ProductionProcess::all()` needs removal or abstraction.
+
+### Comment-Only (7 files — No Impact)
+
+Seven files contain `App\Modules\*` only in docblocks/comments documenting migration history. No functional impact.
 
 ---
 
@@ -2885,3 +2951,84 @@ Column | Type | Purpose |
 `status` | string | `active`, `paused`, `completed` |
 `last_run_at` | timestamp | Last successful execution |
 `next_run_at` | timestamp | Calculated next execution time |
+
+---
+
+## 16. Phase 3.5: Reference Data Engine
+
+### 16.1 Overview
+
+Polymorphic, cache-backed reference data engine. Provides a single unified store for slowly-changing lookup data (countries, currencies, languages, timezones, payment methods, document types). Any number of reference data types can be registered via config without additional migrations.
+
+### 16.2 Architecture
+
+- **Contract**: [`ReferenceDataProvider`](src/Contracts/ReferenceData/ReferenceDataProvider.php) — 6 methods: `getAll()`, `getById()`, `getTypes()`, `create()`, `update()`, `delete()`. Any service can implement this contract to provide reference data from an alternative source (API, external database, etc.).
+- **Service**: [`ReferenceDataService`](src/Services/ReferenceData/ReferenceDataService.php) — default implementation using the `reference_data_items` table. Uses `Cache::remember()` with configurable TTL (`ui-library.reference_data.cache_ttl`, default: 3600s). Auto-flushes cache on create/update/delete.
+- **Model**: [`ReferenceDataItem`](src/Models/ReferenceDataItem.php) — single polymorphic model. Columns: `type` (indexed string), `key` (string), `value` (JSON), `meta` (nullable JSON), `is_active` (boolean, default true). Unique constraint on `[type, key]`. Scopes: `ofType($type)`, `active()`.
+- **Config**: `ui-library.reference_data` — `cache_ttl` (int), `types` (array of type keys with `label` and `icon`). Default types: `countries`, `currencies`, `languages`, `timezones`, `payment_methods`, `document_types`.
+- **Migration**: [`2026_08_09_000002_create_reference_data_items_table.php`](Database/Migrations/2026_08_09_000002_create_reference_data_items_table.php)
+
+### 16.3 Integration
+
+- Registered as singleton in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php) — `ReferenceDataProvider` contract bound to `ReferenceDataService`
+- Zero `App\Modules` references — fully decoupled
+- **No dedicated Controller, Livewire component, or Blade views** — reference data is accessed programmatically; consuming apps build their own management UI if needed
+- **No seeders shipped** — seed data (ISO countries, currencies, etc.) is the consuming app's responsibility
+
+### 16.4 Usage Example
+
+```php
+use QuickerFaster\UILibrary\Contracts\ReferenceData\ReferenceDataProvider;
+
+$refData = app(ReferenceDataProvider::class);
+
+// Get all active countries
+$countries = $refData->getAll('countries');
+
+// Get a specific item
+$item = $refData->getById('currencies', 1);
+
+// Create a new reference data item
+$refData->create('payment_methods', 'bank_transfer', 'Bank Transfer', [
+    'requires_approval' => true,
+]);
+
+// Update an item
+$refData->update(1, ['is_active' => false]);
+
+// Delete an item
+$refData->delete(1);
+
+// Get all registered types
+$types = $refData->getTypes(); // ['countries', 'currencies', 'languages', ...]
+
+// Flush all reference data cache
+$refData->flushCache();
+```
+
+### 16.5 Reference Data Items Table Schema
+
+The [`reference_data_items`](Database/Migrations/2026_08_09_000002_create_reference_data_items_table.php) table:
+
+Column | Type | Purpose |
+|--------|------|---------|
+`id` | bigint | Primary key |
+`type` | string | Reference data type (e.g., `countries`, `currencies`). Indexed. |
+`key` | string | Unique key within the type (e.g., `US`, `NG`) |
+`value` | json | The primary value — flexible JSON for simple strings or complex objects |
+`meta` | json | Optional metadata (e.g., `{ "iso3": "USA", "phone_code": "+1" }`) |
+`is_active` | boolean | Soft enable/disable. Default: `true`. |
+`timestamps` | timestamp | `created_at`, `updated_at` |
+
+**Unique constraint**: `[type, key]` — ensures no duplicate keys within a type.
+
+### 16.6 Design Rationale
+
+**Why a single polymorphic table instead of separate tables per type?**
+
+1. **Extensibility without migrations**: Adding a new reference data type (e.g., `tax_codes`) requires only a config entry — no migration needed.
+2. **Consistent API**: All types use the same `getAll()`, `create()`, `update()`, `delete()` methods.
+3. **Simpler caching**: Single cache key pattern (`reference_data:{type}`) with unified flush strategy.
+4. **Flexible value storage**: JSON columns allow simple values (`"United States"`) or complex objects (`{"name": "United States", "iso3": "USA", "phone_code": "+1"}`) in the same structure.
+
+**Trade-off**: Loses relational integrity (no foreign keys to reference data items). This is acceptable because reference data is slowly-changing and typically cached. For relational reference data, business modules should use their own tables with proper foreign keys.

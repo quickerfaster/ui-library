@@ -1,10 +1,12 @@
 # Phase 4.1: Extract Organization into Core — Implementation Specification
 
-> **Status**: Planning Complete  
-> **Date**: 2026-08-09  
-> **Package**: `quicker-faster/ui-library`  
-> **Namespace**: `QuickerFaster\UILibrary\Core\Organization\`  
+> **Status**: ✅ IMPLEMENTED — 2026-08-09
+> **Date**: 2026-08-09
+> **Package**: `quicker-faster/ui-library`
+> **Namespace**: `QuickerFaster\UILibrary\Core\Organization\`
 > **Risk Level**: HIGH — Highest cascade impact of any Phase 4 task
+> **Amendments**: Added Sections 2.2 (Views & Data Configs), 2.3 (Catch-All Routing), 5.1a (Data Configs), 5.1b (Entity Views), 12 (Pre-Extraction Checklist)
+> **Implementation Notes**: Organization module extracted to [`src/Core/Organization/`](src/Core/Organization/) with 7 models (Company, Branch, Department, Division, BusinessUnit, Location, Team), 7 migrations, navigation config, routes, and seeders. The `ModelConfigRepository` was extended to scan `src/Core/` for Data configs. See [`docs/pre-phase-4-remediation-plan.md`](docs/pre-phase-4-remediation-plan.md) for the remediation steps completed before extraction.
 
 ---
 
@@ -41,16 +43,28 @@ By extracting Organization into the library:
 
 This extraction follows the **Phase 3 contract-driven pattern** established by Workflow, Documents, Notifications, and Reports engines. However, Organization differs from those services in one critical way: **Organization entities are Eloquent models with concrete database tables**, not abstract engines. They do not need a `Contract` + `Engine` pattern — they follow the simpler **Core module pattern** established by [`src/Core/System/`](src/Core/System/) and [`src/Core/Admin/`](src/Core/Admin/).
 
+**CRITICAL AMENDMENT (2026-08-09)**: The existing Core modules (Admin, System) are **incomplete skeletons** — they lack `Data/` configs, entity views, and functional Livewire components. See [`docs/architecture-discrepancy-analysis.md`](docs/architecture-discrepancy-analysis.md) for the full gap inventory. This amended spec ensures Organization does NOT repeat those omissions. Organization will be the **first fully functional Core module** with complete Data configs, entity views, and CRUD capability, establishing the pattern for retrofitting Admin and System.
+
 ---
 
 ## 2. Target Directory Structure
 
-Following the [`src/Core/System/`](src/Core/System/) pattern exactly, with additions from [`src/Core/Admin/`](src/Core/Admin/) where relevant:
+### 2.1 Complete Structure
+
+Following the [`src/Core/System/`](src/Core/System/) pattern exactly, with additions from [`src/Core/Admin/`](src/Core/Admin/) where relevant, **plus the Data config and entity view additions mandated by this amendment**:
 
 ```
 src/Core/Organization/
 ├── Config/
 │   └── navigation.php                  # Navigation: context_groups, contexts, layout
+├── Data/                               # ← NEW: Config-driven data definitions
+│   ├── company.php                     # DataTable/Form/Detail config for Company
+│   ├── branch.php                      # DataTable/Form/Detail config for Branch
+│   ├── department.php                  # DataTable/Form/Detail config for Department
+│   ├── division.php                    # DataTable/Form/Detail config for Division
+│   ├── business_unit.php               # DataTable/Form/Detail config for BusinessUnit
+│   ├── location.php                    # DataTable/Form/Detail config for Location
+│   └── team.php                        # DataTable/Form/Detail config for Team
 ├── Database/
 │   ├── Migrations/
 │   │   ├── 2026_08_09_000001_create_companies_table.php
@@ -72,25 +86,255 @@ src/Core/Organization/
 │   └── Team.php                        # Cross-cutting team structure
 ├── Resources/
 │   └── views/
-│       └── dashboard.blade.php         # Organization dashboard
+│       ├── dashboard.blade.php         # Organization dashboard
+│       ├── companies.blade.php         # ← NEW: Company DataTable view
+│       ├── branches.blade.php          # ← NEW: Branch DataTable view
+│       ├── departments.blade.php       # ← NEW: Department DataTable view
+│       ├── divisions.blade.php         # ← NEW: Division DataTable view
+│       ├── business_units.blade.php    # ← NEW: BusinessUnit DataTable view
+│       ├── locations.blade.php         # ← NEW: Location DataTable view
+│       └── teams.blade.php             # ← NEW: Team DataTable view
 └── Routes/
     └── web.php                         # Organization routes
 ```
 
 **Comparison with existing Core modules:**
 
-| Directory | System | Admin | Organization |
-|-----------|--------|-------|-------------|
+| Directory | System | Admin | Organization (AMENDED) |
+|-----------|--------|-------|----------------------|
 | `Config/navigation.php` | ✅ | ✅ | ✅ |
+| `Data/` | ❌ | ❌ | ✅ (7 configs) |
 | `Database/Migrations/` | ✅ (1) | — | ✅ (7) |
 | `Database/Seeders/` | ✅ (1) | ✅ (2) | ✅ (1) |
 | `Models/` | — (uses `src/Models/`) | — | ✅ (7) |
-| `Resources/views/` | ✅ (1) | ✅ (1) | ✅ (1) |
+| `Resources/views/` | ✅ (1) | ✅ (1) | ✅ (8: dashboard + 7 entity) |
 | `Routes/web.php` | ✅ | ✅ | ✅ |
 | `Http/Controllers/` | — | — | — |
 | `Http/Livewire/` | — | — | — |
 
 **Key decision**: Organization models live in `src/Core/Organization/Models/`, NOT in `src/Models/`. This follows the Core module self-containment pattern. The `src/Models/` directory is reserved for cross-cutting library models (Document, Workflow, Notification, Export, etc.).
+
+### 2.2 Views and Data Configs Handling (NEW SECTION)
+
+#### 2.2.1 Why Data Configs Are Required
+
+The library's architecture is **config-driven**. The [`DataTable`](src/Http/Livewire/DataTables/DataTable.php), [`DataTableForm`](src/Http/Livewire/DataTables/DataTableForm.php), and [`DataTableDetail`](src/Http/Livewire/DataTables/DataTableDetail.php) components render entirely from PHP config files. Without `Data/` configs, Organization entities will have:
+
+- ✅ Database tables (migrations create them)
+- ✅ Eloquent models (PHP classes exist)
+- ✅ Routes (URLs resolve)
+- ❌ **No CRUD UI** — DataTable has no config to render
+- ❌ **No forms** — DataTableForm has no field definitions
+- ❌ **No detail views** — DataTableDetail has no sections to display
+
+#### 2.2.2 Data Config Resolution for Core Modules
+
+**Current limitation**: The [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php) resolves config keys to file paths using only `app/Modules/` as the base path:
+
+```php
+// Current: only scans business modules
+$filePath = app_path('Modules') . '/' . $module . '/Data/' . $relativePath . '.php';
+```
+
+**Required change for Phase 4.1**: The `ModelConfigRepository` must be extended to also scan `src/Core/`. Resolution order:
+
+1. Try `app/Modules/{Module}/Data/{file}.php` (business module — for backward compatibility)
+2. Fall back to `src/Core/{Module}/Data/{file}.php` (core module)
+
+This change is a **prerequisite** for Phase 4.1. Without it, `<livewire:qf.data-table config-key="organization.company" />` will throw `InvalidArgumentException` because the repository cannot find the config file.
+
+**Implementation approach** (in [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php)):
+
+```php
+protected function resolveConfigPath(string $module, string $relativePath): ?string
+{
+    // 1. Try business module path
+    $businessPath = app_path("Modules/{$module}/Data/{$relativePath}.php");
+    if (file_exists($businessPath)) {
+        return $businessPath;
+    }
+    
+    // 2. Try core module path
+    $corePath = base_path("vendor/quicker-faster/ui-library/src/Core/{$module}/Data/{$relativePath}.php");
+    if (file_exists($corePath)) {
+        return $corePath;
+    }
+    
+    return null;
+}
+```
+
+#### 2.2.3 Entity View Pattern
+
+Each entity gets a Blade view that embeds the DataTable component. Following the blueprint pattern ([`docs/ai-optimized-architecture-blueprint.md`](docs/ai-optimized-architecture-blueprint.md:1796)):
+
+```blade
+{{-- src/Core/Organization/Resources/views/companies.blade.php --}}
+<x-layout configKey="organization_company" moduleName="organization">
+    <livewire:qf.data-table config-key="organization.company" />
+</x-layout>
+```
+
+This pattern:
+- Uses the `<x-layout>` component for consistent page shell
+- Passes `configKey` for dashboard widget resolution
+- Passes `moduleName` for navigation context
+- Embeds `<livewire:qf.data-table>` with the dot-notation config key
+
+#### 2.2.4 Data Config Schema
+
+Each Data config follows the canonical schema defined in the blueprint ([`docs/ai-optimized-architecture-blueprint.md`](docs/ai-optimized-architecture-blueprint.md:1319-1440)). Example for Company:
+
+```php
+<?php
+
+// src/Core/Organization/Data/company.php
+
+return [
+    'model' => \QuickerFaster\UILibrary\Core\Organization\Models\Company::class,
+
+    'fieldDefinitions' => [
+        'name' => [
+            'field_type' => 'string',
+            'label' => 'Company Name',
+            'required' => true,
+            'validation' => 'required|string|max:255',
+            'sortable' => true,
+            'searchable' => true,
+        ],
+        'code' => [
+            'field_type' => 'string',
+            'label' => 'Code',
+            'validation' => 'nullable|string|max:50|unique:companies,code',
+            'sortable' => true,
+            'searchable' => true,
+        ],
+        'email' => [
+            'field_type' => 'string',
+            'label' => 'Email',
+            'validation' => 'nullable|email|max:255',
+            'sortable' => true,
+        ],
+        'currency' => [
+            'field_type' => 'select',
+            'label' => 'Currency',
+            'validation' => 'nullable|string|max:3',
+            'options' => ['USD' => 'USD', 'EUR' => 'EUR', 'GBP' => 'GBP', 'NGN' => 'NGN'],
+        ],
+        'is_active' => [
+            'field_type' => 'boolcheckbox',
+            'label' => 'Active',
+            'default' => true,
+        ],
+        // ... additional fields as defined in Section 3.1
+    ],
+
+    'fieldGroups' => [
+        [
+            'key' => 'basic',
+            'label' => 'Basic Information',
+            'icon' => 'fa-building',
+            'fields' => ['name', 'code', 'email', 'phone', 'website'],
+        ],
+        [
+            'key' => 'address',
+            'label' => 'Address',
+            'icon' => 'fa-map-marker-alt',
+            'fields' => ['address', 'city', 'state', 'country', 'postal_code'],
+        ],
+        [
+            'key' => 'settings',
+            'label' => 'Settings',
+            'icon' => 'fa-cog',
+            'fields' => ['currency', 'timezone', 'date_format', 'is_active'],
+        ],
+    ],
+
+    'controls' => [
+        'files' => [
+            'export' => ['xls', 'csv', 'pdf'],
+            'import' => ['xls', 'csv'],
+            'print' => true,
+        ],
+        'bulkActions' => [
+            'export' => ['xls', 'csv'],
+            'delete' => true,
+        ],
+        'perPage' => [10, 25, 50, 100],
+        'search' => true,
+        'showHideColumns' => true,
+        'filterColumns' => true,
+        'addButton' => true,
+        'editable' => true,
+    ],
+
+    'hiddenFields' => [
+        'onTable' => ['metadata'],
+        'onNewForm' => [],
+        'onEditForm' => [],
+        'onQuery' => [],
+        'onDetail' => [],
+    ],
+];
+```
+
+### 2.3 Catch-All Routing Integration (NEW SECTION)
+
+#### 2.3.1 How Organization Routes Interact with the Catch-All
+
+The System module's catch-all route ([`src/Core/System/Routes/web.php`](src/Core/System/Routes/web.php:16-32)) handles `/{module}/{view}/{id?}` patterns. However, Organization defines **explicit named routes** in its own `Routes/web.php`, which take precedence because:
+
+1. **Library routes** load first ([`src/Routes/web.php`](src/Routes/web.php))
+2. **Core module routes** load next (via [`UILibraryServiceProvider::bootCoreModules()`](src/Providers/UILibraryServiceProvider.php:130-134))
+3. **Business module routes** load next (via [`ModuleServiceProvider::discoverBusinessModules()`](src/Providers/ModuleServiceProvider.php:67-70))
+4. **System catch-all** loads LAST (via [`ModuleServiceProvider::discoverBusinessModules()`](src/Providers/ModuleServiceProvider.php:88-92))
+
+Since Organization routes are loaded in step 2 and the catch-all in step 4, explicit Organization routes always win.
+
+#### 2.3.2 View Resolution Flow
+
+For a request to `/organization/companies`:
+
+```
+1. Request: GET /organization/companies
+2. Organization Routes/web.php matches:
+   Route::get('/organization/companies', fn() => view('qf-core::organization.companies'))
+   → Renders: src/Core/Organization/Resources/views/companies.blade.php
+3. The catch-all route is never reached for this URL
+```
+
+For a request to `/organization/company/1` (detail view, if not explicitly routed):
+
+```
+1. Request: GET /organization/company/1
+2. Organization Routes/web.php — no match for this pattern
+3. System catch-all matches:
+   → Tries: view('organization::company') — fails (Organization is a Core module, not business)
+   → Falls back: view('qf-core::organization.company') — succeeds if company.blade.php exists
+   → Renders with ['id' => 1]
+```
+
+#### 2.3.3 Route Design Decision
+
+Organization uses **explicit routes** for entity index pages (e.g., `/organization/companies`) rather than relying on the catch-all. This is intentional:
+
+- **Explicit routes** provide named routes (`organization.companies`) that navigation configs reference
+- **Catch-all** handles ad-hoc view resolution for detail pages or future views
+- This hybrid approach gives the best of both worlds: predictable named routes for navigation + flexible catch-all for extension
+
+#### 2.3.4 View Namespace Registration
+
+Organization views are registered with the `qf-core::organization` namespace by [`UILibraryServiceProvider::bootCoreModules()`](src/Providers/UILibraryServiceProvider.php:124):
+
+```php
+$this->loadViewsFrom($viewPath, "qf-core::{$moduleLower}");
+// Organization → qf-core::organization
+```
+
+This means:
+- `view('qf-core::organization.dashboard')` → `src/Core/Organization/Resources/views/dashboard.blade.php`
+- `view('qf-core::organization.companies')` → `src/Core/Organization/Resources/views/companies.blade.php`
+- Published overrides at `resources/views/vendor/ui-library/core/organization/` take precedence (Laravel's native `loadViewsFrom` behavior)
 
 ---
 
@@ -477,13 +721,32 @@ foreach (['Admin', 'System', 'Organization'] as $module) {
 |---|------|
 | 1 | [`src/Core/Organization/Routes/web.php`](src/Core/Organization/Routes/web.php) |
 
-#### Views (1 file)
+#### Views (8 files) ← AMENDED: was 1, now 8
 
-| # | File |
-|---|------|
-| 1 | [`src/Core/Organization/Resources/views/dashboard.blade.php`](src/Core/Organization/Resources/views/dashboard.blade.php) |
+| # | File | Purpose |
+|---|------|---------|
+| 1 | [`src/Core/Organization/Resources/views/dashboard.blade.php`](src/Core/Organization/Resources/views/dashboard.blade.php) | Organization dashboard |
+| 2 | [`src/Core/Organization/Resources/views/companies.blade.php`](src/Core/Organization/Resources/views/companies.blade.php) | Company DataTable |
+| 3 | [`src/Core/Organization/Resources/views/branches.blade.php`](src/Core/Organization/Resources/views/branches.blade.php) | Branch DataTable |
+| 4 | [`src/Core/Organization/Resources/views/departments.blade.php`](src/Core/Organization/Resources/views/departments.blade.php) | Department DataTable |
+| 5 | [`src/Core/Organization/Resources/views/divisions.blade.php`](src/Core/Organization/Resources/views/divisions.blade.php) | Division DataTable |
+| 6 | [`src/Core/Organization/Resources/views/business_units.blade.php`](src/Core/Organization/Resources/views/business_units.blade.php) | BusinessUnit DataTable |
+| 7 | [`src/Core/Organization/Resources/views/locations.blade.php`](src/Core/Organization/Resources/views/locations.blade.php) | Location DataTable |
+| 8 | [`src/Core/Organization/Resources/views/teams.blade.php`](src/Core/Organization/Resources/views/teams.blade.php) | Team DataTable |
 
-**Total new files: 18**
+#### Data Configs (7 files) ← NEW
+
+| # | File | Config Key |
+|---|------|------------|
+| 1 | [`src/Core/Organization/Data/company.php`](src/Core/Organization/Data/company.php) | `organization.company` |
+| 2 | [`src/Core/Organization/Data/branch.php`](src/Core/Organization/Data/branch.php) | `organization.branch` |
+| 3 | [`src/Core/Organization/Data/department.php`](src/Core/Organization/Data/department.php) | `organization.department` |
+| 4 | [`src/Core/Organization/Data/division.php`](src/Core/Organization/Data/division.php) | `organization.division` |
+| 5 | [`src/Core/Organization/Data/business_unit.php`](src/Core/Organization/Data/business_unit.php) | `organization.business_unit` |
+| 6 | [`src/Core/Organization/Data/location.php`](src/Core/Organization/Data/location.php) | `organization.location` |
+| 7 | [`src/Core/Organization/Data/team.php`](src/Core/Organization/Data/team.php) | `organization.team` |
+
+**Total new files: 32** (was 18 in original spec; +7 Data configs, +7 entity views)
 
 ### 5.2 Files to MODIFY (Library)
 
@@ -499,6 +762,12 @@ foreach (['Admin', 'System', 'Organization'] as $module) {
 | # | File | Change |
 |---|------|--------|
 | 1 | [`src/Config/ui-library.php`](src/Config/ui-library.php) | Add `'organization'` entry to `'modules'` array (after `'system'`, before closing `]`) |
+
+#### ModelConfigRepository (1 file) ← NEW PREREQUISITE
+
+| # | File | Change |
+|---|------|--------|
+| 1 | [`src/Services/Config/ModelConfigRepository.php`](src/Services/Config/ModelConfigRepository.php) | Extend `loadFromFile()` to scan `src/Core/{Module}/Data/` as fallback after `app/Modules/{Module}/Data/`. See Section 2.2.2 for implementation approach. |
 
 #### Composer (1 file)
 
@@ -628,6 +897,39 @@ event(new ModuleRegistered('organization', __DIR__ . '/../Core/Organization'));
 **No changes needed.** Organization is a Core module, not a business module. The `ModuleServiceProvider` handles `app/Modules/*` discovery only. Core modules are booted by `UILibraryServiceProvider`.
 
 However, the `registerModuleConfigs()` method in `ModuleServiceProvider` (line 138) scans both `src/Core` and `app/Modules` for Data/Dashboards and Data/reports configs. If Organization later adds Data configs, they will be auto-discovered.
+
+### 7.3 ModelConfigRepository Changes (PREREQUISITE)
+
+**File**: [`src/Services/Config/ModelConfigRepository.php`](src/Services/Config/ModelConfigRepository.php)
+
+This change is a **hard prerequisite** for Phase 4.1. Without it, DataTable components cannot resolve Organization Data configs.
+
+**Current `loadFromFile()` logic**:
+```php
+$filePath = $this->basePath . '/' . $module . '/Data/' . $relativePath . '.php';
+// Where $this->basePath = app_path('Modules')
+```
+
+**Required change**: Add a fallback to scan `src/Core/` when the business module path doesn't exist:
+
+```php
+protected function resolveConfigPath(string $module, string $relativePath): ?string
+{
+    // 1. Try business module path (app/Modules/)
+    $businessPath = app_path("Modules/{$module}/Data/{$relativePath}.php");
+    if (file_exists($businessPath)) {
+        return $businessPath;
+    }
+    
+    // 2. Try core module path (src/Core/)
+    $corePath = base_path("vendor/quicker-faster/ui-library/src/Core/{$module}/Data/{$relativePath}.php");
+    if (file_exists($corePath)) {
+        return $corePath;
+    }
+    
+    return null;
+}
+```
 
 ---
 
@@ -831,7 +1133,20 @@ Following the pattern from [`src/Core/System/Resources/views/dashboard.blade.php
 </x-layout>
 ```
 
-### 8.5 ModuleSwitcher Integration
+### 8.5 Entity Index Views (NEW)
+
+Each entity view follows the DataTable embedding pattern:
+
+```blade
+{{-- src/Core/Organization/Resources/views/companies.blade.php --}}
+<x-layout configKey="organization_company" moduleName="organization">
+    <livewire:qf.data-table config-key="organization.company" />
+</x-layout>
+```
+
+The `config-key` parameter uses dot-notation: `organization.company` resolves to `src/Core/Organization/Data/company.php` via the updated `ModelConfigRepository`.
+
+### 8.6 ModuleSwitcher Integration
 
 The [`ModuleSwitcher`](src/Http/Livewire/Layouts/Navs/ModuleSwitcher.php:31) reads from `config('ui-library.modules')`. Once the `'organization'` entry is added to the config, it automatically appears in the module switcher. No code changes needed in `ModuleSwitcher`.
 
@@ -883,6 +1198,7 @@ Organization Extraction
 | New migration files | **YES** (if tables already exist) | `Schema::hasTable()` guard prevents duplicate table errors. Consuming apps with existing tables skip these migrations. |
 | Module registry entry | No | Additive change; existing modules unaffected |
 | Route names (`organization.dashboard`, etc.) | No | New routes; no conflicts with existing |
+| ModelConfigRepository change | **YES** (if not done first) | DataTable components cannot resolve Organization configs. This is a hard prerequisite. |
 
 ### 9.3 Rollback Strategy
 
@@ -903,6 +1219,7 @@ If the extraction causes issues:
 | **`company_id` foreign key constraint conflicts** | Low | High | The library migrations use `constrained()->cascadeOnDelete()`. If existing tables use different FK names or constraints, the `Schema::hasTable()` guard prevents conflicts, but the consuming app must reconcile constraints. |
 | **RegistrationController references HR-specific models (Shift, AttendancePolicy, WorkPattern)** | High | Medium | The RegistrationController imports `App\Modules\Hr\Models\*` in addition to Organization models. This is a separate coupling issue (Phase 2.5 scope). For Phase 4.1, only the Organization imports are updated. |
 | **Composer autoloading not covering new namespace** | Low | Low | The existing PSR-4 mapping `"QuickerFaster\\UILibrary\\Core\\": "src/Core/"` already covers `src/Core/Organization/`. No composer.json change needed. |
+| **ModelConfigRepository not updated before Phase 4.1** | **High** | **Critical** | DataTable components will throw `InvalidArgumentException` for all Organization config keys. This is now documented as a hard prerequisite (Section 12). |
 
 ---
 
@@ -910,11 +1227,17 @@ If the extraction causes issues:
 
 The implementation must follow this exact order to minimize risk and enable incremental validation:
 
+### Step 0: PREREQUISITE — Update ModelConfigRepository ← NEW
+
+Update [`src/Services/Config/ModelConfigRepository.php`](src/Services/Config/ModelConfigRepository.php) to scan `src/Core/` as a fallback path for Data configs. See Section 7.3 for implementation details.
+
+**Validation**: `ModelConfigRepository::get('system.dashboard')` should resolve (even if the file doesn't exist yet, the path resolution logic should work).
+
 ### Step 1: Create Directory Structure
 
 Create all empty directories:
 ```bash
-mkdir -p src/Core/Organization/{Config,Database/Migrations,Database/Seeders,Models,Resources/views,Routes}
+mkdir -p src/Core/Organization/{Config,Data,Database/Migrations,Database/Seeders,Models,Resources/views,Routes}
 ```
 
 ### Step 2: Create Migration Files
@@ -935,48 +1258,58 @@ Create all 7 Eloquent models with:
 
 **Validation**: `php artisan tinker` — `QuickerFaster\UILibrary\Core\Organization\Models\Company::class` should resolve.
 
-### Step 4: Create Seeder
+### Step 4: Create Data Configs ← NEW
+
+Create all 7 Data config files following the schema in Section 2.2.4. Each config must include:
+- `model` pointing to the correct FQCN
+- `fieldDefinitions` matching the model's columns
+- `fieldGroups` organizing fields into logical sections
+- `controls` enabling export/import/print
+
+**Validation**: `app(ModelConfigRepository::class)->get('organization.company')` should return the config array.
+
+### Step 5: Create Seeder
 
 Create `OrganizationDemoSeeder.php` with demo data (one company, one branch, one department, etc.).
 
 **Validation**: `php artisan db:seed --class=QuickerFaster\\UILibrary\\Core\\Organization\\Database\\Seeders\\OrganizationDemoSeeder`
 
-### Step 5: Create Routes
+### Step 6: Create Routes
 
 Create `Routes/web.php` with named routes for dashboard and all entity index pages.
 
 **Validation**: `php artisan route:list | grep organization`
 
-### Step 6: Create Views
+### Step 7: Create Views
 
-Create `dashboard.blade.php` following the System/Admin pattern.
+Create `dashboard.blade.php` and all 7 entity index views following the DataTable embedding pattern.
 
-**Validation**: Visit `/organization/dashboard` in browser (after service provider update).
+**Validation**: Visit `/organization/dashboard` and `/organization/companies` in browser (after service provider update).
 
-### Step 7: Create Navigation Config
+### Step 8: Create Navigation Config
 
 Create `Config/navigation.php` with context_groups and contexts.
 
-### Step 8: Update UILibraryServiceProvider
+### Step 9: Update UILibraryServiceProvider
 
 1. Add `'Organization'` to `bootCoreModules()` foreach loop
 2. Add `ModuleRegistered` event for `'organization'`
 
 **Validation**: Views, routes, and migrations should auto-load. `php artisan route:list | grep organization` should show routes.
 
-### Step 9: Update ui-library.php Config
+### Step 10: Update ui-library.php Config
 
 Add `'organization'` entry to `'modules'` array.
 
 **Validation**: Organization module should appear in `ModuleSwitcher`.
 
-### Step 10: Update RegistrationController
+### Step 11: Update RegistrationController
 
 Change imports from `App\Modules\Admin\Models\*` to `QuickerFaster\UILibrary\Core\Organization\Models\*`.
 
 **Validation**: `grep -r "App\\Modules\\Admin\\Models" src/Http/Controllers/RegistrationController.php` returns zero.
 
-### Step 11: Update Consuming Apps (HR, Payroll, Time, Leave)
+### Step 12: Update Consuming Apps (HR, Payroll, Time, Leave)
 
 This is the highest-risk step. For each consuming app:
 
@@ -987,7 +1320,7 @@ This is the highest-risk step. For each consuming app:
 5. Run all tests
 6. Verify CRUD operations on all entities
 
-### Step 12: Final Validation
+### Step 13: Final Validation
 
 Run the complete validation checklist (Section 11).
 
@@ -1004,9 +1337,15 @@ Run the complete validation checklist (Section 11).
 - [ ] `php artisan route:list | grep organization` shows all 8 routes
 - [ ] `php artisan migrate` runs without errors (tables created or skipped)
 - [ ] `php artisan tinker` — all 7 models resolve correctly
+- [ ] `app(ModelConfigRepository::class)->get('organization.company')` returns valid config ← NEW
+- [ ] `app(ModelConfigRepository::class)->get('organization.branch')` returns valid config ← NEW
+- [ ] All 7 Data configs resolve via ModelConfigRepository ← NEW
 - [ ] Organization module appears in `ModuleSwitcher` component
 - [ ] Navigation sidebar shows Organization context groups
 - [ ] `/organization/dashboard` renders the dashboard view
+- [ ] `/organization/companies` renders the DataTable with company data ← NEW
+- [ ] `/organization/branches` renders the DataTable with branch data ← NEW
+- [ ] DataTableForm opens for creating/editing companies ← NEW
 - [ ] `config('ui-library.modules.organization')` returns the module config
 
 ### 11.2 Consuming App Validation (HR App)
@@ -1050,6 +1389,32 @@ Run the complete validation checklist (Section 11).
 - [ ] Import with company scope works correctly
 - [ ] Settings resolution (user → company → system) works with new Company model
 - [ ] `CompanyProvider` contract resolution works (if consuming app binds it)
+
+---
+
+## 12. Pre-Extraction Checklist (NEW SECTION)
+
+Before Phase 4.1 implementation begins, the following prerequisites must be satisfied:
+
+### 12.1 Library Prerequisites
+
+- [ ] **ModelConfigRepository updated**: [`src/Services/Config/ModelConfigRepository.php`](src/Services/Config/ModelConfigRepository.php) scans `src/Core/` as fallback for Data configs (see Section 7.3)
+- [ ] **DataTable decoupled from HR services**: [`src/Http/Livewire/DataTables/DataTable.php`](src/Http/Livewire/DataTables/DataTable.php:10-12) no longer imports `App\Modules\Admin\Services\ActivityLogger` or `App\Modules\Admin\Services\AuthorizationService`
+- [ ] **Core module pattern validated**: At least one existing Core module (Admin or System) has a working `Data/` config that successfully renders a DataTable — this proves the `ModelConfigRepository` change works end-to-end
+- [ ] **View namespace `qf-core::organization` confirmed**: The `bootCoreModules()` pattern for view registration is verified working with existing Admin and System modules
+
+### 12.2 HR App Prerequisites
+
+- [ ] **Organization module location confirmed**: Verify whether Organization models live under `app/Modules/Organization/` or `app/Modules/Admin/` in the HR app
+- [ ] **Existing table schema documented**: The HR app's current `companies`, `branches`, `departments`, etc. table schemas are compared against the canonical schema in Section 3
+- [ ] **Data migration strategy chosen**: The consuming app team has selected Option A, B, or C from Section 4.3
+- [ ] **All `App\Modules\Organization\Models\*` references catalogued**: A complete inventory of files that need namespace updates exists
+
+### 12.3 Documentation Prerequisites
+
+- [ ] **Discrepancy analysis reviewed**: [`docs/architecture-discrepancy-analysis.md`](docs/architecture-discrepancy-analysis.md) has been reviewed and acknowledged
+- [ ] **Blueprint restructuring complete**: The architecture blueprint has been restructured into the `docs/architecture/` topic files (see [`docs/architecture/00-index.md`](docs/architecture/00-index.md))
+- [ ] **Catch-all routing documented**: The view/config/catch-all interplay is clearly documented in the restructured blueprint
 
 ---
 
@@ -1207,7 +1572,89 @@ class OrganizationDemoSeeder extends Seeder
 }
 ```
 
----
+## Appendix D: Data Config Template (NEW)
 
-> **Document Version**: 1.0  
-> **Next Step**: Review and approval → switch to Code mode for Phase 4.1 implementation
+```php
+<?php
+
+// src/Core/Organization/Data/company.php
+
+return [
+    'model' => \QuickerFaster\UILibrary\Core\Organization\Models\Company::class,
+
+    'fieldDefinitions' => [
+        'name' => [
+            'field_type' => 'string',
+            'label' => 'Company Name',
+            'required' => true,
+            'validation' => 'required|string|max:255',
+            'sortable' => true,
+            'searchable' => true,
+        ],
+        'code' => [
+            'field_type' => 'string',
+            'label' => 'Code',
+            'validation' => 'nullable|string|max:50',
+            'sortable' => true,
+            'searchable' => true,
+        ],
+        'email' => [
+            'field_type' => 'string',
+            'label' => 'Email',
+            'validation' => 'nullable|email|max:255',
+            'sortable' => true,
+        ],
+        'currency' => [
+            'field_type' => 'select',
+            'label' => 'Currency',
+            'validation' => 'nullable|string|max:3',
+            'options' => ['USD' => 'USD', 'EUR' => 'EUR', 'GBP' => 'GBP', 'NGN' => 'NGN'],
+        ],
+        'is_active' => [
+            'field_type' => 'boolcheckbox',
+            'label' => 'Active',
+            'default' => true,
+        ],
+    ],
+
+    'fieldGroups' => [
+        [
+            'key' => 'basic',
+            'label' => 'Basic Information',
+            'icon' => 'fa-building',
+            'fields' => ['name', 'code', 'email', 'phone', 'website'],
+        ],
+        [
+            'key' => 'settings',
+            'label' => 'Settings',
+            'icon' => 'fa-cog',
+            'fields' => ['currency', 'timezone', 'date_format', 'is_active'],
+        ],
+    ],
+
+    'controls' => [
+        'files' => [
+            'export' => ['xls', 'csv', 'pdf'],
+            'import' => ['xls', 'csv'],
+            'print' => true,
+        ],
+        'bulkActions' => [
+            'export' => ['xls', 'csv'],
+            'delete' => true,
+        ],
+        'perPage' => [10, 25, 50, 100],
+        'search' => true,
+        'showHideColumns' => true,
+        'filterColumns' => true,
+        'addButton' => true,
+        'editable' => true,
+    ],
+
+    'hiddenFields' => [
+        'onTable' => ['metadata'],
+        'onNewForm' => [],
+        'onEditForm' => [],
+        'onQuery' => [],
+        'onDetail' => [],
+    ],
+];

@@ -57,9 +57,18 @@ class GenericDetailPagePrintController extends Controller
         }
 
         // Load all relations defined in the config
-        $relations = array_keys($resolver->getRelations());
-        if (!empty($relations)) {
-            $record->load($relations);
+        $relationConfigs = $resolver->getRelations();
+        if (!empty($relationConfigs)) {
+            // Only eager-load relations that actually exist on the model.
+            // This prevents crashes when a config defines a relation (e.g. a
+            // module-specific relation like HR's 'profile') that the underlying
+            // model class doesn't implement.
+            $validRelations = array_filter($relationConfigs, function ($config, $name) use ($record) {
+                return method_exists($record, $name);
+            }, ARRAY_FILTER_USE_BOTH);
+            if (!empty($validRelations)) {
+                $record->load(array_keys($validRelations));
+            }
         }
 
         $fieldGroups = $resolver->getFieldGroups();

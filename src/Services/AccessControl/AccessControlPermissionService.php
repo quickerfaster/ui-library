@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 use QuickerFaster\UILibrary\Services\System\ApplicationInfo;
 use function Laravel\Prompts\error;
-use App\Modules\Admin\Models\Permission;
+use Spatie\Permission\Models\Permission;
 use App\Models\User;
 
 class AccessControlPermissionService
@@ -61,19 +61,10 @@ class AccessControlPermissionService
 
     public static function seedPermissionNames()
     {
-        $modules = ApplicationInfo::getModuleNames();
+        $modelDiscovery = app(\QuickerFaster\UILibrary\Services\AccessControl\ModelDiscovery::class);
 
-
-        // Get all model names
-        $modelNames = [];
-        foreach ($modules as $module) {
-            $moduleName = basename($module); // Get the module name from the directory
-            $directory = app_path("Modules/" . $moduleName . "/Models");
-            $namespace = addslashes("App\\Modules\\" . $moduleName . "\\Models\\");
-
-            $modelNames = array_merge($modelNames, ApplicationInfo::getAllModelNames($directory, $namespace));
-        }
-
+        // Get all model names using ModelDiscovery service
+        $modelNames = $modelDiscovery->getAllModelNames();
 
         // Check if permissions exist or create them
         self::checkPermissionsExistsOrCreate($modelNames);

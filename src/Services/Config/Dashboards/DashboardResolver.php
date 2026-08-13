@@ -10,7 +10,7 @@ class DashboardResolver
     protected array $parameters;
 
     /**
-     * @param string $configKey  e.g., 'hr.dashboard_time_overview' (module.config_name)
+     * @param string $configKey  e.g., 'module.dashboard_name' (module.config_name)
      * @param array $parameters  Placeholder replacements
      * @param ModelConfigRepository|null $repository
      */

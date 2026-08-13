@@ -43,4 +43,16 @@ interface ModuleContract
      * Get the module's absolute filesystem path.
      */
     public function getPath(): string;
+
+    /**
+     * Whether this module should appear in user-facing navigation.
+     * Infrastructure modules (System, Common) return false.
+     */
+    public function isUserFacing(): bool;
+
+    /**
+     * Get the module keys this module depends on.
+     * Returns an array of module key strings (e.g., ['organization']).
+     */
+    public function getDependencies(): array;
 }

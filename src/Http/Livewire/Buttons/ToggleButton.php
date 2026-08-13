@@ -4,7 +4,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Buttons;
 
 use Livewire\Component;
 use Illuminate\Support\Facades\Schema;
-use App\Modules\Admin\Events\ToggleButtonEvent;
+use QuickerFaster\UILibrary\Events\ToggleButtonEvent;
 use QuickerFaster\UILibrary\Traits\Buttons\HandlesToggleState;
 
 class ToggleButton extends Component

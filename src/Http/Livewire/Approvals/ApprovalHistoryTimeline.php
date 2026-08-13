@@ -3,7 +3,7 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\Approvals;
 
 use Livewire\Component;
-use App\Modules\System\Models\ApprovalRequest;
+use QuickerFaster\UILibrary\Models\ApprovalRequest;
 
 class ApprovalHistoryTimeline extends Component
 {

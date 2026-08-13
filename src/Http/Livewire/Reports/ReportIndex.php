@@ -11,7 +11,7 @@ class ReportIndex extends Component
 {
     use WithPagination;
 
-    public string $module = '';          // Optional module filter (e.g., 'hr')
+    public string $module = '';          // Optional module filter (e.g., 'admin', 'inventory')
     public string $reportTypeFilter = 'all'; // all, system, user
     public string $search = '';
 
@@ -143,7 +143,7 @@ public function getAvailableSources(): array
     $sources = [];
     foreach ($systemReports as $report) {
         $sources[] = [
-            'key' => $report['report_key'],   // e.g., 'hr.reports.employee_directory'
+            'key' => $report['report_key'],   // e.g., 'module.reports.report_name'
             'label' => $report['name'],
             'module' => $report['module'],
             'context' => $report['context'],
@@ -187,10 +187,10 @@ public function getAvailableSources(): array
     public function getDefaultConfigKey()
     {
         if ($this->module) {
-            // Assuming config key is module name + '.employee'
-            return $this->module . '_employee';
+            // Assuming config key follows module.resource convention
+            return $this->module . '_config';
         }
-        return null; // or a default like 'hr.employee'
+        return null; // or a default like 'module.resource'
     }
 
 

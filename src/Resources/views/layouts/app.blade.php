@@ -8,7 +8,7 @@
 
     <title>@yield('title', config('app.name', 'Laravel'))@include('qf::components.layouts.partials.company-title-suffix')</title>
     <!-- Soft UI [bootstrap] Theme CSS Files -->
-    <link id="pagestyle" href="{{ asset('bootstrap/assets/css/soft-ui-dashboard.css?v=1.0.3') }}" rel="stylesheet" />
+    <link id="pagestyle" href="{{ asset('vendor/ui-library/bootstrap/assets/css/soft-ui-dashboard.css?v=1.0.3') }}" rel="stylesheet" />
     {{-- - --<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous"> --}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
         integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
@@ -44,18 +44,20 @@
     </style>
 
 <body>
-    @props(['moduleName' => 'hr', 'pageComponent' => null, 'pageParams' => []])
+    @props(['moduleName' => null, 'configKey' => null, 'pageComponent' => null, 'pageParams' => []])
 
     <br />
     <br />
 
     {{-- - --<x-qf.navigation-layout :moduleName="$moduleName" :pageComponent="$pageComponent" :pageParams="$pageParams" />--}}
     {{ $slot }}
-    <livewire:qf.alert-modal configKey="hr.attendance" />
-    <livewire:qf.detail-modal configKey="hr.attendance" />
-    <livewire:qf.form-modal configKey="hr.attendance" />
-    <livewire:qf.import-modal configKey="hr.attendance" />
-    <livewire:qf.export-modal configKey="hr.attendance" />
+    @if($configKey)
+    <livewire:qf.alert-modal :configKey="$configKey" />
+    <livewire:qf.detail-modal :configKey="$configKey" />
+    <livewire:qf.form-modal :configKey="$configKey" />
+    <livewire:qf.import-modal :configKey="$configKey" />
+    <livewire:qf.export-modal :configKey="$configKey" />
+    @endif
 
     {{-- <x-qf::onboarding.app-onboarding-tasks />
     <x-qf::onboarding.app-onboarding-tour /> --}}
@@ -66,7 +68,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
     </script>
-    <script src="{{ asset('assets/js/quicker-faster.js') }}"></script>
+    <script src="{{ asset('vendor/ui-library/assets/js/quicker-faster.js') }}"></script>
 
 
     @livewireScripts

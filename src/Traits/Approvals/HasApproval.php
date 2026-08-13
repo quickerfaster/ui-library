@@ -2,7 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Traits\Approvals;
 
-use App\Modules\System\Models\ApprovalRequest;
+use QuickerFaster\UILibrary\Models\ApprovalRequest;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 trait HasApproval
@@ -40,7 +40,7 @@ trait HasApproval
      * This method does NOT automatically enforce anything; it only returns a boolean.
      * The developer must call it manually when needed.
      *
-     * @param string $configKey The approval config key (e.g., 'hr.approvals.leave_request_approval')
+     * @param string $configKey The approval config key (e.g., 'module.approvals.approval_name')
      * @return bool
      */
     public function canBeEditedWhileUnderApproval(string $configKey): bool

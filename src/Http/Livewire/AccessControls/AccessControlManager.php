@@ -5,11 +5,12 @@ namespace QuickerFaster\UILibrary\Http\Livewire\AccessControls;
 use App\Models\User;
 use Livewire\Component;
 use Illuminate\Support\Str;
-use App\Modules\Admin\Models\Role;
+use QuickerFaster\UILibrary\Models\Role;
 
 use Illuminate\Support\Facades\File;
-use App\Modules\Admin\Models\Permission;
+use Spatie\Permission\Models\Permission;
 use QuickerFaster\UILibrary\Services\AccessControl\AccessControlPermissionService;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 use QuickerFaster\UILibrary\Services\System\ApplicationInfo;
 
 class AccessControlManager extends Component
@@ -70,12 +71,16 @@ class AccessControlManager extends Component
     public function mount() {
 
         $this->moduleNames = ApplicationInfo::getModuleNames();
-        $selectedScopeClassName = "App\Modules\Admin\Models\\".$this->selectedScopeName;
+        $selectedScopeClassName = match($this->selectedScopeName) {
+            'Role' => \Spatie\Permission\Models\Role::class,
+            'User' => \App\Models\User::class,
+            default => "App\\Models\\".$this->selectedScopeName,
+        };
         $this->scopeNames =  $selectedScopeClassName::all()->pluck("name", "id");
 
         
         if (strtolower($this->selectedScopeName) == "role")
-            $this->scopeNames = array_diff($this->scopeNames->toArray(), \App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES);
+            $this->scopeNames = array_diff($this->scopeNames->toArray(), AuthorizationService::ADMIN_ROLES_ARRAY);
        
     }
 
@@ -115,10 +120,15 @@ class AccessControlManager extends Component
         if (!$this->selectedScope)
             return;
 
-        $directory = app_path("Modules/".ucfirst($this->selectedModule)."/Models");
-        $namespace = addslashes("App\\Modules\\".ucfirst($this->selectedModule)."\\Models\\");
+        $modelDiscovery = app(\QuickerFaster\UILibrary\Services\AccessControl\ModelDiscovery::class);
+        $directory = $modelDiscovery->getModelsDirectory($this->selectedModule);
+        $namespace = $modelDiscovery->getModelsNamespace($this->selectedModule);
 
-        $this->resourceNames = ApplicationInfo::getAllModelNames($directory, $namespace);
+        if ($directory && $namespace) {
+            $this->resourceNames = ApplicationInfo::getAllModelNames($directory, $namespace);
+        } else {
+            $this->resourceNames = [];
+        }
 
 
         AccessControlPermissionService::checkPermissionsExistsOrCreate($this->resourceNames);

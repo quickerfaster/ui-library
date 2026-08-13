@@ -3,7 +3,7 @@
 @php
     $contextMenuType = $contextMenuType ?? 'sidebar';
     $contextMenuPosition = $contextMenuPosition ?? 'left';
-    $allowMenuTypeSwitch = $allowMenuTypeSwitch ?? false;
+    $allowMenuTypeSwitch = $allowMenuTypeSwitch ?? true;
 @endphp
 
 <!doctype html>

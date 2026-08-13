@@ -2,15 +2,13 @@
 
 namespace QuickerFaster\UILibrary\Services\BankFiles;
 
-use App\Modules\Hr\Models\PayrollRun;
-
 class BACSGenerator implements BankFileGenerator
 {
     protected string $serviceUserId = '123456';  // Your BACS service user number (6 digits)
     protected string $companyName = 'YOURCOMPANY';
     protected string $originatorId = '123456';   // Originator ID
 
-    public function generate(PayrollRun $run): string
+    public function generate($run): string
     {
         $lines = [];
 
@@ -26,7 +24,7 @@ class BACSGenerator implements BankFileGenerator
                 continue;
             }
 
-            $lines[] = $this->formatPaymentRecord($payslip, $profile, $seq++);
+            $lines[] = $this->formatPaymentRecord($payslip, $profile, $run, $seq++);
         }
 
         // Trailer record (Vol 1 – User Trailer)
@@ -35,7 +33,7 @@ class BACSGenerator implements BankFileGenerator
         return implode("\r\n", $lines);
     }
 
-    protected function formatUserHeader(PayrollRun $run): string
+    protected function formatUserHeader($run): string
     {
         return sprintf(
             "VOL1%6s%-18s%-4s%-18s%-2s",
@@ -47,7 +45,7 @@ class BACSGenerator implements BankFileGenerator
         );
     }
 
-    protected function formatPaymentRecord($payslip, $profile, int $seq): string
+    protected function formatPaymentRecord($payslip, $profile, $run, int $seq): string
     {
         $sortCode = str_replace('-', '', $profile->bank_sort_code); // remove hyphens
         $account = str_pad($profile->bank_account_number, 8, '0', STR_PAD_LEFT);
@@ -73,7 +71,7 @@ class BACSGenerator implements BankFileGenerator
         );
     }
 
-    protected function formatUserTrailer(PayrollRun $run, int $count): string
+    protected function formatUserTrailer($run, int $count): string
     {
         $totalAmount = round($run->total_cash_required * 100);
         return sprintf(
@@ -87,7 +85,7 @@ class BACSGenerator implements BankFileGenerator
         );
     }
 
-    public function getFileName(PayrollRun $run): string
+    public function getFileName($run): string
     {
         return "bacs_{$run->id}_{$run->period_end->format('Ymd')}.txt";
     }

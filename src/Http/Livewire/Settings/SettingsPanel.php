@@ -5,7 +5,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Settings;
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 use QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider;
-use App\Modules\System\Models\System;
+use QuickerFaster\UILibrary\Models\System;
 use Illuminate\Support\Facades\Auth;
 
 class SettingsPanel extends Component
@@ -102,7 +102,7 @@ class SettingsPanel extends Component
                 $this->effectiveValues[$key] = $effective;
 
                 // Get user's own stored value (if any)
-                $userValue = $this->getSettableModel()->getSetting($key);
+                $userValue = $this->safeGetSetting($key);
                 $this->overrides[$key] = $userValue;
 
                 // Determine inheritance source
@@ -127,10 +127,51 @@ class SettingsPanel extends Component
         return Auth::user();
     }
 
+    /**
+     * Safely get a setting from the settable model.
+     * Returns null if the model does not support settings.
+     */
+    protected function safeGetSetting(string $key)
+    {
+        $model = $this->getSettableModel();
+        if (method_exists($model, 'getSetting')) {
+            return $model->getSetting($key);
+        }
+        return null;
+    }
+
+    /**
+     * Safely set a setting on the settable model.
+     * Returns true if the model supports settings, false otherwise.
+     */
+    protected function safeSetSetting(string $key, $value): bool
+    {
+        $model = $this->getSettableModel();
+        if (method_exists($model, 'setSetting')) {
+            $model->setSetting($key, $value);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Safely forget a setting on the settable model.
+     * Returns true if the model supports settings, false otherwise.
+     */
+    protected function safeForgetSetting(string $key): bool
+    {
+        $model = $this->getSettableModel();
+        if (method_exists($model, 'forgetSetting')) {
+            $model->forgetSetting($key);
+            return true;
+        }
+        return false;
+    }
+
     protected function resolveInheritanceSource(string $key): ?string
     {
         // For now only for user later the system and module will be implemented
-        $userValue = $this->getSettableModel()->getSetting($key);
+        $userValue = $this->safeGetSetting($key);
         if ($userValue !== null) {
             return 'user';
         }
@@ -187,7 +228,7 @@ class SettingsPanel extends Component
         if ($newValue === null) {
             $this->resetSetting($key);
         } else {
-            $this->getSettableModel()->setSetting($key, $newValue);
+            $this->safeSetSetting($key, $newValue);
 
             // Flush cache for this key so SettingsManager picks up the new value
             $this->settingsManager->flush($key);
@@ -196,7 +237,7 @@ class SettingsPanel extends Component
             $settingDef = $this->settingsMap[$key] ?? [];
             if (($settingDef['pattern_model'] ?? '') && ($settingDef['pattern_field'] ?? '')) {
                 $dottedKey = 'auto_gen.' . $settingDef['pattern_model'] . '.' . $settingDef['pattern_field'] . '.pattern';
-                $this->getSettableModel()->setSetting($dottedKey, $newValue);
+                $this->safeSetSetting($dottedKey, $newValue);
                 $this->settingsManager->flush($dottedKey);
             }
 
@@ -208,14 +249,14 @@ class SettingsPanel extends Component
 
     public function resetSetting(string $key)
     {
-        $this->getSettableModel()->forgetSetting($key);
+        $this->safeForgetSetting($key);
         $this->settingsManager->flush($key);
 
         // Also reset the dotted key for pattern settings
         $settingDef = $this->settingsMap[$key] ?? [];
         if (($settingDef['pattern_model'] ?? '') && ($settingDef['pattern_field'] ?? '')) {
             $dottedKey = 'auto_gen.' . $settingDef['pattern_model'] . '.' . $settingDef['pattern_field'] . '.pattern';
-            $this->getSettableModel()->forgetSetting($dottedKey);
+            $this->safeForgetSetting($dottedKey);
             $this->settingsManager->flush($dottedKey);
         }
 

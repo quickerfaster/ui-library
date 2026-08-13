@@ -9,7 +9,7 @@ class ConfigResolver
     protected $settingsManager;
 
     /**
-     * @param string $configKey  Dot notation key, e.g., 'hr.employee'
+     * @param string $configKey  Dot notation key, e.g., 'module.resource'
      */
     public function __construct(string $configKey, ?ModelConfigRepository $repository = null)
     {

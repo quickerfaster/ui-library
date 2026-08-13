@@ -46,7 +46,7 @@ trait NavigationFilter
 
         if (str_starts_with($rule, 'permission:')) {
             $permission = substr($rule, 11);
-            return Auth::check() && Auth::user()->can($permission);
+            return Auth::check() && \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($permission);
         }
 
         // Unknown rule – assume visible

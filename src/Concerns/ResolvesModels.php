@@ -60,7 +60,11 @@ trait ResolvesModels
         }
 
         // Build the query
-        $query = $modelClass::withoutCompanyScope();
+        // Use withoutCompanyScope() if available (multi-tenant apps),
+        // otherwise fall back to a plain query (standard models).
+        $query = method_exists($modelClass, 'withoutCompanyScope')
+            ? $modelClass::withoutCompanyScope()
+            : $modelClass::query();
 
         // Apply additional scopes
         foreach ($scopes as $scope) {

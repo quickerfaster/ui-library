@@ -52,10 +52,25 @@ class ModuleServiceProvider extends ServiceProvider
                 'order' => 100,
                 'roles' => ['*'],
                 'core' => false,
+                'user_facing' => true,
+                'depends_on' => [],
             ]);
 
+            // Read user_facing and depends_on from config
+            $userFacing = config("ui-library.modules.{$moduleName}.user_facing", true);
+            $dependsOn = config("ui-library.modules.{$moduleName}.depends_on", []);
+
+            // Validate depends_on modules are enabled
+            foreach ($dependsOn as $dependency) {
+                if (!config("ui-library.modules.{$dependency}.enabled", false)) {
+                    throw new \RuntimeException(
+                        "Module '{$moduleName}' depends on '{$dependency}', but it is not enabled."
+                    );
+                }
+            }
+
             // Fire event
-            event(new ModuleRegistered($moduleName, $directory));
+            event(new ModuleRegistered($moduleName, $directory, $userFacing, $dependsOn));
 
             // Register views
             $viewPath = "{$directory}/Resources/views";
@@ -207,10 +222,23 @@ class ModuleServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Get only modules marked as user-facing.
+     */
+    public function getUserFacingModules(): array
+    {
+        $allModules = config('ui-library.modules', []);
+
+        return array_filter($allModules, function ($config) {
+            return ($config['enabled'] ?? false) && ($config['user_facing'] ?? false);
+        });
+    }
+
     private function getClassFromFile(string $moduleName, string $directory, string $filePath): string
     {
         $className = str_replace('.php', '', basename($filePath));
-        return "App\\Modules\\{$moduleName}\\{$directory}\\{$className}";
+        $namespacePrefix = config('ui-library.module_paths.business_namespace', 'App\\Modules');
+        return "{$namespacePrefix}\\{$moduleName}\\{$directory}\\{$className}";
     }
 
     private function getEventFromListener(string $class): ?string

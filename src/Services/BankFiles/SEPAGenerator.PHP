@@ -2,7 +2,6 @@
 
 namespace QuickerFaster\UILibrary\Services\BankFiles;
 
-use App\Modules\Hr\Models\PayrollRun;
 use DOMDocument;
 
 class SEPAGenerator implements BankFileGenerator
@@ -12,7 +11,7 @@ class SEPAGenerator implements BankFileGenerator
     protected string $iban = 'DE12345678901234567890'; // Your company IBAN
     protected string $bic = 'DEUTDEFF';               // Your company BIC
 
-    public function generate(PayrollRun $run): string
+    public function generate($run): string
     {
         $doc = new DOMDocument('1.0', 'UTF-8');
         $doc->formatOutput = true;
@@ -138,7 +137,7 @@ class SEPAGenerator implements BankFileGenerator
         return $doc->saveXML();
     }
 
-    public function getFileName(PayrollRun $run): string
+    public function getFileName($run): string
     {
         return "sepa_{$run->id}_{$run->period_end->format('Ymd')}.xml";
     }

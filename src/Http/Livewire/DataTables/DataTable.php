@@ -7,9 +7,12 @@ use Livewire\WithPagination;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Traits\DataTables\HasColumnPreferences;
-use App\Modules\Admin\Services\ActivityLogger;
+// TODO: Pre-Phase 4 Remediation — ActivityLogger was decoupled.
+// Consuming apps should listen for DataTable events (e.g., RecordUpdated, RecordDeleted)
+// and perform audit logging in their own listeners.
+// See: docs/pre-phase-4-remediation-plan.md Section 2.1.4
 use QuickerFaster\UILibrary\Services\Search\SearchEngine;
-use App\Modules\Admin\Services\AuthorizationService;
+use QuickerFaster\UILibrary\Contracts\DataTables\DataTableAuthorizationProvider;
 use QuickerFaster\UILibrary\Traits\Filters\AppliesFilters;
 
 
@@ -81,7 +84,7 @@ class DataTable extends Component
     public string $density = 'comfortable';      // 'comfortable' or 'compact'
     public bool $showInlineEditing = false;     // mirror of $editable, used in View menu
 
-    protected AuthorizationService $authService;
+    protected DataTableAuthorizationProvider $authService;
 
 
 
@@ -198,7 +201,7 @@ class DataTable extends Component
     }
 
 
-    public function boot(AuthorizationService $authService)
+    public function boot(DataTableAuthorizationProvider $authService)
     {
         $this->authService = $authService;
     }
@@ -434,8 +437,9 @@ class DataTable extends Component
         $record->$field = $value;
         $record->save();
 
-        // Log activity
-        ActivityLogger::updated($this->configKey, $record, [$field => $oldValue], [$field => $value]);
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+        // Consuming apps should listen for DataTable events to perform audit logging.
+        // See: docs/pre-phase-4-remediation-plan.md Section 2.1.4
 
         // Clear all temporary data for this row
         unset($this->editMode[$rowKey]);
@@ -1570,7 +1574,8 @@ class DataTable extends Component
         }
 
         $record->restore();
-        ActivityLogger::log($this->configKey, 'restored', $record, [], [], 'Record restored');
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+        // Consuming apps should listen for DataTable events to perform audit logging.
         $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record restored.', 'autoClose' => true]);
         $this->dispatch('refreshDataTable');
     }
@@ -1594,7 +1599,8 @@ class DataTable extends Component
 
         $old = $record->toArray();
         $record->forceDelete();
-        ActivityLogger::deleted($this->configKey, $record, $old, true);
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+        // Consuming apps should listen for DataTable events to perform audit logging.
         $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record permanently deleted.', 'autoClose' => true]);
         $this->dispatch('refreshDataTable');
     }
@@ -1803,14 +1809,8 @@ class DataTable extends Component
             $record->$field = $value;
             $record->save();
 
-            ActivityLogger::log(
-                $this->configKey,
-                $action['log_action'] ?? 'custom_action',
-                $record,
-                $oldValues,
-                [$field => $value],
-                $action['successMessage'] ?? 'Custom action executed'
-            );
+            // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+            // Consuming apps should listen for DataTable events to perform audit logging.
 
             $this->dispatch('showAlert', ['type' => 'success', 'message' => $action['successMessage'] ?? 'Record updated successfully.', 'autoClose' => true]);
             $this->dispatch('$refresh');
@@ -2017,7 +2017,7 @@ protected function checkConditions(array $action, $record): bool
     {
         $modelClass = $this->getConfigResolver()->getModel();
         $count = $modelClass::onlyTrashed()->whereIn('id', $ids)->restore();
-        ActivityLogger::log($this->configKey, 'bulk_restored', null, [], ['ids' => $ids], $count . ' records restored');
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
         $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records restored.', 'autoClose' => true]);
     }
 
@@ -2027,7 +2027,7 @@ protected function checkConditions(array $action, $record): bool
         $records = $modelClass::withTrashed()->whereIn('id', $ids)->get();
         $count = $records->count();
         foreach ($records as $record) {
-            ActivityLogger::deleted($this->configKey, $record, $record->toArray(), true);
+            // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
             $record->forceDelete();
         }
         $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records permanently deleted.', 'autoClose' => true]);
@@ -2045,7 +2045,7 @@ protected function checkConditions(array $action, $record): bool
 
         if ($softDelete) {
             $modelClass::whereIn('id', $ids)->delete(); // soft delete
-            ActivityLogger::log($this->configKey, 'bulk_soft_deleted', null, [], ['ids' => $ids], count($ids) . ' records moved to trash');
+            // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
             $this->dispatch('showAlert', ['type' => 'success', 'message' => count($ids) . ' records moved to trash.', 'autoClose' => true]);
         } else {
             $modelClass::whereIn('id', $ids)->delete(); // hard delete
@@ -2146,7 +2146,7 @@ protected function checkConditions(array $action, $record): bool
             return;
         }
 
-        ActivityLogger::deleted($this->configKey, $record, $record->toArray());
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
         $record->delete();
 
         $this->dispatch('showAlert', [

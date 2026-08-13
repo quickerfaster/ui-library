@@ -7,7 +7,13 @@
         @endphp
 
         @foreach ($visibleItems as $item)
-            <a href="{{ $item['route'] ?? '#' }}"
+            @php
+                $isNamedRoute = isset($item['route']) && !str_contains($item['route'], '/');
+                $itemUrl = $isNamedRoute
+                    ? route($item['route'])
+                    : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
+            @endphp
+            <a href="{{ $itemUrl }}"
                class="btn btn-light flex-shrink-0 text-center"
                style="min-width:70px;"
                wire:navigate>
@@ -28,9 +34,17 @@
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     @foreach ($overflowItems as $item)
+                        @php
+                            $isNamedRoute = isset($item['route']) && !str_contains($item['route'], '/');
+                            $itemUrl = $isNamedRoute
+                                ? route($item['route'])
+                                : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
+                        @endphp
                         <li>
-                            <a href="{{ $item['route'] ?? '#' }}" class="dropdown-item d-flex align-items-center" wire:navigate>
-                                <i class="fa {{ $item['icon'] }} me-2"></i>
+                            <a href="{{ $itemUrl }}" class="dropdown-item d-flex align-items-center" wire:navigate>
+                                @if (!empty($item['icon']))
+                                    <i class="fa {{ $item['icon'] }} me-2"></i>
+                                @endif
                                 <span>{{ $item['label'] }}</span>
                             </a>
                         </li>
@@ -51,9 +65,17 @@
                     <div class="offcanvas-body p-0">
                         <ul class="list-group list-group-flush">
                             @foreach ($overflowItems as $item)
+                                @php
+                                    $isNamedRoute = isset($item['route']) && !str_contains($item['route'], '/');
+                                    $itemUrl = $isNamedRoute
+                                        ? route($item['route'])
+                                        : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
+                                @endphp
                                 <li class="list-group-item">
-                                    <a href="{{ $item['route'] ?? '#' }}" class="d-flex align-items-center" wire:navigate>
-                                        <i class="fa {{ $item['icon'] }} me-2"></i>
+                                    <a href="{{ $itemUrl }}" class="d-flex align-items-center" wire:navigate>
+                                        @if (!empty($item['icon']))
+                                            <i class="fa {{ $item['icon'] }} me-2"></i>
+                                        @endif
                                         <span>{{ $item['label'] }}</span>
                                     </a>
                                 </li>

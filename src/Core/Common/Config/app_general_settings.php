@@ -1,41 +1,58 @@
 <?php
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | General Settings Configuration
-    |--------------------------------------------------------------------------
-    */
     'groups' => [
         'general' => [
             'label' => 'General',
-            'icon' => 'fa-cog',
-            'fields' => [
-                'app_name' => [
-                    'label' => 'Application Name',
-                    'type' => 'text',
-                    'default' => env('APP_NAME', 'QuickerFaster'),
-                ],
-                'date_format' => [
-                    'label' => 'Date Format',
+            'icon' => 'fas fa-cog',
+            'settings' => [
+                [
+                    'key' => 'timezone',
                     'type' => 'select',
-                    'options' => [
-                        'Y-m-d' => 'YYYY-MM-DD',
-                        'd/m/Y' => 'DD/MM/YYYY',
-                        'm/d/Y' => 'MM/DD/YYYY',
-                    ],
+                    'label' => 'Timezone',
+                    'options' => 'timezones', // special resolver
+                    'default' => 'UTC',
+                ],
+                [
+                    'key' => 'date_format',
+                    'type' => 'select',
+                    'label' => 'Date Format',
+                    'options' => ['Y-m-d' => 'YYYY-MM-DD', 'd/m/Y' => 'DD/MM/YYYY', 'm/d/Y' => 'MM/DD/YYYY'],
                     'default' => 'Y-m-d',
                 ],
-                'timezone' => [
-                    'label' => 'Timezone',
+                [
+                    'key' => 'currency',
                     'type' => 'select',
-                    'options' => [
-                        'UTC' => 'UTC',
-                        'Africa/Lagos' => 'Africa/Lagos',
-                        'America/New_York' => 'America/New_York',
-                        'Europe/London' => 'Europe/London',
-                    ],
-                    'default' => env('APP_TIMEZONE', 'UTC'),
+                    'label' => 'Currency',
+                    'options' => ['USD' => 'USD', 'EUR' => 'EUR', 'GBP' => 'GBP', 'NGN' => 'NGN'],
+                    'default' => 'USD',
+                ],
+            ],
+        ],
+        'appearance' => [
+            'label' => 'Appearance',
+            'icon' => 'fas fa-palette',
+            'settings' => [
+                [
+                    'key' => 'theme',
+                    'type' => 'select',
+                    'label' => 'Theme',
+                    'options' => ['light' => 'Light', 'dark' => 'Dark', 'auto' => 'Auto'],
+                    'default' => 'auto',
+                ],
+            ],
+        ],
+        'pagination' => [
+            'label' => 'Pagination',
+            'icon' => 'fas fa-table',
+            'settings' => [
+                [
+                    'key' => 'pagination.per_page',
+                    'type' => 'number',
+                    'label' => 'Items per page',
+                    'default' => 15,
+                    'min' => 5,
+                    'max' => 100,
                 ],
             ],
         ],

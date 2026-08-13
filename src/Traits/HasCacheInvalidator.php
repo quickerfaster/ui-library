@@ -13,7 +13,7 @@ trait HasCacheInvalidator {
      */
     protected function forgetModelConfigCache(string $configKey) : void // ModelDefinition $model): void
     {
-        // Build the config key, e.g. 'hr.employee'
+        // Build the config key, e.g. 'module.resource'
         //$configKey = strtolower($model->module) . '.' . strtolower($model->name);
 
         try {

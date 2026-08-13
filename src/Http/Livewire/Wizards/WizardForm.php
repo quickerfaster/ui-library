@@ -92,7 +92,16 @@ class WizardForm extends Component
         }
 
         if (!empty($this->relations)) {
-            $record->load(array_keys($this->relations));
+            // Only eager-load relations that actually exist on the model.
+            // This prevents crashes when a config defines a relation (e.g. a
+            // module-specific relation like HR's 'profile') that the underlying
+            // model class doesn't implement.
+            $validRelations = array_filter($this->relations, function ($relationConfig, $relationName) use ($record) {
+                return method_exists($record, $relationName);
+            }, ARRAY_FILTER_USE_BOTH);
+            if (!empty($validRelations)) {
+                $record->load(array_keys($validRelations));
+            }
         }
 
         foreach ($this->fieldDefinitions as $field => $definition) {
@@ -311,7 +320,9 @@ class WizardForm extends Component
             return;
         }
 
-        DB::transaction(function () {
+        $wasEdit = $this->isEditMode;
+
+        DB::transaction(function () use ($wasEdit) {
             if ($this->isEditMode) {
                 $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
             } else {
@@ -382,6 +393,12 @@ class WizardForm extends Component
             $this->syncRelationships($record);
 
             $this->dispatch('stepFormSaved', $record->id, $this->stepIndex);
+
+            // Show success feedback to user
+            $this->dispatch('showAlert', [
+                'type' => 'success',
+                'message' => $wasEdit ? 'Record updated successfully.' : 'Record created successfully.',
+            ]);
         });
     }
 

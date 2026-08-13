@@ -1,4 +1,4 @@
-<x-qf::navigation-layout configKey="hr.employee" context="reports" moduleName="hr" :overrides="[
+<x-qf::navigation-layout :configKey="$configKey ?? null" context="reports" :moduleName="$moduleName ?? null" :overrides="[
     'top_bar' => ['enabled' => false],
     'breadcrumb' => ['enabled' => false],
     'title' => ['enabled' => false],
