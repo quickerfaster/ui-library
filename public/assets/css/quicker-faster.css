@@ -212,3 +212,137 @@ body {
     font-size: 0.75rem;
     color: #818cf8;
 }
+
+/* ============================================================
+   Workspace Tabs
+   ============================================================ */
+.workspace-tabs-container {
+    background: #f8f9fa;
+    overflow: hidden;
+}
+
+.workspace-tab-strip {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    position: relative;
+}
+
+.workspace-tab {
+    cursor: pointer;
+    border-right: 1px solid #dee2e6;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.workspace-tab:hover {
+    background: #f8f9fa;
+}
+
+.workspace-tab.active {
+    background: #fff;
+    border-top: 2px solid #007bff;
+}
+
+.workspace-tab .tab-label {
+    color: inherit;
+    line-height: 1;
+}
+
+.workspace-tab .tab-close {
+    cursor: pointer;
+    opacity: 0.5;
+    margin-left: 8px;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.workspace-tab .tab-close:hover {
+    opacity: 1;
+}
+
+.workspace-tab.tab-hidden {
+    display: none !important;
+}
+
+/* Context menu */
+.tab-context-menu {
+    position: fixed;
+    z-index: 9999;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    min-width: 180px;
+    display: none;
+}
+
+.tab-context-menu.show {
+    display: block;
+}
+
+.tab-context-menu .context-menu-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.8125rem;
+}
+
+.tab-context-menu .context-menu-item:hover {
+    background: #f0f0f0;
+}
+
+/* Overflow */
+.tab-overflow-toggle {
+    cursor: pointer;
+    padding: 4px 8px;
+    flex-shrink: 0;
+}
+
+.tab-overflow-menu {
+    /* Bootstrap .dropdown-menu already provides the base styling. */
+}
+
+/* ============================================================
+   Breadcrumb Collapse Dropdown
+   ============================================================ */
+.breadcrumb-collapse { position: relative; }
+.breadcrumb-collapse-toggle {
+    border: 0;
+    background: transparent;
+    padding: 0 2px;
+    color: #6c757d;
+    cursor: pointer;
+    line-height: 1;
+}
+.breadcrumb-collapse-toggle:hover { color: #333; }
+.breadcrumb-collapse-menu {
+    position: absolute;
+    z-index: 9999;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    min-width: 180px;
+    display: none;
+    top: 100%;
+    left: 0;
+}
+.breadcrumb-collapse-menu.show { display: block; }
+.breadcrumb-collapse-menu a {
+    display: block;
+    padding: 6px 12px;
+    color: #333;
+    text-decoration: none;
+    font-size: 0.8125rem;
+}
+.breadcrumb-collapse-menu a:hover { background: #f0f0f0; }
+
+/* ============================================================
+   Sidebar Filter
+   ============================================================ */
+.sidebar-filter { border-bottom: 1px solid #dee2e6; }
+.sidebar-filter .input-group-text { background: #f8f9fa; border-right: none; }
+.sidebar-filter .form-control { border-left: none; }
+.sidebar-filter-active { background: #e9ecef !important; }
+[data-filterable].filter-hidden { display: none !important; }

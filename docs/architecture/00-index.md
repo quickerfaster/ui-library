@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-10
+> **Last Updated**: 2026-08-14
 > **Status**: ✅ Authoritative Index — canonical reference for architecture documentation
 
 ---
@@ -11,7 +11,7 @@
 
 The original [`docs/ai-optimized-architecture-blueprint.md`](../ai-optimized-architecture-blueprint.md) is a ~3,000-line monolithic document. While comprehensive, it is difficult for AI agents and human developers to consume efficiently. This restructuring splits the blueprint into **self-contained topic files** under `docs/architecture/`, each focused on a single architectural concern.
 
-**Current status**: [`00-index.md`](00-index.md) is the only file created so far. The topic files below are planned but deferred. Until the split is complete, the single source of truth remains [`docs/ai-optimized-architecture-blueprint.md`](../ai-optimized-architecture-blueprint.md).
+**Current status**: ✅ Complete — the blueprint has been split into 17 topic files under `docs/architecture/` (`01-` through `17-*`). The original [`docs/ai-optimized-architecture-blueprint.md`](../ai-optimized-architecture-blueprint.md) is now marked **SUPERSEDED** and retained as historical reference only.
 
 ### Design Principles
 
@@ -20,6 +20,7 @@ The original [`docs/ai-optimized-architecture-blueprint.md`](../ai-optimized-arc
 3. **AI-optimized**: Each file is under ~500 lines where possible, with clear section headers, tables, and code examples
 4. **Single source of truth**: No duplication — each concept is documented in exactly one file
 5. **Progressive disclosure**: The index provides the 10,000-foot view; topic files provide depth
+6. **Vanilla JS policy**: All client-side interactivity uses vanilla JS via `data-*` attributes and `Livewire.dispatch()`. Alpine.js is used only internally by Livewire 3 for DOM diffing. No custom `x-data` directives are written.
 
 ---
 
@@ -28,31 +29,32 @@ The original [`docs/ai-optimized-architecture-blueprint.md`](../ai-optimized-arc
 ```
 docs/architecture/
 ├── 00-index.md                          ← ✅ EXISTS (this file)
-├── 01-core-concepts.md                  ← ⏸️ DEFERRED — content lives in blueprint §1
-├── 02-directory-map.md                  ← ⏸️ DEFERRED — content lives in blueprint §2
-├── 03-module-pattern.md                 ← ⏸️ DEFERRED — content lives in blueprint §6
-├── 04-routing-and-views.md              ← ⏸️ DEFERRED — content lives in blueprint §§6.4,6.8
-├── 05-data-configs.md                   ← ⏸️ DEFERRED — content lives in blueprint §5
-├── 06-navigation-system.md              ← ⏸️ DEFERRED — content lives in blueprint §§4.1,7.5
-├── 07-component-catalog.md              ← ⏸️ DEFERRED — content lives in blueprint §4
-├── 08-contracts-and-interfaces.md       ← ⏸️ DEFERRED — content lives in blueprint §4.4
-├── 09-engines-and-services.md           ← ⏸️ DEFERRED — content lives in blueprint §§12-15
-├── 10-settings-and-config.md            ← ⏸️ DEFERRED — content lives in blueprint §§5.7,8.5
-├── 11-extension-guide.md                ← ⏸️ DEFERRED — content lives in blueprint §7
-├── 12-ai-quick-start.md                 ← ⏸️ DEFERRED — content lives in blueprint §9
-├── 13-adr.md                            ← ⏸️ DEFERRED — content lives in blueprint §3
-├── 14-integration-map.md                ← ⏸️ DEFERRED — content lives in blueprint §8
-├── 15-gaps-and-recommendations.md       ← ⏸️ DEFERRED — content lives in blueprint §10
-├── 16-phase-history.md                  ← ⏸️ DEFERRED — content lives in blueprint §11
-└── 17-view-config-routing-interplay.md  ← ⏸️ DEFERRED — NEW synthesis from multiple blueprint sections + discrepancy analysis
+├── 01-core-concepts.md                  ← ✅ EXISTS
+├── 02-directory-map.md                  ← ✅ EXISTS
+├── 03-module-pattern.md                 ← ✅ EXISTS
+├── 04-routing-and-views.md              ← ✅ EXISTS
+├── 05-data-configs.md                   ← ✅ EXISTS
+├── 06-navigation-system.md              ← ✅ EXISTS
+├── 07-component-catalog.md              ← ✅ EXISTS
+├── 08-contracts-and-interfaces.md       ← ✅ EXISTS
+├── 09-engines-and-services.md           ← ✅ EXISTS
+├── 10-settings-and-config.md            ← ✅ EXISTS
+├── 11-extension-guide.md                ← ✅ EXISTS
+├── 12-ai-quick-start.md                 ← ✅ EXISTS
+├── 13-adr.md                            ← ✅ EXISTS
+├── 14-integration-map.md                ← ✅ EXISTS
+├── 15-gaps-and-recommendations.md       ← ✅ EXISTS
+├── 16-phase-history.md                  ← ✅ EXISTS
+├── 17-view-config-routing-interplay.md  ← ✅ EXISTS — NEW synthesis from multiple blueprint sections + discrepancy analysis
+└── phase-5-navigation-ux.md             ← ✅ EXISTS — Phase 5 Navigation & UX polish (vanilla JS + Livewire 3)
 ```
 
 **File status summary**:
 
 | Status | Count | Files |
 |--------|-------|-------|
-| ✅ EXISTS | 1 | `00-index.md` |
-| ⏸️ DEFERRED | 16 | `01-` through `17-*` (all topic files) |
+| ✅ EXISTS | 19 | `00-index.md`, `01-` through `17-*` (17 topic files), `phase-5-navigation-ux.md` |
+| ⏸️ DEFERRED | 0 | — |
 | ❌ NOT NEEDED | 0 | — |
 
 
@@ -64,7 +66,7 @@ docs/architecture/
 
 **What it covers**: The library's mission, separation of concerns (library layer vs business layer), design principles (convention over configuration, config-driven rendering, catch-all routing, scaffolded auth, reusable composition, three-tier settings), and the `qf` namespace convention.
 
-**Source**: Blueprint Section 1 (lines 28-101)
+**Source**: Extracted from Blueprint Section 1 → [`01-core-concepts.md`](01-core-concepts.md)
 
 **Key takeaways for AI agents**:
 - The library owns cross-cutting concerns; business modules own domain logic
@@ -77,7 +79,7 @@ docs/architecture/
 
 **What it covers**: Complete directory tree of `src/` with every file and its purpose. Includes the canonical business module directory map (`app/Modules/{ModuleName}/`) and the component resolution map showing which library components consume which business module assets.
 
-**Source**: Blueprint Section 2 (lines 104-573)
+**Source**: Extracted from Blueprint Section 2 → [`02-directory-map.md`](02-directory-map.md)
 
 **Key takeaways for AI agents**:
 - Where to find any file in the library
@@ -90,7 +92,7 @@ docs/architecture/
 
 **What it covers**: Mandatory and optional module structure, `ModuleServiceProvider` registration protocol (view aliases, route loading order, migration loading, event listener auto-discovery), global config merging, naming conventions, and the catch-all route pattern overview.
 
-**Source**: Blueprint Section 6 (lines 1552-1674)
+**Source**: Extracted from Blueprint Section 6 → [`03-module-pattern.md`](03-module-pattern.md)
 
 **Key takeaways for AI agents**:
 - Every module needs at minimum: `Data/`, `Models/`, `Resources/views/`, `Routes/web.php`
@@ -104,7 +106,7 @@ docs/architecture/
 
 **What it covers**: The complete routing architecture — library routes (`src/Routes/web.php`), Core module routes, business module routes, and the System catch-all route. View namespace registration for both Core modules (`qf-core::{module}`) and business modules (`{module}`). View resolution flow with fallback logic. Route loading order and why it matters.
 
-**Source**: Blueprint Sections 6.4, 6.8; source files [`src/Core/System/Routes/web.php`](../../src/Core/System/Routes/web.php), [`src/Routes/web.php`](../../src/Routes/web.php), [`src/Providers/ModuleServiceProvider.php`](../../src/Providers/ModuleServiceProvider.php)
+**Source**: Extracted from Blueprint Sections 6.4, 6.8 → [`04-routing-and-views.md`](04-routing-and-views.md); source files [`src/Core/System/Routes/web.php`](../../src/Core/System/Routes/web.php), [`src/Routes/web.php`](../../src/Routes/web.php), [`src/Providers/ModuleServiceProvider.php`](../../src/Providers/ModuleServiceProvider.php)
 
 **Key takeaways for AI agents**:
 - Catch-all route: `/{module}/{view}/{id?}` resolves `{module}::{view}` then `qf-core::{module}.{view}`
@@ -117,7 +119,7 @@ docs/architecture/
 
 **What it covers**: The config-driven architecture in depth. `ModelConfigRepository` resolution flow (dot-notation key → file path), `ConfigResolver` typed accessors, the complete DataTable/Form/Detail config schema with every known key, how config drives validation (`DataTableFormValidationService`), and how config drives import/export.
 
-**Source**: Blueprint Section 5 (lines 1253-1460)
+**Source**: Extracted from Blueprint Section 5 → [`05-data-configs.md`](05-data-configs.md)
 
 **Key takeaways for AI agents**:
 - Config keys use dot-notation: `{lowercase_module}.{filename}` → `app/Modules/{Module}/Data/{file}.php`
@@ -131,7 +133,7 @@ docs/architecture/
 
 **What it covers**: The navigation architecture — `NavigationLayout` (main shell), `TopNav` (top bar with module switcher), `Sidebar` (collapsible context menu), `BottomBar` (mobile), `HorizontalContextMenu`, `MenuRenderer` (dynamic menu type switching), and `ModuleSwitcher`. Navigation config schema (`context_groups`, `contexts`, `shared_items`, `layout`). How `NavigationFilter` applies permission-based filtering.
 
-**Source**: Blueprint Sections 4.1 (Layout & Navigation), 7.5; source files [`src/Http/Livewire/Layouts/Navs/Sidebar.php`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php), [`src/Http/Livewire/Layouts/Navs/MenuRenderer.php`](../../src/Http/Livewire/Layouts/Navs/MenuRenderer.php), [`src/Core/System/Config/navigation.php`](../../src/Core/System/Config/navigation.php)
+**Source**: Extracted from Blueprint Sections 4.1 (Layout & Navigation), 7.5 → [`06-navigation-system.md`](06-navigation-system.md); source files [`src/Http/Livewire/Layouts/Navs/Sidebar.php`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php), [`src/Http/Livewire/Layouts/Navs/MenuRenderer.php`](../../src/Http/Livewire/Layouts/Navs/MenuRenderer.php), [`src/Core/System/Config/navigation.php`](../../src/Core/System/Config/navigation.php)
 
 **Key takeaways for AI agents**:
 - Navigation config lives at `{Module}/Config/navigation.php`
@@ -145,7 +147,7 @@ docs/architecture/
 
 **What it covers**: Complete catalog of all Livewire components (50+ registered with `qf.` prefix), Blade components, services, models, and traits. Each entry includes class location, alias, and purpose.
 
-**Source**: Blueprint Section 4 (lines 682-1214)
+**Source**: Extracted from Blueprint Section 4 → [`07-component-catalog.md`](07-component-catalog.md)
 
 **Key takeaways for AI agents**:
 - Livewire components use `qf.{kebab-case}` aliases (e.g., `qf.data-table`)
@@ -158,7 +160,7 @@ docs/architecture/
 
 **What it covers**: All contracts/interfaces with their full method signatures: `Workflowable`, `Documentable`, `Notifiable`, `NotificationChannel`, `Reportable`, `FieldType`, `Widget`, `ModuleContract`, `NavigationProvider`, `SettingsProvider`, `CompanyProvider`, `ApprovalModelResolver`, `OnboardingCondition`.
 
-**Source**: Blueprint Section 4.4 (lines 854-1130)
+**Source**: Extracted from Blueprint Section 4.4 → [`08-contracts-and-interfaces.md`](08-contracts-and-interfaces.md)
 
 **Key takeaways for AI agents**:
 - Contracts are the extension points for business modules
@@ -171,7 +173,7 @@ docs/architecture/
 
 **What it covers**: The five engine services in depth: `WorkflowEngine` (multi-step, role-based, sequential), `DocumentEngine` (polymorphic, upload/generatePdf/generateExcel), `NotificationService` (channel-based, template rendering, audit logging), `ReportEngine` (scheduled, integrates Document + Notification engines), and the legacy `ApprovalEngine`. Includes usage examples and configuration.
 
-**Source**: Blueprint Sections 12-15 (lines 2437-2888)
+**Source**: Extracted from Blueprint Sections 12-15 → [`09-engines-and-services.md`](09-engines-and-services.md)
 
 **Key takeaways for AI agents**:
 - `WorkflowEngine` supersedes `ApprovalEngine` for new features
@@ -185,7 +187,7 @@ docs/architecture/
 
 **What it covers**: The `SettingsManager` 3-tier cascading resolver (user → company → system), the `HasSettings` trait, `SystemSetting` polymorphic model, `ModelConfigRepository` caching strategy, and the complete `ui-library.php` configuration schema with all keys documented.
 
-**Source**: Blueprint Sections 5.7, 8.5; source file [`src/Config/ui-library.php`](../../src/Config/ui-library.php)
+**Source**: Extracted from Blueprint Sections 5.7, 8.5 → [`10-settings-and-config.md`](10-settings-and-config.md); source file [`src/Config/ui-library.php`](../../src/Config/ui-library.php)
 
 **Key takeaways for AI agents**:
 - Settings cascade: user preferences override company defaults override system defaults
@@ -199,7 +201,7 @@ docs/architecture/
 
 **What it covers**: Step-by-step recipes for common extension tasks: add a new FieldType, create a new business module, override a library component, add a new widget type, extend NavigationLayout.
 
-**Source**: Blueprint Section 7 (lines 1677-1903)
+**Source**: Extracted from Blueprint Section 7 → [`11-extension-guide.md`](11-extension-guide.md)
 
 **Key takeaways for AI agents**:
 - New FieldType: implement `FieldType` contract → register in `FieldFactory::$map` → create Blade view
@@ -212,7 +214,7 @@ docs/architecture/
 
 **What it covers**: Decision tree ("Given task X, which files do I touch?"), common task lookup table, and troubleshooting guide for config not found, component not rendering, route conflicts, validation issues, settings not resolving, and module not auto-discovered.
 
-**Source**: Blueprint Section 9 (lines 2038-2219)
+**Source**: Extracted from Blueprint Section 9 → [`12-ai-quick-start.md`](12-ai-quick-start.md)
 
 **Key takeaways for AI agents**:
 - This is the FIRST file an AI agent should read when given a task
@@ -225,7 +227,7 @@ docs/architecture/
 
 **What it covers**: All six Architecture Decision Records: ADR-001 (catch-all routing), ADR-002 (config-driven DataTables/Forms/Details), ADR-003 (Livewire 3 for interactive, Blade for static), ADR-004 (FieldFactory with contracts), ADR-005 (single NavigationLayout), ADR-006 (three-tier settings resolution).
 
-**Source**: Blueprint Section 3 (lines 577-680)
+**Source**: Extracted from Blueprint Section 3 → [`13-adr.md`](13-adr.md)
 
 **Key takeaways for AI agents**:
 - Each ADR explains the decision, implementation, why, and trade-offs
@@ -237,7 +239,7 @@ docs/architecture/
 
 **What it covers**: Composer dependencies and their roles, service provider wiring diagram, inter-package communication patterns (service binding, event listeners, config merge, view namespace, Blade component, Livewire registration, Blade directive), database assumptions, and the settings architecture flow.
 
-**Source**: Blueprint Section 8 (lines 1906-2035)
+**Source**: Extracted from Blueprint Section 8 → [`14-integration-map.md`](14-integration-map.md)
 
 **Key takeaways for AI agents**:
 - 7 Composer dependencies: livewire, dompdf, excel, fortify, socialite, permission, onboard
@@ -250,7 +252,7 @@ docs/architecture/
 
 **What it covers**: All 10 identified gaps: missing error handling strategy, missing testing architecture, asset compilation strategy, wizard state management, API vs web context, accessibility/i18n, security hardening for catch-all routes, caching strategy for module discovery, bank file generator documentation, missing module scaffold command.
 
-**Source**: Blueprint Section 10 (lines 2222-2347)
+**Source**: Extracted from Blueprint Section 10 → [`15-gaps-and-recommendations.md`](15-gaps-and-recommendations.md)
 
 **Key takeaways for AI agents**:
 - These are known weaknesses — be aware of them when implementing
@@ -263,7 +265,7 @@ docs/architecture/
 
 **What it covers**: Completed phases: Phase 2.5 decoupling (5 couplings resolved, new contracts, migration relocation, deleted items), Phase 3.1 Workflow Engine, Phase 3.2 Document Engine, Phase 3.3 Notification Engine, Phase 3.4 Scheduled Reports Engine, Phase 3.5 Reference Data Engine, Phase 4.1 Organization Extraction, Phase 4.2 Module Registry (`user_facing`/`depends_on`), Phase 4.3 Section-Based Sidebar, Phase 4.4 Dropdown Application Switcher, Phase 4.5 Config-Driven Navigation Metadata. Remaining: 7 hardcoded `App\Modules\*` imports + 1 Blade hardcode + config references (by design) + comment-only references. See [`implementation-plan.md`](../implementation-plan.md#11-known-remaining-appmodules-references) for full details.
 
-**Source**: Blueprint Sections 11-15 (lines 2437-2888)
+**Source**: Extracted from Blueprint Sections 11-15 → [`16-phase-history.md`](16-phase-history.md)
 
 **Key takeaways for AI agents**:
 - Phase 2.5 resolved the 5 most critical HR couplings
@@ -283,12 +285,25 @@ docs/architecture/
 5. **Catch-all route interaction with explicit routes**: When the catch-all fires vs when explicit routes take precedence
 6. **Visual flow diagram**: A Mermaid sequence diagram showing the complete interplay
 
-**Source**: Synthesized from Blueprint Sections 5, 6.4, 6.8; source files [`src/Core/System/Routes/web.php`](../../src/Core/System/Routes/web.php), [`src/Services/Config/ModelConfigRepository.php`](../../src/Services/Config/ModelConfigRepository.php), [`src/Providers/ModuleServiceProvider.php`](../../src/Providers/ModuleServiceProvider.php), [`src/Providers/UILibraryServiceProvider.php`](../../src/Providers/UILibraryServiceProvider.php), and the [`architecture-discrepancy-analysis.md`](../architecture-discrepancy-analysis.md)
+**Source**: Synthesized from Blueprint Sections 5, 6.4, 6.8 → [`17-view-config-routing-interplay.md`](17-view-config-routing-interplay.md); source files [`src/Core/System/Routes/web.php`](../../src/Core/System/Routes/web.php), [`src/Services/Config/ModelConfigRepository.php`](../../src/Services/Config/ModelConfigRepository.php), [`src/Providers/ModuleServiceProvider.php`](../../src/Providers/ModuleServiceProvider.php), [`src/Providers/UILibraryServiceProvider.php`](../../src/Providers/UILibraryServiceProvider.php), and the [`architecture-discrepancy-analysis.md`](../architecture-discrepancy-analysis.md)
 
 **Key takeaways for AI agents**:
 - This is the ROSETTA STONE for understanding how the library's three core systems interact
 - Read this file before modifying routes, views, or data configs
 - The `ModelConfigRepository` gap is the single most important architectural issue to understand
+
+---
+
+### [`phase-5-navigation-ux.md`](phase-5-navigation-ux.md) ← NEW
+
+**What it covers**: Phase 5 Navigation & UX Polish — WorkspaceTabs, Breadcrumbs, Sidebar Filter, and Sidebar → Tabs Integration. Documents the vanilla JS architecture (IIFE, `data-*` attributes, `Livewire.dispatch()`, `morph.updated` hook, debounce utility), config keys, session keys, and keyboard shortcuts.
+
+**Source**: Implemented Phase 5 components ([`WorkspaceTabs.php`](../../src/Http/Livewire/Layouts/Navs/WorkspaceTabs.php), [`Breadcrumbs.php`](../../src/Components/Breadcrumbs.php), [`quicker-faster.js`](../../public/assets/js/quicker-faster.js))
+
+**Key takeaways for AI agents**:
+- All client-side interactivity is vanilla JS via `data-*` attributes and `Livewire.dispatch()` — no custom `x-data` directives
+- WorkspaceTabs persists state to the PHP session (`workspace_tabs`, `workspace_active_tab`, `workspace_recently_closed`)
+- Component READMEs live in [`../components/`](../components/)
 
 ---
 
@@ -437,13 +452,23 @@ docs/architecture/
 
 ---
 
+## Component Documentation
+
+| Component | README |
+|-----------|--------|
+| WorkspaceTabs | [`../components/workspace-tabs.md`](../components/workspace-tabs.md) |
+| Breadcrumbs | [`../components/breadcrumbs.md`](../components/breadcrumbs.md) |
+| Sidebar Filter | [`../components/sidebar-filter.md`](../components/sidebar-filter.md) |
+
+---
+
 ## Implementation Notes
 
-### Current State (2026-08-10)
+### Current State (2026-08-14)
 
 - **Phases 4.4 and 4.5 are now ✅ Complete** (as of 2026-08-11): Application Switcher replaced with inline Bootstrap dropdown (ModuleSwitcher component deleted). Context Groups → Sidebar linkage working with `$activeContext` on Sidebar. Sidebar `sidebar` config section supports `section_label`, `collapsible`, `expanded_default`. Icon mode complete. Workspace parameter support via [`WorkspaceResolver`](../../src/Contracts/Navigation/WorkspaceResolver.php) contract + [`WorkspaceFilter`](../../src/Services/Navigation/WorkspaceFilter.php).
-- **Phase 4.6 is 🔄 In Progress**: The 00-index.md is now the authoritative index. The monolithic [`docs/ai-optimized-architecture-blueprint.md`](../ai-optimized-architecture-blueprint.md) remains the single source of truth until all topic files are created.
-- **16 topic files deferred**: Files `01-` through `17-*` will be created in a future documentation sprint.
+- **Phase 4.6 is ✅ Complete**: The blueprint split is done — all 17 topic files (`01-` through `17-*`) now live under `docs/architecture/`, this index is the authoritative map, and the monolithic [`docs/ai-optimized-architecture-blueprint.md`](../ai-optimized-architecture-blueprint.md) is marked **SUPERSEDED** (retained as historical reference only).
+- **17 topic files created**: Files `01-` through `17-*` are all ✅ EXISTS; no DEFERRED topic files remain.
 - **Blueprint updated**: The monolithic blueprint has been updated with Phase 4.4/4.5 "Complete" status, new directory entries for [`WorkspaceResolver`](../../src/Contracts/Navigation/WorkspaceResolver.php), [`WorkspaceFilter`](../../src/Services/Navigation/WorkspaceFilter.php), and [`NullWorkspaceResolver`](../../src/Services/Navigation/NullWorkspaceResolver.php). ModuleSwitcher entry removed from directory map.
 
 ### Extraction Process (for future execution)
@@ -483,19 +508,13 @@ docs/architecture/
 
 The total is slightly larger than the original because of added cross-references, headers, and the new synthesized file 17. However, each individual file is under ~500 lines, making them suitable for AI context windows.
 
-### Deferral Decision (Phase 4.6)
+### Split Completion (Phase 4.6) — ✅ Complete (2026-08-14)
 
-The 16 topic-file split is **deferred** until after Phase 4.4 and Phase 4.5 completion. Rationale:
+The 17 topic-file split (previously deferred) is now complete:
 
-1. Phase 4.4 (Application Switcher) and Phase 4.5 (Config-Driven Navigation) are at "Half done" — completing them may modify the architecture that would need to be documented in topic files
-2. Doing the split after 4.4/4.5 completion means the topic files can include the final navigation architecture from the start
-3. The current monolithic blueprint is functional and accurate for all completed work
-4. This index (00-index.md) serves as the authoritative map for any AI agent needing to navigate the architecture now
-
-**Recommended approach for future split (Phase 4.6 completion)**:
-1. Create all 16 remaining topic files by extracting from the blueprint
-2. Add Organization-specific and navigation-specific content to relevant files (02-directory-map, 03-module-pattern, 06-navigation-system)
-3. Mark the original blueprint as "SUPERSEDED" with a link to this index
-4. Update all cross-references between topic files
+1. All 17 topic files (`01-` through `17-*`) have been created under `docs/architecture/`
+2. Organization-specific and navigation-specific content included in [`02-directory-map.md`](02-directory-map.md), [`03-module-pattern.md`](03-module-pattern.md), and [`06-navigation-system.md`](06-navigation-system.md)
+3. The original blueprint is marked **SUPERSEDED** and retained as historical reference
+4. Cross-references between topic files updated
 
 See: [`docs/implementation-plan.md`](../implementation-plan.md) Phase 4.6

@@ -3,8 +3,9 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\AccessControls;
 
 use App\Models\User;
-use Livewire\Component;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Livewire\Component;
 use QuickerFaster\UILibrary\Models\Role;
 
 use Illuminate\Support\Facades\File;
@@ -27,6 +28,8 @@ class AccessControlManager extends Component
     public $selectedScopeId;
     public $selectedModule = null;
     public $selectedModuleName = null;
+
+    public $modelSearch = '';
 
 
     public $isUrlAccess = false;
@@ -68,22 +71,29 @@ class AccessControlManager extends Component
     ];
 
 
-    public function mount() {
+    public function mount($selectedModule = null, $isUrlAccess = false) {
 
-        $this->moduleNames = ApplicationInfo::getModuleNames();
+        $this->selectedModule = $selectedModule;
+        $this->isUrlAccess = $isUrlAccess;
+
+        // Modules filtering
+        $moduleConfig = config('ui-library.access_control.modules', []);
+        $this->moduleNames = $this->getFilteredModules($moduleConfig);
+
         $selectedScopeClassName = match($this->selectedScopeName) {
             'Role' => \Spatie\Permission\Models\Role::class,
             'User' => \App\Models\User::class,
             default => "App\\Models\\".$this->selectedScopeName,
         };
-        $this->scopeNames =  $selectedScopeClassName::all()->pluck("name", "id");
 
-        
-        if (strtolower($this->selectedScopeName) == "role")
-            $this->scopeNames = array_diff($this->scopeNames->toArray(), AuthorizationService::ADMIN_ROLES_ARRAY);
-       
+        if (strtolower($this->selectedScopeName) == "role") {
+            // Roles filtering
+            $roleConfig = config('ui-library.access_control.roles', []);
+            $this->scopeNames = $this->getFilteredRoles($roleConfig);
+        } else {
+            $this->scopeNames = $selectedScopeClassName::all()->pluck("name", "id");
+        }
     }
-
 
 
 
@@ -102,7 +112,7 @@ class AccessControlManager extends Component
      }
 
 
-     protected function updateSelectedScope() {
+      protected function updateSelectedScope() {
         if ($this->selectedScopeName == 'Role') {
             //$data['scope'] = Role::with('team')->with('permissions')->findOrFail($id);
             $this->selectedScope = Role::with('permissions')->find($this->selectedScopeId);
@@ -110,7 +120,7 @@ class AccessControlManager extends Component
             //$data['scope'] = User::with('team')->with('permissions')->findOrFail($id);
             $this->selectedScope  = User::with('permissions')->find($this->selectedScopeId);
         }
-     }
+      }
 
 
 
@@ -130,6 +140,9 @@ class AccessControlManager extends Component
             $this->resourceNames = [];
         }
 
+        // Models filtering
+        $modelConfig = config('ui-library.access_control.models', []);
+        $this->resourceNames = $this->getFilteredModels($modelConfig, $this->resourceNames);
 
         AccessControlPermissionService::checkPermissionsExistsOrCreate($this->resourceNames);
         $this->setupResourceControlButtonGroup();
@@ -191,11 +204,169 @@ class AccessControlManager extends Component
 
 
 
+    /**
+     * Filter the discovered resource (model) names by the current model search
+     * term. Matches against the model name and its permission action labels.
+     *
+     * @return array<int, string>
+     */
+    public function getFilteredResourceNamesProperty(): array
+    {
+        $search = trim(strtolower((string) $this->modelSearch));
 
+        if ($search === '') {
+            return $this->resourceNames;
+        }
+
+        return collect($this->resourceNames)
+            ->filter(function ($resourceName) use ($search) {
+                $snake = Str::snake(class_basename((string) $resourceName));
+
+                if (str_contains(strtolower((string) $resourceName), $search)) {
+                    return true;
+                }
+
+                foreach ($this->controlList as $action) {
+                    $label = strtolower($action . ' ' . str_replace('_', ' ', $snake));
+                    if (str_contains($label, $search)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Bulk toggle a single permission action (view, create, edit, delete,
+     * print, export, import) across every model in the selected module.
+     */
+    public function bulkToggle(string $action, bool $value): void
+    {
+        if (!in_array($action, $this->controlList, true)) {
+            return;
+        }
+
+        $this->updateSelectedScope();
+
+        if (!$this->selectedScope) {
+            return;
+        }
+
+        $permissions = $this->selectedScope->getPermissionNames()->toArray();
+
+        foreach ($this->resourceNames as $resourceName) {
+            $permissionName = strtolower($action . '_' . Str::snake(class_basename((string) $resourceName)));
+
+            if ($value) {
+                $permissions = array_unique(array_merge([$permissionName], $permissions));
+            } else {
+                $permissions = array_values(array_diff($permissions, [$permissionName]));
+            }
+        }
+
+        $this->selectedScope->syncPermissions($permissions);
+
+        $this->refreshPermissions();
+    }
+
+    /**
+     * Reload the selected scope and rebuild permission card states so the UI
+     * reflects the latest granted permissions after a bulk toggle.
+     */
+    public function refreshPermissions(): void
+    {
+        $this->updateSelectedScope();
+
+        if ($this->selectedScope) {
+            $this->setupResourceControlButtonGroup();
+        }
+    }
 
     public function render()
     {
 
         return view('qf::livewire.access-controls.access-control-manager');
+    }
+
+    /**
+     * Resolve the roles shown in the permission assignment dropdown.
+     *
+     * Preserves the original behaviour of hiding the admin bypass roles,
+     * then applies the configured include/exclude filters.
+     */
+    protected function getFilteredRoles(array $config): Collection
+    {
+        $roles = \Spatie\Permission\Models\Role::all()->pluck('name', 'id');
+
+        // Admin roles bypass granular permissions, so they are never assignable.
+        $roles = $roles->reject(
+            fn ($name) => in_array($name, AuthorizationService::ADMIN_ROLES_ARRAY, true)
+        );
+
+        return $this->applyIncludeExclude($roles, $config);
+    }
+
+    /**
+     * Resolve the modules shown in the permission assignment dropdown.
+     */
+    protected function getFilteredModules(array $config): array
+    {
+        $modules = collect(ApplicationInfo::getModuleNames());
+
+        return $this->applyIncludeExclude(
+            $modules,
+            $config,
+            fn ($module) => strtolower((string) $module)
+        )->values()->all();
+    }
+
+    /**
+     * Resolve the models shown as permission cards.
+     *
+     * Accepts both bare model names ('User') and FQCNs ('App\Models\User')
+     * in the include/exclude lists.
+     */
+    protected function getFilteredModels(array $config, array $models): array
+    {
+        $items = collect($models);
+
+        return $this->applyIncludeExclude(
+            $items,
+            $config,
+            fn ($model) => class_basename((string) $model)
+        )->values()->all();
+    }
+
+    /**
+     * Apply shared include/exclude filtering to a collection of values.
+     *
+     * - include === '*' keeps everything
+     * - include is an array keeps only matching values
+     * - exclude is an array always removes matching values
+     *
+     * The optional normalizer maps both collection values and config entries
+     * to a common comparison key (e.g. lowercase module names).
+     */
+    protected function applyIncludeExclude(Collection $items, array $config, ?callable $normalizer = null): Collection
+    {
+        $normalizer = $normalizer ?? fn ($value) => $value;
+
+        $include = $config['include'] ?? '*';
+        $exclude = $config['exclude'] ?? [];
+
+        if ($include !== '*' && is_array($include)) {
+            $include = array_map($normalizer, $include);
+            $items = $items->filter(fn ($value) => in_array($normalizer($value), $include, true));
+        }
+
+        if (!empty($exclude) && is_array($exclude)) {
+            $exclude = array_map($normalizer, $exclude);
+            $items = $items->reject(fn ($value) => in_array($normalizer($value), $exclude, true));
+        }
+
+        return $items;
     }
 }

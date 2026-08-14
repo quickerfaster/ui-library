@@ -22,6 +22,28 @@
         'userOrganizations' => $userOrganizations ?? collect(),
     ])
 
+    {{-- Phase 5.3: Sidebar fuzzy filter --}}
+    <div class="sidebar-filter p-2" data-sidebar-filter-wrap>
+        <div class="input-group input-group-sm">
+            <span class="input-group-text" data-sidebar-filter-icon>
+                <i class="fas fa-search"></i>
+            </span>
+            <input type="text"
+                   class="form-control form-control-sm"
+                   placeholder="{{ __('qf::nav.filter_modules') }}"
+                   aria-label="{{ __('qf::nav.filter_modules') }}"
+                   title="{{ __('qf::nav.filter_modules') }}"
+                   data-sidebar-filter>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-sidebar-filter-clear style="display:none;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div data-sidebar-filter-no-results class="text-muted small p-2" style="display:none;">
+            {{ __('qf::nav.no_results') }}
+        </div>
+    </div>
+
     <ul class="nav flex-column mt-3">
         @foreach ($headerItems as $item)
             @include('qf::livewire.navs.partials.sidebar-item', ['item' => $item])
@@ -79,7 +101,9 @@
                 <li class="nav-item mb-1" wire:key="sidebar-section-{{ $sectionKey }}">
                     <div class="sidebar-section-label small fw-semibold text-muted text-uppercase
                                 {{ $state === 'icon' ? 'px-0 py-1 d-flex justify-content-center' : 'px-3 py-2' }}"
-                         style="font-size: 0.7rem; letter-spacing: 0.05em;">
+                         style="font-size: 0.7rem; letter-spacing: 0.05em;"
+                         data-filterable
+                         data-filter-text="{{ strtolower($sectionLabel ?? '') }} {{ strtolower($sectionKey ?? '') }} {{ strtolower($activeContext ?? '') }}">
                         @if ($state === 'full')
                             <i class="fa {{ $sectionIcon }} me-2 text-muted" style="font-size: 0.85rem;" aria-hidden="true"></i>
                             {{ $sectionLabel }}

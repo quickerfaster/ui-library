@@ -75,6 +75,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Layout Configuration
+    |--------------------------------------------------------------------------
+    */
+    'layout' => [
+        'workspace_tabs' => [
+            'enabled' => true,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Socialite Configuration
     |--------------------------------------------------------------------------
     */
@@ -129,6 +140,20 @@ return [
     |
     */
     'navigation' => [
+
+        /*
+        |------------------------------------------------------------------
+        | Open Links In Workspace Tabs
+        |------------------------------------------------------------------
+        |
+        | When true, sidebar navigation items open in a workspace tab via
+        | Livewire's openWorkspaceTab event instead of performing a full
+        | page navigation. When false, sidebar items retain their normal
+        | link behaviour.
+        |
+        */
+        'open_in_tabs' => false,
+
         'top_bar' => [
             'enabled' => true,
             'show_module_switcher' => true,
@@ -300,6 +325,7 @@ return [
     */
     'breadcrumb' => [
         'show_home' => true,
+        'max_visible' => 4,
     ],
 
     /*
@@ -326,6 +352,17 @@ return [
             'log' => \QuickerFaster\UILibrary\Models\ApprovalLog::class,
             'tier_approval' => \QuickerFaster\UILibrary\Models\ApprovalTierApproval::class,
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activity Logs Configuration
+    |--------------------------------------------------------------------------
+    | Model resolution for the activity log widget. Override in the consuming
+    | app's published config to use a custom ActivityLog model.
+    */
+    'activity_logs' => [
+        'model' => env('UI_LIBRARY_ACTIVITY_LOG_MODEL', null),
     ],
 
     /*
@@ -706,6 +743,35 @@ return [
         'required_traits' => [
             \QuickerFaster\UILibrary\Traits\HasUILibraryUser::class,
             \Spatie\Permission\Traits\HasRoles::class,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Access Control Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Controls what roles, modules, and models appear in the
+    | AccessControlManager permission assignment UI.
+    |
+    | - roles.include / roles.exclude: filter which roles are assignable
+    | - modules.include / modules.exclude: filter which modules show permissions
+    | - models.include / models.exclude: filter which models show permission cards
+    |
+    | Use '*' to include all, or an array of keys/names.
+    */
+    'access_control' => [
+        'roles' => [
+            'include' => '*',   // '*' or ['super_admin', 'admin', 'company_admin']
+            'exclude' => [],    // ['super_admin'] to hide from assignment
+        ],
+        'modules' => [
+            'include' => '*',
+            'exclude' => ["system", "common", "admin"],    // ['system'] to hide infrastructure modules
+        ],
+        'models' => [
+            'include' => '*',
+            'exclude' => [],    // ['App\Models\User'] to hide specific models
         ],
     ],
 ];

@@ -4,9 +4,11 @@ namespace QuickerFaster\UILibrary\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
 use Livewire\Livewire;
 use Laravel\Fortify\Fortify;
+use QuickerFaster\UILibrary\Components\Breadcrumbs;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
 use QuickerFaster\UILibrary\Events\ModuleRegistered;
@@ -38,6 +40,11 @@ class UILibraryServiceProvider extends ServiceProvider
 
         $this->app->singleton(\QuickerFaster\UILibrary\Contracts\Approvals\ApprovalModelResolver::class,
             \QuickerFaster\UILibrary\Services\Approvals\ApprovalModelResolver::class);
+
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\ActivityLogs\ActivityLogModelResolver::class,
+            \QuickerFaster\UILibrary\Services\ActivityLogs\ActivityLogModelResolver::class
+        );
 
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class);
 
@@ -139,6 +146,7 @@ class UILibraryServiceProvider extends ServiceProvider
         $this->registerFortifyViews();
         $this->registerSocialiteProviders();
         $this->registerBladeDirectives();
+        $this->registerEventListeners();
         $this->registerTranslations();
     }
 
@@ -196,6 +204,7 @@ class UILibraryServiceProvider extends ServiceProvider
         Blade::component('qf::layouts.app', 'layout');
         Blade::component('qf::layouts.guest', 'guest-layout');
         Blade::component('qf::components.breadcrumb', 'breadcrumb');
+        Blade::component(Breadcrumbs::class, 'breadcrumbs');
         Blade::componentNamespace('QuickerFaster\\UILibrary\\Components', 'qf');
     }
 
@@ -209,6 +218,7 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.horizontal-context-menu', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\HorizontalContextMenu::class);
         Livewire::component('qf.menu-renderer', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\MenuRenderer::class);
         Livewire::component('qf.module-switcher', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\ModuleSwitcher::class);
+        Livewire::component('qf.workspace-tabs', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\WorkspaceTabs::class);
 
         // DataTables
         Livewire::component('qf.data-table', \QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTable::class);
@@ -331,6 +341,18 @@ class UILibraryServiceProvider extends ServiceProvider
         Blade::directive('setting', function ($expression) {
             return "<?php echo app(\\QuickerFaster\\UILibrary\\Services\\Settings\\SettingsManager::class)->get({$expression}); ?>";
         });
+    }
+
+    /**
+     * Register library-level event listeners that are not auto-discovered
+     * from module Listeners directories by ModuleServiceProvider.
+     */
+    private function registerEventListeners(): void
+    {
+        Event::listen(
+            \QuickerFaster\UILibrary\Events\ToggleButtonEvent::class,
+            \QuickerFaster\UILibrary\Listeners\ToggleButtonListener::class
+        );
     }
 
     /**

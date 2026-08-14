@@ -58,12 +58,21 @@
 @endphp
 
 @if ($hasPermission)
-    <li class="nav-item text-nowrap" wire:key="sidebar-item-{{ $item['key'] ?? $item['label'] }}">
+    <li class="nav-item text-nowrap" wire:key="sidebar-item-{{ $item['key'] ?? $item['label'] }}"
+        data-filterable
+        data-filter-text="{{ strtolower($item['label'] ?? '') }} {{ strtolower($item['key'] ?? '') }} {{ strtolower($activeContext ?? '') }}">
         <a href="{{ $itemUrl }}"
         class="nav-link d-flex align-items-center {{ $isActive ? 'active fw-bold text-primary' : 'text-dark' }}"
         data-bs-toggle="tooltip"
         data-bs-placement="right"
-        title="{{ $item['label'] }}">
+        title="{{ $item['label'] }}"
+        @if(config('ui-library.navigation.open_in_tabs', false))
+        data-workspace-tab
+        data-tab-label="{{ $item['label'] ?? '' }}"
+        data-tab-url="{{ $itemUrl }}"
+        data-tab-icon="{{ $item['icon'] ?? '' }}"
+        data-tab-context="{{ $activeContext ?? '' }}"
+        @endif>
             <i class="fa {{ $item['icon'] ?? 'fa-circle' }} me-2"></i>
             @if ($state === 'full')
                 <span>{{ $item['label'] }}</span>

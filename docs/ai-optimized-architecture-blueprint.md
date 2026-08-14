@@ -8,7 +8,7 @@
 > **Livewire Prefix**: `qf.`
 > **Last Updated**: 2026-08-10
 
-> **📋 Note**: The 17-file topic split under [`docs/architecture/`](docs/architecture/) (Phase 4.6) is the next documentation task. Until the split is complete, this blueprint remains the single source of truth. See [`docs/architecture/00-index.md`](docs/architecture/00-index.md) for the authoritative index.
+> ⚠️ **SUPERSEDED** — This file has been split into 17 topic files under [`docs/architecture/`](docs/architecture/00-index.md). See [`00-index.md`](docs/architecture/00-index.md) for the authoritative index. This file is retained as historical reference only.
 
 
 ---
@@ -218,7 +218,7 @@ src/
 │       ├── SetupChecklist.php             # Setup onboarding checklist UI
 │       ├── BackgroundJobsPanel.php        # Background job status monitor
 │       ├── AccessControls/                # Permission/role management
-│       │   ├── AccessControlManager.php   # Full access control UI
+│       │   ├── AccessControlManager.php   # Consolidated access control UI (search + bulk toggles)
 │       │   ├── ModuleSelector.php         # Module selection for permissions
 │       │   ├── PermissionManager.php      # Permission CRUD
 │       │   ├── PermissionGroup.php        # Permission grouping
@@ -749,7 +749,7 @@ All components are registered in [`UILibraryServiceProvider::registerLivewireCom
 
 | Component | Alias | Class | Purpose |
 |-----------|-------|-------|---------|
-| AccessControlManager | `qf.access-control-manager` | `AccessControlManager` | Full access control management UI |
+| AccessControlManager | `qf.access-control-manager` | `AccessControlManager` | Consolidated access control UI with model search and bulk permission toggles |
 | ModuleSelector | `qf.module-selector` | `ModuleSelector` | Module selection for permission scoping |
 | RoleAssignmentManager | `qf.role-assignment-manager` | `RoleAssignmentManager` | Role assignment interface |
 | PermissionManager | `qf.permission-manager` | `PermissionManager` | Permission CRUD interface |

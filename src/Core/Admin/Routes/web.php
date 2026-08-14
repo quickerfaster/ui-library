@@ -18,4 +18,8 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/admin/permissions', function () {
         return view('qf-core::admin.permissions');
     })->name('admin.permissions');
+
+    Route::get('/admin/access-control-management', function () {
+        return view('qf-core::admin.access-control-management');
+    })->name('admin.access-control-management');
 });

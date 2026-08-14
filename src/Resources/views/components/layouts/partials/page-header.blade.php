@@ -119,5 +119,5 @@
 @endif
 
 @if ($layoutConfig['breadcrumb']['enabled'] ?? true)
-    <x-breadcrumb :items="$breadcrumbItems" />
+    <x-breadcrumbs :segments="$breadcrumbItems" :maxVisible="4" />
 @endif

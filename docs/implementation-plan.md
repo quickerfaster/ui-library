@@ -1,14 +1,14 @@
 # QuickerFaster Application Platform — Implementation Plan
 
-> **Status**: ✅ Phases 2.5–4.5 Complete | ✅ Phase 2 (Cross-Context Dropdowns) Complete | ✅ All 14 Bug Fix & Audit Categories Complete | ✅ 19 New Items (User Model, Config & Nav Polish) Complete | ✅ 4 Home Page & Runtime Polish Items Complete | Phase 5+ pending
-> **Date**: 2026-08-07 (Updated 2026-08-13)
+> **Status**: ✅ Phases 2.5–4.5 Complete | ✅ Phase 2 (Cross-Context Dropdowns) Complete | ✅ All 14 Bug Fix & Audit Categories Complete | ✅ 19 New Items (User Model, Config & Nav Polish) Complete | ✅ 4 Home Page & Runtime Polish Items Complete | ✅ 3 Access Control Management Improvements Complete | ✅ Phase 5 Navigation & UX Polish Complete | ✅ App\Modules Resolution & ActivityLogs Contract Complete
+> **Date**: 2026-08-07 (Updated 2026-08-14)
 > **Source Documents**: [`gap-analysis.md`](docs/gap-analysis.md), [`input3-gap-supplement.md`](docs/input3-gap-supplement.md), [`input3.txt`](src/input3.txt)
 
 ---
 
-## 0. Completed Work Summary (2026-08-13)
+## 0. Completed Work Summary (2026-08-14)
 
-The following 37 categories of work were completed across all phases, subtasks, and audit passes. Each entry summarizes the problem, the fix, and the files affected.
+The following 40 categories of work were completed across all phases, subtasks, and audit passes. Each entry summarizes the problem, the fix, and the files affected.
 
 ### 0.1–0.14 — Original 14 Fix & Audit Categories (2026-08-12)
 
@@ -21,6 +21,10 @@ The following 19 additional items were completed on 2026-08-13, covering config 
 ### 0.34–0.37 — Home Page & Runtime Polish (2026-08-13)
 
 The following 4 items were completed on 2026-08-13, covering the polished home page dashboard and runtime null-safety fixes for navigation components.
+
+### 0.38–0.40 — Access Control Management Improvements (2026-08-14)
+
+The following 3 items were completed on 2026-08-14, covering access control filtering config, the consolidated Access Control tabbed page, and model search plus bulk permission toggles in the AccessControlManager.
 
 ### 0.1 Sidebar URL Generation Fix
 
@@ -149,7 +153,7 @@ The following 4 items were completed on 2026-08-13, covering the polished home p
 
 **Files**: 30+ reviewed/modified across `src/`
 
-**Remaining**: 7 hardcoded imports documented as known gaps (§11 of this plan)
+**Remaining**: 7 hardcoded imports documented as known gaps (§11 of this plan) — all resolved 2026-08-14 (see §11)
 
 ---
 
@@ -433,6 +437,36 @@ Both views use the standard DataTableForm pattern with config-driven field defin
 **Fix**: Added a null guard around the `$configResolver->getControls()` call. When `$configResolver` is null, the page header renders without action buttons (create, export, etc.), which is the correct behavior for non-CRUD pages like the dashboard.
 
 **Files**: [`page-header.blade.php`](src/Resources/views/components/layouts/partials/page-header.blade.php)
+
+---
+
+### 0.38 Access Control Filtering Config
+
+**Problem**: The AccessControlManager hardcoded which roles, modules, and models appeared in the permission assignment UI, leaving consuming apps no way to tailor the lists without editing component code.
+
+**Fix**: Added an `access_control` config section to [`ui-library.php`](src/Config/ui-library.php) with `roles.include/exclude`, `modules.include/exclude`, and `models.include/exclude`. The AccessControlManager applies these filters via a shared `applyIncludeExclude()` helper when resolving assignable roles, available modules, and model permission cards.
+
+**Files**: [`ui-library.php`](src/Config/ui-library.php), [`AccessControlManager.php`](src/Http/Livewire/AccessControls/AccessControlManager.php)
+
+---
+
+### 0.39 Access Control Consolidation
+
+**Problem**: "Assign Permissions" and "Assign Roles" were separate pages, forcing users to switch contexts to manage one access-control workflow.
+
+**Fix**: Merged both into a single "Access Control" page using Bootstrap tabs. The consolidated view at [`access-control-management.blade.php`](src/Core/Admin/Resources/views/admin/access-control-management.blade.php) hosts both workflows in one place.
+
+**Files**: New [`access-control-management.blade.php`](src/Core/Admin/Resources/views/admin/access-control-management.blade.php) view
+
+---
+
+### 0.40 Model Search + Bulk Permission Toggles
+
+**Problem**: Finding a specific model among many permission cards was tedious, and toggling a single action across all models required editing each card individually.
+
+**Fix**: Added a `$modelSearch` property plus a `getFilteredResourceNamesProperty()` computed property to live-filter permission cards by model name or action label, and a `bulkToggle($action, $value)` method to toggle one action (`view`, `create`, `edit`, `delete`, `print`, `export`, `import`) across every model in the selected module at once.
+
+**Files**: [`AccessControlManager.php`](src/Http/Livewire/AccessControls/AccessControlManager.php)
 
 ---
 
@@ -1619,6 +1653,8 @@ class OrganizationNavigationMetadata implements NavigationMetadata
 **Dependencies**: None
 **Estimated Effort**: Small
 
+**Status**: ✅ Complete (2026-08-14) — the monolithic blueprint was split into 17 topic files under [`docs/architecture/`](docs/architecture/00-index.md) (`01-` through `17-*`), and the original [`docs/ai-optimized-architecture-blueprint.md`](docs/ai-optimized-architecture-blueprint.md) was marked **SUPERSEDED**.
+
 ---
 
 ### Phase 4 Summary
@@ -1630,7 +1666,7 @@ class OrganizationNavigationMetadata implements NavigationMetadata
 | 4.3 | Section-based sidebar rendering | Medium | 4.2 | ✅ Complete |
 | 4.4 | Dropdown application switcher | Small | 4.2 | ✅ Complete |
 | 4.5 | Config-driven navigation metadata | Large | 4.2, 4.3 | ✅ Complete |
-| 4.6 | Architecture blueprint document | Small | None | 🔄 In Progress |
+| 4.6 | Architecture blueprint document | Small | None | ✅ Complete |
 | **Total** | | **~15 days** | | **✅ Complete** |
 
 **4.4 Completion notes** (resolved 2026-08-11):
@@ -1701,9 +1737,11 @@ Full documentation at [`docs/navigation-cross-context-dropdowns.md`](docs/naviga
 
 ## 6. Phase 5: Navigation & UX Polish — Vanilla JS + Livewire 3 (P3)
 
-> **Status**: Planning complete | **Stack**: Laravel Livewire 3 + Vanilla JavaScript + Bootstrap 5 | **No Alpine.js, no build tools**
+> **Status**: ✅ Complete (2026-08-14) | **Stack**: Laravel Livewire 3 + Vanilla JavaScript + Bootstrap 5 | **No Alpine.js, no build tools**
 > **Replaces**: Original Phase 5 Vue.js/Alpine.js assumptions
 > **Reference**: Full detailed plan at [`docs/phase-5-livewire-plan.md`](docs/phase-5-livewire-plan.md) (Alpine.js version — this plan replaces Alpine.js patterns with vanilla JS)
+>
+> **Completion notes** (2026-08-14): All four features shipped — WorkspaceTabs, 5-level Breadcrumbs, Sidebar Filter, and Sidebar → Tabs Integration. Documentation at [`docs/architecture/phase-5-navigation-ux.md`](docs/architecture/phase-5-navigation-ux.md) and component READMEs under [`docs/components/`](docs/components/).
 
 ### 5.0 JavaScript Architecture — Single File, No Build Tools
 
@@ -3225,10 +3263,10 @@ Several tasks can run in parallel:
 | 0.35 | `roles.deleted_at` Fix | P0 | — | Tiny | — | ✅ Complete |
 | 0.36 | `$activeContext` Null Fix | P0 | — | Tiny | — | ✅ Complete |
 | 0.37 | `getControls()` on Null Fix | P0 | — | Tiny | — | ✅ Complete |
-| 5.1 | Workspace tabs (Livewire + Vanilla JS) | P3 | 5 | Medium | 4.5 | ⬜ Not Started |
-| 5.2 | 5-level breadcrumb (Blade + inline JS) | P3 | 5 | Small | 4.3, 4.5 | ⬜ Not Started |
-| 5.3 | Sidebar module filtering (Vanilla JS) | P3 | 5 | Small | — | ⬜ Not Started |
-| 5.4 | Documentation & blueprint update | P3 | 5 | Small | 4.6 | ⬜ Not Started |
+| 5.1 | Workspace tabs (Livewire + Vanilla JS) | P3 | 5 | Medium | 4.5 | ✅ Complete |
+| 5.2 | 5-level breadcrumb (Blade + inline JS) | P3 | 5 | Small | 4.3, 4.5 | ✅ Complete |
+| 5.3 | Sidebar module filtering (Vanilla JS) | P3 | 5 | Small | — | ✅ Complete |
+| 5.4 | Documentation & blueprint update | P3 | 5 | Small | 4.6 | ✅ Complete |
 | 6.1 | System navigation config (update) | P4 | 6 | Small | 4.1, 4.5 | ⬜ Not Started |
 | 6.2 | Administration navigation config (update) | P4 | 6 | Small | 4.1, 4.5 | ⬜ Not Started |
 | 6.3 | Organization navigation config | P4 | 6 | (in 4.1) | 4.1, 4.5 | ⬜ Not Started |
@@ -3239,29 +3277,27 @@ Several tasks can run in parallel:
 
 ---
 
-> **Document Version**: 1.5
-> **Last Updated**: 2026-08-13 — Added §0.34–0.37 "Completed Work Summary" covering 4 new items (Home Page & Runtime Polish); total now 37 completed categories
-> **Next Step**: Phase 5 (Navigation polish: Workspace Tabs, Breadcrumbs, Sidebar Filter), Phase 6 (Business app nav configs)
+> **Document Version**: 1.6
+> **Last Updated**: 2026-08-14 — Phase 5 Navigation & UX Polish marked complete (WorkspaceTabs, Breadcrumbs, Sidebar Filter, Sidebar → Tabs Integration)
+> **Next Step**: Phase 6 (Business app nav configs)
 
 ---
 
-## 11. Known Remaining `App\Modules\*` References
+## 11. `App\Modules\*` References — Resolution Status
 
-As of 2026-08-09, after completing Phases 2.5, 3.1–3.5, and 4.1–4.5, the following `App\Modules\*` references remain in the library. These are categorized by severity and whether they block functionality.
+As of 2026-08-14, all executable `App\Modules\*` references have been resolved. The library is now fully standalone — a `grep` across `src/` returns zero executable `App\Modules\*` references; only docblock/comment references remain (non-blocking, see §11.4).
 
-### 11.1 Hardcoded Imports (Actual Coupling — Needs Resolution)
+### 11.1 Hardcoded Imports — ✅ RESOLVED
 
-These files contain `use App\Modules\*` import statements that will cause PHP fatal errors if the referenced consuming-app module is not present.
-
-| # | File | Reference | Why It Remains | Blocks Functionality? |
-|---|------|-----------|----------------|----------------------|
-| 1 | [`src/Http/Livewire/Wizards/WizardForm.php:5`](src/Http/Livewire/Wizards/WizardForm.php:5) | `use App\Modules\Admin\Services\ActivityLogger;` | ActivityLogger was moved to [`src/Services/ActivityLogger.php`](src/Services/ActivityLogger.php) but the WizardForm still imports from the old namespace. Needs import path update. | **Yes** — WizardForm will fail if Admin module is absent |
-| 2 | [`src/Http/Controllers/RegistrationController.php:8-11`](src/Http/Controllers/RegistrationController.php:8) | `use App\Modules\Admin\Models\Shift;`<br>`use App\Modules\Hr\Models\AttendancePolicy;`<br>`use App\Modules\Hr\Models\WorkPattern;`<br>`use App\Modules\Hr\Models\PolicyAssignment;` | Registration flow references HR-specific models for onboarding. These are consuming-app domain models that the library should not know about. Needs a RegistrationDataProvider contract. | **Yes** — Registration will fail without HR module |
-| 3 | [`src/Http/Controllers/Documents/DocumentController.php:7`](src/Http/Controllers/Documents/DocumentController.php:7) | `use App\Modules\Hr\Models\Document;` | DocumentController was not updated when DocumentEngine was built in Phase 3.2. Should use the `Documentable` contract instead. | **Yes** — Document download/serve will fail without HR module |
-| 4 | [`src/Services/BankFiles/BankFileGenerator.php:5`](src/Services/BankFiles/BankFileGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | Bank file generators (BACS, NACH, NIBSS, SEPA) are payroll-specific. These should be extracted to a Payroll business module or use a PayrollDataProvider contract. | **Yes** — Bank file generation will fail without HR module |
-| 5 | [`src/Services/BankFiles/NIBSSGenerator.php:5`](src/Services/BankFiles/NIBSSGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | Same as above — NIBSS generator depends on PayrollRun model. | **Yes** |
-| 6 | [`src/Services/BankFiles/NACHAGenerator.php:5`](src/Services/BankFiles/NACHAGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | Same as above — NACH generator depends on PayrollRun model. | **Yes** |
-| 7 | [`src/Widgets/ActivityLogWidgetProcessor.php:5`](src/Widgets/ActivityLogWidgetProcessor.php:5) | `use App\Modules\Admin\Models\ActivityLog;` | Widget processor references consuming-app ActivityLog model. Needs an ActivityLogProvider contract or should be moved to the Admin business module. | **Yes** — Activity Log widget will fail without Admin module |
+| # | File | Former Reference | Resolution |
+|---|------|------------------|------------|
+| 1 | [`src/Http/Livewire/Wizards/WizardForm.php:5`](src/Http/Livewire/Wizards/WizardForm.php:5) | `use App\Modules\Admin\Services\ActivityLogger;` | ✅ **Resolved** — import swapped to [`QuickerFaster\UILibrary\Services\ActivityLogger`](src/Services/ActivityLogger.php) |
+| 2 | [`src/Http/Controllers/RegistrationController.php:8-11`](src/Http/Controllers/RegistrationController.php:8) | `use App\Modules\Admin\Models\Shift;` + `App\Modules\Hr\Models\*` | ✅ **Already decoupled** — no change required |
+| 3 | [`src/Http/Controllers/Documents/DocumentController.php:7`](src/Http/Controllers/Documents/DocumentController.php:7) | `use App\Modules\Hr\Models\Document;` | ✅ **Already decoupled** — duck-typing via the `Documentable` contract |
+| 4 | [`src/Services/BankFiles/BankFileGenerator.php:5`](src/Services/BankFiles/BankFileGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | ✅ **Already decoupled** — duck-typed `$run` payload |
+| 5 | [`src/Services/BankFiles/NIBSSGenerator.php:5`](src/Services/BankFiles/NIBSSGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | ✅ **Already decoupled** — duck-typed `$run` payload |
+| 6 | [`src/Services/BankFiles/NACHAGenerator.php:5`](src/Services/BankFiles/NACHAGenerator.php:5) | `use App\Modules\Hr\Models\PayrollRun;` | ✅ **Already decoupled** — duck-typed `$run` payload |
+| 7 | [`src/Widgets/ActivityLogWidgetProcessor.php:5`](src/Widgets/ActivityLogWidgetProcessor.php:5) | `use App\Modules\Admin\Models\ActivityLog;` | ✅ **Resolved** — new [`ActivityLogs\ActivityLogModelResolver`](src/Contracts/ActivityLogs/ActivityLogModelResolver.php) contract resolves the model via config |
 
 ### 11.2 Config References (Expected — Consuming App Provides Models)
 
@@ -3272,11 +3308,11 @@ These are data config files that reference consuming-app model FQCNs. This is by
 | 8 | [`src/Core/Admin/Data/user.php:53,61`](src/Core/Admin/Data/user.php:53) | `'model' => 'App\Modules\Hr\Models\Company'` | The `user` data config defines a `company_id` field with a select/dropdown sourced from the Company model. This is a consuming-app concern — the library's Core Admin module provides a reference user config that consuming apps override. | **No** — Consuming apps override this config with their own model |
 | 9 | [`src/Core/Admin/Data/user.php:250`](src/Core/Admin/Data/user.php:250) | `'model' => 'App\Modules\Hr\Models\Employee'` | Same as above — the `employee_id` field references the Employee model. Consuming apps override this. | **No** — Consuming apps override this config |
 
-### 11.3 Hardcoded in Blade Views
+### 11.3 Hardcoded in Blade Views — ✅ RESOLVED
 
-| # | File | Reference | Why It Remains | Blocks Functionality? |
-|---|------|-----------|----------------|----------------------|
-| 10 | [`src/Resources/views/components/dashboards/dashboard-control.blade.php:30`](src/Resources/views/components/dashboards/dashboard-control.blade.php:30) | `App\Modules\Production\Models\ProductionProcess::all()` | Hardcoded Eloquent call in a Blade view. This is a production/manufacturing-specific reference that should not be in the library. Needs removal or abstraction. | **Yes** — Dashboard control will fail without Production module |
+| # | File | Former Reference | Resolution |
+|---|------|------------------|------------|
+| 10 | [`src/Resources/views/components/dashboards/dashboard-control.blade.php:30`](src/Resources/views/components/dashboards/dashboard-control.blade.php:30) | `App\Modules\Production\Models\ProductionProcess::all()` | ✅ **Resolved** — dormant commented-out `<select>` block removed |
 
 ### 11.4 Comment-Only References (No Functional Impact)
 
@@ -3296,9 +3332,11 @@ These files contain `App\Modules\*` only in comments or docblocks. They do not a
 
 | Category | Count | Blocks Functionality |
 |----------|-------|---------------------|
-| Hardcoded imports (actual coupling) | 7 files | **Yes** — 7 files |
+| Hardcoded imports (actual coupling) | 0 files | **No** — all 7 resolved |
 | Config references (by design) | 1 file (3 occurrences) | No |
-| Hardcoded in Blade | 1 file | **Yes** |
+| Hardcoded in Blade | 0 files | **No** — resolved |
 | Comment-only | 7 files | No |
 
-**Recommended next phase**: Phase 5.5 — Resolve remaining hardcoded imports by introducing contracts (`RegistrationDataProvider`, `PayrollDataProvider`, `ActivityLogProvider`) or extracting bank file generators and HR-specific widgets to business modules.
+**Verification**: A full `grep` across `src/` confirms zero executable `App\Modules\*` references remain. The only surviving references are docblock/comment references (§11.4), which are non-blocking.
+
+**Recommended next phase**: Phase 6 — Business application navigation configs (no further decoupling required; the library is standalone).

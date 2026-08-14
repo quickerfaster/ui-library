@@ -2,7 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\Wizards;
 
-use App\Modules\Admin\Services\ActivityLogger;
+use QuickerFaster\UILibrary\Services\ActivityLogger;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Validator;

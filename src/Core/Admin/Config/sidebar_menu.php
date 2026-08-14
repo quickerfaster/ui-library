@@ -16,18 +16,11 @@ return [
     'order' => 2,
 ],
     [
-    'title' => 'Assign Permissions',
-    'icon' => 'fas fa-user-lock',
+    'title' => 'Access Control',
+    'icon' => 'fas fa-shield-alt',
     'url' => 'admin/admin/access-control-management',
     'permission' => 'view_permission',
     'order' => 3,
-],
-    [
-    'title' => 'Assign Roles',
-    'icon' => 'fas fa-user-tag',
-    'url' => 'admin/admin/role-assignment',
-    'permission' => 'view_assign_user_role',
-    'order' => 4,
 ],
     [
     'itemType' => 'item-separator',

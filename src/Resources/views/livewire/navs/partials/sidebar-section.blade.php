@@ -33,7 +33,9 @@
             data-bs-placement="right"
             title="{{ $sectionLabel }}"
             aria-expanded="false"
-            :aria-expanded="isExpanded('{{ $sectionKey }}')">
+            :aria-expanded="isExpanded('{{ $sectionKey }}')"
+            data-filterable
+            data-filter-text="{{ strtolower($sectionLabel ?? '') }} {{ strtolower($sectionKey ?? '') }} {{ strtolower($activeContext ?? '') }}">
             <i class="fa {{ $sectionIcon }} {{ $state === 'icon' ? '' : 'me-2' }} {{ $hasActive ? 'text-primary' : 'text-muted' }}"
                style="font-size: 0.85rem;" aria-hidden="true"></i>
             @if ($state === 'icon')
@@ -70,7 +72,9 @@
         {{-- Static label — no chevron, no click handler --}}
         <div class="sidebar-section-label small fw-semibold text-muted text-uppercase
                     {{ $state === 'icon' ? 'px-0 py-1 d-flex justify-content-center' : 'px-3 py-2' }}"
-             style="font-size: 0.7rem; letter-spacing: 0.05em;">
+             style="font-size: 0.7rem; letter-spacing: 0.05em;"
+             data-filterable
+             data-filter-text="{{ strtolower($sectionLabel ?? '') }} {{ strtolower($sectionKey ?? '') }} {{ strtolower($activeContext ?? '') }}">
             @if ($state === 'full')
                 <i class="fa {{ $sectionIcon }} me-2 text-muted" style="font-size: 0.85rem;" aria-hidden="true"></i>
                 {{ $sectionLabel }}

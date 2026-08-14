@@ -18,8 +18,43 @@ class ToggleButton extends Component
 
 
 
-    public function mount()
-    {
+    public function mount(
+        $isCard = true,
+        $title = null,
+        $subtitle = null,
+        $icon = null,
+        $iconBg = 'primary',
+        $iconColor = '',
+        $hasCorners = true,
+        $isOn = false,
+        $componentId = null,
+        $model = null,
+        $column = null,
+        $recordId = null,
+        $onStateValue = 1,
+        $offStateValue = 0,
+        $stateSyncMethod = 'database',
+        $method = null,
+        $data = []
+    ) {
+        $this->isCard = $isCard;
+        $this->title = $title;
+        $this->subtitle = $subtitle;
+        $this->icon = $icon;
+        $this->iconBg = $iconBg;
+        $this->iconColor = $iconColor;
+        $this->hasCorners = $hasCorners;
+        $this->isOn = $isOn;
+        $this->componentId = $componentId;
+        $this->model = $model;
+        $this->column = $column;
+        $this->recordId = $recordId;
+        $this->onStateValue = $onStateValue;
+        $this->offStateValue = $offStateValue;
+        $this->stateSyncMethod = $stateSyncMethod;
+        $this->method = $method;
+        $this->data = $data;
+
         $this->syncStateFromDatabase();
     }
 

@@ -1,27 +1,42 @@
-<div class="module-selector">
-    <h6 class="text-uppercase text-body text-xs font-weight-bolder mb-3">
-        {{ __('qf::nav.modules') }}
-    </h6>
-    <ul class="list-group list-group-flush">
-        @forelse($moduleNames as $key => $moduleName)
-            <li class="list-group-item border-0 px-0">
-                <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0">
-                    <label class="form-check-label mb-0 ms-2" for="module-{{ $key }}">
-                        <i class="fas fa-cube me-2"></i>
-                        {{ is_array($moduleName) ? ($moduleName['label'] ?? ucfirst($key)) : ucfirst($moduleName) }}
-                    </label>
-                    <input
-                        class="form-check-input ms-auto"
-                        type="checkbox"
-                        id="module-{{ $key }}"
-                        wire:model.live="moduleStates.{{ $key }}"
-                    >
-                </div>
-            </li>
-        @empty
-            <li class="list-group-item border-0 px-0">
-                <span class="text-muted">No modules found</span>
-            </li>
-        @endforelse
-    </ul>
+<div class="d-flex flex-wrap align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <label for="access-control-scope" class="form-label mb-0 text-xs fw-bold text-uppercase text-secondary">
+            Role
+        </label>
+        <select
+            id="access-control-scope"
+            class="form-select form-select-sm"
+            wire:model.live="selectedScopeId"
+        >
+            <option value="">-- Select Role --</option>
+            @foreach($scopeNames as $scopeId => $scopeName)
+                <option value="{{ $scopeId }}">{{ $scopeName }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <label for="access-control-module" class="form-label mb-0 text-xs fw-bold text-uppercase text-secondary">
+            Module
+        </label>
+        <select
+            id="access-control-module"
+            class="form-select form-select-sm"
+            wire:model.live="selectedModule"
+        >
+            <option value="">-- Select Module --</option>
+            @foreach($moduleNames as $moduleName)
+                <option value="{{ $moduleName }}">{{ ucfirst($moduleName) }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    <button
+        type="button"
+        class="btn btn-sm btn-primary rounded-pill px-3 text-uppercase fw-bold"
+        wire:click="manageAccessControl"
+        wire:loading.attr="disabled"
+    >
+        OK
+    </button>
 </div>

@@ -25,8 +25,22 @@ class ToggleButtonGroup extends Component
 
 
 
-    public function mount()
-    {
+    public function mount(
+        $title = null,
+        $subtitle = null,
+        $componentId = null,
+        $buttons = [],
+        $groupId = null,
+        $stateSyncMethod = 'database',
+        $data = []
+    ) {
+        $this->title = $title;
+        $this->subtitle = $subtitle;
+        $this->componentId = $componentId;
+        $this->buttons = $buttons;
+        $this->groupId = $groupId;
+        $this->stateSyncMethod = $stateSyncMethod;
+        $this->data = $data;
 
         $this->description = $this->getUpdatedDescription();
 

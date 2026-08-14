@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Traits\NavigationFilter;
 use QuickerFaster\UILibrary\Contracts\Navigation\WorkspaceResolver;
+use QuickerFaster\UILibrary\Services\Navigation\NavigationManager;
 use QuickerFaster\UILibrary\Services\Navigation\WorkspaceFilter;
 
 class NavigationLayout extends Component
@@ -243,17 +244,116 @@ class NavigationLayout extends Component
     public function getBreadcrumbItems(): array
     {
         $items = [];
+
+        // 1. Home
         if (config('ui-library.breadcrumb.show_home', true)) {
             $items[] = ['label' => __('Home'), 'url' => url('/')];
         }
+
+        // 2. Application (module name)
+        $moduleLabel = $this->resolveModuleLabel();
+        $items[] = ['label' => $moduleLabel, 'url' => $this->resolveModuleUrl()];
+
+        // 3. Workspace (active context group)
         if ($this->activeContext && isset($this->contextGroups[$this->activeContext])) {
             $group = $this->contextGroups[$this->activeContext];
             $items[] = ['label' => $group['label'], 'url' => $group['route'] ?? $group['url'] ?? null];
         }
-        if ($this->currentContextItem) {
-            $items[] = ['label' => $this->currentContextItem['label'], 'url' => $this->currentContextItem['route'] ?? null];
+
+        // 4. Section (active sidebar section from NavigationManager)
+        $section = $this->resolveCurrentSection();
+        if ($section && $section['label'] && strcasecmp((string) $section['label'], (string) $moduleLabel) !== 0) {
+            $items[] = ['label' => $section['label'], 'url' => $section['url'] ?? null];
         }
+
+        // 5. Page / Record
+        if ($this->currentContextItem) {
+            $items[] = [
+                'label' => $this->currentContextItem['page_title'] ?? $this->currentContextItem['label'],
+                'url' => $this->currentContextItem['route'] ?? null,
+            ];
+        }
+
         return $items;
+    }
+
+    /**
+     * Resolve the current sidebar section via NavigationManager.
+     *
+     * @return array{label: string|null, url: string|null}|null
+     */
+    protected function resolveCurrentSection(): ?array
+    {
+        try {
+            $sections = app(NavigationManager::class)->getSections($this->moduleName);
+        } catch (\Throwable $e) {
+            $sections = [];
+        }
+
+        foreach ($sections as $section) {
+            if (!empty($section['has_active'])) {
+                $url = null;
+                $firstItem = $section['items'][0] ?? null;
+
+                if ($firstItem) {
+                    $url = $this->resolveBreadcrumbUrl(
+                        $firstItem['route'] ?? null,
+                        $firstItem['url'] ?? null
+                    );
+                }
+
+                return [
+                    'label' => $section['label'] ?? null,
+                    'url' => $url,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    protected function resolveModuleLabel(): string
+    {
+        $moduleConfig = config('ui-library.modules.' . $this->moduleName);
+
+        return $moduleConfig['label'] ?? $this->moduleName ?? 'Module';
+    }
+
+    protected function resolveModuleUrl(): ?string
+    {
+        $moduleConfig = config('ui-library.modules.' . $this->moduleName);
+
+        if (! $moduleConfig) {
+            return null;
+        }
+
+        if (! empty($moduleConfig['route'])) {
+            try {
+                return route($moduleConfig['route']);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        return $moduleConfig['url'] ?? null;
+    }
+
+    protected function resolveBreadcrumbUrl(?string $route, ?string $url): ?string
+    {
+        if ($route) {
+            // A leading slash indicates a URL path rather than a named route.
+            if (str_starts_with($route, '/')) {
+                return $route;
+            }
+
+            try {
+                return route($route);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        return $url;
     }
 
     public function getPageTitle(): string

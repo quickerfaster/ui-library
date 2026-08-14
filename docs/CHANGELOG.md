@@ -1,8 +1,86 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-08-13
-> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items completed
+> **Date**: 2026-08-14
+> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split
+
+---
+
+## 2026-08-14 — Architecture Blueprint Split (17 Topic Files)
+
+The monolithic [`ai-optimized-architecture-blueprint.md`](docs/ai-optimized-architecture-blueprint.md) (~3,000 lines) was split into **17 topic files** under [`docs/architecture/`](docs/architecture/00-index.md) (`01-` through `17-*`), each focused on a single architectural concern. The original blueprint is marked **SUPERSEDED** and retained as historical reference only.
+
+- **Authoritative index**: [`00-index.md`](docs/architecture/00-index.md) now maps all 17 topic files plus `phase-5-navigation-ux.md`, with cross-references and reading orders by role.
+- **Status**: All 17 topic files are `✅ EXISTS`; no `⏸️ DEFERRED` topic files remain.
+- **Blueprint**: [`ai-optimized-architecture-blueprint.md`](docs/ai-optimized-architecture-blueprint.md) is marked `⚠️ SUPERSEDED`.
+
+---
+
+## 2026-08-14 — App\Modules Resolution + ActivityLogs Contract
+
+### Standalone Library: Zero Executable `App\Modules\*` References
+
+The library is now fully standalone — no executable `App\Modules\*` references remain. All previously documented hardcoded imports in [`implementation-plan.md` §11](docs/implementation-plan.md) have been resolved or confirmed already decoupled.
+
+- **WizardForm import swap**: [`WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php) now imports [`QuickerFaster\UILibrary\Services\ActivityLogger`](src/Services/ActivityLogger.php) instead of `App\Modules\Admin\Services\ActivityLogger`.
+- **ActivityLogWidgetProcessor decoupling**: new [`ActivityLogs\ActivityLogModelResolver`](src/Contracts/ActivityLogs/ActivityLogModelResolver.php) contract with `resolveModel(): ?string`, plus a default [`ActivityLogModelResolver`](src/Services/ActivityLogs/ActivityLogModelResolver.php) returning `config('ui-library.activity_logs.model')`.
+- **`ui-library.activity_logs.model` config key**: env `UI_LIBRARY_ACTIVITY_LOG_MODEL` (default `null`). When unset, [`ActivityLogWidgetProcessor`](src/Widgets/ActivityLogWidgetProcessor.php) gracefully no-ops instead of failing.
+- **Service provider binding**: default `ActivityLogModelResolver` bound in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php) alongside `ApprovalModelResolver`.
+- **dashboard-control.blade.php cleanup**: removed the dormant commented-out `<select>` block that referenced `App\Modules\Production\Models\ProductionProcess::all()`.
+
+**Verification**: `grep` across `src/` confirms zero executable `App\Modules\*` references remain — only docblock/comment references persist, which are non-blocking.
+
+**Files**: [`WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php), [`src/Contracts/ActivityLogs/ActivityLogModelResolver.php`](src/Contracts/ActivityLogs/ActivityLogModelResolver.php) (new), [`src/Services/ActivityLogs/ActivityLogModelResolver.php`](src/Services/ActivityLogs/ActivityLogModelResolver.php) (new), [`ui-library.php`](src/Config/ui-library.php), [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php), [`ActivityLogWidgetProcessor.php`](src/Widgets/ActivityLogWidgetProcessor.php), [`dashboard-control.blade.php`](src/Resources/views/components/dashboards/dashboard-control.blade.php)
+
+---
+
+## 2026-08-14 — Phase 5 Navigation & UX Polish
+
+### WorkspaceTabs
+Browser-style tab system with session persistence. Livewire component [`WorkspaceTabs.php`](src/Http/Livewire/Layouts/Navs/WorkspaceTabs.php) plus a vanilla JS tab strip supporting click-to-switch, close button, middle-click close, right-click context menu (close others / close all to right / close all), overflow chevron, and Ctrl+W / Ctrl+Shift+T keyboard shortcuts. State persists via the `workspace_tabs`, `workspace_active_tab`, and `workspace_recently_closed` session keys.
+
+### Breadcrumbs
+5-level collapsible Blade component [`Breadcrumbs.php`](src/Components/Breadcrumbs.php) supporting `Application → Workspace → Section → Page → Record`. Collapses to first + "..." + last 2 segments via a vanilla JS dropdown.
+
+### Sidebar Filter
+Real-time client-side fuzzy search (word-based, case-insensitive, 150ms debounce) via `data-sidebar-filter` / `data-filterable` / `data-filter-text` attributes. Arrow/Enter/Escape/Ctrl+K keyboard navigation. No server round-trip.
+
+### Sidebar → Tabs Integration
+`ui-library.navigation.open_in_tabs` config toggles sidebar clicks into workspace tabs via the `openWorkspaceTab` event.
+
+### Vanilla JS Architecture
+All client-side interactivity uses vanilla JS (IIFE in [`quicker-faster.js`](public/assets/js/quicker-faster.js)) via `data-*` attributes and `Livewire.dispatch()`. No Alpine.js `x-data` directives were introduced.
+
+**Docs**: [`phase-5-navigation-ux.md`](docs/architecture/phase-5-navigation-ux.md), [`workspace-tabs.md`](docs/components/workspace-tabs.md), [`breadcrumbs.md`](docs/components/breadcrumbs.md), [`sidebar-filter.md`](docs/components/sidebar-filter.md)
+
+---
+
+## 2026-08-14 — Access Control Management Improvements
+
+### Access Control Filtering Config (#38)
+**Problem**: The AccessControlManager hardcoded which roles, modules, and models appeared in the permission assignment UI, with no way for consuming apps to tailor the lists without editing component code.
+
+**Fix**: Added a new `access_control` config section to [`ui-library.php`](src/Config/ui-library.php) with `roles.include/exclude`, `modules.include/exclude`, and `models.include/exclude`. The AccessControlManager applies these filters when resolving assignable roles, available modules, and model permission cards. `'*'` includes everything; arrays of keys/names restrict or hide entries.
+
+**Files**: [`ui-library.php`](src/Config/ui-library.php), [`AccessControlManager.php`](src/Http/Livewire/AccessControls/AccessControlManager.php)
+
+---
+
+### Access Control Consolidation (#39)
+**Problem**: Permission assignment and role assignment lived on two separate pages, forcing users to switch contexts to manage a single access-control workflow.
+
+**Fix**: Merged "Assign Permissions" and "Assign Roles" into a single "Access Control" page using Bootstrap tabs. The consolidated view at [`access-control-management.blade.php`](src/Core/Admin/Resources/views/admin/access-control-management.blade.php) hosts both workflows in one place.
+
+**Files**: New [`access-control-management.blade.php`](src/Core/Admin/Resources/views/admin/access-control-management.blade.php) view
+
+---
+
+### Model Search + Bulk Permission Toggles (#40)
+**Problem**: With many models in a module, finding a specific model to assign permissions was tedious, and granting or revoking a single action (e.g. `view`) across all models required toggling each card individually.
+
+**Fix**: Added a `$modelSearch` property and a `getFilteredResourceNamesProperty()` computed property that live-filters the permission cards by model name or action label. Added a `bulkToggle($action, $value)` method that toggles a single action (`view`, `create`, `edit`, `delete`, `print`, `export`, `import`) across every model in the selected module at once.
+
+**Files**: [`AccessControlManager.php`](src/Http/Livewire/AccessControls/AccessControlManager.php)
 
 ---
 

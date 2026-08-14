@@ -129,6 +129,10 @@
                 :rightShared="$sharedTopRight" :hideTopnavContexts="$hideTopnavContexts ?? false" wire:key="top-nav-{{ $moduleName }}" />
         @endif
 
+        {{-- Workspace Tabs (browser-style tab strip) --}}
+        @if (config('ui-library.layout.workspace_tabs.enabled', true))
+            <livewire:qf.workspace-tabs />
+        @endif
 
         {{-- Desktop context area --}}
         <div class="d-none d-md-block mt-5">
