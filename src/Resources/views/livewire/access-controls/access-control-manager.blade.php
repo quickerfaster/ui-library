@@ -23,16 +23,28 @@
                 <div class="bulk-actions mb-3">
                     <span class="fw-bold me-2">Bulk:</span>
                     @foreach ($this->controlList as $control)
-                        <button
-                            type="button"
-                            wire:click="bulkToggle('{{ $control }}', true)"
-                            class="btn btn-sm btn-outline-primary me-1 mb-1"
-                        >All {{ ucfirst($control) }} On</button>
-                        <button
-                            type="button"
-                            wire:click="bulkToggle('{{ $control }}', false)"
-                            class="btn btn-sm btn-outline-secondary me-1 mb-1"
-                        >All {{ ucfirst($control) }} Off</button>
+                        @php
+                            $state = $this->bulkToggleStates[$control] ?? 'off';
+                            $color = match($state) {
+                                'on'    => 'success',
+                                'off'   => 'light',
+                                default => 'secondary',
+                            };
+                            $isChecked = $state === 'on' || $state === 'mixed';
+                        @endphp
+                        <div class="form-check form-switch d-inline-block me-3 mb-1"
+                             wire:key="bulk-toggle-{{ $controlButtonGroupVersion }}-{{ $control }}">
+                            <input type="checkbox"
+                                   class="form-check-input bg-{{ $color }} border-{{ $color }}"
+                                   wire:click="bulkToggle('{{ $control }}', {{ $isChecked ? 'false' : 'true' }})"
+                                   wire:loading.attr="disabled"
+                                   @checked($isChecked)>
+                            <label class="form-check-label text-sm">
+                                {{ ucfirst($control) }}
+                                <span wire:loading wire:target="bulkToggle('{{ $control }}', {{ $isChecked ? 'false' : 'true' }})"
+                                      class="spinner-border spinner-border-sm text-primary ms-1" role="status" aria-hidden="true"></span>
+                            </label>
+                        </div>
                     @endforeach
                 </div>
 

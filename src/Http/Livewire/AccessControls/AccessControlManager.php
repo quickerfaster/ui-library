@@ -212,37 +212,66 @@ class AccessControlManager extends Component
 
     /**
      * Filter the discovered resource (model) names by the current model search
-     * term. Matches against the model name and its permission action labels.
+     * term. The query is tokenized into words and every word must match
+     * (AND semantics) against a rich searchable representation of each model.
      *
      * @return array<int, string>
      */
     public function getFilteredResourceNamesProperty(): array
     {
-        $search = trim(strtolower((string) $this->modelSearch));
+        $query = trim((string) $this->modelSearch);
 
-        if ($search === '') {
+        if ($query === '') {
             return $this->resourceNames;
         }
 
-        return collect($this->resourceNames)
-            ->filter(function ($resourceName) use ($search) {
-                $snake = Str::snake(class_basename((string) $resourceName));
+        $words = preg_split('/\s+/', strtolower($query)) ?: [];
 
-                if (str_contains(strtolower((string) $resourceName), $search)) {
-                    return true;
+        return array_values(array_filter($this->resourceNames, function ($resourceName) use ($words) {
+            $haystack = $this->buildResourceSearchText((string) $resourceName);
+
+            foreach ($words as $word) {
+                if ($word === '' || !str_contains($haystack, $word)) {
+                    return false;
                 }
+            }
 
-                foreach ($this->controlList as $action) {
-                    $label = strtolower($action . ' ' . str_replace('_', ' ', $snake));
-                    if (str_contains($label, $search)) {
-                        return true;
-                    }
-                }
+            return true;
+        }));
+    }
 
-                return false;
-            })
-            ->values()
-            ->all();
+    /**
+     * Build a rich, lowercase searchable string for a model resource so that
+     * partial words, camelCase splits, snake_case and display labels all match.
+     *
+     * @param  string  $resourceName
+     * @return string
+     */
+    protected function buildResourceSearchText(string $resourceName): string
+    {
+        $basename = class_basename($resourceName);
+        $headline = Str::headline($basename);      // "Business Unit"
+        $snake = Str::snake($basename);            // "business_unit"
+        $kebab = Str::kebab($basename);            // "business-unit"
+        $plural = Str::plural($basename);          // "BusinessUnits"
+
+        $parts = [
+            $basename,
+            $headline,
+            $snake,
+            $kebab,
+            $plural,
+            Str::headline($plural),                // "Business Units"
+            $headline . ' management',             // "Business Unit Management"
+        ];
+
+        // Permission action labels, e.g. "view business unit", "view_business_unit".
+        foreach ($this->controlList as $action) {
+            $parts[] = strtolower($action) . ' ' . strtolower($headline);
+            $parts[] = strtolower($action) . '_' . $snake;
+        }
+
+        return strtolower(implode(' ', $parts));
     }
 
     /**
@@ -295,6 +324,53 @@ class AccessControlManager extends Component
 
         // Force nested Livewire components to re-mount with fresh state.
         $this->controlButtonGroupVersion++;
+    }
+
+    /**
+     * Determine the bulk toggle state for each permission action across every
+     * model in the selected module.
+     *
+     * Returns 'on' when every model has the action granted, 'off' when none do,
+     * and 'mixed' when only some do. Permission names are built with the same
+     * format used by bulkToggle() so the switches stay in sync.
+     *
+     * @return array<string, string>
+     */
+    public function getBulkToggleStatesProperty(): array
+    {
+        $states = [];
+
+        foreach ($this->controlList as $control) {
+            $states[$control] = 'off';
+        }
+
+        if (!$this->selectedScope || empty($this->resourceNames)) {
+            return $states;
+        }
+
+        $granted = $this->selectedScope->getPermissionNames()->toArray();
+
+        foreach ($this->controlList as $control) {
+            $total = 0;
+            $grantedCount = 0;
+
+            foreach ($this->resourceNames as $resourceName) {
+                $permissionName = strtolower($control . '_' . Str::snake(class_basename((string) $resourceName)));
+                $total++;
+
+                if (in_array($permissionName, $granted, true)) {
+                    $grantedCount++;
+                }
+            }
+
+            if ($total > 0 && $grantedCount === $total) {
+                $states[$control] = 'on';
+            } elseif ($total > 0 && $grantedCount > 0) {
+                $states[$control] = 'mixed';
+            }
+        }
+
+        return $states;
     }
 
     public function render()
