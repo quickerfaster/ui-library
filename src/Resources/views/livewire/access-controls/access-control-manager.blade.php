@@ -52,11 +52,13 @@
 
                             <div class="col-12 col-sm-6" wire:key="resource-{{ $resourceName }}-{{ $key }}">
                                 <livewire:qf.toggle-button-group
+                                    wire:key="toggle-group-{{ $controlButtonGroupVersion }}-{{ $resourceName }}"
                                     :title="$title"
                                     :subtitle="$subtitle"
                                     :componentId="$resourceName.'-'.$key"
                                     :buttons="$resourceControlButtonGroup[$resourceName]?? []"
                                     :groupId="$resourceName"
+                                    :version="$controlButtonGroupVersion"
                                     stateSyncMethod="method"
                                     :data="[
                                         'selectedScope' => $this->selectedScope,

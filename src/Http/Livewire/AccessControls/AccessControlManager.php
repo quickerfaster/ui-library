@@ -64,6 +64,12 @@ class AccessControlManager extends Component
 
     public $resourceControlButtonGroup = [];
 
+    /**
+     * Incremented whenever permission state changes so nested Livewire
+     * components are re-keyed (and thus re-mounted) to reflect new state.
+     */
+    public $controlButtonGroupVersion = 0;
+
 
 
 
@@ -245,6 +251,7 @@ class AccessControlManager extends Component
      */
     public function bulkToggle(string $action, bool $value): void
     {
+        
         if (!in_array($action, $this->controlList, true)) {
             return;
         }
@@ -270,6 +277,8 @@ class AccessControlManager extends Component
         $this->selectedScope->syncPermissions($permissions);
 
         $this->refreshPermissions();
+
+        $this->dispatch('refresh-toggle-state', permissions: $this->selectedScope->getPermissionNames()->toArray());
     }
 
     /**
@@ -283,6 +292,9 @@ class AccessControlManager extends Component
         if ($this->selectedScope) {
             $this->setupResourceControlButtonGroup();
         }
+
+        // Force nested Livewire components to re-mount with fresh state.
+        $this->controlButtonGroupVersion++;
     }
 
     public function render()

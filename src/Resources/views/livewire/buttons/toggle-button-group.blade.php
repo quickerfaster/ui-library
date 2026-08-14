@@ -42,6 +42,7 @@
                   class="list-group-item border-0 rounded rounded-3  bg-gray-100  m-2 p-0"
                 >
                     <livewire:qf.toggle-button
+                        wire:key="toggle-btn-{{ $version }}-{{ $button['componentId'] }}"
                         :is-card="true"
                         :title="$button['title']?? ''"
                         :subtitle="$button['subtitle']?? ''"

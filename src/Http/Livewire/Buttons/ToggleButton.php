@@ -2,6 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\Buttons;
 
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Illuminate\Support\Facades\Schema;
 use QuickerFaster\UILibrary\Events\ToggleButtonEvent;
@@ -64,6 +65,14 @@ class ToggleButton extends Component
         if ($this->componentId === $buttonId) {
             $this->isOn = $newState;
             $this->saveState($newState);
+        }
+    }
+
+    #[On('refresh-toggle-state')]
+    public function refreshState(array $permissions = [])
+    {
+        if ($this->stateSyncMethod === 'method') {
+            $this->isOn = in_array($this->componentId, $permissions, true);
         }
     }
 
