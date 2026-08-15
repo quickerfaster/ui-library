@@ -501,8 +501,23 @@ class TopNav extends Component
             }
 
             $roles = $config['roles'] ?? ['*'];
-            if ($roles !== ['*'] && !auth()->user()?->hasAnyRole($roles)) {
-                continue;
+            if ($roles !== ['*']) {
+                $user = auth()->user();
+
+                if (! $user) {
+                    continue;
+                }
+
+                // Mirrors AuthorizationService::isBypassAllowed() — the
+                // configured super admin email always bypasses the module
+                // role filter. This prevents a failed role assignment from
+                // silently hiding admin/system modules from the super admin.
+                $superAdminEmail = (string) env('SUPER_ADMIN_EMAIL', 'admin@example.com');
+                $isSuperAdmin = $user->getAttribute('email') === $superAdminEmail;
+
+                if (! $isSuperAdmin && ! $user->hasAnyRole(...$roles)) {
+                    continue;
+                }
             }
 
             $modules[$key] = array_merge($config, ['key' => $key]);

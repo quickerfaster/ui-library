@@ -18,6 +18,7 @@
     {{-- Your CSS assets (from config) --}}
     <link id="pagestyle" href="{{ config('ui-library.theme.css') }}" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" />
+    <link id="qf-styles" href="{{ asset('vendor/ui-library/assets/css/quicker-faster.css') }}" rel="stylesheet" />
 
 
 

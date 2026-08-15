@@ -14,7 +14,7 @@ class AuthorizationService
      * Usage in Blade:
      *   @hasanyrole(\QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::ADMIN_ROLES)
      */
-    const ADMIN_ROLES = 'super_admin|admin';
+    const ADMIN_ROLES = 'super_admin|admin|company_admin';
 
     /**
      * Array of admin role names for use with hasAnyRole() checks.
@@ -22,7 +22,7 @@ class AuthorizationService
      * Usage in PHP:
      *   auth()->user()->hasAnyRole(AuthorizationService::ADMIN_ROLES_ARRAY)
      */
-    const ADMIN_ROLES_ARRAY = ['super_admin', 'admin'];
+    const ADMIN_ROLES_ARRAY = ['super_admin', 'admin', 'company_admin'];
 
     /**
      * Array of company-level admin roles (super_admin + company_admin).
@@ -44,11 +44,28 @@ class AuthorizationService
             return false;
         }
 
-        if (!method_exists($user, 'hasAnyRole')) {
-            return false;
+        // Primary check: Spatie role-based bypass (super_admin or admin).
+        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(self::ADMIN_ROLES_ARRAY)) {
+            return true;
         }
 
-        return $user->hasAnyRole(self::ADMIN_ROLES_ARRAY);
+        // Fallback: the configured super admin email always bypasses.
+        // This protects against seed failures where role assignment silently
+        // fails, leaving the model_has_roles pivot table empty.
+        $superAdminEmail = env('SUPER_ADMIN_EMAIL', 'admin@example.com');
+        if (
+            $superAdminEmail
+            && method_exists($user, 'getAttribute')
+            && $user->getAttribute('email') === $superAdminEmail
+        ) {
+            \Log::debug('[AuthorizationService] super admin email bypass', [
+                'email' => $superAdminEmail,
+            ]);
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

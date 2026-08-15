@@ -17,11 +17,19 @@ class UserSeeder extends Seeder
                 'email' => env('SUPER_ADMIN_EMAIL', 'admin@example.com'),
                 'name' => 'Super Admin',
                 'password' => env('SUPER_ADMIN_PASSWORD', 'password'),
+                'role' => 'super_admin',
             ],
             [
                 'email' => 'admin@test.com',
                 'name' => 'Test Admin',
                 'password' => 'password',
+                'role' => 'admin',
+            ],
+            [
+                'email' => 'company.admin@example.com',
+                'name' => 'Company Admin',
+                'password' => 'password',
+                'role' => 'company_admin',
             ],
         ];
 
@@ -35,14 +43,24 @@ class UserSeeder extends Seeder
                 ]
             );
 
+            $role = $data['role'] ?? 'super_admin';
+
             // The InstallCommand ensures the User model has the HasRoles trait
-            // before seeders run. The try-catch is a safety net for edge cases.
+            // before seeders run. The try-catch is a safety net for edge cases,
+            // but a failure here must never be silently swallowed — an admin
+            // without a role can lock themselves out of every admin/organization page.
             try {
-                if (!$user->hasRole('super_admin')) {
-                    $user->assignRole('super_admin');
+                if (!$user->hasRole($role)) {
+                    $user->assignRole($role);
                 }
-            } catch (\Exception $e) {
-                $this->command->warn('   ⚠️  UserSeeder role assignment failed for ' . $data['email'] . ': ' . $e->getMessage());
+            } catch (\Throwable $e) {
+                \Log::error('UserSeeder: role assignment failed', [
+                    'email' => $data['email'],
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                $this->command->error('   ❌  UserSeeder role assignment failed for ' . $data['email'] . ': ' . $e->getMessage());
             }
         }
     }

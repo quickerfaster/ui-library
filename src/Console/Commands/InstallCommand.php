@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use QuickerFaster\UILibrary\Console\Support\UserModelTraitInjector;
+use Symfony\Component\Process\Process;
 
 class InstallCommand extends Command
 {
@@ -296,10 +297,12 @@ class InstallCommand extends Command
             $config = File::get($configPath);
 
             // Replace the 'model' entry inside the 'user' array
+            // Scoped regex: only matches 'model' within the 'user' => [...] block
             $config = preg_replace(
-                "/('model'\s*=>\s*)([^,\n]*)(,)/",
-                "\$1'{$userModel}'\$3",
-                $config
+                "/('user'\s*=>\s*\[.*?'model'\s*=>\s*)[^\n]+/s",
+                "\$1'{$userModel}',",
+                $config,
+                1
             );
 
             File::put($configPath, $config);
@@ -470,9 +473,10 @@ class InstallCommand extends Command
 
         $content = File::get($libraryUserConfig);
         $content = preg_replace(
-            "/('model'\s*=>\s*)([^,\n]*)(,)/",
-            "\$1'{$userModel}'\$3",
-            $content
+            "/('model'\s*=>\s*)[^\n]+/",
+            "\$1'{$userModel}',",
+            $content,
+            1
         );
 
         File::put($targetFile, $content);
@@ -498,12 +502,30 @@ class InstallCommand extends Command
             'SystemSettingsSeeder' => 'QuickerFaster\UILibrary\Core\System\Database\Seeders\SystemSettingsSeeder',
             'OrganizationSeeder' => 'QuickerFaster\UILibrary\Core\Organization\Database\Seeders\OrganizationSeeder',
             'NotificationTemplateSeeder' => 'QuickerFaster\UILibrary\Core\Common\Database\Seeders\NotificationTemplateSeeder',
+            'AccessControlPermissionSeeder' => 'QuickerFaster\UILibrary\Core\Admin\Database\Seeders\AccessControlPermissionSeeder',
         ];
 
         foreach ($seeders as $name => $class) {
             try {
-                Artisan::call('db:seed', ['--class' => $class]);
-                $this->info("   ✅ {$name} seeded.");
+                // Run each seeder in a separate PHP process so that any
+                // source-file modifications made earlier in the install
+                // (e.g. injecting the HasRoles trait into the User model)
+                // are picked up by the freshly-booted process.
+                $process = new Process([
+                    PHP_BINARY,
+                    base_path('artisan'),
+                    'db:seed',
+                    '--class=' . $class,
+                    '--force',
+                ]);
+                $process->setWorkingDirectory(base_path());
+                $process->run();
+
+                if (!$process->isSuccessful()) {
+                    $this->warn("   ⚠️  {$name} failed: " . trim($process->getErrorOutput()));
+                } else {
+                    $this->info("   ✅ {$name} seeded.");
+                }
             } catch (\Exception $e) {
                 $this->warn("   ⚠️  {$name} failed: " . $e->getMessage());
             }
@@ -534,7 +556,6 @@ class InstallCommand extends Command
             $this->warn('   ⚠️  Laravel Breeze is not installed. Auth scaffolding skipped.');
             $this->warn('   The library\'s own auth views (login, register) will work independently.');
             $this->warn('   To add Breeze later, run: composer require laravel/breeze --dev && php artisan breeze:install blade');
-            $this->hasErrors = true;
             return;
         }
 

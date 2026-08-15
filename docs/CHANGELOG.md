@@ -2,7 +2,46 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Date**: 2026-08-14
-> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split
+> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish
+
+---
+
+## 2026-08-14 — Access Control & Navigation UX Polish
+
+Follow-up UX refinements across the sidebar filter and the Access Control Manager.
+
+### Sidebar Filter — Label, Data Attributes & SPA Survival
+
+- **Label change**: the filter placeholder changed from "Filter modules..." to **"Search menu..."** (Spanish **"Buscar menú..."**) via the `filter_modules` key in [`public/lang/en/nav.php`](public/lang/en/nav.php) and [`public/lang/es/nav.php`](public/lang/es/nav.php).
+- **`data-filterable` fix**: filterable attributes now live on the correct elements — [`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php) (nav items), the collapsible header and static label in [`sidebar-section.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-section.blade.php), and the inline static section label in [`sidebar.blade.php`](src/Resources/views/livewire/navs/sidebar.blade.php).
+- **`wire:navigate` SPA survival**: the filter now survives Livewire SPA navigations via document-level event delegation plus a `livewire:navigated` re-init in [`quicker-faster.js`](public/assets/js/quicker-faster.js).
+
+### Access Control Manager — Bulk Toggle Switches
+
+The per-action bulk ON/OFF buttons were consolidated from **14 buttons into 7 Bootstrap toggle switches** (one per action: `view`, `create`, `edit`, `delete`, `print`, `export`, `import`).
+
+- New [`getBulkToggleStatesProperty()`](src/Http/Livewire/AccessControls/AccessControlManager.php) returns `'on'` / `'off'` / `'mixed'` per action.
+- Switches are state-aware and color-coded (`success` / `light` / `secondary`).
+- `wire:loading` spinner + `wire:loading.attr="disabled"`, scoped per switch via `wire:target="bulkToggle('...', ...)"`.
+
+### Reactive Permission State
+
+- New `refresh-toggle-state` Livewire event: [`ToggleButton::refreshState()`](src/Http/Livewire/Buttons/ToggleButton.php) and [`ToggleButtonGroup::refreshState()`](src/Http/Livewire/Buttons/ToggleButtonGroup.php) listen for it.
+- [`AccessControlManager::bulkToggle()`](src/Http/Livewire/AccessControls/AccessControlManager.php) dispatches the event with the fresh permission names.
+- The "What user can do" badge recomputes via `getUpdatedDescription()` from `$buttonStates`.
+
+### Model Search Accuracy
+
+- [`getFilteredResourceNamesProperty()`](src/Http/Livewire/AccessControls/AccessControlManager.php) rewritten for word-based AND matching.
+- New `buildResourceSearchText()` builds a rich searchable string from the raw basename, `Str::headline`, snake, kebab, plural, display label, and permission action labels.
+
+### Permission Card Expand/Collapse Chevron
+
+- Added `fas fa-chevron-down collapse-chevron` and the `collapse-chevron-trigger` class to the permission card header in [`toggle-button-group.blade.php`](src/Resources/views/livewire/buttons/toggle-button-group.blade.php).
+- CSS rotation via `.collapse-chevron-trigger[aria-expanded="true"] .collapse-chevron` in [`quicker-faster.css`](public/assets/css/quicker-faster.css).
+- Fixed the missing stylesheet link: [`quicker-faster.css`](public/assets/css/quicker-faster.css) is now linked in [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php).
+
+**Docs updated**: [`sidebar-filter.md`](docs/components/sidebar-filter.md), [`06-navigation-system.md`](docs/architecture/06-navigation-system.md), [`07-component-catalog.md`](docs/architecture/07-component-catalog.md), [`implementation-plan.md`](docs/implementation-plan.md).
 
 ---
 

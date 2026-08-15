@@ -34,7 +34,13 @@ class RoleSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         $admin->givePermissionTo(['view dashboard', 'manage users', 'manage settings']);
 
+        $companyAdmin = Role::firstOrCreate(['name' => 'company_admin', 'guard_name' => 'web']);
+        $companyAdmin->givePermissionTo(['view dashboard', 'manage users', 'manage settings']);
+
         $user = Role::firstOrCreate(['name' => 'user', 'guard_name' => 'web']);
         $user->givePermissionTo(['view dashboard']);
+
+        $employee = Role::firstOrCreate(['name' => 'employee', 'guard_name' => 'web']);
+        $employee->givePermissionTo(['view dashboard']);
     }
 }

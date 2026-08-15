@@ -193,6 +193,10 @@ See [`navigation-workspace-architecture.md`](../navigation-workspace-architectur
 
 Phase 5 built additional navigation UX on top of this foundation — **WorkspaceTabs**, **Breadcrumbs**, and **Sidebar Filter**. All client-side interactivity is vanilla JS (IIFE, `data-*` attributes, `Livewire.dispatch()`). See [`phase-5-navigation-ux.md`](./phase-5-navigation-ux.md) and the component READMEs in [`../components/`](../components/).
 
+### Sidebar Filter
+
+The sidebar filter placeholder label is **"Search menu..."** (Spanish **"Buscar menú..."**), sourced from the `filter_modules` translation key. Its listeners are registered with document-level event delegation and re-initialised on the `livewire:navigated` event, so the filter survives Livewire `wire:navigate` SPA navigations (the sidebar DOM is swapped without re-firing `livewire:initialized`). Full details in [`../components/sidebar-filter.md`](../components/sidebar-filter.md).
+
 ---
 
 **Related files**: [`00-index.md`](./00-index.md) · [`03-module-pattern.md`](./03-module-pattern.md) · [`07-component-catalog.md`](./07-component-catalog.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`10-settings-and-config.md`](./10-settings-and-config.md) · [`11-extension-guide.md`](./11-extension-guide.md) · [`13-adr.md`](./13-adr.md) · [`phase-5-navigation-ux.md`](./phase-5-navigation-ux.md)

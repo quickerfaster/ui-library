@@ -40,7 +40,7 @@ class AccessControlPermissionService
             $permissionNames = self::getResourcePermissionNames($resourceName);
             foreach ($permissionNames as $permissionName) {
                 if (!Permission::where("name", $permissionName)->first())
-                    Permission::create(['name' => $permissionName, 'description' => 'Allow role or user to ' . str_replace('_', ' ', $permissionName)]);
+                    Permission::create(['name' => $permissionName, 'guard_name' => 'web']);
             }
         }
     }

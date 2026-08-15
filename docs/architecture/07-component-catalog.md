@@ -62,7 +62,7 @@ All components are registered in [`UILibraryServiceProvider::registerLivewireCom
 
 | Component | Alias | Class | Purpose |
 |-----------|-------|-------|---------|
-| AccessControlManager | `qf.access-control-manager` | `AccessControlManager` | Consolidated access control UI with model search and bulk permission toggles |
+| AccessControlManager | `qf.access-control-manager` | `AccessControlManager` | Consolidated access control UI with word-based model search, state-aware bulk toggle switches, and reactive permission state |
 | ModuleSelector | `qf.module-selector` | `ModuleSelector` | Module selection for permission scoping |
 | RoleAssignmentManager | `qf.role-assignment-manager` | `RoleAssignmentManager` | Role assignment interface |
 | PermissionManager | `qf.permission-manager` | `PermissionManager` | Permission CRUD interface |
@@ -71,8 +71,10 @@ All components are registered in [`UILibraryServiceProvider::registerLivewireCom
 
 | Component | Alias | Class | Purpose |
 |-----------|-------|-------|---------|
-| ToggleButton | `qf.toggle-button` | `ToggleButton` | Single toggle button |
-| ToggleButtonGroup | `qf.toggle-button-group` | `ToggleButtonGroup` | Group of toggle buttons |
+| ToggleButton | `qf.toggle-button` | `ToggleButton` | Single toggle button; listens for the `refresh-toggle-state` event |
+| ToggleButtonGroup | `qf.toggle-button-group` | `ToggleButtonGroup` | Group of toggle buttons; listens for `refresh-toggle-state`, recomputes the description badge, and renders an expand/collapse chevron |
+
+> **Access-control UX notes**: [`AccessControlManager::bulkToggle()`](../../src/Http/Livewire/AccessControls/AccessControlManager.php) dispatches the `refresh-toggle-state` event with the fresh permission names; [`ToggleButton::refreshState()`](../../src/Http/Livewire/Buttons/ToggleButton.php) and [`ToggleButtonGroup::refreshState()`](../../src/Http/Livewire/Buttons/ToggleButtonGroup.php) react to keep cards in sync. Bulk actions render as 7 Bootstrap toggle switches driven by [`AccessControlManager::getBulkToggleStatesProperty()`](../../src/Http/Livewire/AccessControls/AccessControlManager.php) (returns `'on'` / `'off'` / `'mixed'`). Permission cards expose a `fas fa-chevron-down collapse-chevron` indicator rotated by the `.collapse-chevron-trigger[aria-expanded="true"] .collapse-chevron` rule in [`quicker-faster.css`](../../public/assets/css/quicker-faster.css).
 
 #### Reports
 

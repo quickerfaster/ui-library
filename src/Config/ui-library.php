@@ -15,7 +15,7 @@ return [
             'icon' => 'fa-shield-haltered',
             'route' => 'admin.dashboard',
             'order' => 900,
-            'roles' => ['super_admin'],
+            'roles' => ['super_admin', 'company_admin'],
             'core' => true,
             'user_facing' => true,
             'depends_on' => ['organization'],
@@ -739,6 +739,7 @@ return [
     |                      which traits are auto-injected.
     */
     'user' => [
+        'model' => env('UI_LIBRARY_USER_MODEL', config('auth.providers.users.model', 'App\Models\User')),
 
         'required_traits' => [
             \QuickerFaster\UILibrary\Traits\HasUILibraryUser::class,

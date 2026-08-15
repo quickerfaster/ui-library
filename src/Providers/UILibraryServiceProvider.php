@@ -310,6 +310,11 @@ class UILibraryServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../Resources/views' => resource_path('views/vendor/ui-library'),
         ], 'ui-library-views');
+
+        // Seeders (app-level DatabaseSeeder / UserSeeder for complete user & role setup)
+        $this->publishes([
+            __DIR__ . '/../../dependencies/database/seeders' => database_path('seeders'),
+        ], 'ui-library-seeders');
     }
 
     private function registerFortifyViews(): void

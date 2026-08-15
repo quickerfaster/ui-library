@@ -346,3 +346,13 @@ body {
 .sidebar-filter .form-control { border-left: none; }
 .sidebar-filter-active { background: #e9ecef !important; }
 [data-filterable].filter-hidden { display: none !important; }
+
+/* Permission card collapse chevron */
+.collapse-chevron {
+    transition: transform 0.2s ease;
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+.collapse-chevron-trigger[aria-expanded="true"] .collapse-chevron {
+    transform: rotate(180deg);
+}

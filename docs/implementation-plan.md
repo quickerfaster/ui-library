@@ -1,6 +1,6 @@
 # QuickerFaster Application Platform — Implementation Plan
 
-> **Status**: ✅ Phases 2.5–4.5 Complete | ✅ Phase 2 (Cross-Context Dropdowns) Complete | ✅ All 14 Bug Fix & Audit Categories Complete | ✅ 19 New Items (User Model, Config & Nav Polish) Complete | ✅ 4 Home Page & Runtime Polish Items Complete | ✅ 3 Access Control Management Improvements Complete | ✅ Phase 5 Navigation & UX Polish Complete | ✅ App\Modules Resolution & ActivityLogs Contract Complete
+> **Status**: ✅ Phases 2.5–4.5 Complete | ✅ Phase 2 (Cross-Context Dropdowns) Complete | ✅ All 14 Bug Fix & Audit Categories Complete | ✅ 19 New Items (User Model, Config & Nav Polish) Complete | ✅ 4 Home Page & Runtime Polish Items Complete | ✅ 3 Access Control Management Improvements Complete | ✅ Phase 5 Navigation & UX Polish Complete | ✅ App\Modules Resolution & ActivityLogs Contract Complete | ✅ Access Control & Navigation UX Polish Complete
 > **Date**: 2026-08-07 (Updated 2026-08-14)
 > **Source Documents**: [`gap-analysis.md`](docs/gap-analysis.md), [`input3-gap-supplement.md`](docs/input3-gap-supplement.md), [`input3.txt`](src/input3.txt)
 
@@ -24,7 +24,7 @@ The following 4 items were completed on 2026-08-13, covering the polished home p
 
 ### 0.38–0.40 — Access Control Management Improvements (2026-08-14)
 
-The following 3 items were completed on 2026-08-14, covering access control filtering config, the consolidated Access Control tabbed page, and model search plus bulk permission toggles in the AccessControlManager.
+The following 3 items were completed on 2026-08-14, covering access control filtering config, the consolidated Access Control tabbed page, and the AccessControlManager UX — word-based model search, consolidated bulk toggle switches, reactive permission state, and expand/collapse chevrons.
 
 ### 0.1 Sidebar URL Generation Fix
 
@@ -462,11 +462,15 @@ Both views use the standard DataTableForm pattern with config-driven field defin
 
 ### 0.40 Model Search + Bulk Permission Toggles
 
-**Problem**: Finding a specific model among many permission cards was tedious, and toggling a single action across all models required editing each card individually.
+**Problem**: Finding a specific model among many permission cards was tedious, and toggling a single action across all models required editing each card individually. The original 14 per-action bulk ON/OFF buttons were also verbose.
 
-**Fix**: Added a `$modelSearch` property plus a `getFilteredResourceNamesProperty()` computed property to live-filter permission cards by model name or action label, and a `bulkToggle($action, $value)` method to toggle one action (`view`, `create`, `edit`, `delete`, `print`, `export`, `import`) across every model in the selected module at once.
+**Fix**: Reworked the AccessControlManager UX:
+- **Model search accuracy**: [`getFilteredResourceNamesProperty()`](src/Http/Livewire/AccessControls/AccessControlManager.php) now does word-based AND matching against a rich searchable string built by `buildResourceSearchText()` (raw basename, `Str::headline`, snake, kebab, plural, display label, and permission action labels).
+- **Bulk toggle switches**: consolidated 14 ON/OFF buttons into 7 Bootstrap toggle switches (one per action), driven by a new [`getBulkToggleStatesProperty()`](src/Http/Livewire/AccessControls/AccessControlManager.php) returning `'on'`/`'off'`/`'mixed'` per action. Switches are color-coded and state-aware, with a scoped `wire:loading` spinner and `wire:loading.attr="disabled"`.
+- **Reactive permission state**: `bulkToggle()` dispatches a `refresh-toggle-state` event with the fresh permission names; [`ToggleButton::refreshState()`](src/Http/Livewire/Buttons/ToggleButton.php) and [`ToggleButtonGroup::refreshState()`](src/Http/Livewire/Buttons/ToggleButtonGroup.php) listen for it, and the "What user can do" badge recomputes via `getUpdatedDescription()`.
+- **Expand/collapse chevron**: permission cards gained a `fas fa-chevron-down collapse-chevron` indicator (rotated via CSS) and the missing [`quicker-faster.css`](public/assets/css/quicker-faster.css) stylesheet link was restored in [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php).
 
-**Files**: [`AccessControlManager.php`](src/Http/Livewire/AccessControls/AccessControlManager.php)
+**Files**: [`AccessControlManager.php`](src/Http/Livewire/AccessControls/AccessControlManager.php), [`ToggleButton.php`](src/Http/Livewire/Buttons/ToggleButton.php), [`ToggleButtonGroup.php`](src/Http/Livewire/Buttons/ToggleButtonGroup.php), [`access-control-manager.blade.php`](src/Resources/views/livewire/access-controls/access-control-manager.blade.php), [`toggle-button-group.blade.php`](src/Resources/views/livewire/buttons/toggle-button-group.blade.php), [`quicker-faster.css`](public/assets/css/quicker-faster.css), [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php)
 
 ---
 
@@ -2739,7 +2743,7 @@ Update [`docs/architecture/00-index.md`](docs/architecture/00-index.md):
 
 Add to [`public/lang/en/nav.php`](public/lang/en/nav.php):
 ```php
-'filter_modules' => 'Filter modules...',
+'filter_modules' => 'Search menu...',
 'no_results' => 'No matching items',
 'more_tabs' => 'More tabs',
 'close_others' => 'Close Others',

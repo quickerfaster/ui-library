@@ -24,10 +24,18 @@ The sidebar can hold dozens of navigation items. The filter adds a search input 
 | `data-sidebar-filter-icon` | icon `<span>` | Search icon (styled on focus). |
 | `data-sidebar-filter-clear` | `<button>` | Clear button (shown when there is a query). |
 | `data-sidebar-filter-no-results` | `<div>` | "No results" message (shown when nothing matches). |
-| `data-filterable` | sidebar `<li>` items and section headers | Marks an element as filterable. |
+| `data-filterable` | sidebar items, section headers and section labels | Marks an element as filterable (nav items, collapsible section headers, and static section labels). |
 | `data-filter-text` | same `[data-filterable]` elements | Lowercased searchable text (label + key + active context). |
 
 The filter scope is resolved as the closest `.sidebar-container` ancestor (falling back to the wrapper's parent or `document`), so the filterable items outside the input wrapper are still included.
+
+### Where `data-filterable` lives
+
+The filterable attributes are placed on the correct partials:
+
+- [`sidebar-item.blade.php`](../../src/Resources/views/livewire/navs/partials/sidebar-item.blade.php) — each navigation `<li>` item.
+- [`sidebar-section.blade.php`](../../src/Resources/views/livewire/navs/partials/sidebar-section.blade.php) — both the collapsible section header and the static section label.
+- [`sidebar.blade.php`](../../src/Resources/views/livewire/navs/sidebar.blade.php) — the inline static section label rendered when a context group has a non-collapsible header.
 
 ---
 
@@ -61,6 +69,14 @@ The arrow-key navigation wraps and scrolls the highlighted item into view.
 
 ---
 
+## SPA Navigation (`wire:navigate`) Survival
+
+The filter listeners (`input`, `click`, `keydown`) are registered with **document-level event delegation**, so they keep working after Livewire swaps the sidebar DOM during a `wire:navigate` SPA navigation (which does not re-fire `livewire:initialized`). A separate `livewire:navigated` listener re-runs `initSidebarFilter()`, re-applying the current query and hidden state to the freshly rendered sidebar DOM.
+
+This means the filter — including any active query — survives SPA navigation.
+
+---
+
 ## Config / Translation Keys
 
 The filter is always rendered (no on/off config). Behavioural config relevant to the sidebar:
@@ -73,5 +89,5 @@ Translation keys in [`public/lang/en/nav.php`](../../public/lang/en/nav.php):
 
 | Key | Default |
 |-----|---------|
-| `filter_modules` | `Filter modules...` |
-| `no_results` | `No matching items` |
+| `filter_modules` | `Search menu...` (Spanish: `Buscar menú...`) |
+| `no_results` | `No matching items` (Spanish: `Sin resultados`) |
