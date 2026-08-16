@@ -51,6 +51,7 @@ class MetricWidgetProcessor
             'change_percentage' => $changePercentage !== null ? round(abs($changePercentage), 1) : null,
             'trend'             => $trend,
             'icon'              => $definition['icon'] ?? null,
+            'color'             => $definition['color'] ?? 'info',
             'width'             => $definition['width'] ?? 4,
             'description'       => $definition['description'] ?? null,
         ];

@@ -108,6 +108,10 @@ Route::group(['middleware' => 'web'], function () {
         Route::get('/my-account', function () {
             return view('qf::my-account');
         })->name('my-account');
+
+        Route::get('/notifications', function () {
+            return view('qf::notifications');
+        })->name('notifications.index');
     });
 
 

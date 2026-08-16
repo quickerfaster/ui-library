@@ -78,6 +78,8 @@ class ChartWidgetProcessor
         return [
             'type' => 'chart',
             'title' => $definition['title'] ?? 'Chart',
+            'icon' => $definition['icon'] ?? null,
+            'color' => $definition['color'] ?? 'primary',
             'chart_id' => 'chart-' . uniqid(),
             'chart_data' => $chartData,
             'chart_type' => $definition['chart_type'] ?? 'bar',

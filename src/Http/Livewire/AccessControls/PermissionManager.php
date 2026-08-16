@@ -143,6 +143,6 @@ public function getScopesProperty()
     private function getResourceNames(): array
     {
         // Use your existing logic (scanning modules)
-        return ['Employee', 'Store', 'HumanResource']; // example
+        return ['Record', 'Store', 'Inventory']; // example
     }
 }

@@ -77,7 +77,7 @@ class AuthorizationService
      * Usage in Blade:
      *   @if(\QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView('view_users'))
      *
-     * @param string $permission  e.g. 'view_users', 'create_employee'
+     * @param string $permission  e.g. 'view_users', 'create_record'
      * @param Authenticatable|null $user  Defaults to auth()->user()
      * @return bool
      */

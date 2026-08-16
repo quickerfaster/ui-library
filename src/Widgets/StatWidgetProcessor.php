@@ -49,6 +49,7 @@ class StatWidgetProcessor
             'title' => $definition['title'] ?? 'Statistic',
             'value' => $value,
             'icon'  => $definition['icon'] ?? null,
+            'color' => $definition['color'] ?? 'primary',
             'width' => $definition['width'] ?? 4,
         ];
     }

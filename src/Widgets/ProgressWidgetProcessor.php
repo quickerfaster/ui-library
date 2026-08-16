@@ -64,6 +64,7 @@ class ProgressWidgetProcessor
             'target_value' => $targetValue,
             'percentage' => round($percentage, 1),
             'icon' => $definition['icon'] ?? null,
+            'color' => $definition['color'] ?? 'success',
             'width' => $definition['width'] ?? 4,
         ];
     }

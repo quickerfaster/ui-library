@@ -10,7 +10,7 @@ interface Documentable
     public function getDocumentableId(): int|string;
 
     /**
-     * Get the document type key (e.g., 'employee_contract', 'payslip').
+     * Get the document type key (e.g., 'contract', 'invoice').
      */
     public function getDocumentType(): string;
 

@@ -45,19 +45,55 @@ The System module at [`src/Core/System/Routes/web.php`](../../src/Core/System/Ro
 ```php
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/{module}/{view}/{id?}', function ($module, $view, $id = null) {
-        $viewName = "{$module}::{$view}";
+        // 1. Module allow-list (config-driven)
+        $allowedModules = config('ui-library.catch_all.allowed_modules', []);
+        if (!in_array($module, $allowedModules, true)) {
+            abort(404);
+        }
 
+        // 2. Directory-traversal sanitization (defense in depth)
+        foreach ([$module, $view] as $segment) {
+            if (
+                str_contains($segment, "\0")
+                || str_contains($segment, '\\')
+                || str_contains($segment, '/')
+                || str_contains($segment, '..')
+                || str_starts_with($segment, '.')
+            ) {
+                abort(400);
+            }
+        }
+
+        // 3. Per-view authorization (config-driven)
+        $user = auth()->user();
+
+        if (config('ui-library.catch_all.require_auth', true) && !$user) {
+            abort(401);
+        }
+
+        $authCallback = config('ui-library.catch_all.authorization_callback');
+        if ($authCallback && is_callable($authCallback)) {
+            if (!$authCallback($user, $module, $view, $id)) {
+                abort(403);
+            }
+        } else {
+            $gate = config('ui-library.catch_all.gate');
+            if ($gate && !Gate::allows($gate, [$module, $view, $id])) {
+                abort(403);
+            }
+        }
+
+        // 4. View resolution
+        $viewName = "{$module}::{$view}";
         if (view()->exists($viewName)) {
             return view($viewName, ['id' => $id]);
         }
 
-        // Fallback: try qf-core namespace
         $coreViewName = "qf-core::{$module}.{$view}";
         if (view()->exists($coreViewName)) {
             return view($coreViewName, ['id' => $id]);
         }
 
-        // Fallback: try with underscores instead of hyphens
         $underscoreView = str_replace('-', '_', $view);
         $coreViewNameUnderscore = "qf-core::{$module}.{$underscoreView}";
         if (view()->exists($coreViewNameUnderscore)) {
@@ -65,11 +101,15 @@ Route::middleware(['web', 'auth'])->group(function () {
         }
 
         abort(404, "View [{$viewName}] not found.");
-    })->where('module', '[a-z-]+')->where('view', '[a-z-]+')->where('id', '[0-9]+');
+    })
+    ->where('module', '[a-z-]+')
+    ->where('view', '[a-z-]+')
+    ->where('id', '[0-9]+')
+    ->middleware(config('ui-library.catch_all.rate_limiting.enabled', true) ? 'throttle:qf-catch-all' : []);
 });
 ```
 
-This is loaded LAST so explicit module routes take precedence.
+This is loaded LAST so explicit module routes take precedence. The `qf-catch-all` named rate limiter is registered in [`UILibraryServiceProvider`](../../src/Providers/UILibraryServiceProvider.php).
 
 #### Two-Tier View Resolution (with underscore fallback)
 
@@ -82,6 +122,15 @@ The catch-all resolves a view through the following fallback chain:
 If none resolve, the route aborts with `404`.
 
 Route parameter constraints: `module` and `view` accept `[a-z-]+`; `id` accepts `[0-9]+`.
+
+#### Security Gates (config-driven)
+
+The catch-all now applies four security gates before view resolution, all configured under `ui-library.catch_all`:
+
+1. **Module allow-list** (`allowed_modules`, default `['admin', 'system', 'organization', 'common']`) — non-listed modules `abort(404)`; business modules are appended automatically by [`ModuleServiceProvider`](../../src/Providers/ModuleServiceProvider.php).
+2. **Directory-traversal sanitization** — null byte, slash, backslash, `..`, and leading-dot checks `abort(400)`.
+3. **Per-view authorization** — `authorization_callback` (callable, takes precedence) or `gate` (Gate ability); `require_auth` re-checked in the handler.
+4. **Rate limiting** — `throttle:qf-catch-all` middleware when `rate_limiting.enabled` is `true`.
 
 #### Component Resolution Map (catch-all row)
 
@@ -104,14 +153,16 @@ Catch-all route (System module)    →  app/Modules/{Module}/Resources/views/**
 - Risk of accidental view exposure if authorization is weak
 - Needs a clear module allow-list and view existence checks
 
-### 4.5 Security Hardening
+### 4.5 Security Hardening — ✅ Implemented (2026-08-16)
 
-The centralized route pattern `/{module}/{view}/{id?}` can be abused if authorization and validation are weak. See [`15-gaps-and-recommendations.md`](./15-gaps-and-recommendations.md) §10.7 for the full hardening recommendations, including:
+The centralized route pattern `/{module}/{view}/{id?}` can be abused if authorization and validation are weak. All recommendations from [`15-gaps-and-recommendations.md`](./15-gaps-and-recommendations.md) §10.7 are now implemented (see §4.3):
 
-- Enforce strict module allow-lists in the catch-all handler
-- Require explicit authorization checks per view using Laravel Gates or Policies
-- Sanitize `$module` and `$view` parameters to prevent directory traversal
-- Add rate limiting to the catch-all route
+- ✅ Strict module allow-lists in the catch-all handler (`ui-library.catch_all.allowed_modules`)
+- ✅ Explicit per-view authorization via `authorization_callback` or `gate`
+- ✅ Directory-traversal sanitization of `$module` and `$view`
+- ✅ Rate limiting via the `qf-catch-all` named limiter
+
+The config schema for `ui-library.catch_all` is documented in [`10-settings-and-config.md`](./10-settings-and-config.md).
 
 ---
 

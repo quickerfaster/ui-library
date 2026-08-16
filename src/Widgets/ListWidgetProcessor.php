@@ -64,6 +64,7 @@ class ListWidgetProcessor
             'title' => $definition['title'] ?? 'List',
             'description' => $definition['description'] ?? '',
             'icon' => $definition['icon'] ?? null,
+            'color' => $definition['color'] ?? 'primary',
             'columns' => $columns,
             'items' => $items,
             'width' => $definition['width'] ?? 6,

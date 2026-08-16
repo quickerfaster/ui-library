@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-14
+> **Last Updated**: 2026-08-16
 
 **Related files**: [`00-index.md`](./00-index.md) · [`04-routing-and-views.md`](./04-routing-and-views.md) · [`05-data-configs.md`](./05-data-configs.md) · [`03-module-pattern.md`](./03-module-pattern.md) · [`13-adr.md`](./13-adr.md) · [`../architecture-discrepancy-analysis.md`](../architecture-discrepancy-analysis.md)
 
@@ -83,32 +83,77 @@ Three namespace families coexist:
 From [`src/Core/System/Routes/web.php`](../../src/Core/System/Routes/web.php:16):
 
 ```php
-Route::get('/{module}/{view}/{id?}', function ($module, $view, $id = null) {
-    $viewName = "{$module}::{$view}";                 // 1. business namespace
-    if (view()->exists($viewName)) {
-        return view($viewName, ['id' => $id]);
-    }
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/{module}/{view}/{id?}', function ($module, $view, $id = null) {
+        // 1. Module allow-list (config-driven)
+        $allowedModules = config('ui-library.catch_all.allowed_modules', []);
+        if (!in_array($module, $allowedModules, true)) {
+            abort(404);
+        }
 
-    $coreViewName = "qf-core::{$module}.{$view}";     // 2. core namespace
-    if (view()->exists($coreViewName)) {
-        return view($coreViewName, ['id' => $id]);
-    }
+        // 2. Directory-traversal sanitization (defense in depth)
+        foreach ([$module, $view] as $segment) {
+            if (
+                str_contains($segment, "\0")
+                || str_contains($segment, '\\')
+                || str_contains($segment, '/')
+                || str_contains($segment, '..')
+                || str_starts_with($segment, '.')
+            ) {
+                abort(400);
+            }
+        }
 
-    $underscoreView = str_replace('-', '_', $view);   // 3. underscore fallback
-    $coreViewNameUnderscore = "qf-core::{$module}.{$underscoreView}";
-    if (view()->exists($coreViewNameUnderscore)) {
-        return view($coreViewNameUnderscore, ['id' => $id]);
-    }
+        // 3. Per-view authorization (config-driven)
+        $user = auth()->user();
+        if (config('ui-library.catch_all.require_auth', true) && !$user) {
+            abort(401);
+        }
 
-    abort(404, "View [{$viewName}] not found.");
-})->where('module', '[a-z-]+')->where('view', '[a-z-]+')->where('id', '[0-9]+');
+        $authCallback = config('ui-library.catch_all.authorization_callback');
+        if ($authCallback && is_callable($authCallback)) {
+            if (!$authCallback($user, $module, $view, $id)) {
+                abort(403);
+            }
+        } else {
+            $gate = config('ui-library.catch_all.gate');
+            if ($gate && !Gate::allows($gate, [$module, $view, $id])) {
+                abort(403);
+            }
+        }
+
+        // 4. View resolution (unchanged logic)
+        $viewName = "{$module}::{$view}";                 // 1. business namespace
+        if (view()->exists($viewName)) {
+            return view($viewName, ['id' => $id]);
+        }
+
+        $coreViewName = "qf-core::{$module}.{$view}";     // 2. core namespace
+        if (view()->exists($coreViewName)) {
+            return view($coreViewName, ['id' => $id]);
+        }
+
+        $underscoreView = str_replace('-', '_', $view);   // 3. underscore fallback
+        $coreViewNameUnderscore = "qf-core::{$module}.{$underscoreView}";
+        if (view()->exists($coreViewNameUnderscore)) {
+            return view($coreViewNameUnderscore, ['id' => $id]);
+        }
+
+        abort(404, "View [{$viewName}] not found.");
+    })
+    ->where('module', '[a-z-]+')
+    ->where('view', '[a-z-]+')
+    ->where('id', '[0-9]+')
+    ->middleware(config('ui-library.catch_all.rate_limiting.enabled', true) ? 'throttle:qf-catch-all' : []);
+});
 ```
 
 **Key mechanics**:
 - The `{module}::{view}` path resolves **business module views first**.
 - The `qf-core::{module}.{view}` path is the **Core module fallback** — Core views share one namespace, with the module name as the first path segment (e.g., `qf-core::admin.dashboard` → `src/Core/Admin/Resources/views/admin/dashboard.blade.php`).
 - The underscore fallback handles view names like `business-units` → `business_units` when the filename uses underscores.
-- Parameters are constrained (`[a-z-]+` / `[0-9]+`) to prevent traversal, but there is **no module allow-list** — see [`15-gaps-and-recommendations.md`](./15-gaps-and-recommendations.md) §10.7.
+- Parameters are constrained (`[a-z-]+` / `[0-9]+`) and additionally sanitized against null bytes, slashes, backslashes, `..`, and leading dots.
+- The module allow-list, per-view authorization, and rate limiting are config-driven via `ui-library.catch_all` (see [`10-settings-and-config.md`](./10-settings-and-config.md) and [`15-gaps-and-recommendations.md`](./15-gaps-and-recommendations.md) §10.7).
 
 ---
 

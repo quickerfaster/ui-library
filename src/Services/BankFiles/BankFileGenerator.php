@@ -7,9 +7,9 @@ namespace QuickerFaster\UILibrary\Services\BankFiles;
  *
  * The $run parameter should be an object that provides:
  * - $run->id
- * - $run->payslips (collection with: net_pay, employee->payrollProfile, employee->full_name)
- * - $run->period_start / $run->period_end (Carbon instances)
- * - $run->total_cash_required
+ * - $run->payments (collection with: amount, recipient->bankAccount, recipient->full_name)
+ * - $run->start_date / $run->end_date (Carbon instances)
+ * - $run->total_amount
  */
 interface BankFileGenerator
 {

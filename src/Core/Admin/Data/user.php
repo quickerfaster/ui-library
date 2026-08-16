@@ -245,7 +245,7 @@ return [
       'morphName' => 'roles',
       'displayField' => 'name',
     ],
-    // NOTE: 'profile' relation removed — it was HR-specific (Employee model).
+    // NOTE: 'profile' relation removed — it is a consuming-app concern.
     // Consuming apps that need a 'profile' relation on App\Models\User should
     // publish this config and add their own relation definition.
   ],

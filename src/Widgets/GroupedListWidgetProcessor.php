@@ -70,6 +70,7 @@ class GroupedListWidgetProcessor
             'title' => $definition['title'] ?? 'Grouped List',
             'description' => $definition['description'] ?? '',
             'icon' => $definition['icon'] ?? null,
+            'color' => $definition['color'] ?? 'primary',
             'columns' => $columns,
             'items' => $items,
             'width' => $definition['width'] ?? 6,

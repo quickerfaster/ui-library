@@ -41,7 +41,7 @@
                     {{-- Floating Badge (Top-Right) --}}
                     @if (!empty($viewConfig['badgeField']))
                         @php
-                            // Safely access nested data like 'employeePosition.employment_status'
+                            // Safely access nested data like 'recordPosition.employment_status'
                             $val = data_get($record, $viewConfig['badgeField']);
 
                             // Map the value to the configured color

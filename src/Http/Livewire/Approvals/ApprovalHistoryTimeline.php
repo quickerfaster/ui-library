@@ -3,37 +3,100 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\Approvals;
 
 use Livewire\Component;
-use QuickerFaster\UILibrary\Models\ApprovalRequest;
+use QuickerFaster\UILibrary\Contracts\Approvals\ApproverLabelResolver;
+use QuickerFaster\UILibrary\Models\Workflow;
+use QuickerFaster\UILibrary\Models\WorkflowAction;
 
+/**
+ * Renders the chronological action history for a Workflow.
+ *
+ * Each WorkflowAction record is resolved into a display-ready entry showing
+ * who acted (via ApproverLabelResolver), the action label, the affected step,
+ * the timestamp, and any comments.
+ */
 class ApprovalHistoryTimeline extends Component
 {
-    public string $configKey;
-    public int $approvableId;
-    public ?ApprovalRequest $request = null;
+    public ?int $workflowId = null;
 
     protected $listeners = ['refreshApprovalTimeline' => '$refresh'];
 
-    public function mount(string $configKey, int $approvableId): void
+    public function __construct(protected ApproverLabelResolver $labels)
     {
-        $this->configKey = $configKey;
-        $this->approvableId = $approvableId;
-        $this->loadRequest();
     }
 
-    protected function loadRequest(): void
+    public function mount(?Workflow $workflow = null, ?int $workflowId = null): void
     {
-        $resolver = app(\QuickerFaster\UILibrary\Services\Config\Approvals\ApprovalConfigResolver::class, ['configKey' => $this->configKey]);
-        $modelClass = $resolver->getModelClass();
-        $approvable = $modelClass::find($this->approvableId);
-        $this->request = $approvable?->approvalRequest;
+        $this->workflowId = $workflowId ?? ($workflow?->getKey() ?? null);
     }
 
     public function render()
     {
-        $tiers = $this->request ? $this->request->tiers()->orderBy('sequence')->get() : collect();
+        $workflow = $this->resolveWorkflow();
+
+        $actions = $workflow
+            ? WorkflowAction::query()
+                ->with('step')
+                ->where('workflow_id', $workflow->id)
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->get()
+                ->map(fn (WorkflowAction $action) => $this->formatAction($action))
+            : collect();
+
         return view('qf::livewire.approvals.timeline', [
-            'tiers' => $tiers,
-            'request' => $this->request,
+            'workflow' => $workflow,
+            'actions' => $actions,
         ]);
+    }
+
+    protected function resolveWorkflow(): ?Workflow
+    {
+        if (! $this->workflowId) {
+            return null;
+        }
+
+        return Workflow::query()
+            ->with(['currentStep', 'steps'])
+            ->find($this->workflowId);
+    }
+
+    protected function formatAction(WorkflowAction $action): array
+    {
+        return [
+            'id' => $action->id,
+            'action' => $action->action,
+            'label' => $this->actionLabel($action->action),
+            'status' => $this->actionStatus($action->action),
+            'step_name' => $action->step?->name,
+            'actor' => $action->user_id ? $this->labels->label($action->user_id) : null,
+            'actor_avatar' => $action->user_id ? $this->labels->avatar($action->user_id) : null,
+            'actor_profile_route' => $action->user_id ? $this->labels->profileRoute($action->user_id) : null,
+            'comments' => $action->comments,
+            'created_at' => $action->created_at,
+        ];
+    }
+
+    protected function actionLabel(string $action): string
+    {
+        return match ($action) {
+            'submitted' => 'Submitted',
+            'approved' => 'Approved',
+            'rejected' => 'Rejected',
+            'completed' => 'Completed',
+            'recalled' => 'Recalled',
+            default => ucfirst($action),
+        };
+    }
+
+    protected function actionStatus(string $action): string
+    {
+        return match ($action) {
+            'submitted' => 'pending',
+            'approved' => 'approved',
+            'rejected' => 'rejected',
+            'completed' => 'approved',
+            'recalled' => 'cancelled',
+            default => 'pending',
+        };
     }
 }

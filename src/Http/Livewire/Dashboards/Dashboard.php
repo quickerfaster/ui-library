@@ -14,6 +14,8 @@ class Dashboard extends Component
     public array $parameters = [];
     public string $title = '';
     public string $description = '';
+    public array $hero = [];
+    public array $stats = [];
 
     /** @var array Custom widget definitions (overrides config file) */
     public array $customWidgets = [];
@@ -37,6 +39,8 @@ class Dashboard extends Component
         if (!empty($this->customWidgets)) {
             $this->title = $this->customWidgets['title'] ?? '';
             $this->description = $this->customWidgets['description'] ?? '';
+            $this->hero = $this->customWidgets['hero'] ?? [];
+            $this->stats = $this->customWidgets['stats'] ?? [];
             $this->layout = $this->customWidgets['layout'] ?? ['columns' => 12, 'gutter' => 3];
             $widgetDefinitions = $this->customWidgets['widgets'] ?? [];
         } else {
@@ -44,6 +48,8 @@ class Dashboard extends Component
             $config = $resolver->getConfig();
             $this->title = $config['title'] ?? '';
             $this->description = $config['description'] ?? '';
+            $this->hero = $resolver->getHero();
+            $this->stats = $resolver->getStats();
             $this->layout = $config['layout'] ?? ['columns' => 12, 'gutter' => 3];
             $widgetDefinitions = $config['widgets'] ?? [];
         }
@@ -59,6 +65,8 @@ class Dashboard extends Component
             'layout' => $this->layout,
             'title' => $this->title,
             'description' => $this->description,
+            'hero' => $this->hero,
+            'stats' => $this->stats,
         ]);
     }
 }

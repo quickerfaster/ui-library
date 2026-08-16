@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-14
+> **Last Updated**: 2026-08-15
 
 **Related files**: [`00-index.md`](./00-index.md) · [`07-component-catalog.md`](./07-component-catalog.md) · [`09-engines-and-services.md`](./09-engines-and-services.md) · [`11-extension-guide.md`](./11-extension-guide.md) · [`14-integration-map.md`](./14-integration-map.md)
 

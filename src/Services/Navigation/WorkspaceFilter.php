@@ -58,7 +58,7 @@ class WorkspaceFilter
      * Filter context items by workspace constraints.
      *
      * If an item has a `workspace` key with constraint key-value pairs
-     * (e.g., `['role' => 'payroll_admin', 'department_type' => 'engineering']`),
+     * (e.g., `['role' => 'finance_admin', 'department_type' => 'engineering']`),
      * the item is only kept when ALL constraints match the current workspace
      * context. Items with no `workspace` key are always kept.
      *

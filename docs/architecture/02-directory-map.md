@@ -14,11 +14,6 @@
 
 ```
 src/
-├── Commands/                              # Artisan console commands
-│   ├── CleanExports.php                   # Cleans stale export files
-│   ├── CleanImportErrors.php              # Cleans stale import error files
-│   └── QuickerFasterInstallUI.php         # Scaffolds UI assets into consuming app
-│
 ├── Console/                               # Console kernel + commands
 │   ├── Kernel.php                         # Registers package commands
 │   └── Commands/

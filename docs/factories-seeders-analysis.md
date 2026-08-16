@@ -42,15 +42,17 @@
 | 9 | `Hr/Database/Seeders/OnboardingTaskSeeder.php` | Seeder | **EMPTY** — all code commented out | `App\Models\OnboardingTask` (commented) |
 | 10 | `Hr/Database/Seeders/WorkDaySeeder.php` | Seeder | **EMPTY** — all code commented out | `App\Models\WorkDay` (commented) |
 
-### Library Existing Seeders (5 files)
+### Library Existing Seeders (7 files)
 
 | # | File Path | What It Seeds |
 |---|-----------|---------------|
-| 1 | [`src/Core/Admin/Database/Seeders/RoleSeeder.php`](src/Core/Admin/Database/Seeders/RoleSeeder.php:1) | 3 roles (super_admin, admin, user) + 6 permissions |
+| 1 | [`src/Core/Admin/Database/Seeders/RoleSeeder.php`](src/Core/Admin/Database/Seeders/RoleSeeder.php:1) | 5 roles (super_admin, admin, company_admin, user, employee) + 6 permissions |
 | 2 | [`src/Core/Admin/Database/Seeders/SuperAdminSeeder.php`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php:1) | Super admin user via `env()` credentials |
-| 3 | [`src/Core/System/Database/Seeders/SystemSettingsSeeder.php`](src/Core/System/Database/Seeders/SystemSettingsSeeder.php:1) | 6 default system settings (app_name, date_format, time_format, timezone, language, pagination) |
-| 4 | [`src/Core/Organization/Database/Seeders/OrganizationSeeder.php`](src/Core/Organization/Database/Seeders/OrganizationSeeder.php:1) | Demo Company, Branch (HQ), Department (General), Location (Main Office) |
-| 5 | [`src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php:1) | 5 notification templates (document_generated, report_ready, workflow_stage_changed) |
+| 3 | [`src/Core/Admin/Database/Seeders/UserSeeder.php`](src/Core/Admin/Database/Seeders/UserSeeder.php:1) | 3 users: super_admin, admin (admin@test.com), company_admin (company.admin@example.com) |
+| 4 | [`src/Core/System/Database/Seeders/SystemSettingsSeeder.php`](src/Core/System/Database/Seeders/SystemSettingsSeeder.php:1) | 6 default system settings (app_name, date_format, time_format, timezone, language, pagination) |
+| 5 | [`src/Core/Organization/Database/Seeders/OrganizationSeeder.php`](src/Core/Organization/Database/Seeders/OrganizationSeeder.php:1) | Demo Company, Branch (HQ), Department (General), Location (Main Office) |
+| 6 | [`src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php:1) | 5 notification templates (document_generated, report_ready, workflow_stage_changed) |
+| 7 | [`src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php`](src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php:1) | Model-level access-control permissions (view_*, create_*, edit_*, delete_*, print_*, export_*, import_*) for all discovered models |
 
 ---
 
@@ -87,8 +89,8 @@
 
 **Justification:**
 - This is a meta-seeder that auto-discovers all seeders across `App\Modules/*/Database/Seeders/`. It depends on Quick-HR's modular directory structure.
-- The library already has its own seeding orchestration via [`InstallCommand::runSeeders()`](src/Console/Commands/InstallCommand.php:318), which explicitly calls each seeder class by its FQCN.
-- The auto-discovery pattern is clever but unnecessary — the library has a fixed, known set of 5 seeders.
+- The library already has its own seeding orchestration via [`InstallCommand::runSeeders()`](src/Console/Commands/InstallCommand.php:318), which runs each seeder in a separate PHP process using `Symfony\Component\Process\Process` so that source-file modifications (e.g., trait injection into the User model) are picked up by each freshly-booted process.
+- The auto-discovery pattern is clever but unnecessary — the library has a fixed, known set of 7 seeders.
 
 ---
 
@@ -96,7 +98,7 @@
 **Verdict: Stale – Remove (already covered)**
 
 **Justification:**
-- The library already has [`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php:1) which creates 3 roles (`super_admin`, `admin`, `user`) with 6 permissions.
+- The library already has [`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php:1) which creates 5 roles (`super_admin`, `admin`, `company_admin`, `user`, `employee`) with 6 permissions.
 - The Quick-HR version creates 13 HR-specific roles (`hr_manager`, `payroll_officer`, `recruiter`, etc.) that are irrelevant to a generic UI library.
 - The Quick-HR version references `App\Modules\Admin\Models\Role` instead of `Spatie\Permission\Models\Role`.
 - **Recommendation:** The library's existing RoleSeeder is sufficient. However, the Quick-HR version's `description` and `editable` fields on roles are a pattern worth noting for future enhancement of the library's RoleSeeder.
@@ -170,42 +172,57 @@ After thorough analysis, **zero** Quick-HR factories or seeders should be copied
 
 ### 3.2 What the Library Already Has (and Should Keep)
 
-The library's 5 existing seeders provide complete coverage for autonomous installation:
+The library's 7 existing seeders provide complete coverage for autonomous installation:
 
 ```mermaid
 flowchart TD
     A[ui-library:install] --> B[runSeeders]
     B --> C[RoleSeeder]
     B --> D[SuperAdminSeeder]
-    B --> E[SystemSettingsSeeder]
-    B --> F[OrganizationSeeder]
-    B --> G[NotificationTemplateSeeder]
+    B --> E[UserSeeder]
+    B --> F[SystemSettingsSeeder]
+    B --> G[OrganizationSeeder]
+    B --> H[NotificationTemplateSeeder]
+    B --> I[AccessControlPermissionSeeder]
     
-    C --> C1["3 roles: super_admin, admin, user"]
+    C --> C1["5 roles: super_admin, admin, company_admin, user, employee"]
     C --> C2["6 permissions"]
     
     D --> D1["Super admin user from env"]
     D --> D2["HasRoles auto-injection"]
     
-    E --> E1["6 system settings"]
+    E --> E1["3 users: super_admin, admin, company_admin"]
     
-    F --> F1["Demo Company"]
-    F --> F2["HQ Branch"]
-    F --> F3["General Department"]
-    F --> F4["Main Office Location"]
+    F --> F1["6 system settings"]
     
-    G --> G1["5 notification templates"]
+    G --> G1["Demo Company"]
+    G --> G2["HQ Branch"]
+    G --> G3["General Department"]
+    G --> G4["Main Office Location"]
+    
+    H --> H1["5 notification templates"]
+    
+    I --> I1["Model-level access-control permissions"]
+    I --> I2["view_*, create_*, edit_*, delete_*, print_*, export_*, import_*"]
 ```
 
 ### 3.3 Integration with `ui-library:install`
 
-The [`InstallCommand::runSeeders()`](src/Console/Commands/InstallCommand.php:318) method already calls all 5 library seeders in the correct dependency order:
+The [`InstallCommand::runSeeders()`](src/Console/Commands/InstallCommand.php:489) method runs all 7 library seeders in the correct dependency order. Each seeder is executed in a **separate PHP process** via [`Symfony\Component\Process\Process`](src/Console/Commands/InstallCommand.php:514) so that any source-file modifications made earlier in the install (e.g., injecting the `HasRoles` trait into the User model) are picked up by the freshly-booted process:
 
 1. **RoleSeeder** — must run first (permissions and roles)
 2. **SuperAdminSeeder** — depends on roles existing
-3. **SystemSettingsSeeder** — independent
-4. **OrganizationSeeder** — independent (creates demo org structure)
-5. **NotificationTemplateSeeder** — independent
+3. **UserSeeder** — depends on roles existing; creates admin@test.com and company.admin@example.com
+4. **SystemSettingsSeeder** — independent
+5. **OrganizationSeeder** — independent (creates demo org structure)
+6. **NotificationTemplateSeeder** — independent
+7. **AccessControlPermissionSeeder** — seeds model-level access-control permissions for all discovered models
+
+The seeders are also available via the `ui-library-seeders` publishable tag, allowing consuming apps to publish and customize them:
+
+```bash
+php artisan vendor:publish --tag=ui-library-seeders
+```
 
 No changes are needed to the InstallCommand. The existing set is complete and self-contained.
 
@@ -255,4 +272,4 @@ While no Quick-HR files should be copied, the analysis revealed patterns that co
 
 The Quick-HR application's factories and seeders are overwhelmingly HR-domain-specific. They reference models (`App\Modules\Hr\Models\*`) that represent payroll, attendance, employee management, and workforce scheduling — none of which belong in a generic UI library.
 
-The QuickerFaster UI Library's existing 5 seeders ([`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php:1), [`SuperAdminSeeder`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php:1), [`SystemSettingsSeeder`](src/Core/System/Database/Seeders/SystemSettingsSeeder.php:1), [`OrganizationSeeder`](src/Core/Organization/Database/Seeders/OrganizationSeeder.php:1), [`NotificationTemplateSeeder`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php:1)) already provide complete coverage for autonomous installation: roles, permissions, admin user, system settings, demo organization structure, and notification templates. No additions are needed.
+The QuickerFaster UI Library's existing 7 seeders ([`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php:1), [`SuperAdminSeeder`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php:1), [`UserSeeder`](src/Core/Admin/Database/Seeders/UserSeeder.php:1), [`SystemSettingsSeeder`](src/Core/System/Database/Seeders/SystemSettingsSeeder.php:1), [`OrganizationSeeder`](src/Core/Organization/Database/Seeders/OrganizationSeeder.php:1), [`NotificationTemplateSeeder`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php:1), [`AccessControlPermissionSeeder`](src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php:1)) already provide complete coverage for autonomous installation: roles, permissions, admin users, system settings, demo organization structure, notification templates, and model-level access-control permissions. No additions are needed.

@@ -155,7 +155,7 @@
                 @endphp
                 <div class="col-12 col-md-6 col-xl-4">
                     <a href="{{ $href }}" class="text-decoration-none">
-                        <div class="card h-100 border-0 shadow-sm rounded-4 transition-hover" style="transition: transform .2s ease, box-shadow .2s ease;">
+                        <div class="card h-100 border-0 shadow-sm rounded-4 transition-hover">
                             <div class="card-body p-4">
                                 <div class="d-flex align-items-center mb-3">
                                     <div class="icon-shape icon-lg rounded-3 bg-gradient-{{ $module['color'] }} text-white d-flex align-items-center justify-content-center me-3" style="width: 56px; height: 56px; flex-shrink: 0;">
@@ -209,17 +209,4 @@
             </div>
         </div>
     </div>
-
-    <style>
-        .transition-hover:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 1rem 2rem rgba(0, 0, 0, .08) !important;
-        }
-        .opacity-6 {
-            opacity: .6;
-        }
-        .opacity-8 {
-            opacity: .8;
-        }
-    </style>
 </x-qf::navigation-layout>

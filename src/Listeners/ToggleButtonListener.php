@@ -7,7 +7,7 @@ use QuickerFaster\UILibrary\Events\ToggleButtonEvent;
 /**
  * Handles ToggleButtonEvent payloads for access control permission toggles.
  *
- * Mirrors the original QuickHR ToggleButtonListener: when a toggle button
+ * Mirrors the original ToggleButtonListener: when a toggle button
  * uses stateSyncMethod "method" (rather than directly writing to a model
  * column), this listener syncs the granted permissions on the selected
  * scope (a Role or User) via Spatie's syncPermissions().

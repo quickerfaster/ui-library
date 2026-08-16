@@ -42,7 +42,7 @@ class FileField implements FieldType
     }
 
     // Detect if this record has a related owner via common relationship names
-    $isDocument = (method_exists($record, 'employee') && $record->employee)
+    $isDocument = (method_exists($record, 'subject') && $record->subject)
         || (method_exists($record, 'owner') && $record->owner)
         || (method_exists($record, 'user') && $record->user);
     

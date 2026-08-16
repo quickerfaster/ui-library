@@ -30,6 +30,7 @@ namespace QuickerFaster\UILibrary\Traits;
 trait HasUILibraryUser
 {
     use HasSettings;
+    use HasNotifications;
 
     /**
      * Columns the library manages on the consuming app's User model that must
@@ -60,6 +61,5 @@ trait HasUILibraryUser
     }
 
     // Future traits to be composed here:
-    // use HasNotifications;
     // use HasDashboardPreferences;
 }

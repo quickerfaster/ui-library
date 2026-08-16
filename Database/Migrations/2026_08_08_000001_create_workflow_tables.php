@@ -13,7 +13,7 @@ return new class extends Migration
             $table->morphs('workflowable');
             $table->string('definition_key');
             $table->string('status')->default('pending'); // pending, approved, rejected, cancelled
-            $table->foreignId('current_step')->nullable()->constrained('workflow_steps')->nullOnDelete();
+            $table->foreignId('current_step')->nullable();
             $table->foreignId('submitted_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('submitted_at')->nullable();
             $table->timestamp('completed_at')->nullable();
@@ -35,6 +35,10 @@ return new class extends Migration
             $table->timestamp('approved_at')->nullable();
             $table->text('comments')->nullable();
             $table->timestamps();
+        });
+
+        Schema::table('workflows', function (Blueprint $table) {
+            $table->foreign('current_step')->references('id')->on('workflow_steps')->nullOnDelete();
         });
 
         Schema::create('workflow_actions', function (Blueprint $table) {

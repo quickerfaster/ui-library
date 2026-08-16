@@ -79,10 +79,16 @@ class ReportEngine
 
     /**
      * Resolve a notifiable entity from an ID.
+     *
+     * Uses the same config source as WorkflowEngine for consistency:
+     * config('ui-library.user.model') is authoritative, with a fallback
+     * to the default App User model.
      */
     protected function resolveNotifiable(int|string $id): ?Notifiable
     {
-        $userModel = config('auth.providers.users.model', \App\Models\User::class);
-        return $userModel::find($id);
+        $userModel = config('ui-library.user.model', \App\Models\User::class);
+        $user = $userModel::find($id);
+
+        return $user instanceof Notifiable ? $user : null;
     }
 }

@@ -562,7 +562,7 @@ class DataTable extends Component
         }
 
         // 2. Intelligent fallback: try common relation paths (supports dot notation)
-        $relationPaths = ['employeeProfile', 'profile', 'avatar', 'employee.employeeProfile'];
+        $relationPaths = ['profile', 'avatar', 'record.profile'];
         $fields = ['photo', 'avatar_url', 'image', 'picture', 'profile_photo', 'avatar'];
 
         foreach ($relationPaths as $path) {
@@ -1409,7 +1409,7 @@ class DataTable extends Component
 
         // ✅ 1b. ENSURE FOREIGN KEYS FOR VIEW CONFIG RELATIONS ARE SELECTED
         // Without the FK in the SELECT, eager-loading fails because Laravel
-        // can't resolve the relationship (e.g. employee_id for employee.first_name).
+        // can't resolve the relationship (e.g. record_id for record.first_name).
         $viewRelations = $this->getViewConfigRelations();
         if (!empty($viewRelations)) {
             $configRelations = $resolver->getRelations();
@@ -1718,7 +1718,8 @@ class DataTable extends Component
 
 
         // Check permission with record
-        if (!$this->authService->canPerformAction(auth()->user(), $action, $record)) {
+        $permission = is_array($action) ? ($action['action'] ?? $action['permission'] ?? '') : $action;
+        if (!$this->authService->canPerformAction(auth()->user(), $permission, $record)) {
             $this->dispatch('showAlert', [
                 'type' => 'warning',
                 'message' => 'You do not have permission to perform this action.',

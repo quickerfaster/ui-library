@@ -99,7 +99,7 @@ Everything in the library uses the `qf` prefix for discoverability:
 | Blade component tag | `<x-qf::...>` | `<x-qf::layout>` |
 | Livewire component tag | `<livewire:qf....>` | `<livewire:qf.data-table>` |
 | Translation namespace | `qf::` | `__('qf::nav.dashboard')` |
-| Config key | `quicker-faster-ui` | `config('quicker-faster-ui.features.multi_company_payroll')` |
+| Config key | `ui-library` | `config('ui-library.features.multi_company_payroll')` |
 | Publishable tag | `quicker-faster-ui-*` | `php artisan vendor:publish --tag=quicker-faster-ui-views` |
 
 ---
@@ -147,7 +147,7 @@ src/
 │       └── ProfileComplete.php            # Checks if user profile is complete
 │
 ├── Config/                                # Library-level configuration
-│   └── quicker-faster-ui.php              # Socialite, multitenancy, feature flags
+│   └── ui-library.php                     # Socialite, multitenancy, feature flags, approvals, workflows, documents, notifications, reports
 │
 ├── Console/                               # Console kernel
 │   ├── Kernel.php                         # Registers package commands
@@ -157,8 +157,6 @@ src/
 │
 ├── Contracts/                             # Interfaces and contracts
 │   ├── OnboardingCondition.php            # Contract for onboarding step completion checks
-│   ├── Approvals/
-│   │   └── ApprovalModelResolver.php      # Contract for approval model resolution
 │   ├── FieldTypes/
 │   │   └── FieldType.php                  # Contract for field type implementations
 │   ├── Modules/
@@ -199,13 +197,13 @@ src/
 │   │   │   └── ExportController.php       # Export queue, download, template, cancel
 │   │   ├── Imports/
 │   │   │   └── ImportController.php       # Import status, error download
-│   │   ├── OrganizationSwitchController.php  # ⚠️ Half done — Organization switching; works standalone, Breeze/Jetstream integration deferred
+│   │   ├── OrganizationSwitchController.php  # Organization switching via CompanyProvider; session-based, with access validation
 │   │   └── Prints/
 │   │       ├── GenericTablePrintController.php    # Print-friendly table view
 │   │       └── GenericDetailPagePrintController.php # Print-friendly detail view
 │   │
 │   ├── ViewComposers/                      # View composition
-│   │   └── SidebarComposer.php            # ⚠️ Half done — Composes sidebar data for views; registered in UILibraryServiceProvider
+│   │   └── SidebarComposer.php            # Composes sidebar data (organizations + navigation sections) for views; registered in UILibraryServiceProvider
 │   │
 │   └── Livewire/                          # Livewire 3 components
 │       ├── ColumnManager.php              # Column visibility toggling for data tables
@@ -391,8 +389,9 @@ src/
 │   ├── AccessControl/
 │   │   └── AccessControlPermissionService.php  # Permission CRUD operations
 │   ├── Approvals/
-│   │   ├── ApprovalEngine.php             # Legacy approval workflow engine (deprecated — prefer WorkflowEngine)
-│   │   └── ApprovalModelResolver.php      # Config-driven approval model resolution
+│   │   ├── ApprovalGuard.php              # Guards approval actions (authorization checks)
+│   │   ├── DefaultApproverResolver.php    # Default approver resolution from config
+│   │   └── DefaultApproverLabelResolver.php # Default approver label resolution
 │   ├── BankFiles/                         # Bank file generators
 │   │   ├── BankFileGenerator.php          # Interface/contract for generators
 │   │   ├── BankFileGeneratorFactory.php   # Factory for bank file generators
@@ -444,7 +443,7 @@ src/
 │   ├── Reports/
 │   │   └── ReportEngine.php               # Scheduled report engine
 │   └── Workflow/
-│       └── WorkflowEngine.php             # Generic workflow engine (supersedes ApprovalEngine)
+│       └── WorkflowEngine.php             # Generic workflow engine (replaced legacy ApprovalEngine)
 │
 ├── Events/                                # Library events
 │   ├── ModuleBooted.php                   # Fires after module boot sequence completes
@@ -492,15 +491,7 @@ src/
     ├── OnboardingWidgetProcessor.php      # Onboarding progress
     ├── ActionCardWidgetProcessor.php      # Action card with CTA
     ├── ActivityLogWidgetProcessor.php     # Activity log feed
-    ├── ProfileHeaderWidgetProcessor.php   # User/employee profile header
-    ├── TurnoverRateWidgetProcessor.php    # HR: turnover rate
-    ├── ENPSWidgetProcessor.php            # HR: eNPS score
-    ├── AbsenteeismRateWidgetProcessor.php # HR: absenteeism rate
-    ├── GoalCompletionRateWidgetProcessor.php  # HR: goal completion
-    ├── TrainingCompletionRateWidgetProcessor.php # HR: training completion
-    ├── HeadcountVsBudgetWidgetProcessor.php    # HR: headcount vs budget
-    ├── DiversityIndexWidgetProcessor.php       # HR: diversity index
-    └── OfferAcceptanceRateWidgetProcessor.php  # HR: offer acceptance rate
+    └── ProfileHeaderWidgetProcessor.php   # User/employee profile header
 ```
 
 **Package-level Database/Migrations/** (loaded via `loadMigrationsFrom()` in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php)):
@@ -529,7 +520,7 @@ src/Core/
 │   ├── RoleSeeder.php                             # Default roles and permissions
 │   └── SuperAdminSeeder.php                       # Super admin user creation
 ├── Common/Database/Seeders/
-│   └── NotificationTemplateSeeder.php             # 5 default notification templates
+│   └── NotificationTemplateSeeder.php             # 13 notification templates (document, report, 4 workflow types × database/mail channels + legacy)
 └── System/Database/Seeders/
     └── SystemSettingsSeeder.php                   # Default system settings
 ```
@@ -799,16 +790,7 @@ All components are registered in [`UILibraryServiceProvider::registerLivewireCom
 
 #### Conditional (HR Module — Registered Only If Files Exist)
 
-These are registered conditionally in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php:299) by checking `app_path()` for file existence:
-
-| Component | Alias | Condition Path |
-|-----------|-------|---------------|
-| PayrollWizardAdjustments | `qf.payroll-wizard-adjustments` | `Modules/Hr/Http/Livewire/Payroll/PayrollWizardAdjustments.php` |
-| PayrollWizardPreview | `qf.payroll-wizard-preview` | `Modules/Hr/Http/Livewire/Payroll/PayrollWizardPreview.php` |
-| PayrollRunWizard | `qf.payroll-run-wizard` | `Modules/Hr/Http/Livewire/Payroll/PayrollRunWizard.php` |
-| PayrollRunDetail | `qf.payroll-run-detail` | `Modules/Hr/Http/Livewire/Payroll/PayrollRunDetail.php` |
-| PayslipItems | `qf.payslip-items` | `Modules/Hr/Http/Livewire/Payroll/PayslipItems.php` |
-| PolicyCalculationBuilder | `qf.policy-calculation-builder` | `Modules/Hr/Http/Livewire/Payroll/PolicyCalculationBuilder.php` |
+> ⚠️ **Superseded note**: No HR/payroll Livewire registrations remain in the library. The conditional `PayrollWizard` / `PayrollRunWizard` / `PayslipItems` / `PolicyCalculationBuilder` components were removed as part of the HR decoupling. The library registers only domain-agnostic Livewire components.
 
 ### 4.2 Blade Components
 
@@ -832,9 +814,10 @@ These are registered conditionally in [`UILibraryServiceProvider`](src/Providers
 | DataTableExport | [`src/Services/Exports/DataTableExport.php`](src/Services/Exports/DataTableExport.php) | Excel/CSV export from DataTable config |
 | TemplateExport | [`src/Services/Exports/TemplateExport.php`](src/Services/Exports/TemplateExport.php) | Import template generation with LookupSheet, OptionsReferenceSheet, TemplateDataSheet |
 | **DocumentEngine** | [`src/Services/Documents/DocumentEngine.php`](src/Services/Documents/DocumentEngine.php:13) | **NEW** — Generic document engine. API: `upload()`, `generatePdf()`, `generateExcel()`, `getDocuments()`, `delete()`. Polymorphic, config-driven. |
-| **WorkflowEngine** | [`src/Services/Workflow/WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php:12) | **NEW** — Generic workflow engine. API: `start()`, `approve()`, `reject()`, `recall()`, `getDefinition()`, `hasActiveWorkflow()`. Supersedes ApprovalEngine. |
-| ApprovalEngine | [`src/Services/Approvals/ApprovalEngine.php`](src/Services/Approvals/ApprovalEngine.php:11) | ⚠️ **DEPRECATED** — Legacy approval workflow engine. Maintained for backward compatibility. Prefer [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) for new workflow-enabled features. |
-| ApprovalModelResolver | [`src/Services/Approvals/ApprovalModelResolver.php`](src/Services/Approvals/ApprovalModelResolver.php:7) | Config-driven approval model resolution (implements [`ApprovalModelResolver`](src/Contracts/Approvals/ApprovalModelResolver.php) contract) |
+| **WorkflowEngine** | [`src/Services/Workflow/WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php:12) | **NEW** — Generic workflow engine. API: `start()`, `approve()`, `reject()`, `recall()`, `getDefinition()`, `hasActiveWorkflow()`. Replaced the legacy ApprovalEngine (now removed). |
+| ApprovalGuard | [`src/Services/Approvals/ApprovalGuard.php`](src/Services/Approvals/ApprovalGuard.php) | Guards approval actions with authorization checks |
+| DefaultApproverResolver | [`src/Services/Approvals/DefaultApproverResolver.php`](src/Services/Approvals/DefaultApproverResolver.php) | Default approver resolution from `ui-library.approvals.approver_resolver` config |
+| DefaultApproverLabelResolver | [`src/Services/Approvals/DefaultApproverLabelResolver.php`](src/Services/Approvals/DefaultApproverLabelResolver.php) | Default approver label resolution from `ui-library.approvals.approver_label_resolver` config |
 | NullCompanyProvider | [`src/Services/Navigation/NullCompanyProvider.php`](src/Services/Navigation/NullCompanyProvider.php:9) | Default no-op [`CompanyProvider`](src/Contracts/Navigation/CompanyProvider.php) implementation — returns empty collection/null |
 | **NavigationManager** | [`src/Services/Navigation/NavigationManager.php`](src/Services/Navigation/NavigationManager.php) | Config-driven navigation manager: `getSections()`, 5-tier priority chain, context_groups |
 | **WorkspaceFilter** | [`src/Services/Navigation/WorkspaceFilter.php`](src/Services/Navigation/WorkspaceFilter.php) | **NEW** — Workspace-scoped navigation filtering: `filterContextGroups()` (feature gates), `filterContextItems()` (role/department constraints) |
@@ -896,9 +879,9 @@ interface Workflowable
 
 Any Eloquent model implements this contract to become workflow-enabled. The [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) uses these methods to start, advance, and complete workflows.
 
-#### ApprovalModelResolver Contract
+#### ApprovalModelResolver Contract (Removed)
 
-**Location**: [`src/Contracts/Approvals/ApprovalModelResolver.php`](src/Contracts/Approvals/ApprovalModelResolver.php:5)
+**Superseded historical reference**: [`src/Contracts/Approvals/ApprovalModelResolver.php`](src/Contracts/Approvals/ApprovalModelResolver.php:5)
 
 ```php
 namespace QuickerFaster\UILibrary\Contracts\Approvals;
@@ -912,7 +895,7 @@ interface ApprovalModelResolver
 }
 ```
 
-Abstracts model class resolution for approval workflows. The default implementation ([`src/Services/Approvals/ApprovalModelResolver.php`](src/Services/Approvals/ApprovalModelResolver.php)) reads from `config('ui-library.approvals.models')`.
+> ⚠️ **Superseded note**: This `ApprovalModelResolver` contract and its service implementation were removed. Approval model resolution is superseded by the [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) and the [`Workflow`](src/Models/Workflow.php), [`WorkflowStep`](src/Models/WorkflowStep.php), [`WorkflowAction`](src/Models/WorkflowAction.php), [`WorkflowDefinition`](src/Models/WorkflowDefinition.php), and [`WorkflowDefinitionStep`](src/Models/WorkflowDefinitionStep.php) models.
 
 #### CompanyProvider Contract
 
@@ -1203,14 +1186,6 @@ protected array $map = [
     'action_card' => ActionCardWidgetProcessor::class,
     'activity_log' => ActivityLogWidgetProcessor::class,
     'profile_header' => ProfileHeaderWidgetProcessor::class,
-    'turnover_rate' => TurnoverRateWidgetProcessor::class,
-    'enps'          => ENPSWidgetProcessor::class,
-    'absenteeism_rate' => AbsenteeismRateWidgetProcessor::class,
-    'goal_completion'  => GoalCompletionRateWidgetProcessor::class,
-    'training_completion' => TrainingCompletionRateWidgetProcessor::class,
-    'headcount_vs_budget' => HeadcountVsBudgetWidgetProcessor::class,
-    'diversity_index' => DiversityIndexWidgetProcessor::class,
-    'offer_acceptance' => OfferAcceptanceRateWidgetProcessor::class,
 ];
 ```
 
@@ -1515,16 +1490,12 @@ The library's own configuration is defined in [`src/Config/ui-library.php`](src/
 
 ```php
 'approvals' => [
-    'models' => [
-        'request'       => \QuickerFaster\UILibrary\Models\ApprovalRequest::class,
-        'tier'          => \QuickerFaster\UILibrary\Models\ApprovalTier::class,
-        'log'           => \QuickerFaster\UILibrary\Models\ApprovalLog::class,
-        'tier_approval' => \QuickerFaster\UILibrary\Models\ApprovalTierApproval::class,
-    ],
+    'approver_resolver'       => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverResolver::class,
+    'approver_label_resolver' => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverLabelResolver::class,
 ],
 ```
 
-These are library-owned model defaults. Consuming apps can override them by publishing the config. The [`ApprovalModelResolver`](src/Services/Approvals/ApprovalModelResolver.php) reads from these keys.
+> ⚠️ **Superseded note**: The legacy `approvals.models` key pointing at library-owned `ApprovalRequest` / `ApprovalTier` / `ApprovalLog` / `ApprovalTierApproval` FQCNs was removed along with those models. Approval workflow state is now handled by the [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) and the [`Workflow`](src/Models/Workflow.php), [`WorkflowStep`](src/Models/WorkflowStep.php), [`WorkflowAction`](src/Models/WorkflowAction.php), [`WorkflowDefinition`](src/Models/WorkflowDefinition.php), and [`WorkflowDefinitionStep`](src/Models/WorkflowDefinitionStep.php) models. The remaining `approvals` config keys resolve approvers for approval UI actions.
 
 #### Workflows
 
@@ -1681,7 +1652,7 @@ Report configs from `app/Modules/*/Data/reports/*.php` are merged with keys like
 | Config key (dot notation) | `{lowercase_module}.{filename}` | `hr.employee`, `admin.user` |
 | Dashboard config key | `{lowercase_module}_{filename}` | `hr_employee_overview` |
 | Report config key | `{lowercase_module}_{filename}` | `hr_headcount` |
-| Livewire component alias | `qf.{kebab-case}` | `qf.data-table`, `qf.payroll-run-wizard` |
+| Livewire component alias | `qf.{kebab-case}` | `qf.data-table`, `qf.data-table-form` |
 | Blade component tag | `<x-qf::{kebab-case}>` | `<x-qf::text-field>` |
 | Model namespace | `App\Modules\{ModuleName}\Models` | `App\Modules\Hr\Models\Employee` |
 | Listener namespace | `App\Modules\{ModuleName}\Listeners` | `App\Modules\Hr\Listeners\SendWelcomeEmail` |
@@ -1966,7 +1937,7 @@ return [
 │    • Blade::component('qf::components.breadcrumb', ...)     │
 │    • Blade::componentNamespace('QuickerFaster\\...', 'qf')  │
 │    • Blade::directive('setting', ...)                       │
-│    • mergeConfigFrom(... 'quicker-faster-ui')               │
+│    • mergeConfigFrom(... 'ui-library')                      │
 │    • loadTranslationsFrom(... 'qf')                         │
 ├─────────────────────────────────────────────────────────────┤
 │                    ModuleServiceProvider                     │
@@ -2117,7 +2088,7 @@ TASK: "I need to..."
 │   │   └─ Implement: QuickerFaster\UILibrary\Contracts\OnboardingCondition
 │
 ├─ "...add a social login provider"
-│   └─ Edit: src/Config/quicker-faster-ui.php
+│   └─ Edit: src/Config/ui-library.php
 │   │   └─ Add provider config under 'socialite.providers'
 │   └─ Edit: src/Providers/UILibraryServiceProvider.php
 │   │   └─ Add provider to $providers array in registerSocialiteProviders()
@@ -2173,11 +2144,11 @@ TASK: "I need to..."
 | Add bank file format | `src/Services/BankFiles/{Format}Generator.php` | `src/Services/BankFiles/BankFileGeneratorFactory.php` |
 | Add settings page | `app/Modules/app_general_settings.php` | `src/Http/Livewire/Settings/SettingsPanel.php` |
 | Add permission | Spatie migration/seeder | `src/Http/Livewire/AccessControls/PermissionManager.php` |
-| Add approval workflow | `app/Modules/{Module}/Data/{Entity}.php` | `src/Services/Approvals/ApprovalEngine.php`, `src/Traits/Approvals/HasApproval.php` |
-| Override library view | `resources/views/vendor/quicker-faster-ui/` | `src/Providers/UILibraryServiceProvider.php` (publish tag) |
+| Add approval workflow | `app/Modules/{Module}/Data/{Entity}.php` | `src/Services/Workflow/WorkflowEngine.php`, `src/Models/Workflow.php` |
+| Override library view | `resources/views/vendor/ui-library/` | `src/Providers/UILibraryServiceProvider.php` (publish tag) |
 | Add translation | `src/Resources/lang/{locale}/` | `src/Providers/UILibraryServiceProvider.php` |
 | Change auth behavior | `src/Providers/FortifyServiceProvider.php` | `src/Resources/views/auth/` |
-| Add social provider | `src/Config/quicker-faster-ui.php` | `src/Providers/UILibraryServiceProvider.php`, `src/Routes/web.php` |
+| Add social provider | `src/Config/ui-library.php` | `src/Providers/UILibraryServiceProvider.php`, `src/Routes/web.php` |
 | Add console command | `src/Commands/{Command}.php` | `src/Providers/UILibraryServiceProvider.php` |
 
 ### 9.3 Troubleshooting Guide
@@ -2404,8 +2375,7 @@ The QuickerFaster UI Library is a **layered architecture** with seven core respo
 │  4. WORKFLOW ENGINE                                          │
 │     • WorkflowEngine: generic, contract-based, multi-step    │
 │     • Workflowable contract: any Eloquent model can opt in   │
-│     • ApprovalEngine: legacy, maintained for backward compat │
-│     • ApprovalModelResolver: config-driven model resolution  │
+│     • Approval workflow via WorkflowEngine (ApprovalEngine removed) │
 │     • CompanyProvider: multi-tenant navigation abstraction   │
 ├──────────────────────────────────────────────────────────────┤
 │  5. DOCUMENT ENGINE                                          │
@@ -2436,7 +2406,7 @@ The QuickerFaster UI Library is a **layered architecture** with seven core respo
 ```
 
 **Completed Phases**:
-- **Phase 2.5**: ✅ Decoupling (CompanyProvider, ApprovalModelResolver, migration relocation, HR-specific code removal)
+- **Phase 2.5**: ✅ Decoupling (CompanyProvider, migration relocation, HR-specific code removal)
 - **Phase 3.1**: ✅ Workflow Engine ([`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) + [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract)
 - **Phase 3.2**: ✅ Document Engine ([`DocumentEngine`](src/Services/Documents/DocumentEngine.php) + [`Documentable`](src/Contracts/Documents/Documentable.php) contract)
 - **Phase 3.3**: ✅ Notification Engine ([`NotificationService`](src/Services/Notifications/NotificationService.php) + [`Notifiable`](src/Contracts/Notifications/Notifiable.php) + [`NotificationChannel`](src/Contracts/Notifications/NotificationChannel.php) contracts)
@@ -2504,7 +2474,7 @@ Seven files contain `App\Modules\*` only in docblocks/comments documenting migra
 
 ### 12.1 Overview
 
-Config-driven, contract-based generic workflow engine that supersedes the legacy [`ApprovalEngine`](src/Services/Approvals/ApprovalEngine.php). Any Eloquent model can become workflow-enabled by implementing the [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract.
+Config-driven, contract-based generic workflow engine that replaced the legacy `ApprovalEngine` (which has been removed). Any Eloquent model can become workflow-enabled by implementing the [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract.
 
 ### 12.2 Architecture
 
@@ -2518,8 +2488,8 @@ Config-driven, contract-based generic workflow engine that supersedes the legacy
 - Registered as singleton in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php)
 - Migration at [`Database/Migrations/2026_08_08_000001_create_workflow_tables.php`](Database/Migrations/2026_08_08_000001_create_workflow_tables.php)
 - Zero `App\Modules` references — fully decoupled
-- Legacy [`ApprovalEngine`](src/Services/Approvals/ApprovalEngine.php) still exists for backward compatibility with existing approval workflows
-- **No dedicated Controller, Livewire component, or Blade views** — workflow is dispatched programmatically; UI is provided by the legacy [`ApprovalActions`](src/Http/Livewire/Approvals/ApprovalActions.php) and [`ApprovalHistoryTimeline`](src/Http/Livewire/Approvals/ApprovalHistoryTimeline.php) Livewire components
+- Legacy `ApprovalEngine` was removed; the [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) is now the sole approval/workflow engine
+- **No dedicated Controller, Livewire component, or Blade views** — workflow is dispatched programmatically; UI is provided by the [`ApprovalActions`](src/Http/Livewire/Approvals/ApprovalActions.php) and [`ApprovalHistoryTimeline`](src/Http/Livewire/Approvals/ApprovalHistoryTimeline.php) Livewire components
 
 ### 12.4 Usage Example
 
@@ -2596,13 +2566,7 @@ if ($engine->hasActiveWorkflow($leaveRequest)) {
 
 ### 12.6 Relationship to Legacy ApprovalEngine
 
-| Aspect | WorkflowEngine (NEW) | ApprovalEngine (LEGACY) |
-|--------|---------------------|------------------------|
-| Contract | [`Workflowable`](src/Contracts/Workflow/Workflowable.php) | None (ad-hoc) |
-| Models | [`Workflow`](src/Models/Workflow.php), [`WorkflowStep`](src/Models/WorkflowStep.php), [`WorkflowAction`](src/Models/WorkflowAction.php) | ApprovalRequest, ApprovalTier, ApprovalLog, ApprovalTierApproval |
-| Config | `ui-library.workflows.definitions` | ApprovalConfigResolver |
-| Decoupling | Zero `App\Modules` references | Uses ApprovalModelResolver contract |
-| Status | **Preferred for new features** | Maintained for backward compatibility |
+> ⚠️ **Superseded note**: The legacy `ApprovalEngine` and its `ApprovalRequest`, `ApprovalTier`, `ApprovalLog`, and `ApprovalTierApproval` models were removed. The [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) and its [`Workflow`](src/Models/Workflow.php), [`WorkflowStep`](src/Models/WorkflowStep.php), [`WorkflowAction`](src/Models/WorkflowAction.php), [`WorkflowDefinition`](src/Models/WorkflowDefinition.php), and [`WorkflowDefinitionStep`](src/Models/WorkflowDefinitionStep.php) models are the sole workflow implementation.
 
 ## 11. Phase 2.5 Decoupling Status
 
@@ -2627,8 +2591,7 @@ Phase 2.5 targeted the most impactful hard-coded couplings between the UI librar
 | Layer | Name | Location | Purpose |
 |-------|------|----------|---------|
 | **Contract** | `CompanyProvider` | [`src/Contracts/Navigation/CompanyProvider.php`](src/Contracts/Navigation/CompanyProvider.php:8) | Abstracts company resolution for multi-tenant navigation. Methods: `getCompanies(?User)`, `getCurrentCompanyId(?User)`. |
-| **Contract** | `ApprovalModelResolver` | [`src/Contracts/Approvals/ApprovalModelResolver.php`](src/Contracts/Approvals/ApprovalModelResolver.php) | Abstracts model class resolution for approval workflows. Config-driven implementation maps model keys to FQCNs. |
-| **Implementation** | `ApprovalModelResolver` | [`src/Services/Approvals/ApprovalModelResolver.php`](src/Services/Approvals/ApprovalModelResolver.php) | Config-driven resolver: reads `ui-library.approvals.model_map` to resolve model keys to fully-qualified class names. |
+| **Contract** | `CompanyProvider` | [`src/Contracts/Navigation/CompanyProvider.php`](src/Contracts/Navigation/CompanyProvider.php:8) | Abstracts company resolution for multi-tenant navigation. Methods: `getCompanies(?User)`, `getCurrentCompanyId(?User)`. |
 | **Implementation** | `NullCompanyProvider` | [`src/Services/Navigation/NullCompanyProvider.php`](src/Services/Navigation/NullCompanyProvider.php:9) | Default no-op implementation: returns empty collection and null company ID. Used when no consuming app provider is configured. |
 
 ### 11.4 Migration Relocation
@@ -2652,7 +2615,7 @@ Phase 2.5 targeted the most impactful hard-coded couplings between the UI librar
 
 | Change | Detail |
 |--------|--------|
-| **Contract bindings** | `CompanyProvider` → configurable implementation (default: `NullCompanyProvider`); `ApprovalModelResolver` → singleton binding |
+| **Contract bindings** | `CompanyProvider` → configurable implementation (default: `NullCompanyProvider`) |
 | **Shared migration loading** | Added `loadMigrationsFrom(__DIR__.'/../../Database/Migrations/')` for 8 shared migrations (exports, imports, saved filters, etc.) |
 | **Core namespace autoloading** | `composer.json` PSR-4 updated: `"QuickerFaster\\UILibrary\\Core\\": "src/Core/"` for Admin, Common, and System module namespaces within the library |
 | **Event imports** | Added `use` statements for `ModuleRegistered` and `ModuleBooted` events |
@@ -2667,13 +2630,11 @@ Phase 2.5 targeted the most impactful hard-coded couplings between the UI librar
 
 ### 11.8 Remaining for Later Phases
 
-Approximately **50 broader references** remain across the codebase, primarily in widget processors (HR KPI calculators like [`TurnoverRateWidgetProcessor`](src/Widgets/TurnoverRateWidgetProcessor.php), [`ENPSWidgetProcessor`](src/Widgets/ENPSWidgetProcessor.php), etc.) and bank file generators. These will be addressed in future phases as they require more extensive architectural refactoring (introducing data-source contracts, report-engine abstractions, etc.).
+> ⚠️ **Superseded note**: The HR-specific widget processors (`TurnoverRateWidgetProcessor`, `ENPSWidgetProcessor`, `AbsenteeismRateWidgetProcessor`, `GoalCompletionRateWidgetProcessor`, `TrainingCompletionRateWidgetProcessor`, `HeadcountVsBudgetWidgetProcessor`, `DiversityIndexWidgetProcessor`, `OfferAcceptanceRateWidgetProcessor`) and conditional Livewire registrations for payroll components were removed. The library now ships only domain-agnostic widget processors (`StatWidgetProcessor`, `ChartWidgetProcessor`, `ListWidgetProcessor`, `GroupedListWidgetProcessor`, `ProgressWidgetProcessor`, `MetricWidgetProcessor`, `TrendWidgetProcessor`, `OnboardingWidgetProcessor`, `ActionCardWidgetProcessor`, `ActivityLogWidgetProcessor`, `ProfileHeaderWidgetProcessor`). Remaining decoupling work focuses on bank file generators and other non-HR references.
 
 | Category | Estimated Count | Planned Phase |
 |----------|----------------|---------------|
-| HR-specific widget processors | 9 | Phase 3 |
 | Bank file generators (country-specific) | 4 | Phase 3 |
-| Conditional Livewire registrations in UILibraryServiceProvider | 6 | Phase 3 |
 | Navigation/config references to HR models | ~15 | Phase 4 |
 | View/Blade references to HR entities | ~16 | Phase 4 |
 
@@ -2786,7 +2747,7 @@ Polymorphic, channel-based notification engine. Supports database (in-app) and m
 - **Listener**: [`NotificationEventSubscriber`](src/Listeners/NotificationEventSubscriber.php) — logs dispatched notifications to [`NotificationLog`](src/Models/NotificationLog.php)
 - **Config**: `ui-library.notifications` — `default_channels`, `queue_connection`
 - **Migration**: [`2026_08_08_000003_create_notification_tables.php`](Database/Migrations/2026_08_08_000003_create_notification_tables.php) — 4 tables (notifications, notification_templates, notification_preferences, notification_logs)
-- **Seeder**: [`NotificationTemplateSeeder`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php) — 5 default templates for `document_generated`, `report_ready`, `workflow_stage_changed`, and more
+- **Seeder**: [`NotificationTemplateSeeder`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php) — 13 templates: `document_generated` (2 channels), `report_ready` (2 channels), `workflow_submitted` (2), `workflow_approved` (2), `workflow_rejected` (2), `workflow_recalled` (2), and legacy `workflow_stage_changed` (1 database channel)
 
 ### 14.3 Integration
 

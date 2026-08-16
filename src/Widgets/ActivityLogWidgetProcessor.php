@@ -45,6 +45,7 @@ class ActivityLogWidgetProcessor
             'type'          => 'activity_log',
             'title'         => $definition['title'] ?? 'Recent Activity',
             'icon'          => $definition['icon'] ?? 'fas fa-history',
+            'color'         => $definition['color'] ?? 'info',
             'items'         => $items,
             'width'         => $definition['width'] ?? 6,
             'show_view_all' => $definition['show_view_all'] ?? false,

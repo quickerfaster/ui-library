@@ -32,9 +32,9 @@ class SEPAGenerator implements BankFileGenerator
         $grpHdr->appendChild($msgId);
         $creDtTm = $doc->createElement('CreDtTm', now()->format('Y-m-d\TH:i:s'));
         $grpHdr->appendChild($creDtTm);
-        $nbOfTxs = $doc->createElement('NbOfTxs', $run->payslips->count());
+        $nbOfTxs = $doc->createElement('NbOfTxs', $run->payments->count());
         $grpHdr->appendChild($nbOfTxs);
-        $ctrlSum = $doc->createElement('CtrlSum', number_format($run->total_cash_required, 2, '.', ''));
+        $ctrlSum = $doc->createElement('CtrlSum', number_format($run->total_amount, 2, '.', ''));
         $grpHdr->appendChild($ctrlSum);
 
         // Initiating Party
@@ -50,7 +50,7 @@ class SEPAGenerator implements BankFileGenerator
         $initgPty->appendChild($id);
         $grpHdr->appendChild($initgPty);
 
-        // Payment Information (one per batch, all employees in one batch)
+        // Payment Information (one per batch, all recipients in one batch)
         $pmtInf = $doc->createElement('PmtInf');
         $cstmrCdtTrfInitn->appendChild($pmtInf);
 
@@ -60,9 +60,9 @@ class SEPAGenerator implements BankFileGenerator
         $pmtInf->appendChild($pmtMtd);
         $btchBookg = $doc->createElement('BtchBookg', 'true');
         $pmtInf->appendChild($btchBookg);
-        $nbOfTxsPmt = $doc->createElement('NbOfTxs', $run->payslips->count());
+        $nbOfTxsPmt = $doc->createElement('NbOfTxs', $run->payments->count());
         $pmtInf->appendChild($nbOfTxsPmt);
-        $ctrlSumPmt = $doc->createElement('CtrlSum', number_format($run->total_cash_required, 2, '.', ''));
+        $ctrlSumPmt = $doc->createElement('CtrlSum', number_format($run->total_amount, 2, '.', ''));
         $pmtInf->appendChild($ctrlSumPmt);
 
         // Payment Type Information
@@ -93,40 +93,40 @@ class SEPAGenerator implements BankFileGenerator
         $dbtrAgt->appendChild($finInstnId);
         $pmtInf->appendChild($dbtrAgt);
 
-        // Credit Transfer Transaction Information per employee
-        foreach ($run->payslips as $payslip) {
-            $employee = $payslip->employee;
-            $profile = $employee->payrollProfile;
-            if (!$profile || !$profile->bank_iban) {
-                continue; // skip employees without IBAN
+        // Credit Transfer Transaction Information per recipient
+        foreach ($run->payments as $payment) {
+            $recipient = $payment->recipient;
+            $bankAccount = $recipient->bankAccount;
+            if (!$bankAccount || !$bankAccount->bank_iban) {
+                continue; // skip recipients without IBAN
             }
 
             $cdtTrfTxInf = $doc->createElement('CdtTrfTxInf');
 
             $pmtId = $doc->createElement('PmtId');
-            $pmtId->appendChild($doc->createElement('EndToEndId', 'PAY-' . $run->id . '-' . $employee->id));
+            $pmtId->appendChild($doc->createElement('EndToEndId', 'PAY-' . $run->id . '-' . $recipient->id));
             $cdtTrfTxInf->appendChild($pmtId);
 
             $amt = $doc->createElement('Amt');
-            $instdAmt = $doc->createElement('InstdAmt', number_format($payslip->net_pay, 2, '.', ''));
+            $instdAmt = $doc->createElement('InstdAmt', number_format($payment->amount, 2, '.', ''));
             $instdAmt->setAttribute('Ccy', 'EUR');
             $amt->appendChild($instdAmt);
             $cdtTrfTxInf->appendChild($amt);
 
             $cdtr = $doc->createElement('Cdtr');
-            $cdtr->appendChild($doc->createElement('Nm', substr($profile->bank_account_name ?? $employee->full_name, 0, 70)));
+            $cdtr->appendChild($doc->createElement('Nm', substr($bankAccount->bank_account_name ?? $recipient->full_name, 0, 70)));
             $cdtTrfTxInf->appendChild($cdtr);
 
             $cdtrAcct = $doc->createElement('CdtrAcct');
             $idAcctCred = $doc->createElement('Id');
-            $idAcctCred->appendChild($doc->createElement('IBAN', $profile->bank_iban));
+            $idAcctCred->appendChild($doc->createElement('IBAN', $bankAccount->bank_iban));
             $cdtrAcct->appendChild($idAcctCred);
             $cdtTrfTxInf->appendChild($cdtrAcct);
 
             $cdtrAgt = $doc->createElement('CdtrAgt');
             $finInstnIdCred = $doc->createElement('FinInstnId');
-            if ($profile->bank_swift) {
-                $finInstnIdCred->appendChild($doc->createElement('BIC', $profile->bank_swift));
+            if ($bankAccount->bank_swift) {
+                $finInstnIdCred->appendChild($doc->createElement('BIC', $bankAccount->bank_swift));
             }
             $cdtrAgt->appendChild($finInstnIdCred);
             $cdtTrfTxInf->appendChild($cdtrAgt);
@@ -139,7 +139,7 @@ class SEPAGenerator implements BankFileGenerator
 
     public function getFileName($run): string
     {
-        return "sepa_{$run->id}_{$run->period_end->format('Ymd')}.xml";
+        return "sepa_{$run->id}_{$run->end_date->format('Ymd')}.xml";
     }
 
     public function getMimeType(): string

@@ -47,7 +47,7 @@
 
                         @if (!empty($viewConfig['badgeField']))
                             @php
-                                // Use data_get to safely reach nested relationships like 'employeePosition.employment_status'
+                                // Use data_get to safely reach nested relationships like 'recordPosition.employment_status'
                                 $val = data_get($record, $viewConfig['badgeField']);
 
                                 // Match the value to the color config, defaulting to 'secondary'

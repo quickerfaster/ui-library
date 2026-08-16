@@ -21,6 +21,8 @@ class RoleSeeder extends Seeder
             'manage permissions',
             'manage settings',
             'manage modules',
+            'view_workflows_overview',
+            'view_workflow_definition',
         ];
 
         foreach ($permissions as $permission) {
@@ -32,15 +34,15 @@ class RoleSeeder extends Seeder
         $superAdmin->givePermissionTo(Permission::all());
 
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
-        $admin->givePermissionTo(['view dashboard', 'manage users', 'manage settings']);
+        $admin->givePermissionTo(['view dashboard', 'manage users', 'manage settings', 'view_workflows_overview', 'view_workflow_definition']);
 
         $companyAdmin = Role::firstOrCreate(['name' => 'company_admin', 'guard_name' => 'web']);
-        $companyAdmin->givePermissionTo(['view dashboard', 'manage users', 'manage settings']);
+        $companyAdmin->givePermissionTo(['view dashboard', 'manage users', 'manage settings', 'view_workflows_overview', 'view_workflow_definition']);
 
         $user = Role::firstOrCreate(['name' => 'user', 'guard_name' => 'web']);
         $user->givePermissionTo(['view dashboard']);
 
-        $employee = Role::firstOrCreate(['name' => 'employee', 'guard_name' => 'web']);
-        $employee->givePermissionTo(['view dashboard']);
+        $member = Role::firstOrCreate(['name' => 'member', 'guard_name' => 'web']);
+        $member->givePermissionTo(['view dashboard']);
     }
 }

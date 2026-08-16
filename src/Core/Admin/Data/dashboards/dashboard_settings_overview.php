@@ -10,7 +10,7 @@ return array (
       'type' => 'stat',
       'title' => 'System Settings',
       'size' => 'col-12',
-      'model' => 'App\\Modules\\System\\Models\\SystemSetting',
+      'model' => 'QuickerFaster\\UILibrary\\Models\\SystemSetting',
       'icon' => 'fas fa-cogs',
       'aggregate' => 'count',
       'width' => 3,

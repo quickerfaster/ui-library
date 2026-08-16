@@ -14,7 +14,7 @@ use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
  * DataTableAuthorizationProvider contract.
  *
  * Permission naming convention: {action}_{resource}
- *   - view_employee, create_employee, edit_employee, delete_employee
+ *   - view_record, create_record, edit_record, delete_record
  */
 class DefaultAuthorizationProvider implements DataTableAuthorizationProvider
 {

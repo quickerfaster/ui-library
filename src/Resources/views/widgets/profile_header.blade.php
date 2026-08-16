@@ -1,5 +1,5 @@
 @props(['data'])
-<div class="card border-0 shadow-sm h-100">
+<div class="card border-0 shadow-sm rounded-4 h-100">
     <div class="card-body p-4">
         <div class="text-center mb-3">
             @if($data['photo_url'])
@@ -10,7 +10,7 @@
                 </div>
             @endif
             <h4 class="mt-3 mb-1">{{ $data['full_name'] }}</h4>
-            <span class="mt-3 mb-1">{{ $data['employee_number'] }}</span>
+            <span class="mt-3 mb-1">{{ $data['record_number'] }}</span>
             <p class="text-muted small mb-2">{{ $data['title'] ?? '' }}</p>
         </div>
         <hr>

@@ -1,14 +1,14 @@
 # QuickerFaster Application Platform — Implementation Plan
 
-> **Status**: ✅ Phases 2.5–4.5 Complete | ✅ Phase 2 (Cross-Context Dropdowns) Complete | ✅ All 14 Bug Fix & Audit Categories Complete | ✅ 19 New Items (User Model, Config & Nav Polish) Complete | ✅ 4 Home Page & Runtime Polish Items Complete | ✅ 3 Access Control Management Improvements Complete | ✅ Phase 5 Navigation & UX Polish Complete | ✅ App\Modules Resolution & ActivityLogs Contract Complete | ✅ Access Control & Navigation UX Polish Complete
-> **Date**: 2026-08-07 (Updated 2026-08-14)
+> **Status**: ✅ Phases 2.5–4.5 Complete | ✅ Phase 2 (Cross-Context Dropdowns) Complete | ✅ All 14 Bug Fix & Audit Categories Complete | ✅ 19 New Items (User Model, Config & Nav Polish) Complete | ✅ 4 Home Page & Runtime Polish Items Complete | ✅ 3 Access Control Management Improvements Complete | ✅ Phase 5 Navigation & UX Polish Complete | ✅ App\Modules Resolution & ActivityLogs Contract Complete | ✅ Access Control & Navigation UX Polish Complete | ✅ Authorization, Seeding & Install Fixes (Observations 17-23) Complete
+> **Date**: 2026-08-07 (Updated 2026-08-15)
 > **Source Documents**: [`gap-analysis.md`](docs/gap-analysis.md), [`input3-gap-supplement.md`](docs/input3-gap-supplement.md), [`input3.txt`](src/input3.txt)
 
 ---
 
-## 0. Completed Work Summary (2026-08-14)
+## 0. Completed Work Summary (2026-08-15)
 
-The following 40 categories of work were completed across all phases, subtasks, and audit passes. Each entry summarizes the problem, the fix, and the files affected.
+The following 47 categories of work were completed across all phases, subtasks, and audit passes. Each entry summarizes the problem, the fix, and the files affected.
 
 ### 0.1–0.14 — Original 14 Fix & Audit Categories (2026-08-12)
 
@@ -25,6 +25,10 @@ The following 4 items were completed on 2026-08-13, covering the polished home p
 ### 0.38–0.40 — Access Control Management Improvements (2026-08-14)
 
 The following 3 items were completed on 2026-08-14, covering access control filtering config, the consolidated Access Control tabbed page, and the AccessControlManager UX — word-based model search, consolidated bulk toggle switches, reactive permission state, and expand/collapse chevrons.
+
+### 0.41–0.47 — Authorization, Seeding & Install Fixes (2026-08-15)
+
+The following 7 items were completed on 2026-08-15, covering the 403 email-fallback bypass, module switcher email fallback, the `company_admin` role, separate-process seeders, dependencies seeders integration, permission seeding fix, and the Breeze exit-code fix.
 
 ### 0.1 Sidebar URL Generation Fix
 
@@ -226,11 +230,11 @@ Both views use the standard DataTableForm pattern with config-driven field defin
 
 ### 0.18 `withoutCompanyScope()` Fix
 
-**Problem**: [`ResolvesModels.php`](src/Traits/ResolvesModels.php) called `withoutCompanyScope()` on models that may not have that scope, causing `BadMethodCallException` for models without multi-tenant scoping.
+**Problem**: [`ResolvesModels.php`](src/Concerns/ResolvesModels.php) called `withoutCompanyScope()` on models that may not have that scope, causing `BadMethodCallException` for models without multi-tenant scoping.
 
 **Fix**: Added `method_exists()` guard before calling `withoutCompanyScope()`. Models without the scope are resolved normally. Models with the scope have it temporarily removed during resolution.
 
-**Files**: [`ResolvesModels.php`](src/Traits/ResolvesModels.php)
+**Files**: [`ResolvesModels.php`](src/Concerns/ResolvesModels.php)
 
 ---
 
@@ -471,6 +475,86 @@ Both views use the standard DataTableForm pattern with config-driven field defin
 - **Expand/collapse chevron**: permission cards gained a `fas fa-chevron-down collapse-chevron` indicator (rotated via CSS) and the missing [`quicker-faster.css`](public/assets/css/quicker-faster.css) stylesheet link was restored in [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php).
 
 **Files**: [`AccessControlManager.php`](src/Http/Livewire/AccessControls/AccessControlManager.php), [`ToggleButton.php`](src/Http/Livewire/Buttons/ToggleButton.php), [`ToggleButtonGroup.php`](src/Http/Livewire/Buttons/ToggleButtonGroup.php), [`access-control-manager.blade.php`](src/Resources/views/livewire/access-controls/access-control-manager.blade.php), [`toggle-button-group.blade.php`](src/Resources/views/livewire/buttons/toggle-button-group.blade.php), [`quicker-faster.css`](public/assets/css/quicker-faster.css), [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php)
+
+---
+
+### 0.41 403 Fix — Email Fallback Bypass & Error Surfacing
+
+**Problem**: When the `model_has_roles` pivot table was empty (e.g., after a fresh install where role assignment silently failed), super admins were locked out of every admin page with a 403 error. [`AuthorizationService::isBypassAllowed()`](src/Services/AccessControl/AuthorizationService.php) only checked Spatie roles, and [`SuperAdminSeeder`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php)/[`UserSeeder`](src/Core/Admin/Database/Seeders/UserSeeder.php) silently swallowed role-assignment failures.
+
+**Fix**:
+1. Added email-based fallback bypass in [`AuthorizationService::isBypassAllowed()`](src/Services/AccessControl/AuthorizationService.php) — when the configured `SUPER_ADMIN_EMAIL` matches the authenticated user's email, the bypass is granted regardless of Spatie role state.
+2. Added `AuthorizationService::isBypassAllowed()` calls to all 15 methods in [`DefaultAuthorizationProvider`](src/Services/DataTables/DefaultAuthorizationProvider.php).
+3. Replaced silent `catch` blocks in [`SuperAdminSeeder`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php) and [`UserSeeder`](src/Core/Admin/Database/Seeders/UserSeeder.php) with `\Log::error()` + `$this->command->error()` calls.
+
+**Files**: [`AuthorizationService.php`](src/Services/AccessControl/AuthorizationService.php), [`DefaultAuthorizationProvider.php`](src/Services/DataTables/DefaultAuthorizationProvider.php), [`SuperAdminSeeder.php`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php), [`UserSeeder.php`](src/Core/Admin/Database/Seeders/UserSeeder.php)
+
+---
+
+### 0.42 Module Switcher Email Fallback
+
+**Problem**: [`TopNav::loadModules()`](src/Http/Livewire/Layouts/Navs/TopNav.php) filtered modules by role only. If role assignment failed during seeding, the super admin would not see the admin/system modules in the switcher.
+
+**Fix**: Added the same email-based fallback bypass from [`AuthorizationService::isBypassAllowed()`](src/Services/AccessControl/AuthorizationService.php) to [`TopNav::loadModules()`](src/Http/Livewire/Layouts/Navs/TopNav.php). When the authenticated user's email matches `SUPER_ADMIN_EMAIL`, the module role filter is bypassed.
+
+**Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php)
+
+---
+
+### 0.43 `company_admin` Role Seeded
+
+**Problem**: The library had no `company_admin` role — only `super_admin`, `admin`, and `user`. Multi-tenant applications needed a company-scoped admin role.
+
+**Fix**:
+1. Added `company_admin` role creation in [`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php) with `view dashboard`, `manage users`, and `manage settings` permissions.
+2. Added `company_admin` to the admin module's `roles` array in [`ui-library.php`](src/Config/ui-library.php).
+3. Added `company_admin` to [`AuthorizationService::ADMIN_ROLES`](src/Services/AccessControl/AuthorizationService.php) and `ADMIN_ROLES_ARRAY`.
+4. Added `company.admin@example.com` seed user in [`UserSeeder`](src/Core/Admin/Database/Seeders/UserSeeder.php) with the `company_admin` role.
+
+**Files**: [`RoleSeeder.php`](src/Core/Admin/Database/Seeders/RoleSeeder.php), [`ui-library.php`](src/Config/ui-library.php), [`AuthorizationService.php`](src/Services/AccessControl/AuthorizationService.php), [`UserSeeder.php`](src/Core/Admin/Database/Seeders/UserSeeder.php)
+
+---
+
+### 0.44 InstallCommand Separate-Process Seeders
+
+**Problem**: [`InstallCommand::runSeeders()`](src/Console/Commands/InstallCommand.php) called seeders via `Artisan::call()` in the same PHP process. Since the install command modifies the User model source file before seeding, the in-memory class definition was stale — seeders used the old User model without the injected traits.
+
+**Fix**: Replaced in-process `Artisan::call()` with separate-process execution via [`Symfony\Component\Process\Process`](src/Console/Commands/InstallCommand.php). Each seeder now runs as `php artisan db:seed --class={FQCN} --force` in its own PHP process, booting fresh with the updated User model. Added [`AccessControlPermissionSeeder`](src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php) to the seeder list.
+
+**Files**: [`InstallCommand.php`](src/Console/Commands/InstallCommand.php)
+
+---
+
+### 0.45 Dependencies Seeders Integration
+
+**Problem**: The library's `dependencies/database/seeders/` directory was not publishable, and there was no library-level seeder for model-level access-control permissions.
+
+**Fix**:
+1. Created [`AccessControlPermissionSeeder`](src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php) — calls [`AccessControlPermissionService::seedPermissionNames()`](src/Services/AccessControl/AccessControlPermissionService.php) to seed permission names for all discovered models.
+2. Added `employee` role to [`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php) with `view dashboard` permission.
+3. Added `ui-library-seeders` publishable tag in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php) publishing `dependencies/database/seeders/` to the app's `database/seeders/` directory.
+
+**Files**: [`AccessControlPermissionSeeder.php`](src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php) (new), [`RoleSeeder.php`](src/Core/Admin/Database/Seeders/RoleSeeder.php), [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php)
+
+---
+
+### 0.46 Permission Seeding Fix — Removed `description`
+
+**Problem**: [`AccessControlPermissionService::checkPermissionsExistsOrCreate()`](src/Services/AccessControl/AccessControlPermissionService.php) passed a `description` field to `Permission::create()`. The standard Spatie `permissions` table has no `description` column, causing a `SQLSTATE[42S22]: Column not found` error during seeding.
+
+**Fix**: Removed the `description` key from the `Permission::create()` call. Only `name` and `guard_name` are now passed.
+
+**Files**: [`AccessControlPermissionService.php`](src/Services/AccessControl/AccessControlPermissionService.php)
+
+---
+
+### 0.47 Breeze Exit Code Fix
+
+**Problem**: [`InstallCommand::scaffoldAuth()`](src/Console/Commands/InstallCommand.php) set `$this->hasErrors = true` when Laravel Breeze was not installed, causing the install command to exit `FAILURE` even though Breeze not being installed is expected — the library's own auth views work independently.
+
+**Fix**: Removed `$this->hasErrors = true` from the Breeze-not-installed branch. It now only emits a warning with instructions for installing Breeze later.
+
+**Files**: [`InstallCommand.php`](src/Console/Commands/InstallCommand.php)
 
 ---
 

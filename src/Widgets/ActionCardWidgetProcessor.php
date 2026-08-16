@@ -13,6 +13,7 @@ class ActionCardWidgetProcessor
             'title'       => $definition['title'] ?? 'Action',
             'description' => $definition['description'] ?? '',
             'icon'        => $definition['icon'] ?? null,
+            'color'       => $definition['color'] ?? 'primary',
             'actions'     => $definition['actions'] ?? [],
             'width'       => $definition['width'] ?? 4,
         ];

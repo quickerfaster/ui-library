@@ -139,11 +139,11 @@ class Wizard extends Component
     // In your Wizard component, enhance dispatchCompletionEvent to support multiple placeholders
     public function dispatchCompletionEvent(string $eventName, array $params): void
     {
-        // Replace placeholders like {employee_id}, {position_id} with actual record IDs
+        // Replace placeholders like {record_id}, {category_id} with actual record IDs
         $placeholders = [
             '{id}' => $this->primaryModelId,
-            // '{employee_id}' => $this->stepData[0] ?? null,   // assuming step 0 is Employee
-            // '{position_id}' => $this->stepData[1] ?? null,   // assuming step 1 is EmployeePosition
+            // '{record_id}' => $this->stepData[0] ?? null,   // assuming step 0 is Record
+            // '{category_id}' => $this->stepData[1] ?? null, // assuming step 1 is Category
         ];
 
         array_walk_recursive($params, function (&$value) use ($placeholders) {
@@ -243,7 +243,7 @@ class Wizard extends Component
                     $sourceRecordId = $this->stepData[$index] ?? null;
                     if ($sourceRecordId) {
                         $linkFields = (new WizardConfigResolver($this->configKey))->getLinkFields();
-                        $foreignKey = $linkFields['databaseField'] ?? 'employee_id';
+                        $foreignKey = $linkFields['databaseField'] ?? 'record_id';
                         $preset[$foreignKey] = $sourceRecordId;
                     }
                     break;

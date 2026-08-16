@@ -306,9 +306,9 @@ return [
         |
         |   [
         |       'company_id'      => 1,
-        |       'role'            => 'payroll_admin',
+        |       'role'            => 'finance_admin',
         |       'department_type' => 'engineering',
-        |       'features'        => ['departments', 'time', 'payroll'],
+        |       'features'        => ['departments', 'time', 'inventory'],
         |   ]
         |
         | Context groups with a `feature` key are filtered against the
@@ -340,22 +340,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Approvals Configuration
-    |--------------------------------------------------------------------------
-    | Model mappings for the approval engine. Override these in the consuming
-    | app's published config to use custom models.
-    */
-    'approvals' => [
-        'models' => [
-            'request' => \QuickerFaster\UILibrary\Models\ApprovalRequest::class,
-            'tier' => \QuickerFaster\UILibrary\Models\ApprovalTier::class,
-            'log' => \QuickerFaster\UILibrary\Models\ApprovalLog::class,
-            'tier_approval' => \QuickerFaster\UILibrary\Models\ApprovalTierApproval::class,
-        ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Activity Logs Configuration
     |--------------------------------------------------------------------------
     | Model resolution for the activity log widget. Override in the consuming
@@ -373,15 +357,58 @@ return [
     | definitions into this array via their service providers.
     */
     'workflows' => [
+        /*
+        |------------------------------------------------------------------
+        | Workflow Definitions
+        |------------------------------------------------------------------
+        |
+        | Workflow definitions are resolved DB-first: the engine queries
+        | the workflow_definitions table for an active row matching the
+        | requested key. When no DB row exists, it falls back to the
+        | config-driven definitions below.
+        |
+        | Use the Workflow Definition Wizard (Admin → Workflows) to
+        | create and manage definitions through the UI. The examples
+        | below serve as seed/defaults for consuming applications.
+        |
+        */
         'definitions' => [
-            // Example: leave_request workflow
-            // 'leave_request' => [
-            //     'label' => 'Leave Request Approval',
+            // Example: purchase_order workflow
+            // 'purchase_order' => [
+            //     'label' => 'Purchase Order Approval',
             //     'steps' => [
             //         ['name' => 'Manager Approval', 'step_type' => 'approval', 'approval_mode' => 'any', 'roles' => ['manager', 'admin']],
-            //         ['name' => 'HR Review', 'step_type' => 'approval', 'approval_mode' => 'any', 'roles' => ['hr', 'super_admin']],
+            //         ['name' => 'Finance Review', 'step_type' => 'approval', 'approval_mode' => 'any', 'roles' => ['finance', 'super_admin']],
             //     ],
             // ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Approval Configuration
+    |--------------------------------------------------------------------------
+    | Default approver resolution for the workflow engine. Consuming apps can
+    | override 'approver_resolver' and 'approver_label_resolver' with their own
+    | implementations bound against the corresponding contracts. The
+    | 'bypass_roles' list is used by ApprovalGuard to short-circuit role
+    | resolution for privileged users.
+    |
+    | 'list_columns' drives the ApprovalRequestListView component. Each key
+    | maps to a column definition with 'label' and 'enabled' flags. Consuming
+    | apps can reorder, relabel, or disable columns by publishing this config.
+    */
+    'approvals' => [
+        'approver_resolver' => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverResolver::class,
+        'approver_label_resolver' => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverLabelResolver::class,
+        'bypass_roles' => ['super_admin'],
+        'list_columns' => [
+            'workflow' => ['label' => 'Workflow', 'enabled' => true],
+            'entity' => ['label' => 'Entity', 'enabled' => true],
+            'current_step' => ['label' => 'Current Step', 'enabled' => true],
+            'status' => ['label' => 'Status', 'enabled' => true],
+            'submitted_at' => ['label' => 'Submitted', 'enabled' => true],
+            'actions' => ['label' => 'Actions', 'enabled' => true],
         ],
     ],
 
@@ -394,16 +421,6 @@ return [
         'disk' => env('UI_LIBRARY_DOCUMENT_DISK', 'public'),
         'max_file_size' => env('UI_LIBRARY_MAX_FILE_SIZE', 10240), // KB
         'allowed_types' => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt', 'csv'],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Notification Engine Configuration
-    |--------------------------------------------------------------------------
-    */
-    'notifications' => [
-        'default_channels' => ['database', 'mail'],
-        'queue_connection' => env('UI_LIBRARY_NOTIFICATION_QUEUE', 'default'),
     ],
 
     /*
@@ -462,17 +479,6 @@ return [
         'onboarding' => true,
         'tour' => true,
 
-        /*
-        |------------------------------------------------------------------
-        | Multi-Company Payroll
-        |------------------------------------------------------------------
-        | When enabled, super admins in "All Companies" mode can process
-        | payroll for all companies at once. Each company's payslips are
-        | generated independently within a single PayrollRun.
-        |
-        | Set in .env: FEATURE_MULTI_COMPANY_PAYROLL=true
-        */
-        'multi_company_payroll' => env('FEATURE_MULTI_COMPANY_PAYROLL', false),
     ],
 
     /*
@@ -548,8 +554,8 @@ return [
         | Cross-Module Links
         |------------------------------------------------------------------
         | Navigation links rendered inside the top bar that point to other
-        | modules (e.g. an "Admin Panel" link when in the HR module, or a
-        | "Back to HR" link when in the Admin module).
+        | modules (e.g. an "Admin Panel" link when in the Finance module, or a
+        | "Back to Finance" link when in the Admin module).
         |
         | Each link has:
         |   - label : Display text
@@ -569,8 +575,8 @@ return [
             //     'icon' => 'fas fa-cog',
             // ],
             // 'back' => [
-            //     'label' => 'Back to HR',
-            //     'url' => '/hr/dashboard',
+            //     'label' => 'Back to Finance',
+            //     'url' => '/finance/dashboard',
             //     'icon' => 'fas fa-reply',
             // ],
         ],
@@ -624,58 +630,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Notifications Configuration
+    | Notification Engine & Nav Bell Configuration
     |--------------------------------------------------------------------------
-    | Controls the notifications icon button in the top navigation bar.
-    | Mirrors the background_jobs, module_switcher, and multitenancy patterns
-    | for consistency.
+    | Unified configuration for the notification engine (dispatch, channels,
+    | queue) and the top-nav notification bell (visibility, icon, badge).
     */
     'notifications' => [
 
-        /*
-        |------------------------------------------------------------------
-        | Enable Notifications
-        |------------------------------------------------------------------
-        | Toggle the notifications icon button on/off. When false,
-        | the button is hidden for all users regardless of role.
-        */
+        // ----------------------------------------------------------------
+        //  Engine
+        // ----------------------------------------------------------------
+        'default_channels' => ['database', 'mail'],
+        'queue_connection' => env('UI_LIBRARY_NOTIFICATION_QUEUE', null),
+        'queue' => env('UI_LIBRARY_NOTIFICATION_ASYNC', false),
+
+        // ----------------------------------------------------------------
+        //  Nav bell
+        // ----------------------------------------------------------------
         'enabled' => true,
-
-        /*
-        |------------------------------------------------------------------
-        | Notifications Roles
-        |------------------------------------------------------------------
-        | Roles that can see the notifications icon button in the
-        | top nav. Use '*' to allow all authenticated users.
-        | Use an array of role names (e.g. ['super_admin', 'admin']) to
-        | restrict visibility to specific roles.
-        */
-        'roles' => '*',
-
-        /*
-        |------------------------------------------------------------------
-        | Icon
-        |------------------------------------------------------------------
-        | Font Awesome icon class for the notifications button.
-        */
+        'roles' => ['super_admin', 'admin', 'user'],
         'icon' => 'fas fa-bell',
-
-        /*
-        |------------------------------------------------------------------
-        | Title
-        |------------------------------------------------------------------
-        | Tooltip / title attribute for the notifications button.
-        */
         'title' => 'Notifications',
+        'badge_enabled' => false, // Future feature
 
-        /*
-        |------------------------------------------------------------------
-        | Badge Enabled
-        |------------------------------------------------------------------
-        | When true, a badge showing the unread notification count is
-        | displayed on the icon. (Future feature — not yet implemented.)
-        */
-        'badge_enabled' => false,
+        // ----------------------------------------------------------------
+        //  Channel registry (config-driven, see Fix 6)
+        // ----------------------------------------------------------------
+        'channels' => [
+            'database' => \QuickerFaster\UILibrary\Services\Notifications\Channels\DatabaseChannel::class,
+            'mail' => \QuickerFaster\UILibrary\Services\Notifications\Channels\MailChannel::class,
+            'broadcast' => \QuickerFaster\UILibrary\Services\Notifications\Channels\BroadcastChannel::class,
+        ],
     ],
 
     /*
@@ -773,6 +758,85 @@ return [
         'models' => [
             'include' => '*',
             'exclude' => [],    // ['App\Models\User'] to hide specific models
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Catch-All Route Security
+    |--------------------------------------------------------------------------
+    |
+    | Hardening for the centralized /{module}/{view}/{id?} route pattern
+    | (see docs/architecture/15-gaps-and-recommendations.md §10.7).
+    |
+    | The catch-all route is loaded LAST by ModuleServiceProvider so that
+    | module-specific routes take precedence. These settings constrain
+    | what the catch-all route is allowed to resolve and render.
+    |
+    */
+    'catch_all' => [
+
+        /*
+        |------------------------------------------------------------------
+        | Module Allow-List
+        |------------------------------------------------------------------
+        |
+        | Only modules listed here are resolvable via the catch-all route.
+        | Requests for modules not in this list receive a 404, preventing
+        | the route from being used to probe arbitrary namespaces.
+        |
+        | The default covers the library's core modules. Business modules
+        | discovered under app/Modules/ are appended automatically by
+        | ModuleServiceProvider, so consuming apps do not need to publish
+        | this config just to enable their own modules.
+        |
+        */
+        'allowed_modules' => ['admin', 'system', 'organization', 'common'],
+
+        /*
+        |------------------------------------------------------------------
+        | Authorization
+        |------------------------------------------------------------------
+        |
+        | 'require_auth' — When true (default), the catch-all route
+        | requires an authenticated user. This is enforced by the 'auth'
+        | middleware already applied to the route group and additionally
+        | re-checked in the handler for defense in depth.
+        |
+        | 'gate' — Optional Laravel Gate ability to check before rendering.
+        | When set, Gate::allows($gate, [$module, $view, $id]) is called.
+        | Set to null to skip per-view Gate checks (default).
+        |
+        | 'authorization_callback' — Optional callable that receives
+        | ($user, $module, $view, $id) and returns true to allow or false
+        | to deny (403). This is the primary extension point for consuming
+        | apps that need custom per-view/module authorization. It takes
+        | precedence over 'gate' when both are configured.
+        |
+        */
+        'require_auth' => true,
+        'gate' => null,
+        'authorization_callback' => null,
+
+        /*
+        |------------------------------------------------------------------
+        | Rate Limiting
+        |------------------------------------------------------------------
+        |
+        | 'enabled' — When true, applies Laravel's RateLimiter to the
+        | catch-all route using the named limiter 'qf-catch-all'.
+        |
+        | 'max_attempts' — Maximum requests per decay window.
+        | 'decay_minutes' — Decay window in minutes.
+        |
+        | Requests are keyed by authenticated user id when available,
+        | falling back to the client IP address for guests.
+        |
+        */
+        'rate_limiting' => [
+            'enabled' => true,
+            'max_attempts' => 60,
+            'decay_minutes' => 1,
         ],
     ],
 ];

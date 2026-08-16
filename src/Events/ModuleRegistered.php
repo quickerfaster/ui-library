@@ -9,7 +9,7 @@ class ModuleRegistered
     use Dispatchable;
 
     /**
-     * @param string $name Module key (e.g., 'admin', 'hr')
+     * @param string $name Module key (e.g., 'admin', 'inventory')
      * @param string $path Absolute filesystem path to the module
      * @param bool $userFacing Whether the module appears in user-facing navigation
      * @param array $dependsOn Module keys this module depends on

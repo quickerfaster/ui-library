@@ -4,10 +4,12 @@ namespace QuickerFaster\UILibrary\Services\Notifications;
 
 use QuickerFaster\UILibrary\Contracts\Notifications\Notifiable;
 use QuickerFaster\UILibrary\Contracts\Notifications\NotificationChannel;
+use QuickerFaster\UILibrary\Events\Notifications\NotificationDispatched;
 use QuickerFaster\UILibrary\Models\Notification;
 use QuickerFaster\UILibrary\Models\NotificationTemplate;
 use QuickerFaster\UILibrary\Models\NotificationPreference;
 use QuickerFaster\UILibrary\Models\NotificationLog;
+use QuickerFaster\UILibrary\Jobs\SendNotification;
 use Illuminate\Support\Str;
 
 class NotificationService
@@ -55,6 +57,8 @@ class NotificationService
 
             $notification->update(['status' => $success ? 'sent' : 'failed']);
 
+            event(new NotificationDispatched($notification));
+
             NotificationLog::create([
                 'notifiable_type' => $notifiable->getNotifiableType(),
                 'notifiable_id' => $notifiable->getNotifiableId(),
@@ -69,6 +73,14 @@ class NotificationService
         }
 
         return $results;
+    }
+
+    /**
+     * Queue a notification for asynchronous delivery to a single notifiable.
+     */
+    public function dispatchAsync(Notifiable $notifiable, string $type, array $data = []): void
+    {
+        SendNotification::dispatch($notifiable, $type, $data);
     }
 
     /**
@@ -112,15 +124,25 @@ class NotificationService
     }
 
     /**
-     * Simple placeholder replacement in templates.
+     * Placeholder replacement in templates with dot-notation support.
+     *
+     * Supports both simple keys ({name}) and dot-notation ({user.name},
+     * {order.total}) using Laravel's data_get() helper to resolve nested
+     * array values.
      */
     protected function renderTemplate(string $template, array $data): string
     {
-        foreach ($data as $key => $value) {
-            if (is_scalar($value)) {
-                $template = str_replace("{{$key}}", (string) $value, $template);
+        // Match {placeholder} patterns, including dot-notation keys.
+        return preg_replace_callback('/\{([a-zA-Z_][a-zA-Z0-9_.]*)\}/', function ($matches) use ($data) {
+            $key = $matches[1];
+            $value = data_get($data, $key);
+
+            if (is_scalar($value) || (is_object($value) && method_exists($value, '__toString'))) {
+                return (string) $value;
             }
-        }
-        return $template;
+
+            // Leave the placeholder unchanged if the value is not renderable.
+            return $matches[0];
+        }, $template);
     }
 }

@@ -6,6 +6,8 @@ use Livewire\Component;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
 use QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider;
+use QuickerFaster\UILibrary\Contracts\Notifications\Notifiable;
+use QuickerFaster\UILibrary\Services\Notifications\NotificationService;
 use QuickerFaster\UILibrary\Events\NavigationBuilding;
 
 class TopNav extends Component
@@ -70,6 +72,9 @@ class TopNav extends Component
 
     /** @var string Title attribute for the notifications button. */
     public string $notificationsTitle = 'Notifications';
+
+    /** @var bool Whether the notifications drawer/offcanvas is open. */
+    public bool $showNotificationsDrawer = false;
 
     // ------------------------------------------------------------------
 
@@ -238,6 +243,117 @@ class TopNav extends Component
         // 3. Icon and title from config
         $this->notificationsIcon = $config['icon'] ?? 'fas fa-bell';
         $this->notificationsTitle = $config['title'] ?? 'Notifications';
+    }
+
+    /**
+     * Open the notifications drawer.
+     */
+    public function openNotificationsDrawer(): void
+    {
+        $this->showNotificationsDrawer = true;
+    }
+
+    /**
+     * Close the notifications drawer.
+     */
+    public function closeNotificationsDrawer(): void
+    {
+        $this->showNotificationsDrawer = false;
+    }
+
+    /**
+     * Return unread notifications for the currently authenticated user.
+     */
+    public function getUnreadNotificationsProperty(): Collection
+    {
+        $user = auth()->user();
+
+        if (!$user instanceof Notifiable) {
+            return collect();
+        }
+
+        return app(NotificationService::class)->getUnread($user);
+    }
+
+    /**
+     * Return the unread notification count for the currently authenticated user.
+     */
+    public function getUnreadCountProperty(): int
+    {
+        return $this->getUnreadNotificationsProperty()->count();
+    }
+
+    /**
+     * Mark a notification as read for the currently authenticated user.
+     */
+    public function markAsRead(int $notificationId): void
+    {
+        $user = auth()->user();
+
+        if (!$user instanceof Notifiable) {
+            return;
+        }
+
+        $notification = \QuickerFaster\UILibrary\Models\Notification::query()
+            ->where('id', $notificationId)
+            ->where('notifiable_type', $user->getNotifiableType())
+            ->where('notifiable_id', $user->getNotifiableId())
+            ->first();
+
+        $notification?->markAsRead();
+    }
+
+    /**
+     * Handle an inline action button click for a notification.
+     *
+     * Loads the notification, resolves the handler from the
+     * NotificationActionRegistry, calls handle(), and optionally
+     * marks the notification as read.
+     */
+    public function handleAction(int $notificationId, string $handler, array $data = []): void
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof Notifiable) {
+            return;
+        }
+
+        $notification = \QuickerFaster\UILibrary\Models\Notification::query()
+            ->where('id', $notificationId)
+            ->where('notifiable_type', $user->getNotifiableType())
+            ->where('notifiable_id', $user->getNotifiableId())
+            ->first();
+
+        if (! $notification) {
+            return;
+        }
+
+        $registry = app(\QuickerFaster\UILibrary\Services\Notifications\NotificationActionRegistry::class);
+        $registry->handle($handler, $notification, $data);
+
+        // Optionally mark as read after handling the action.
+        $notification->markAsRead();
+    }
+
+    /**
+     * Livewire event listeners for real-time notification broadcasts.
+     */
+    public function getListeners(): array
+    {
+        $user = auth()->user();
+        $id = $user instanceof Notifiable ? $user->getNotifiableId() : '0';
+
+        return [
+            "echo-private:notifiable.{$id},notification.dispatched" => 'refreshUnreadCount',
+        ];
+    }
+
+    /**
+     * Re-render the component when a new notification is broadcast.
+     */
+    public function refreshUnreadCount(): void
+    {
+        $this->dispatch('$refresh');
     }
 
     /**

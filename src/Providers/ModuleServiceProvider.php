@@ -72,6 +72,16 @@ class ModuleServiceProvider extends ServiceProvider
             // Fire event
             event(new ModuleRegistered($moduleName, $directory, $userFacing, $dependsOn));
 
+            // Allow this business module to be resolved via the catch-all route.
+            // Core modules are already present in the config allow-list; app-level
+            // modules are appended here so consuming apps do not need to publish
+            // the config just to enable their own modules.
+            $allowedModules = config('ui-library.catch_all.allowed_modules', []);
+            if (!in_array($moduleName, $allowedModules, true)) {
+                $allowedModules[] = $moduleName;
+                config()->set('ui-library.catch_all.allowed_modules', $allowedModules);
+            }
+
             // Register views
             $viewPath = "{$directory}/Resources/views";
             if (is_dir($viewPath)) {

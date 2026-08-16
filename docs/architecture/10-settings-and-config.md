@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-14
+> **Last Updated**: 2026-08-15
 
 **Related files**: [`00-index.md`](./00-index.md) · [`05-data-configs.md`](./05-data-configs.md) · [`06-navigation-system.md`](./06-navigation-system.md) · [`09-engines-and-services.md`](./09-engines-and-services.md) · [`13-adr.md`](./13-adr.md) · [`14-integration-map.md`](./14-integration-map.md)
 
@@ -65,6 +65,36 @@ The library's own configuration is defined in [`src/Config/ui-library.php`](../.
 
 These are library-owned model defaults. Consuming apps can override them by publishing the config. The [`ApprovalModelResolver`](../../src/Services/Approvals/ApprovalModelResolver.php) reads from these keys.
 
+### Activity Logs
+
+```php
+'activity_logs' => [
+    'model' => env('UI_LIBRARY_ACTIVITY_LOG_MODEL', null),
+],
+```
+
+Resolves the `ActivityLog` Eloquent model FQCN for the activity-log widget. The default implementation ([`src/Services/ActivityLogs/ActivityLogModelResolver.php`](../../src/Services/ActivityLogs/ActivityLogModelResolver.php:7)) reads this key and returns `null` when unset. When `null`, [`ActivityLogWidgetProcessor`](../../src/Widgets/ActivityLogWidgetProcessor.php) gracefully no-ops instead of failing. Consuming apps set `UI_LIBRARY_ACTIVITY_LOG_MODEL` (or publish the config) to enable activity-log widgets.
+
+### User Model
+
+```php
+'user' => [
+    'model' => env('UI_LIBRARY_USER_MODEL', config('auth.providers.users.model', 'App\Models\User')),
+
+    'required_traits' => [
+        \QuickerFaster\UILibrary\Traits\HasUILibraryUser::class,
+        \Spatie\Permission\Traits\HasRoles::class,
+    ],
+],
+```
+
+Controls which User model the library resolves and which traits the install command injects:
+
+- **`user.model`** — the fully-qualified User model class. Defaults to Laravel's auth provider configuration so it always matches the application's actual User model regardless of namespace. Env-overridable via `UI_LIBRARY_USER_MODEL`.
+- **`user.required_traits`** — traits the [`InstallCommand`](../../src/Console/Commands/InstallCommand.php) auto-injects into the User model via [`UserModelTraitInjector`](../../src/Console/Support/UserModelTraitInjector.php). Consuming apps can customize which traits are injected.
+
+Seeders ([`SuperAdminSeeder`](../../src/Core/Admin/Database/Seeders/SuperAdminSeeder.php), [`UserSeeder`](../../src/Core/Admin/Database/Seeders/UserSeeder.php)) and [`InstallCommand::updateUserDataConfig()`](../../src/Console/Commands/InstallCommand.php) resolve the User model from `config('ui-library.user.model')`, falling back to `config('auth.providers.users.model')` and finally `App\Models\User`.
+
 ### Workflows
 
 ```php
@@ -118,6 +148,32 @@ The [`DocumentEngine`](../../src/Services/Documents/DocumentEngine.php:13) reads
 The [`ReportEngine`](../../src/Services/Reports/ReportEngine.php) resolves report implementations from `config('ui-library.reports.report_types.{type}')`. The `notification_channels` key controls which channels are used for report delivery. The `queue_connection` key determines which queue connection [`GenerateReportJob`](../../src/Jobs/GenerateReportJob.php) dispatches to.
 
 > **Cross-link**: Report engine deep-dive is in [`09-engines-and-services.md`](./09-engines-and-services.md).
+
+### Catch-All Route Security
+
+```php
+'catch_all' => [
+    'allowed_modules'       => ['admin', 'system', 'organization', 'common'],
+    'require_auth'          => true,
+    'gate'                  => null,
+    'authorization_callback' => null,
+    'rate_limiting' => [
+        'enabled'       => true,
+        'max_attempts'  => 60,
+        'decay_minutes' => 1,
+    ],
+],
+```
+
+Hardening for the centralized `/{module}/{view}/{id?}` route pattern (see [`15-gaps-and-recommendations.md`](./15-gaps-and-recommendations.md) §10.7):
+
+- **`allowed_modules`** — modules the catch-all may resolve. The default covers the Core modules; business modules discovered under `app/Modules/` are appended automatically by [`ModuleServiceProvider`](../../src/Providers/ModuleServiceProvider.php). Non-listed modules receive `404`.
+- **`require_auth`** — when `true` (default), the handler requires an authenticated user (the route group already applies the `auth` middleware; this is a defense-in-depth re-check).
+- **`gate`** — optional Laravel Gate ability checked via `Gate::allows($gate, [$module, $view, $id])`. `null` disables.
+- **`authorization_callback`** — optional callable `($user, $module, $view, $id)` returning `true`/`false`. Takes precedence over `gate` when both are set.
+- **`rate_limiting`** — applies the `qf-catch-all` named limiter (registered in [`UILibraryServiceProvider`](../../src/Providers/UILibraryServiceProvider.php)) keyed by user id or IP.
+
+The consuming-app guidance for these settings lives in [`19-notification-consuming-app-guide.md`](./19-notification-consuming-app-guide.md).
 
 ---
 

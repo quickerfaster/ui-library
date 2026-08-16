@@ -10,7 +10,7 @@ trait HandlesRelationshipGroupBy
      * Apply a group by expression that supports dot notation for relationships.
      *
      * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $groupBy  e.g. 'employee.company.name'
+     * @param string $groupBy  e.g. 'record.company.name'
      * @param string $alias    Alias for the grouped column (default 'group_label')
      * @return string The final column expression (with alias) for SELECT
      */

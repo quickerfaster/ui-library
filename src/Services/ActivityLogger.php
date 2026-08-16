@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
  * ActivityLogger stub for the UI Library.
  *
  * This replaces the App\Modules\Admin\Services\ActivityLogger reference
- * that was previously coupled to the QuickHR application.
+ * that was previously coupled to the consuming application.
  *
  * Consuming applications should bind their own implementation
  * in their AppServiceProvider:

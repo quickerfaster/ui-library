@@ -2,7 +2,7 @@
     $isNamedRoute = isset($item['route']) && !Str::contains($item['route'], '/');
     $url = $isNamedRoute ? route($item['route']) : url($item['url'] ?? Str::kebab($item['key'] ?? $item['label']));
 
-    // Use explicit permission from config if available (Quick-HR pattern),
+    // Use explicit permission from config if available,
     // otherwise derive from URL with Str::singular() fallback
     $hasPermission = true;
     if (!empty($item['permission'])) {

@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-14
+> **Last Updated**: 2026-08-16
 
 **Related files**: [`00-index.md`](./00-index.md) · [`13-adr.md`](./13-adr.md) · [`16-phase-history.md`](./16-phase-history.md) · [`17-view-config-routing-interplay.md`](./17-view-config-routing-interplay.md)
 
@@ -22,7 +22,7 @@ The "Known Gaps — Remaining `App\Modules\*` References" section (the *other* �
 | 10.4 | State Management for Wizards and Multi-Step Flows | Component lifecycle |
 | 10.5 | API vs Web Context Handling | Interface separation |
 | 10.6 | Accessibility and Internationalization Standards | UX compliance |
-| 10.7 | Security Hardening for Catch-All Routes | **Highest priority** |
+| 10.7 | Security Hardening for Catch-All Routes | **Highest priority** — ✅ Resolved (2026-08-16) |
 | 10.8 | Caching Strategy for Module Discovery | Performance |
 | 10.9 | Missing Documentation for Bank File Generators | Docs |
 | 10.10 | Missing Module Scaffold Command | Developer experience |
@@ -116,22 +116,19 @@ The "Known Gaps — Remaining `App\Modules\*` References" section (the *other* �
 
 ---
 
-## 10.7 Security Hardening for Catch-All Routes
+## 10.7 Security Hardening for Catch-All Routes — ✅ RESOLVED (2026-08-16)
 
 **Gap**: The centralized route pattern `/{module}/{view}/{id?}` in the System module can be abused if authorization and validation are weak.
 
-**Recommendation**:
-- Enforce strict module allow-lists in the catch-all handler:
-  ```php
-  $allowedModules = ['hr', 'admin', 'billing', 'system'];
-  if (!in_array($module, $allowedModules)) { abort(404); }
-  ```
-- Require explicit authorization checks per view using Laravel Gates or Policies
-- Avoid exposing internal logic or model names through route parameters
-- Add rate limiting to the catch-all route
-- Sanitize `$module` and `$view` parameters to prevent directory traversal
+**Resolution**: All five hardening recommendations have been implemented in [`src/Core/System/Routes/web.php`](../../src/Core/System/Routes/web.php) and [`src/Config/ui-library.php`](../../src/Config/ui-library.php):
 
-> **Related**: [`17-view-config-routing-interplay.md`](./17-view-config-routing-interplay.md) — the current catch-all already constrains parameters via `where('module', '[a-z-]+')->where('view', '[a-z-]+')->where('id', '[0-9]+')`, but has no module allow-list or per-view authorization.
+1. **Module allow-list** — `config('ui-library.catch_all.allowed_modules')` (default `['admin', 'system', 'organization', 'common']`); business modules are appended automatically by [`ModuleServiceProvider`](../../src/Providers/ModuleServiceProvider.php). Non-allow-listed modules receive `abort(404)`.
+2. **Directory-traversal sanitization** — explicit null-byte, slash, backslash, `..`, and leading-dot checks (`abort(400)`) as defense in depth beyond the regex constraint.
+3. **Per-view authorization** — `authorization_callback` callable (takes precedence) or `gate` Gate ability; `require_auth` re-checked in the handler.
+4. **Rate limiting** — `qf-catch-all` named limiter registered in [`UILibraryServiceProvider`](../../src/Providers/UILibraryServiceProvider.php), keyed by user id or IP, applied via `throttle:qf-catch-all` middleware when `rate_limiting.enabled` is `true`.
+5. **Consuming-app configurability** — all settings live under `ui-library.catch_all` and can be published/overridden.
+
+> **Related**: [`17-view-config-routing-interplay.md`](./17-view-config-routing-interplay.md) §2.1 documents the updated catch-all handler. [`04-routing-and-views.md`](./04-routing-and-views.md) §4.3 and §4.5 reflect the implementation.
 
 ---
 
@@ -176,6 +173,24 @@ The "Known Gaps — Remaining `App\Modules\*` References" section (the *other* �
 - Publish stubs via `qf-modules` tag (already partially implemented in [`ModuleServiceProvider::registerPublishables()`](../../src/Providers/ModuleServiceProvider.php:84))
 
 > **Related**: The extension guide [`11-extension-guide.md`](./11-extension-guide.md) documents the manual module-creation recipe that this command would automate.
+
+---
+
+---
+
+## Resolved Items (not originally in the 10 gaps)
+
+### Navigation Configs (Phase 6.1–6.3) — ✅ Complete (2026-08-16)
+
+All three Core navigation configs have been expanded to their full context-group + context-item structure:
+
+- [`System`](../../src/Core/System/Config/navigation.php) — 7 groups, 42 items
+- [`Admin`](../../src/Core/Admin/Config/navigation.php) — 7 groups, 33 items
+- [`Organization`](../../src/Core/Organization/Config/navigation.php) — 7 groups, 28 items
+
+### Legacy Dead Code — ✅ Removed (2026-08-16)
+
+Three legacy Artisan commands deleted: `QuickerFasterInstallUI`, `CleanExports`, `CleanImportErrors` — all superseded by [`InstallCommand`](../../src/Console/Commands/InstallCommand.php).
 
 ---
 

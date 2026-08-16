@@ -17,16 +17,16 @@ use Illuminate\Support\Facades\Session;
  * Usage in a Livewire component:
  *   use ResolvesModels;
  *
- *   $record = $this->resolveModel(PayrollRun::class, $this->payrollRunId);
+ *   $record = $this->resolveModel(Invoice::class, $this->invoiceId);
  *   if (!$record) {
- *       $this->flashAndRedirect('error', 'Payroll run not found.', 'payroll-runs.index');
+ *       $this->flashAndRedirect('error', 'Invoice not found.', 'invoices.index');
  *       return;
  *   }
  *
  * Usage in a controller:
  *   use ResolvesModels;
  *
- *   $record = $this->resolveModelOrFail(Employee::class, $id);
+ *   $record = $this->resolveModelOrFail(Record::class, $id);
  */
 trait ResolvesModels
 {
@@ -208,7 +208,7 @@ trait ResolvesModels
      * been deleted or is no longer accessible. Prevents the user from
      * being stuck with stale wizard state.
      *
-     * @param  string $wizardId      Session key for the wizard (e.g., 'payroll-wizard-' . auth()->id())
+     * @param  string $wizardId      Session key for the wizard (e.g., 'invoice-wizard-' . auth()->id())
      * @param  string $errorMessage  User-facing error message
      * @param  string $fallbackRoute Route to redirect to
      * @param  array  $params        Optional route parameters

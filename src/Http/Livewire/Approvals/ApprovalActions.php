@@ -2,96 +2,46 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\Approvals;
 
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
-use QuickerFaster\UILibrary\Models\ApprovalRequest;
-use QuickerFaster\UILibrary\Services\Config\Approvals\ApprovalConfigResolver;
-use QuickerFaster\UILibrary\Services\Approvals\ApprovalEngine;
+use QuickerFaster\UILibrary\Contracts\Approvals\ApproverLabelResolver;
+use QuickerFaster\UILibrary\Contracts\Approvals\ApproverResolver;
+use QuickerFaster\UILibrary\Models\Workflow;
+use QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard;
+use QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine;
 
+/**
+ * Renders the approve / reject / recall actions for a Workflow.
+ *
+ * The component delegates every state transition to the WorkflowEngine and
+ * uses ApprovalGuard to decide which buttons the current user may perform.
+ * Approver display labels and avatars are resolved through the
+ * ApproverLabelResolver contract.
+ */
 class ApprovalActions extends Component
 {
-    public string $configKey;
-    public int $approvableId;
-    public ?ApprovalRequest $request = null;
+    public ?int $workflowId = null;
+
     public bool $showCommentModal = false;
-    public string $actionType = ''; // 'approve' or 'reject'
+
+    public string $actionType = '';
+
     public string $comments = '';
-    public bool $canSubmit = false;
-    public bool $canApprove = false;
-    public bool $canReject = false;
-    public bool $canRecall = false;
 
     protected $listeners = ['refreshApprovalActions' => '$refresh'];
 
-    public function mount(string $configKey, int $approvableId): void
-    {
-        $this->configKey = $configKey;
-        $this->approvableId = $approvableId;
-        $this->loadApprovalRequest();
+    public function __construct(
+        protected WorkflowEngine $engine,
+        protected ApprovalGuard $guard,
+        protected ApproverResolver $approvers,
+        protected ApproverLabelResolver $labels,
+    ) {
     }
 
-    protected function loadApprovalRequest(): void
+    public function mount(?Workflow $workflow = null, ?int $workflowId = null): void
     {
-        $resolver = app(ApprovalConfigResolver::class, ['configKey' => $this->configKey]);
-        $modelClass = $resolver->getModelClass();
-        $approvable = $modelClass::find($this->approvableId);
-
-        if ($approvable && $approvable->approvalRequest) {
-            $this->request = $approvable->approvalRequest;
-            $this->determinePermissions();
-        } else {
-            $this->canSubmit = true;
-        }
-    }
-
-    protected function determinePermissions(): void
-    {
-        if (!$this->request) {
-            return;
-        }
-
-        $user = auth()->user();
-        if (!$user) return; // Abort when user is not logged-in
-
-        $currentTier = $this->request->currentTier;
-
-        // Submit is only for draft (not yet submitted) – we don't have draft in our schema, but can be used.
-        $this->canSubmit = false; // already submitted if request exists.
-
-        if ($this->request->status === 'pending' && $currentTier) {
-            // TODO: replace with actual role check against $currentTier->roles
-            $hasRole = true; // placeholder: check if user has any role in $currentTier->roles
-            $this->canApprove = $hasRole;
-            $this->canReject = $hasRole;
-        }
-
-
-        /*if ($this->request->status === 'pending' && $currentTier) {
-            $requiredRoles = $currentTier->roles; // e.g., ['payroll_officer']
-            $hasRole = $user->hasAnyRole($requiredRoles);
-            $this->canApprove = $hasRole;
-            $this->canReject = $hasRole;
-        }*/
-
-
-
-        // Recall allowed only for the submitter when status is pending
-        $this->canRecall = ($this->request->status === 'pending' && $this->request->submitted_by === $user->id);
-    }
-
-    public function submitForApproval(): void
-    {
-        $resolver = app(ApprovalConfigResolver::class, ['configKey' => $this->configKey]);
-        $modelClass = $resolver->getModelClass();
-        $approvable = $modelClass::find($this->approvableId);
-        $engine = app(ApprovalEngine::class, ['configResolver' => $resolver]);
-        $engine->startApproval($approvable, auth()->user());
-
-        $this->dispatch('refreshApprovalActions');
-        $this->dispatch('showAlert', [
-            'type' => 'success',
-            'message' => 'Approval request submitted successfully.',
-            'autoClose' => true,
-        ]);
+        $this->workflowId = $workflowId ?? ($workflow?->getKey() ?? null);
     }
 
     public function openCommentModal(string $action): void
@@ -103,44 +53,179 @@ class ApprovalActions extends Component
 
     public function confirmAction(): void
     {
-        $resolver = app(ApprovalConfigResolver::class, ['configKey' => $this->configKey]);
-        $engine = app(ApprovalEngine::class, ['configResolver' => $resolver]);
-
         if ($this->actionType === 'approve') {
-            $engine->approve($this->request, auth()->user(), $this->comments);
-            $message = 'Request approved.';
+            $this->approve($this->comments);
         } elseif ($this->actionType === 'reject') {
-            $engine->reject($this->request, auth()->user(), $this->comments);
-            $message = 'Request rejected.';
+            $this->reject($this->comments);
         }
+    }
 
-        $this->showCommentModal = false;
-        $this->dispatch('refreshApprovalActions');
-        $this->dispatch('refreshApprovalTimeline');
-        $this->dispatch('showAlert', [
-            'type' => 'success',
-            'message' => $message,
-            'autoClose' => true,
-        ]);
+    public function approve(?string $comments = null): void
+    {
+        $this->runTransition(
+            fn (Workflow $workflow) => $this->engine->approve($workflow, $this->normalizeComments($comments)),
+            'Workflow approved.'
+        );
+    }
+
+    public function reject(?string $comments = null): void
+    {
+        $this->runTransition(
+            fn (Workflow $workflow) => $this->engine->reject($workflow, $this->normalizeComments($comments)),
+            'Workflow rejected.'
+        );
     }
 
     public function recall(): void
     {
-        $resolver = app(ApprovalConfigResolver::class, ['configKey' => $this->configKey]);
-        $engine = app(ApprovalEngine::class, ['configResolver' => $resolver]);
-        $engine->recall($this->request, auth()->user());
-
-        $this->dispatch('refreshApprovalActions');
-        $this->dispatch('refreshApprovalTimeline');
-        $this->dispatch('showAlert', [
-            'type' => 'success',
-            'message' => 'Approval request cancelled.',
-            'autoClose' => true,
-        ]);
+        $this->runTransition(
+            fn (Workflow $workflow) => $this->engine->recall($workflow),
+            'Workflow recalled.'
+        );
     }
 
     public function render()
     {
-        return view('qf::livewire.approvals.actions');
+        $workflow = $this->resolveWorkflow();
+        $permissions = $this->permissions($workflow);
+
+        return view('qf::livewire.approvals.actions', array_merge([
+            'workflow' => $workflow,
+            'approvers' => $workflow ? $this->resolveApprovers($workflow) : [],
+        ], $permissions));
+    }
+
+    protected function runTransition(callable $transition, string $message): void
+    {
+        $workflow = $this->resolveWorkflow();
+
+        if (! $workflow) {
+            $this->notify('Workflow not found.', 'error');
+
+            return;
+        }
+
+        try {
+            $transition($workflow);
+
+            $this->resetModal();
+            $this->dispatch('refreshApprovalActions');
+            $this->dispatch('refreshApprovalTimeline');
+            $this->dispatch('refreshApprovalRequests');
+            $this->notify($message, 'success');
+        } catch (AuthorizationException $e) {
+            $this->notify($e->getMessage(), 'error');
+        } catch (\RuntimeException $e) {
+            $this->notify($e->getMessage(), 'error');
+        }
+    }
+
+    protected function resolveWorkflow(): ?Workflow
+    {
+        if (! $this->workflowId) {
+            return null;
+        }
+
+        return Workflow::query()
+            ->with(['currentStep', 'steps'])
+            ->find($this->workflowId);
+    }
+
+    protected function permissions(?Workflow $workflow): array
+    {
+        $canApprove = false;
+        $canReject = false;
+        $canRecall = false;
+
+        if ($workflow && $workflow->isPending()) {
+            $user = Auth::user();
+
+            if ($user) {
+                $currentStep = $workflow->currentStep;
+
+                if ($currentStep && $currentStep->isPending()) {
+                    $canAct = $this->guard->canApprove(
+                        $user,
+                        $currentStep->roles ?? [],
+                        $this->resolveWorkspaceId($workflow)
+                    );
+
+                    $canApprove = $canAct;
+                    $canReject = $canAct;
+                }
+
+                $canRecall = (string) $workflow->submitted_by === (string) $user->getAuthIdentifier();
+            }
+        }
+
+        return compact('canApprove', 'canReject', 'canRecall');
+    }
+
+    /**
+     * Resolve the approvers for the workflow's current step as label/avatar
+     * payloads for the UI.
+     */
+    protected function resolveApprovers(Workflow $workflow): array
+    {
+        $step = $workflow->currentStep;
+
+        if (! $step) {
+            return [];
+        }
+
+        $workspaceId = $this->resolveWorkspaceId($workflow);
+
+        if (is_array($step->roles) && $step->roles !== []) {
+            $userIds = $this->approvers->resolve($step->roles, $workspaceId);
+        } elseif ($step->assigned_to) {
+            $userIds = [$step->assigned_to];
+        } else {
+            return [];
+        }
+
+        return array_map(function ($userId) {
+            return [
+                'id' => $userId,
+                'label' => $this->labels->label($userId),
+                'avatar' => $this->labels->avatar($userId),
+                'profileRoute' => $this->labels->profileRoute($userId),
+            ];
+        }, array_values(array_unique($userIds)));
+    }
+
+    protected function resolveWorkspaceId(Workflow $workflow): ?string
+    {
+        $context = $workflow->context;
+
+        if (! is_array($context)) {
+            return null;
+        }
+
+        $workspaceId = $context['workspace_id'] ?? null;
+
+        return $workspaceId !== null ? (string) $workspaceId : null;
+    }
+
+    protected function normalizeComments(?string $comments): ?string
+    {
+        $comments = $comments ?? $this->comments;
+
+        return $comments !== null && trim($comments) !== '' ? $comments : null;
+    }
+
+    protected function resetModal(): void
+    {
+        $this->showCommentModal = false;
+        $this->actionType = '';
+        $this->comments = '';
+    }
+
+    protected function notify(string $message, string $type): void
+    {
+        $this->dispatch('showAlert', [
+            'type' => $type,
+            'message' => $message,
+            'autoClose' => true,
+        ]);
     }
 }

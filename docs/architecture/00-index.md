@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-14
+> **Last Updated**: 2026-08-16
 > **Status**: ✅ Authoritative Index — canonical reference for architecture documentation
 
 ---
@@ -49,11 +49,18 @@ docs/architecture/
 └── phase-5-navigation-ux.md             ← ✅ EXISTS — Phase 5 Navigation & UX polish (vanilla JS + Livewire 3)
 ```
 
+> **Workflow/approval companion docs** (added 2026-08-16; numbered `18-`/`21-`–`24-` to keep the sequence collision-free):
+> - [`18-workflow-approval-testing-checklist.md`](18-workflow-approval-testing-checklist.md) — consuming-app integration & end-to-end testing guidance
+> - [`21-approval-infrastructure-analysis.md`](21-approval-infrastructure-analysis.md) — legacy vs. `WorkflowEngine` analysis, foundational building blocks
+> - [`22-workflow-definition-wizard-ux.md`](22-workflow-definition-wizard-ux.md) — definition data model + 5-step wizard UX
+> - [`23-workflow-approval-implementation-plan.md`](23-workflow-approval-implementation-plan.md) — implementation plan + fix passes
+> - [`24-workflow-wizard-ux-polish.md`](24-workflow-wizard-ux-polish.md) — Summary step + wizard chrome polish
+
 **File status summary**:
 
 | Status | Count | Files |
 |--------|-------|-------|
-| ✅ EXISTS | 19 | `00-index.md`, `01-` through `17-*` (17 topic files), `phase-5-navigation-ux.md` |
+| ✅ EXISTS | 26 | `00-index.md`, `01-` through `17-*` (17 topic files), `phase-5-navigation-ux.md`, workflow/approval companion set (`18-`, `21-`–`24-`), `19-notification-consuming-app-guide.md`, `20-reference-workspace-scoped-approver-resolver.md` |
 | ⏸️ DEFERRED | 0 | — |
 | ❌ NOT NEEDED | 0 | — |
 
@@ -250,13 +257,13 @@ docs/architecture/
 
 ### [`15-gaps-and-recommendations.md`](15-gaps-and-recommendations.md)
 
-**What it covers**: All 10 identified gaps: missing error handling strategy, missing testing architecture, asset compilation strategy, wizard state management, API vs web context, accessibility/i18n, security hardening for catch-all routes, caching strategy for module discovery, bank file generator documentation, missing module scaffold command.
+**What it covers**: All 10 identified gaps: missing error handling strategy, missing testing architecture, asset compilation strategy, wizard state management, API vs web context, accessibility/i18n, security hardening for catch-all routes (**now resolved** — see §10.7), caching strategy for module discovery, bank file generator documentation, missing module scaffold command.
 
 **Source**: Extracted from Blueprint Section 10 → [`15-gaps-and-recommendations.md`](15-gaps-and-recommendations.md)
 
 **Key takeaways for AI agents**:
 - These are known weaknesses — be aware of them when implementing
-- Security hardening for catch-all routes is the highest-priority gap
+- Security hardening for catch-all routes was the highest-priority gap and is now resolved (2026-08-16) via `ui-library.catch_all`
 - Module discovery caching is partially implemented (events) but not for views/routes
 
 ---

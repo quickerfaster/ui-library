@@ -52,4 +52,14 @@ class DashboardResolver
     {
         return $this->config['widgets'] ?? [];
     }
+
+    public function getHero(): array
+    {
+        return $this->config['hero'] ?? [];
+    }
+
+    public function getStats(): array
+    {
+        return $this->config['stats'] ?? [];
+    }
 }

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * Company registration controller for multi-tenant SaaS setups.
  *
  * This controller creates a new company with default organizational structure.
- * Domain-specific defaults (shifts, attendance policies, work patterns, etc.)
+ * Domain-specific defaults (schedules, policies, rules, etc.)
  * should be provided by the consuming application via event listeners or by
  * extending this controller.
  *

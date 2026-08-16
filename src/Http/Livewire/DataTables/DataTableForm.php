@@ -872,42 +872,42 @@ protected function hydrateMorphToSelectFields(): void
             return true;
         }
 
-        $employeeId = $this->fields['employee_id'] ?? null;
-        if (!$employeeId) {
-            // No employee selected yet – validation will catch required rule later
+        $documentableId = $this->fields['documentable_id'] ?? null;
+        if (!$documentableId) {
+            // No related record selected yet – validation will catch required rule later
             return true;
         }
 
-        $employee = $this->resolveRelatedModel('employee', $employeeId);
-        if (!$employee) {
+        $documentable = $this->resolveRelatedModel('documentable', $documentableId);
+        if (!$documentable) {
             return true;
         }
 
-        // Get max limit from config or default to 10
-        $max = $this->fieldDefinitions['document']['maxDocumentsPerEmployee'] ?? 3;
+        // Get max limit from config or default to 3
+        $max = $this->fieldDefinitions['document']['maxDocumentsPerRecord'] ?? 3;
 
         $isCreating = !$this->isEditMode;
-        $isChangingEmployee = false;
+        $isChangingDocumentable = false;
 
         if ($this->isEditMode && $this->recordId) {
             $existingDocument = $this->modelClass::find($this->recordId);
-            if ($existingDocument && $existingDocument->employee_id != $employeeId) {
-                $isChangingEmployee = true;
+            if ($existingDocument && $existingDocument->documentable_id != $documentableId) {
+                $isChangingDocumentable = true;
             }
         }
 
-        $shouldCheck = $isCreating || $isChangingEmployee;
+        $shouldCheck = $isCreating || $isChangingDocumentable;
 
         if ($shouldCheck) {
-            $excludeDocumentId = ($this->isEditMode && $isChangingEmployee) ? $this->recordId : null;
-            $currentCount = $this->modelClass::where('employee_id', $employeeId);
+            $excludeDocumentId = ($this->isEditMode && $isChangingDocumentable) ? $this->recordId : null;
+            $currentCount = $this->modelClass::where('documentable_id', $documentableId);
             if ($excludeDocumentId) {
                 $currentCount->where('id', '!=', $excludeDocumentId);
             }
             if ($currentCount->count() >= $max) {
                 $this->dispatch('showAlert', [
                     'type' => 'error',
-                    'message' => "This employee already has the maximum allowed documents ({$max}). Cannot add another document.",
+                    'message' => "This record already has the maximum allowed documents ({$max}). Cannot add another document.",
                     'autoClose' => true,
                 ]);
                 return false;
@@ -920,11 +920,11 @@ protected function hydrateMorphToSelectFields(): void
     /**
      * Resolve a related model instance dynamically.
      *
-     * This replaces hardcoded App\Modules references (e.g., \App\Modules\Hr\Models\Employee)
+     * This replaces hardcoded App\Modules references (e.g., \App\Models\Invoice)
      * with config-driven model resolution. The consuming application should configure
      * the related model mapping in their ui-library config.
      *
-     * @param string $relation The relation name (e.g., 'employee')
+     * @param string $relation The relation name (e.g., 'documentable')
      * @param mixed $id The model ID to find
      * @return \Illuminate\Database\Eloquent\Model|null
      */
@@ -1145,10 +1145,10 @@ protected function hydrateMorphToSelectFields(): void
                 $this->addError('calculation_logic', 'At least one tax bracket with a positive limit or rate is required.');
             }
         } else {
-            $employeeValue = $data['employee_value'] ?? 0;
-            $employerValue = $data['employer_value'] ?? 0;
-            if ($employeeValue <= 0 && $employerValue <= 0) {
-                $this->addError('calculation_logic', 'At least one of Employee or Employer contribution must be positive.');
+            $individualValue = $data['individual_value'] ?? 0;
+            $organizationValue = $data['organization_value'] ?? 0;
+            if ($individualValue <= 0 && $organizationValue <= 0) {
+                $this->addError('calculation_logic', 'At least one of Individual or Organization contribution must be positive.');
             }
         }
     }
@@ -1231,11 +1231,11 @@ protected function hydrateMorphToSelectFields(): void
 
                 // Override for Document model's 'document' field
                 if ($this->modelClass === \QuickerFaster\UILibrary\Models\Document::class && $field === 'document') {
-                    $employeeId = $data['employee_id'] ?? $this->fields['employee_id'] ?? null;
-                    if ($employeeId) {
-                        $employee = $this->resolveRelatedModel('employee', $employeeId);
-                        if ($employee) {
-                            $customFolder = 'documents/employee_' . $employee->id;
+                    $documentableId = $data['documentable_id'] ?? $this->fields['documentable_id'] ?? null;
+                    if ($documentableId) {
+                        $documentable = $this->resolveRelatedModel('documentable', $documentableId);
+                        if ($documentable) {
+                            $customFolder = 'documents/record_' . $documentable->id;
                             $disk = 'documents';
                         }
                     }

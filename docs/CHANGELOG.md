@@ -1,10 +1,243 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-08-14
-> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish
+> **Date**: 2026-08-15
+> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23)
 
 ---
+
+> ⚠️ **Testing status (2026-08-16)**: The workflow/approval foundation has been implemented and unit-verified (`php -l`, config validation), but has **NOT** yet been tested end-to-end in a consuming app. Further adjustments may be needed once integrated into a real consuming app (e.g., Spatie role/permission seeding, notification template registration, workspace-scoped approver resolution, and runtime workflow execution against real entities).
+
+## 2026-08-16 — Catch-All Route Security Hardening
+
+Hardened the centralized `/{module}/{view}/{id?}` catch-all route in [`src/Core/System/Routes/web.php`](src/Core/System/Routes/web.php) with a config-driven module allow-list, directory-traversal sanitization, per-view authorization, and a named rate limiter.
+
+- **New config section** `ui-library.catch_all` in [`ui-library.php`](src/Config/ui-library.php):
+  - `allowed_modules` (default `['admin', 'system', 'organization', 'common']`) — modules the catch-all may resolve; business modules are appended automatically by [`ModuleServiceProvider`](src/Providers/ModuleServiceProvider.php).
+  - `require_auth` (default `true`) — re-checked in the handler for defense in depth.
+  - `gate` (default `null`) — optional Laravel Gate ability checked via `Gate::allows($gate, [$module, $view, $id])`.
+  - `authorization_callback` (default `null`) — optional callable `($user, $module, $view, $id)` returning `true`/`false`; takes precedence over `gate`.
+  - `rate_limiting.enabled` (default `true`), `max_attempts` (60), `decay_minutes` (1).
+- **Route hardening**: module allow-list (`abort(404)`), explicit null-byte/slash/backslash/`..`/leading-dot sanitization (`abort(400)`), and per-view authorization (`abort(401)`/`abort(403)`).
+- **Rate limiter**: `qf-catch-all` named limiter registered in [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php), keyed by authenticated user id (falling back to client IP), applied via `throttle:qf-catch-all` middleware when enabled.
+
+**Files modified**: [`src/Core/System/Routes/web.php`](src/Core/System/Routes/web.php), [`src/Config/ui-library.php`](src/Config/ui-library.php), [`src/Providers/UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php)
+
+---
+
+## 2026-08-16 — Legacy Dead Code Removed
+
+Deleted three legacy Artisan commands superseded by [`InstallCommand.php`](src/Console/Commands/InstallCommand.php) and the cleaner publish/cleanup flow:
+
+- [`QuickerFasterInstallUI.php`](src/Commands/QuickerFasterInstallUI.php) — superseded by [`InstallCommand.php`](src/Console/Commands/InstallCommand.php)
+- [`CleanExports.php`](src/Commands/CleanExports.php) — no longer used
+- [`CleanImportErrors.php`](src/Commands/CleanImportErrors.php) — no longer used
+
+**Files removed**: `src/Commands/QuickerFasterInstallUI.php`, `src/Commands/CleanExports.php`, `src/Commands/CleanImportErrors.php`
+
+---
+
+## 2026-08-16 — Phase 6.1–6.3 Navigation Configs Completed
+
+Completed the three Core navigation configs to the full context-group + context-item structure:
+
+- [`System navigation`](src/Core/System/Config/navigation.php) — 7 context groups, 42 items (Dashboard, Accounts, Subscriptions, Plans, Applications, Settings, Setup)
+- [`Admin navigation`](src/Core/Admin/Config/navigation.php) — 7 groups, 33 items (added Dashboard and Security; expanded Users & Permissions and Audit)
+- [`Organization navigation`](src/Core/Organization/Config/navigation.php) — 7 groups, 28 items (added Classification and Reports; expanded Companies, Structure, and Locations)
+
+**Files modified**: [`src/Core/System/Config/navigation.php`](src/Core/System/Config/navigation.php), [`src/Core/Admin/Config/navigation.php`](src/Core/Admin/Config/navigation.php), [`src/Core/Organization/Config/navigation.php`](src/Core/Organization/Config/navigation.php)
+
+---
+
+## 2026-08-16 — Dashboard/Widget Visual Polish (hero/stats/color)
+
+Added optional dashboard-level and per-widget visual fields, plus a shared card partial and consolidated utility CSS.
+
+- **Dashboard config** gains optional `hero` (title/description/icon) and `stats` (gradient stat row) fields, resolved via [`DashboardResolver::getHero()`](src/Services/Config/Dashboards/DashboardResolver.php) / `getStats()` and rendered by [`Dashboard.php`](src/Http/Livewire/Dashboards/Dashboard.php).
+- **Per-widget `color`** field threaded through all 11 widget processors in [`src/Widgets/`](src/Widgets/).
+- **Reusable partial** [`widgets/partials/card.blade.php`](src/Resources/views/widgets/partials/card.blade.php) wraps widget output in a polished card (header icon/title/description/actions, hover lift).
+- **Utility CSS** (`.transition-hover`, `.opacity-6`, `.opacity-8`, `.min-width-0`) consolidated into [`public/assets/css/quicker-faster.css`](public/assets/css/quicker-faster.css).
+
+**Files created**: [`src/Resources/views/widgets/partials/card.blade.php`](src/Resources/views/widgets/partials/card.blade.php)
+**Files modified**: [`src/Http/Livewire/Dashboards/Dashboard.php`](src/Http/Livewire/Dashboards/Dashboard.php), [`src/Services/Config/Dashboards/DashboardResolver.php`](src/Services/Config/Dashboards/DashboardResolver.php), [`src/Widgets/*`](src/Widgets/), [`public/assets/css/quicker-faster.css`](public/assets/css/quicker-faster.css)
+
+---
+
+## 2026-08-16 — Notifications Dashboard Overview
+
+Added a config-driven analytics/summary dashboard for the Notifications context group, matching the pattern used by the Workflows, Users & Permissions, Audit, and General Settings groups.
+
+- **Dashboard config**: [`dashboard_notifications_overview.php`](src/Core/Admin/Data/dashboards/dashboard_notifications_overview.php) defines stat cards (total notifications, unread notifications, total templates, failed deliveries), "Notifications by Type" and "Notifications by Channel" doughnut charts, a 30-day notification activity trend, a recent notifications list, and action cards linking to the notification logs and preferences pages.
+- **Blade wrapper**: [`dashboard-notifications-overview.blade.php`](src/Core/Admin/Resources/views/admin/dashboard-notifications-overview.blade.php) embeds `<livewire:qf.dashboard>` within the navigation layout.
+- **Navigation**: [`navigation.php`](src/Core/Admin/Config/navigation.php) now points the Notifications group header to `admin/dashboard-notifications-overview` and adds a `notifications_overview` context item (`view_notifications_overview`) at order 1.
+
+**Files created**: [`dashboard_notifications_overview.php`](src/Core/Admin/Data/dashboards/dashboard_notifications_overview.php), [`dashboard-notifications-overview.blade.php`](src/Core/Admin/Resources/views/admin/dashboard-notifications-overview.blade.php)
+**Files modified**: [`navigation.php`](src/Core/Admin/Config/navigation.php)
+
+---
+
+## 2026-08-16 — Workflows Dashboard Overview
+
+Added a config-driven analytics/summary dashboard for the Workflows context group, matching the pattern used by the Users & Permissions, Audit, and General Settings groups.
+
+- **Dashboard config**: [`dashboard_workflows_overview.php`](src/Core/Admin/Data/dashboards/dashboard_workflows_overview.php) defines stat cards (total/active definitions, total workflows, pending approvals), a "Workflows by Status" doughnut chart, a 30-day workflow activity trend, a recent workflows list, and action cards linking to the definition wizard and definitions list.
+- **Blade wrapper**: [`dashboard-workflows-overview.blade.php`](src/Core/Admin/Resources/views/admin/dashboard-workflows-overview.blade.php) embeds `<livewire:qf.dashboard>` within the navigation layout.
+- **Navigation**: [`navigation.php`](src/Core/Admin/Config/navigation.php) now points the Workflows group header to `admin/dashboard-workflows-overview` and adds a `workflows_overview` context item (`view_workflows_overview`) at order 1.
+
+**Files created**: [`dashboard_workflows_overview.php`](src/Core/Admin/Data/dashboards/dashboard_workflows_overview.php), [`dashboard-workflows-overview.blade.php`](src/Core/Admin/Resources/views/admin/dashboard-workflows-overview.blade.php)
+**Files modified**: [`navigation.php`](src/Core/Admin/Config/navigation.php)
+
+---
+
+## 2026-08-16 — Notification Consuming-App Guide
+
+Created [`19-notification-consuming-app-guide.md`](docs/architecture/19-notification-consuming-app-guide.md), a comprehensive guide documenting the four consuming-app concerns the notification engine deliberately leaves to the application:
+
+- **🟢 Throttling & Scheduling** — `dispatchAsync()` + `SendNotification` (`ShouldQueue`) as the async primitive; consuming-app examples for `Redis::throttle`, queue worker `--max-jobs`/`--rate`, `delay()`, and scheduled commands.
+- **🟢 Audience Segmentation** — `dispatch(Notifiable $notifiable, ...)` per-recipient; consuming-app examples for querying target audiences, looping, and chunking large lists.
+- **🟡 Inline Actions** — `NotificationAction` contract + `NotificationActionRegistry` + `actions` JSON column + button rendering; consuming-app examples for implementing handlers, registering them, and populating the `actions` column.
+- **🟡 Template Variables** — `TemplateVariableRegistry` contract + `DefaultTemplateVariableRegistry` + dot-notation `renderTemplate()`; consuming-app examples for registering placeholders, building a template CRUD UI, and providing a preview renderer.
+- **Testing guidance** — concrete PHPUnit examples for verifying delivery, throttling, segmentation, inline actions, and template variable rendering.
+
+The guide also flags two library seams: `dispatch()` does not yet accept an `$actions` argument, and `renderTemplate()` is `protected` (not public API for previews).
+
+**Files created**: [`19-notification-consuming-app-guide.md`](docs/architecture/19-notification-consuming-app-guide.md)
+**Files modified**: [`18-workflow-approval-testing-checklist.md`](docs/architecture/18-workflow-approval-testing-checklist.md) (added cross-reference in §3.4)
+
+---
+
+## 2026-08-16 — Workflow Definition List Refactored to DataTable
+
+The custom [`WorkflowDefinitionList`](src/Http/Livewire/Workflows/WorkflowDefinitionList.php) Livewire component and its [`workflow-definition-list.blade.php`](src/Resources/views/livewire/workflows/workflow-definition-list.blade.php) view have been deprecated in favor of the generic [`DataTable`](src/Http/Livewire/DataTables/DataTable.php) component.
+
+- **New config**: [`workflow_definition.php`](src/Core/Admin/Data/workflow_definition.php) — DataTable config with key `admin.workflow_definition`, defining fields (`name`, `key`, `entity_type`, `is_active`, `description`, `notifications`, `created_at`, `updated_at`), table/list switch views, `moreActions` linking to the wizard via `?definitionId={id}`, and controls (search, column management, filtering, per-page).
+- **Admin page**: [`workflow-definitions.blade.php`](src/Core/Admin/Resources/views/admin/workflow-definitions.blade.php) now embeds `<livewire:qf.data-table configKey="admin.workflow_definition" />` instead of the deprecated `qf.workflow-definition-list`.
+- **Service provider**: The `qf.workflow-definition-list` Livewire registration in [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php) is commented out with a deprecation note.
+- **Deprecated files**: [`WorkflowDefinitionList.php`](src/Http/Livewire/Workflows/WorkflowDefinitionList.php) and [`workflow-definition-list.blade.php`](src/Resources/views/livewire/workflows/workflow-definition-list.blade.php) now carry `@deprecated` docblocks.
+
+**Files created**: [`workflow_definition.php`](src/Core/Admin/Data/workflow_definition.php)
+**Files modified**: [`workflow-definitions.blade.php`](src/Core/Admin/Resources/views/admin/workflow-definitions.blade.php), [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php), [`WorkflowDefinitionList.php`](src/Http/Livewire/Workflows/WorkflowDefinitionList.php), [`workflow-definition-list.blade.php`](src/Resources/views/livewire/workflows/workflow-definition-list.blade.php)
+
+---
+
+## 2026-08-16 — Workflow Definition Wizard Fixes
+
+Five follow-up issues in the wizard and its list page were fixed:
+
+### Validation error persistence fix
+[`WorkflowDefinitionWizard::validateCurrentStep()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) now calls `resetErrorBag()` before validating, so errors from a previously-failed step are cleared on the next attempt instead of persisting across navigation.
+
+### Tag retention across navigation fix
+[`repopulateCurrentPicker()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) / [`repopulatePicker()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) rebuild the transient `$fields`/`$selectedLabels` picker state on navigation, so initiator/authorizer tags no longer disappear on Back/Continue/jump.
+
+### TypeError fix (`canPerformAction`)
+[`row-actions.blade.php`](src/Resources/views/livewire/data-tables/partials/row-actions.blade.php) and [`DataTable::handleRowAction()`](src/Http/Livewire/DataTables/DataTable.php) were passing the whole `moreActions` entry (an array) to `canPerformAction()`, which expects a string. They now extract the permission string (`$action['action'] ?? $action['permission'] ?? ''`); the new [`workflow_definition.php`](src/Core/Admin/Data/workflow_definition.php) config supplies `'action' => 'edit'`.
+
+### Edit pre-load fix
+[`WorkflowDefinitionWizard::mount()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) now reads `definitionId` from the request query string (the admin wrapper passes no mount params), and `loadDefinition()` pre-populates all fields including the four notification toggles.
+
+### Notification toggles
+The four free-text notification "type name" inputs on the Summary step were replaced with four toggle switches (`$notifyOnSubmitted`, `$notifyOnApproved`, `$notifyOnRejected`, `$notifyOnRecalled`). The master "Enable workflow notifications" toggle was removed; `enabled` is derived (`enabled = any toggle on`) and each `types.*` value is a fixed template name or `null`.
+
+**Files changed**: [`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php), [`row-actions.blade.php`](src/Resources/views/livewire/data-tables/partials/row-actions.blade.php), [`DataTable.php`](src/Http/Livewire/DataTables/DataTable.php), [`workflow_definition.php`](src/Core/Admin/Data/workflow_definition.php)
+
+---
+
+## 2026-08-15 — Cache-Busting & Navigation Layout Cleanup
+
+- Added a `?v=1.0.4` cache-busting query string to the [`quicker-faster.css`](src/Resources/views/components/layouts/navigation-layout.blade.php) stylesheet link so browsers no longer serve the stale cached step-tracker CSS indefinitely.
+- Wrapped the theme CSS `<link id="pagestyle">` in a conditional so it only renders when `config('ui-library.theme.css')` is non-null (no more empty `href=""`).
+- Removed the duplicate opening `<body>` tag in the navigation layout.
+
+**Files changed**: [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php)
+
+---
+
+## 2026-08-15 — Step 5 (Summary + Plug-In Usage) Fix Pass
+
+Nine discrepancies found during the Step 5 (Summary + Plug-In Usage) code walkthrough were resolved — three genuine fixes and six documentation updates:
+
+### Fixes
+
+| # | Severity | Area | Fix |
+|---|----------|------|-----|
+| 1 | Yellow | [`WorkflowDefinitionWizard::finish()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Added `validateFinalStep()` so saving re-validates `workflowName`, `workflowKey`, and `authorizers`, preventing an incomplete definition from being saved via direct navigation to the Summary. |
+| 2 | Yellow | Workflow definition list page | New [`WorkflowDefinitionList`](src/Http/Livewire/Workflows/WorkflowDefinitionList.php) component, [`workflow-definition-list.blade.php`](src/Resources/views/livewire/workflows/workflow-definition-list.blade.php) view, and [`admin/workflow-definitions.blade.php`](src/Core/Admin/Resources/views/admin/workflow-definitions.blade.php) page wrapper served at `/admin/workflow-definitions`; navigation updated to point at the list with a separate "New Workflow" item; wizard completion/cancel return to the list. |
+| 3 | Green | [`WorkflowDefinitionWizard::saveDefinition()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Moved `showAlert` dispatch for skipped review steps out of the `DB::transaction` closure — warnings are collected and dispatched after commit. |
+| 4 | Green | [`WorkflowDefinitionWizard`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Corrected the "Step 6 Notifications" docblock to "Notifications configuration (within Step 5 — Summary)". |
+| 5 | Green | [`Workflowable::getWorkflowDefinitionKey()`](src/Contracts/Workflow/Workflowable.php) | Updated docstring to document DB-first resolution with config fallback. |
+| 6 | Green | [`WorkflowDefinition`](src/Models/WorkflowDefinition.php) | Documented `entity_type` as descriptive-only (not used for matching; `key` is the sole lookup key). |
+| 7 | Green | [`WorkflowDefinitionWizard`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Documented the Summary pipeline "Initiator" node as presentation-only vs. runtime `WorkflowStep` rows. |
+| 8 | Green | [`WorkflowDefinition`](src/Models/WorkflowDefinition.php) & [`WorkflowEngine::getDefinition()`](src/Services/Workflow/WorkflowEngine.php) | Documented `is_active = false` as "un-startable" (skipped in DB-first lookup), not merely "hidden". |
+| 9 | Green | [`workflow-definition-wizard.blade.php`](src/Resources/views/livewire/workflows/workflow-definition-wizard.blade.php) | Clarified the notifications section is a Livewire toggle, not a Bootstrap collapse. |
+
+**Files changed**: [`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php), [`Workflowable.php`](src/Contracts/Workflow/Workflowable.php), [`WorkflowDefinition.php`](src/Models/WorkflowDefinition.php), [`WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php), [`WorkflowDefinitionList.php`](src/Http/Livewire/Workflows/WorkflowDefinitionList.php), [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php), [`navigation.php`](src/Core/Admin/Config/navigation.php), and three Blade views.
+
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
+
+---
+
+## 2026-08-15 — Step 3 (Add Reviewers) Fix Pass
+
+Eight discrepancies found during the Step 3 (Add Reviewers) code walkthrough were fixed across the workflow engine, wizard, and definition models:
+
+### Fixes
+
+| # | Severity | Area | Fix |
+|---|----------|------|-----|
+| 1 | Yellow | [`WorkflowDefinitionWizard::validateCurrentStep()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Added `case 2` (`validateReviewSteps()`) — named review steps must have at least one assignee; empty seeded blanks are skipped; the review tier remains optional. |
+| 2 | Critical | [`WorkflowEngine::approve()`](src/Services/Workflow/WorkflowEngine.php) | Enforced `all` resolution mode via per-user [`WorkflowAction`](src/Models/WorkflowAction.php) tracking. `any` mode retains the original single-approval path. |
+| 3 | Yellow | [`WorkflowEngine::reject()`](src/Services/Workflow/WorkflowEngine.php) | Added the same [`ApprovalGuard::canApprove()`](src/Services/Approvals/ApprovalGuard.php) authorization check used by `approve()`; unauthorized users now get `AuthorizationException`. |
+| 4 | Green | [`WorkflowDefinitionWizard::saveDefinition()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Named review steps with no assignees now dispatch a `showAlert` warning before being skipped. |
+| 5 | Green | [`WorkflowDefinitionStep`](src/Models/WorkflowDefinitionStep.php) & [`ReviewerChainBuilder`](src/Http/Livewire/Workflows/ReviewerChainBuilder.php) | Added docblocks clarifying `resolution_mode` (`any`/`all` runtime enforcement) vs. `assignees.mode` (`users`/`roles`/`mixed` informational). |
+| 6 | Yellow | [`WorkflowEngine::start()`](src/Services/Workflow/WorkflowEngine.php) | A definition with no review/authorizer steps now auto-approves the workflow on submission instead of leaving it stuck `pending`. |
+| 7 | Yellow | DB notifications | New migration [`2026_08_15_000004_add_notifications_to_workflow_definitions.php`](Database/Migrations/2026_08_15_000004_add_notifications_to_workflow_definitions.php) adds a `notifications` JSON column; [`WorkflowDefinition`](src/Models/WorkflowDefinition.php) gained fillable + cast; [`WorkflowEngine::notificationConfig()`](src/Services/Workflow/WorkflowEngine.php) now reads DB-first; wizard gained an optional notifications toggle + type fields. |
+| 8 | Green | [`admin/workflow-definition-wizard.blade.php`](src/Core/Admin/Resources/views/admin/workflow-definition-wizard.blade.php) | Added a docblock explaining the thin-wrapper role vs. the Livewire component view. |
+
+**Files changed**: [`WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php), [`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php), [`WorkflowDefinition.php`](src/Models/WorkflowDefinition.php), [`WorkflowDefinitionStep.php`](src/Models/WorkflowDefinitionStep.php), [`ReviewerChainBuilder.php`](src/Http/Livewire/Workflows/ReviewerChainBuilder.php), [`WorkflowApproved.php`](src/Events/Workflows/WorkflowApproved.php), new migration, and two Blade views.
+
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
+
+---
+
+## 2026-08-15 — Step 4 (Add Authorizers) Fix Pass
+
+Seven discrepancies found during the Step 4 (Add Authorizers) code walkthrough were fixed across the workflow engine, wizard, and definition models:
+
+### Fixes
+
+| # | Severity | Area | Fix |
+|---|----------|------|-----|
+| A | Yellow | [`WorkflowEngine::hydrateFromModel()`](src/Services/Workflow/WorkflowEngine.php) | Authorizer steps are now forced to `approval_mode = 'any'` during hydration, regardless of the stored `resolution_mode`. A manually-authored or DB-edited authorizer row with `resolution_mode = 'all'` would otherwise make every authorizer approve — contradicting "ANY ONE can authorize". Review steps keep their stored `any`/`all` mode. |
+| B | Green | [`WorkflowDefinitionWizard::resetPicker()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | The assignment-mode toggle (users/roles/mixed) is now non-destructive: switching mode preserves the `$initiators`/`$authorizers` selection, clears only the transient search state, and rebuilds `$fields`/`$selectedLabels` from the preserved selection so badges continue to render. |
+| C | Green | [`WorkflowDefinitionStep`](src/Models/WorkflowDefinitionStep.php) & [`WorkflowStep`](src/Models/WorkflowStep.php) | Docblocks added/updated clarifying that `resolution_mode` is the definition column (`any`/`all`) mapping to the runtime `WorkflowStep::approval_mode`. |
+| D | Green | [`WorkflowDefinitionWizard`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Added a class docblock mapping the 1-based UI steps (Step 1–5) to the 0-based internal `$currentStep` (0–4). |
+| E | Green | [`WorkflowDefinitionWizard`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php) | Documented the intentional split: the wizard requires ≥1 authorizer (`validateAssignees()`), but the engine auto-approves zero-step definitions. Normal wizard-created definitions always include an authorizer; only manually-authored config definitions can hit the auto-approve path. |
+
+**Files changed**: [`WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php), [`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php), [`WorkflowDefinitionStep.php`](src/Models/WorkflowDefinitionStep.php), [`WorkflowStep.php`](src/Models/WorkflowStep.php)
+
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
+
+---
+
+## 2026-08-15 — Approval & Workflow Infrastructure Bug Fixes
+
+Eight bugs discovered during a code-grounded walkthrough of the Workflow Definition Wizard's "Add Initiators" step were fixed across the approval/workflow infrastructure:
+
+### Critical Fixes
+
+- **Initiator authorization enforced** ([`WorkflowEngine::start()`](src/Services/Workflow/WorkflowEngine.php)): The engine now resolves initiator assignees and calls [`ApprovalGuard::canSubmit()`](src/Services/Approvals/ApprovalGuard.php) before creating a workflow. Unauthorized submitters receive an `AuthorizationException`. Super-admin/bypass roles are honoured.
+- **`hydrateFromModel()` respects `tier_type`** ([`WorkflowEngine::hydrateFromModel()`](src/Services/Workflow/WorkflowEngine.php)): Initiator steps are now collected into a separate `initiators` key in the hydrated definition array. Only `review` and `authorizer` steps populate the `steps` array. Runtime `WorkflowStep` rows are created only for review/authorizer tiers.
+- **Duplicate workflow prevention** ([`WorkflowEngine::start()`](src/Services/Workflow/WorkflowEngine.php)): `hasActiveWorkflow()` is now called before creating a new workflow; throws `RuntimeException` if one already exists.
+
+### Convention Alignment
+
+- **Role storage unified to string names** ([`WorkflowDefinitionWizard::updatedSearches()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php)): The initiator/authorizer picker now stores roles by their `name` string (matching [`ReviewerChainBuilder`](src/Http/Livewire/Workflows/ReviewerChainBuilder.php)). User IDs remain integers.
+- **`DefaultApproverResolver` int=user/string=role convention** ([`DefaultApproverResolver::resolve()`](src/Services/Approvals/DefaultApproverResolver.php)): Integers are treated as already-resolved user IDs (pass-through); strings are treated as role names (queried by `name`). The [`ApproverResolver`](src/Contracts/Approvals/ApproverResolver.php) contract docblock documents this convention.
+- **`normalizeAssignees()` self-describing classification** ([`WorkflowDefinitionWizard::normalizeAssignees()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php)): Now classifies by id type (int = user, string = role) independent of the stored `mode` field, which is derived/informational.
+- **Mode toggle synced on reload** ([`WorkflowDefinitionWizard::loadDefinition()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php)): `initiatorMode`/`authorizerMode` are now synced from `detectMode()` after loading a saved definition, ensuring the UI toggle matches the items.
+
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
 
 ## 2026-08-14 — Access Control & Navigation UX Polish
 
@@ -461,6 +694,88 @@ Both views use the standard DataTableForm pattern with config-driven field defin
 - The icon shows an unread count badge and opens a dropdown with recent notifications
 
 **Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php), [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php), [`ui-library.php`](src/Config/ui-library.php)
+
+---
+
+## 2026-08-15 — Authorization, Seeding & Install Fixes
+
+### 403 Fix — Email Fallback Bypass & Error Surfacing (#41)
+
+**Problem**: When the `model_has_roles` pivot table was empty (e.g., after a fresh install where role assignment silently failed), super admins were locked out of every admin page with a 403 error. The `AuthorizationService::isBypassAllowed()` only checked Spatie roles, and the `SuperAdminSeeder`/`UserSeeder` silently swallowed role-assignment failures.
+
+**Fix**:
+1. Added email-based fallback bypass in [`AuthorizationService::isBypassAllowed()`](src/Services/AccessControl/AuthorizationService.php): when the configured `SUPER_ADMIN_EMAIL` matches the authenticated user's email, the bypass is granted regardless of Spatie role state. This protects against seed failures where role assignment silently fails.
+2. Added `AuthorizationService::isBypassAllowed()` calls to all 15 methods in [`DefaultAuthorizationProvider`](src/Services/DataTables/DefaultAuthorizationProvider.php) — `canAccessView`, `canView`, `canCreate`, `canUpdate`, `canDelete`, `canRestore`, `canForceDelete`, `canPerformAction`, `canExport`, `canImport`, `canPrint`, `canBulkDelete`, `canBulkRestore`, `canBulkForceDelete`, `canBulkExport`, `canBulkUpdate`.
+3. Replaced silent `catch` blocks in [`SuperAdminSeeder`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php) and [`UserSeeder`](src/Core/Admin/Database/Seeders/UserSeeder.php) with `\Log::error()` + `$this->command->error()` calls so role-assignment failures are surfaced during `php artisan db:seed`.
+
+**Files**: [`AuthorizationService.php`](src/Services/AccessControl/AuthorizationService.php), [`DefaultAuthorizationProvider.php`](src/Services/DataTables/DefaultAuthorizationProvider.php), [`SuperAdminSeeder.php`](src/Core/Admin/Database/Seeders/SuperAdminSeeder.php), [`UserSeeder.php`](src/Core/Admin/Database/Seeders/UserSeeder.php)
+
+---
+
+### Module Switcher Email Fallback (#42)
+
+**Problem**: The module switcher dropdown in [`TopNav::loadModules()`](src/Http/Livewire/Layouts/Navs/TopNav.php) filtered modules by role only. If role assignment failed during seeding, the super admin would not see the admin/system modules in the switcher, making it impossible to navigate to the admin panel to fix the issue.
+
+**Fix**: Added the same email-based fallback bypass from [`AuthorizationService::isBypassAllowed()`](src/Services/AccessControl/AuthorizationService.php) to [`TopNav::loadModules()`](src/Http/Livewire/Layouts/Navs/TopNav.php). When the authenticated user's email matches `SUPER_ADMIN_EMAIL`, the module role filter is bypassed — the super admin always sees all modules regardless of role state.
+
+**Files**: [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php)
+
+---
+
+### `company_admin` Role Seeded (#43)
+
+**Problem**: The library had no `company_admin` role — only `super_admin`, `admin`, and `user`. Multi-tenant applications needed a company-scoped admin role that could manage users and settings within their own company but not access system-level configuration.
+
+**Fix**:
+1. Added `company_admin` role creation in [`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php) with `view dashboard`, `manage users`, and `manage settings` permissions.
+2. Added `company_admin` to the admin module's `roles` array in [`ui-library.php`](src/Config/ui-library.php) so company admins can access the Administration module.
+3. Added `company_admin` to [`AuthorizationService::ADMIN_ROLES`](src/Services/AccessControl/AuthorizationService.php) and `ADMIN_ROLES_ARRAY` so company admins benefit from the admin bypass in authorization checks.
+4. Added `company.admin@example.com` seed user in [`UserSeeder`](src/Core/Admin/Database/Seeders/UserSeeder.php) with the `company_admin` role.
+
+**Files**: [`RoleSeeder.php`](src/Core/Admin/Database/Seeders/RoleSeeder.php), [`ui-library.php`](src/Config/ui-library.php), [`AuthorizationService.php`](src/Services/AccessControl/AuthorizationService.php), [`UserSeeder.php`](src/Core/Admin/Database/Seeders/UserSeeder.php)
+
+---
+
+### InstallCommand Separate-Process Seeders (#44)
+
+**Problem**: The [`InstallCommand::runSeeders()`](src/Console/Commands/InstallCommand.php) called seeders via `Artisan::call('db:seed', ['--class' => ...])` in the same PHP process. Since the install command modifies the User model source file (injecting `HasRoles` and `HasUILibraryUser` traits) before running seeders, the in-memory class definition was stale — the seeders used the old User model without the traits, causing role assignment to silently fail.
+
+**Fix**: Replaced in-process `Artisan::call()` with separate-process execution via [`Symfony\Component\Process\Process`](src/Console/Commands/InstallCommand.php). Each seeder now runs as `php artisan db:seed --class={FQCN} --force` in its own PHP process, which boots fresh with the updated User model file. The `AccessControlPermissionSeeder` was also added to the seeder list.
+
+**Files**: [`InstallCommand.php`](src/Console/Commands/InstallCommand.php)
+
+---
+
+### Dependencies Seeders Integration (#45)
+
+**Problem**: The library's `dependencies/database/seeders/` directory (containing app-level seeders like `DatabaseSeeder`) was not publishable. Consuming apps had no way to get the standard seeder setup that integrates `AccessControlPermissionSeeder` and the `employee` role.
+
+**Fix**:
+1. Created [`AccessControlPermissionSeeder`](src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php) — a library-level seeder that calls [`AccessControlPermissionService::seedPermissionNames()`](src/Services/AccessControl/AccessControlPermissionService.php) to seed `view_*`, `create_*`, `edit_*`, `delete_*`, `print_*`, `export_*`, `import_*` permissions for all discovered models.
+2. Added `employee` role to [`RoleSeeder`](src/Core/Admin/Database/Seeders/RoleSeeder.php) with `view dashboard` permission.
+3. Added `ui-library-seeders` publishable tag in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php) that publishes `dependencies/database/seeders/` to the app's `database/seeders/` directory.
+
+**Files**: [`AccessControlPermissionSeeder.php`](src/Core/Admin/Database/Seeders/AccessControlPermissionSeeder.php) (new), [`RoleSeeder.php`](src/Core/Admin/Database/Seeders/RoleSeeder.php), [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php)
+
+---
+
+### Permission Seeding Fix — Removed `description` (#46)
+
+**Problem**: [`AccessControlPermissionService::checkPermissionsExistsOrCreate()`](src/Services/AccessControl/AccessControlPermissionService.php) passed a `description` field to `Permission::create()`. The standard Spatie `permissions` table does not have a `description` column, causing a `SQLSTATE[42S22]: Column not found` error during permission seeding.
+
+**Fix**: Removed the `description` key from the `Permission::create()` call. Only `name` and `guard_name` are now passed, matching the standard Spatie schema.
+
+**Files**: [`AccessControlPermissionService.php`](src/Services/AccessControl/AccessControlPermissionService.php)
+
+---
+
+### Breeze Exit Code Fix (#47)
+
+**Problem**: The [`InstallCommand::scaffoldAuth()`](src/Console/Commands/InstallCommand.php) set `$this->hasErrors = true` when Laravel Breeze was not installed. This caused the install command to exit with `FAILURE` even though Breeze not being installed is a normal, expected condition — the library's own auth views work independently.
+
+**Fix**: Removed `$this->hasErrors = true` from the Breeze-not-installed branch. The branch now only emits a warning with instructions for installing Breeze later, and the install command exits with `SUCCESS` as long as no other errors occurred.
+
+**Files**: [`InstallCommand.php`](src/Console/Commands/InstallCommand.php)
 
 ---
 

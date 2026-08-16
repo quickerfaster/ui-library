@@ -5,7 +5,10 @@ namespace QuickerFaster\UILibrary\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Livewire\Livewire;
 use Laravel\Fortify\Fortify;
 use QuickerFaster\UILibrary\Components\Breadcrumbs;
@@ -38,9 +41,6 @@ class UILibraryServiceProvider extends ServiceProvider
 
         $this->app->singleton(ModelConfigRepository::class);
 
-        $this->app->singleton(\QuickerFaster\UILibrary\Contracts\Approvals\ApprovalModelResolver::class,
-            \QuickerFaster\UILibrary\Services\Approvals\ApprovalModelResolver::class);
-
         $this->app->bind(
             \QuickerFaster\UILibrary\Contracts\ActivityLogs\ActivityLogModelResolver::class,
             \QuickerFaster\UILibrary\Services\ActivityLogs\ActivityLogModelResolver::class
@@ -48,14 +48,47 @@ class UILibraryServiceProvider extends ServiceProvider
 
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class);
 
+        // Bind the approval contracts to their default implementations.
+        // Consuming applications can override these by publishing the config
+        // and pointing the keys at their own resolver implementations.
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\Approvals\ApproverResolver::class,
+            config(
+                'ui-library.approvals.approver_resolver',
+                \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverResolver::class
+            )
+        );
+
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\Approvals\ApproverLabelResolver::class,
+            config(
+                'ui-library.approvals.approver_label_resolver',
+                \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverLabelResolver::class
+            )
+        );
+
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Documents\DocumentEngine::class);
 
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Notifications\NotificationService::class, function ($app) {
             $service = new \QuickerFaster\UILibrary\Services\Notifications\NotificationService();
-            $service->registerChannel('database', new \QuickerFaster\UILibrary\Services\Notifications\Channels\DatabaseChannel());
-            $service->registerChannel('mail', new \QuickerFaster\UILibrary\Services\Notifications\Channels\MailChannel());
+
+            foreach (config('ui-library.notifications.channels', []) as $name => $class) {
+                $service->registerChannel($name, new $class());
+            }
+
             return $service;
         });
+
+        // NotificationActionRegistry — singleton so consuming apps can register
+        // handlers in their own service providers.
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Notifications\NotificationActionRegistry::class);
+
+        // TemplateVariableRegistry — config-driven default, overridable by
+        // consuming apps via config('ui-library.notifications.template_variables').
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\Notifications\TemplateVariableRegistry::class,
+            \QuickerFaster\UILibrary\Services\Notifications\DefaultTemplateVariableRegistry::class
+        );
 
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Reports\ReportEngine::class);
 
@@ -101,6 +134,15 @@ class UILibraryServiceProvider extends ServiceProvider
     {
         // Set Core module path in config
         config()->set('ui-library.module_paths.core', __DIR__ . '/../Core');
+
+        // Register the named rate limiter used by the catch-all route.
+        RateLimiter::for('qf-catch-all', function (Request $request) {
+            $maxAttempts = (int) config('ui-library.catch_all.rate_limiting.max_attempts', 60);
+            $decayMinutes = (int) config('ui-library.catch_all.rate_limiting.decay_minutes', 1);
+
+            return Limit::perMinutes($decayMinutes, $maxAttempts)
+                ->by($request->user()?->id ?: $request->ip());
+        });
 
         // Load shared library routes (export, import, print, etc.)
         $sharedRoutesPath = __DIR__ . '/../Routes/web.php';
@@ -241,6 +283,12 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.setup-checklist', \QuickerFaster\UILibrary\Http\Livewire\SetupChecklist::class);
         Livewire::component('qf.wizard-form', \QuickerFaster\UILibrary\Http\Livewire\Wizards\WizardForm::class);
 
+        // Workflows
+        Livewire::component('qf.workflow-definition-wizard', \QuickerFaster\UILibrary\Http\Livewire\Workflows\WorkflowDefinitionWizard::class);
+        // Deprecated: replaced by qf.data-table with configKey="admin.workflow_definition"
+        // Livewire::component('qf.workflow-definition-list', \QuickerFaster\UILibrary\Http\Livewire\Workflows\WorkflowDefinitionList::class);
+        Livewire::component('qf.reviewer-chain-builder', \QuickerFaster\UILibrary\Http\Livewire\Workflows\ReviewerChainBuilder::class);
+
         // Dashboard
         Livewire::component('qf.dashboard', \QuickerFaster\UILibrary\Http\Livewire\Dashboards\Dashboard::class);
 
@@ -279,15 +327,17 @@ class UILibraryServiceProvider extends ServiceProvider
         // Approvals
         Livewire::component('qf.approval-actions', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalActions::class);
         Livewire::component('qf.approval-history-timeline', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalHistoryTimeline::class);
+        Livewire::component('qf.approval-request-list', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalRequestListView::class);
+
+        // Notifications
+        Livewire::component('qf.notifications-index', \QuickerFaster\UILibrary\Http\Livewire\Notifications\NotificationsIndex::class);
+        Livewire::component('qf.notification-preferences', \QuickerFaster\UILibrary\Http\Livewire\Notifications\NotificationPreferences::class);
     }
 
     private function registerCommands(): void
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                \QuickerFaster\UILibrary\Commands\QuickerFasterInstallUI::class,
-                \QuickerFaster\UILibrary\Commands\CleanExports::class,
-                \QuickerFaster\UILibrary\Commands\CleanImportErrors::class,
                 \QuickerFaster\UILibrary\Console\Commands\GenerateScheduledReports::class,
                 \QuickerFaster\UILibrary\Console\Commands\InstallCommand::class,
             ]);
@@ -358,6 +408,8 @@ class UILibraryServiceProvider extends ServiceProvider
             \QuickerFaster\UILibrary\Events\ToggleButtonEvent::class,
             \QuickerFaster\UILibrary\Listeners\ToggleButtonListener::class
         );
+
+        Event::subscribe(\QuickerFaster\UILibrary\Listeners\NotificationEventSubscriber::class);
     }
 
     /**

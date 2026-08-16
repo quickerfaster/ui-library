@@ -10,7 +10,8 @@
     // Pre‑filter moreActions to only those the user can perform
     $visibleMoreActions = [];
     foreach ($moreActions as $index => $action) {
-        if ($authService->canPerformAction($user, $action, $record)) {
+        $permission = is_array($action) ? ($action['action'] ?? $action['permission'] ?? '') : $action;
+        if ($authService->canPerformAction($user, $permission, $record)) {
             $visibleMoreActions[] = ['index' => $index, 'action' => $action];
         }
     }

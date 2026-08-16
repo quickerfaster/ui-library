@@ -9,7 +9,7 @@ interface WorkspaceResolver
      *
      * Returns key-value pairs representing the current workspace context,
      * for example:
-     *   ['company_id' => 1, 'role' => 'payroll_admin', 'department_type' => 'engineering', 'features' => ['departments', 'time']]
+     *   ['company_id' => 1, 'role' => 'finance_admin', 'department_type' => 'engineering', 'features' => ['departments', 'time']]
      *
      * Navigation items can define `workspace` constraints that are matched
      * against this map. Context groups can define `feature` gates that are

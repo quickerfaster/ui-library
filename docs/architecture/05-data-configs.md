@@ -226,6 +226,66 @@ The [`DataTableFormValidationService`](../../src/Services/Validation/DataTableFo
 - **Import Template**: [`TemplateExport`](../../src/Services/Exports/TemplateExport.php) generates Excel templates with [`LookupSheet`](../../src/Services/Exports/LookupSheet.php) (relationship options), [`OptionsReferenceSheet`](../../src/Services/Exports/OptionsReferenceSheet.php) (field options), and [`TemplateDataSheet`](../../src/Services/Exports/TemplateDataSheet.php) (data entry columns)
 - **Import Processing**: [`ImportProcessor`](../../src/Services/Imports/ImportProcessor.php) (singleton) processes uploaded files, maps columns, and creates/updates records
 
+### 5.7 Dashboard Config Schema
+
+Dashboard configs (e.g., `app/Modules/{Module}/Data/Dashboards/{Name}.php`) drive the [`qf.dashboard`](../../src/Http/Livewire/Dashboards/Dashboard.php) Livewire component via [`DashboardResolver`](../../src/Services/Config/Dashboards/DashboardResolver.php). In addition to `title`, `description`, `layout`, and `widgets`, the resolver now exposes two optional visual sections:
+
+```php
+return [
+    'title'       => 'People Overview',
+    'description' => 'Workforce snapshot across the organization.',
+
+    // Optional hero banner (title/description/icon)
+    'hero' => [
+        'title'       => 'Welcome back',
+        'description' => 'Here is today\'s workforce summary.',
+        'icon'        => 'fas fa-chart-pie',
+    ],
+
+    // Optional gradient stat row
+    'stats' => [
+        [
+            'label' => 'Active Employees',
+            'value' => 1284,
+            'icon'  => 'fas fa-users',
+            'color' => 'primary',
+        ],
+        [
+            'label' => 'Open Positions',
+            'value' => 32,
+            'icon'  => 'fas fa-briefcase',
+            'color' => 'info',
+        ],
+    ],
+
+    // Widget grid
+    'layout'  => ['columns' => 12, 'gutter' => 3],
+    'widgets' => [
+        [
+            'type'  => 'stat',
+            'title' => 'Headcount',
+            'color' => 'success',   // Optional per-widget color
+            // ... widget-specific config
+        ],
+        [
+            'type'  => 'chart',
+            'title' => 'Headcount Trend',
+            'color' => 'primary',
+            // ... widget-specific config
+        ],
+    ],
+];
+```
+
+**Key additions**:
+
+- **`hero`** — optional banner rendered at the top of the dashboard; resolved via [`DashboardResolver::getHero()`](../../src/Services/Config/Dashboards/DashboardResolver.php) and passed to the dashboard view by [`Dashboard.php`](../../src/Http/Livewire/Dashboards/Dashboard.php).
+- **`stats`** — optional gradient stat row; resolved via [`DashboardResolver::getStats()`](../../src/Services/Config/Dashboards/DashboardResolver.php).
+- **Per-widget `color`** — an optional key threaded through all 11 widget processors in [`src/Widgets/`](../../src/Widgets/) that controls accent color (icon shape, gradients, etc.).
+- **Reusable card partial** — [`widgets/partials/card.blade.php`](../../src/Resources/views/widgets/partials/card.blade.php) wraps widget output in a polished card (header icon/title/description/actions, optional hover lift).
+
+> The `qf.dashboard` component also accepts `$customWidgets` and `$parameters` mount arguments, which can supply `hero` and `stats` inline (overriding the config file).
+
 ---
 
 **Related files**: [`00-index.md`](./00-index.md) · [`03-module-pattern.md`](./03-module-pattern.md) · [`07-component-catalog.md`](./07-component-catalog.md) · [`10-settings-and-config.md`](./10-settings-and-config.md) · [`17-view-config-routing-interplay.md`](./17-view-config-routing-interplay.md)

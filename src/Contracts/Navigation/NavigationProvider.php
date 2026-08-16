@@ -7,7 +7,7 @@ interface NavigationProvider
     /**
      * Get navigation items for a given context within a module.
      *
-     * @param string $module Module key (e.g., 'admin', 'hr')
+     * @param string $module Module key (e.g., 'admin', 'inventory')
      * @param string|null $context Context key (e.g., 'users', 'reports')
      * @return array Array of navigation item definitions
      */

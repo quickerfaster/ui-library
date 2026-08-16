@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-14
+> **Last Updated**: 2026-08-15
 
 **Related files**: [`00-index.md`](./00-index.md) · [`05-data-configs.md`](./05-data-configs.md) · [`06-navigation-system.md`](./06-navigation-system.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`09-engines-and-services.md`](./09-engines-and-services.md) · [`11-extension-guide.md`](./11-extension-guide.md)
 
@@ -159,6 +159,9 @@ These are registered conditionally in [`UILibraryServiceProvider`](../../src/Pro
 | ValueGenerator | [`src/Services/ValueGenerator.php`](../../src/Services/ValueGenerator.php) | Auto-generates field values from patterns |
 | ApplicationInfo | [`src/Services/System/ApplicationInfo.php`](../../src/Services/System/ApplicationInfo.php) | Application metadata |
 | AccessControlPermissionService | [`src/Services/AccessControl/AccessControlPermissionService.php`](../../src/Services/AccessControl/AccessControlPermissionService.php) | Permission CRUD operations |
+| **AuthorizationService** | [`src/Services/AccessControl/AuthorizationService.php`](../../src/Services/AccessControl/AuthorizationService.php:8) | Central authorization gate. `isBypassAllowed()` grants super admin / admin / `company_admin` bypass via Spatie roles, with an email fallback (`SUPER_ADMIN_EMAIL`) to protect against seed failures. `canAccessView()`, `authorizeView()`, `authorizeCreate()`, `authorizeUpdate()` (with self-edit bypass). Exposes `ADMIN_ROLES`, `ADMIN_ROLES_ARRAY`, `COMPANY_ADMIN_ROLES_ARRAY` constants. |
+| **DefaultAuthorizationProvider** | [`src/Services/DataTables/DefaultAuthorizationProvider.php`](../../src/Services/DataTables/DefaultAuthorizationProvider.php:19) | Default [`DataTableAuthorizationProvider`](../../src/Contracts/DataTables/DataTableAuthorizationProvider.php) implementation. All 15 permission methods delegate to [`AuthorizationService::isBypassAllowed()`](../../src/Services/AccessControl/AuthorizationService.php) first, then fall back to Spatie `can()` checks (`view_*`, `create_*`, `edit_*`, `delete_*`, `print_*`, `export_*`, `import_*`, `restore_*`, `force_delete_*`, plus bulk variants). |
+| **ActivityLogModelResolver** | [`src/Services/ActivityLogs/ActivityLogModelResolver.php`](../../src/Services/ActivityLogs/ActivityLogModelResolver.php:7) | Default [`ActivityLogModelResolver`](../../src/Contracts/ActivityLogs/ActivityLogModelResolver.php) contract implementation — resolves the ActivityLog model FQCN from `config('ui-library.activity_logs.model')`, returning `null` when unconfigured. |
 | BankFileGeneratorFactory | [`src/Services/BankFiles/BankFileGeneratorFactory.php`](../../src/Services/BankFiles/BankFileGeneratorFactory.php) | Factory for BACS/NACHA/NIBSS/SEPA generators |
 | **NotificationService** | [`src/Services/Notifications/NotificationService.php`](../../src/Services/Notifications/NotificationService.php) | **NEW** — Polymorphic notification dispatch engine. API: `dispatch()`, `getUnread()`, `registerChannel()`, `resolveTemplate()`. Supports `{placeholder}` replacement in templates. |
 | **DatabaseChannel** | [`src/Services/Notifications/Channels/DatabaseChannel.php`](../../src/Services/Notifications/Channels/DatabaseChannel.php) | **NEW** — In-app notification channel (no-op; notifications already persisted by NotificationService) |
