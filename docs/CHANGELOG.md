@@ -1,12 +1,135 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-08-15
-> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23)
+> **Date**: 2026-08-17
+> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23) + Module Auto-Discovery + Tenancy Foundation + DataTable Record Events + HasWorkflow Trait + Resolver Config Bindings
 
 ---
 
 > ⚠️ **Testing status (2026-08-16)**: The workflow/approval foundation has been implemented and unit-verified (`php -l`, config validation), but has **NOT** yet been tested end-to-end in a consuming app. Further adjustments may be needed once integrated into a real consuming app (e.g., Spatie role/permission seeding, notification template registration, workspace-scoped approver resolution, and runtime workflow execution against real entities).
+
+## [Organization Domain — 2026-08-17]
+
+### Added
+- `src/Core/Organization/` — domain-agnostic organizational structure (Company, Department, Location, Branch, Team, BusinessUnit, Division)
+- Models with generic columns: `state_code`, `country_code`, `currency_code`, `parent_department_id`
+- 7 migrations (`2026_06_11_000003`–`2026_06_11_000009`) for companies, branches, departments, divisions, business_units, locations, teams
+- Data configs (form, table, detail) for each entity; dashboards: companies_overview, locations_overview, structure_overview
+- `OrganizationSeeder` with demo data
+- Library web routes under `/organization/*`
+
+### Changed
+- Company model: `state`→`state_code`, `country`→`country_code` (consistent with Branch/Location naming)
+- Dashboard role configs: `hr_admin`→`organization_manager` (domain-neutral)
+
+### Fixed
+- Removed duplicate Organization migrations from HR consuming app's `database/migrations/` (now loaded exclusively from package via `UILibraryServiceProvider::loadMigrationsFrom()`)
+- Extended `scripts/check-domain-independence.sh` DOMAIN_TERMS to catch role-name leakage (`hr_admin|hr_manager|hr_staff|hr_supervisor`)
+
+### Verification (all passing)
+- `composer dump-autoload`: 10,398 classes
+- `php artisan route:list`: 140 routes
+- `php artisan migrate --pretend`: clean, no duplicate table errors
+- `php artisan ui-library:discover`: hr module discovered (1 module, 3 listeners, 1 workflow, 364 permissions)
+- `bash scripts/check-domain-independence.sh`: all 3 checks pass
+
+---
+
+## 2026-08-17 — Module Auto-Discovery System
+
+A convention-based auto-discovery system scans `app/Modules/*` and registers business-module assets without manual service-provider wiring. The [`DiscoveryRegistrar`](src/Services/Discovery/DiscoveryRegistrar.php) is the central coordinator; [`ModuleServiceProvider`](src/Providers/ModuleServiceProvider.php) drives registration during boot, and `php artisan ui-library:discover` renders a debuggable summary.
+
+### Listeners
+- Scans `app/Modules/{Module}/Listeners/*.php` via reflection on `handle()` method signatures.
+- Fixed case-sensitivity in listener class resolution.
+- One-to-many event→listener map (a single event can have multiple listeners).
+- Content-hash cache keys (file paths + mtimes) with finite TTL — self-invalidates on deploy.
+
+### Reports
+- Scans business modules for classes implementing [`Reportable`](src/Contracts/Reports/Reportable.php).
+- Resolves the report-type key from the new `#[ReportType('key')]` attribute, falling back to `const REPORT_TYPE` and finally `getReportType()`.
+- Auto-registers discovered reports into `ui-library.reports.report_types`.
+
+### Workflows
+- Merges `app/Modules/{Module}/Config/workflows.php` into `ui-library.workflows.definitions` via deep-merge.
+
+### Permissions
+- Auto-generates CRUD permission names from discovered models (`view_{entity}`, `create_{entity}`, `edit_{entity}`, `delete_{entity}`).
+- `app/Modules/{Module}/Config/permissions.php` can override or extend the auto-generated names.
+
+### Notifications
+- Reads `app/Modules/{Module}/Data/notifications.php` for notification templates and channel configuration.
+
+### Opt-outs
+- Global toggles: `ui-library.discovery.listeners`, `ui-library.discovery.reports`, `ui-library.discovery.workflows`.
+- Per-module opt-outs: `ui-library.modules.{module}.auto_register_listeners`, `auto_register_reports`, `auto_register_workflows`, `auto_register_permissions`, `auto_register_notifications`.
+- Cache TTL: `ui-library.discovery.cache_ttl` (default 86400s).
+
+### New command
+- `php artisan ui-library:discover` — dumps all discovered modules, listeners, reports, workflows, configs, permissions, and notifications.
+
+**Files created**: [`DiscoveryRegistrar.php`](src/Services/Discovery/DiscoveryRegistrar.php), [`ReportType.php`](src/Attributes/ReportType.php), [`DiscoverCommand.php`](src/Console/Commands/DiscoverCommand.php)
+**Files modified**: [`ui-library.php`](src/Config/ui-library.php) (new `discovery` section), [`ModuleServiceProvider.php`](src/Providers/ModuleServiceProvider.php)
+
+---
+
+## 2026-08-17 — Tenancy / Multi-Tenancy Foundation
+
+Added a domain-agnostic tenancy foundation using "company" as the tenant term (consistent with the existing `CompanyProvider`, company switcher, and `company_id` convention).
+
+- **New global scope**: [`CompanyScope`](src/Scopes/CompanyScope.php) — automatically filters Eloquent queries by the tenant column when a current company ID is present in the session.
+- **New trait**: [`HasCompanyScope`](src/Traits/HasCompanyScope.php) — apply to any Eloquent model to auto-register the `CompanyScope`. Provides `withoutCompanyScope()` for bypass queries.
+- **New middleware**: [`ResolveCompanyContext`](src/Http/Middleware/ResolveCompanyContext.php) (alias `qf.resolve-company-context`) — resolves the current company at request start and persists it to the session, so the scope works reliably on both web and API routes.
+- **Config**: `ui-library.tenancy.column` (default `company_id`) and `ui-library.tenancy.session_key` (default `current_company_id`).
+
+**Files created**: [`CompanyScope.php`](src/Scopes/CompanyScope.php), [`HasCompanyScope.php`](src/Traits/HasCompanyScope.php), [`ResolveCompanyContext.php`](src/Http/Middleware/ResolveCompanyContext.php)
+**Files modified**: [`ui-library.php`](src/Config/ui-library.php) (new `tenancy` section)
+
+---
+
+## 2026-08-17 — DataTable Record Events
+
+New event/listener infrastructure for hooking into DataTable record lifecycle changes without modifying the library's DataTable or DataTableForm components.
+
+- **New event**: [`DataTableRecordSaved`](src/Events/DataTableRecordSaved.php) — dispatched from [`DataTableForm`](src/Http/Livewire/DataTables/DataTableForm.php) and [`DataTable`](src/Http/Livewire/DataTables/DataTable.php). Payload: `$oldRecord`, `$newRecord`, `$model` (FQCN), `$action` (one of `created`/`updated`/`deleted`/`restored`), and optional `$component`.
+- **New abstract listener**: [`DataTableRecordListener`](src/Listeners/DataTableRecordListener.php) — base class with `handleCreated()`, `handleUpdated()`, `handleDeleted()`, `handleRestored()` hooks. Subclasses override the relevant hook and filter by model/status in their own domain logic.
+
+**Files created**: [`DataTableRecordSaved.php`](src/Events/DataTableRecordSaved.php), [`DataTableRecordListener.php`](src/Listeners/DataTableRecordListener.php)
+**Files modified**: [`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php), [`DataTable.php`](src/Http/Livewire/DataTables/DataTable.php)
+
+---
+
+## 2026-08-17 — Workflow Convenience: `HasWorkflow` Trait
+
+- **New trait**: [`HasWorkflow`](src/Traits/Workflows/HasWorkflow.php) — provides convenience methods on any model implementing [`Workflowable`](src/Contracts/Workflow/Workflowable.php):
+  - `workflow()` — returns the latest [`Workflow`](src/Models/Workflow.php) for the model.
+  - `workflows()` — returns all workflows (morphMany).
+  - `activeWorkflow()` — returns the currently active (non-terminal) workflow.
+  - `isUnderApproval()` — boolean check for pending/in_progress workflows.
+  - `getWorkflowableId()` — returns the polymorphic identifier.
+- The [`Workflowable`](src/Contracts/Workflow/Workflowable.php) contract remains the participation point; `HasWorkflow` is an optional convenience layer.
+
+**Files created**: [`HasWorkflow.php`](src/Traits/Workflows/HasWorkflow.php)
+
+---
+
+## 2026-08-17 — Resolver Config Bindings
+
+- **New config key**: `ui-library.navigation.workspace_resolver` — binds the [`WorkspaceResolver`](src/Contracts/Navigation/WorkspaceResolver.php) contract. Defaults to [`NullWorkspaceResolver`](src/Services/Navigation/NullWorkspaceResolver.php) (empty context, no filtering). Consuming apps publish and point to their own implementation.
+- **Existing keys documented**: `ui-library.navigation.company_provider` (default [`DefaultCompanyProvider`](src/Services/Navigation/DefaultCompanyProvider.php)), `ui-library.approvals.approver_resolver`, `ui-library.approvals.approver_label_resolver`.
+
+**Files modified**: [`ui-library.php`](src/Config/ui-library.php)
+
+---
+
+## 2026-08-17 — Bug Fixes
+
+- **Recursive `{id}` placeholder resolution**: DataTable params with nested `{id}` references (e.g., `{parent_id}` resolving to a record that itself contains `{id}`) now resolve correctly through recursive expansion.
+- **Config parity in export/import jobs**: The `session_key` and `column` config keys are now consistently read from `ui-library.tenancy` in both export and import job classes, fixing a mismatch where one path used a hardcoded fallback.
+
+**Files modified**: [`DataTable.php`](src/Http/Livewire/DataTables/DataTable.php), export/import job classes
+
+---
 
 ## 2026-08-16 — Catch-All Route Security Hardening
 
@@ -91,7 +214,7 @@ Added a config-driven analytics/summary dashboard for the Workflows context grou
 
 ## 2026-08-16 — Notification Consuming-App Guide
 
-Created [`19-notification-consuming-app-guide.md`](docs/architecture/19-notification-consuming-app-guide.md), a comprehensive guide documenting the four consuming-app concerns the notification engine deliberately leaves to the application:
+Created [`19-notification-consuming-app-guide.md`](consuming-app/19-notification-consuming-app-guide.md), a comprehensive guide documenting the four consuming-app concerns the notification engine deliberately leaves to the application:
 
 - **🟢 Throttling & Scheduling** — `dispatchAsync()` + `SendNotification` (`ShouldQueue`) as the async primitive; consuming-app examples for `Redis::throttle`, queue worker `--max-jobs`/`--rate`, `delay()`, and scheduled commands.
 - **🟢 Audience Segmentation** — `dispatch(Notifiable $notifiable, ...)` per-recipient; consuming-app examples for querying target audiences, looping, and chunking large lists.
@@ -101,8 +224,8 @@ Created [`19-notification-consuming-app-guide.md`](docs/architecture/19-notifica
 
 The guide also flags two library seams: `dispatch()` does not yet accept an `$actions` argument, and `renderTemplate()` is `protected` (not public API for previews).
 
-**Files created**: [`19-notification-consuming-app-guide.md`](docs/architecture/19-notification-consuming-app-guide.md)
-**Files modified**: [`18-workflow-approval-testing-checklist.md`](docs/architecture/18-workflow-approval-testing-checklist.md) (added cross-reference in §3.4)
+**Files created**: [`19-notification-consuming-app-guide.md`](consuming-app/19-notification-consuming-app-guide.md)
+**Files modified**: [`18-workflow-approval-testing-checklist.md`](consuming-app/18-workflow-approval-testing-checklist.md) (added cross-reference in §3.4)
 
 ---
 
@@ -173,7 +296,7 @@ Nine discrepancies found during the Step 5 (Summary + Plug-In Usage) code walkth
 
 **Files changed**: [`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php), [`Workflowable.php`](src/Contracts/Workflow/Workflowable.php), [`WorkflowDefinition.php`](src/Models/WorkflowDefinition.php), [`WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php), [`WorkflowDefinitionList.php`](src/Http/Livewire/Workflows/WorkflowDefinitionList.php), [`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php), [`navigation.php`](src/Core/Admin/Config/navigation.php), and three Blade views.
 
-**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](library/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](project/23-workflow-approval-implementation-plan.md)
 
 ---
 
@@ -196,7 +319,7 @@ Eight discrepancies found during the Step 3 (Add Reviewers) code walkthrough wer
 
 **Files changed**: [`WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php), [`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php), [`WorkflowDefinition.php`](src/Models/WorkflowDefinition.php), [`WorkflowDefinitionStep.php`](src/Models/WorkflowDefinitionStep.php), [`ReviewerChainBuilder.php`](src/Http/Livewire/Workflows/ReviewerChainBuilder.php), [`WorkflowApproved.php`](src/Events/Workflows/WorkflowApproved.php), new migration, and two Blade views.
 
-**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](library/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](project/23-workflow-approval-implementation-plan.md)
 
 ---
 
@@ -216,7 +339,7 @@ Seven discrepancies found during the Step 4 (Add Authorizers) code walkthrough w
 
 **Files changed**: [`WorkflowEngine.php`](src/Services/Workflow/WorkflowEngine.php), [`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php), [`WorkflowDefinitionStep.php`](src/Models/WorkflowDefinitionStep.php), [`WorkflowStep.php`](src/Models/WorkflowStep.php)
 
-**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](library/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](project/23-workflow-approval-implementation-plan.md)
 
 ---
 
@@ -237,7 +360,7 @@ Eight bugs discovered during a code-grounded walkthrough of the Workflow Definit
 - **`normalizeAssignees()` self-describing classification** ([`WorkflowDefinitionWizard::normalizeAssignees()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php)): Now classifies by id type (int = user, string = role) independent of the stored `mode` field, which is derived/informational.
 - **Mode toggle synced on reload** ([`WorkflowDefinitionWizard::loadDefinition()`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php)): `initiatorMode`/`authorizerMode` are now synced from `detectMode()` after loading a saved definition, ensuring the UI toggle matches the items.
 
-**Docs updated**: [`22-workflow-definition-wizard-ux.md`](docs/architecture/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](docs/architecture/23-workflow-approval-implementation-plan.md)
+**Docs updated**: [`22-workflow-definition-wizard-ux.md`](library/22-workflow-definition-wizard-ux.md), [`23-workflow-approval-implementation-plan.md`](project/23-workflow-approval-implementation-plan.md)
 
 ## 2026-08-14 — Access Control & Navigation UX Polish
 
@@ -274,17 +397,17 @@ The per-action bulk ON/OFF buttons were consolidated from **14 buttons into 7 Bo
 - CSS rotation via `.collapse-chevron-trigger[aria-expanded="true"] .collapse-chevron` in [`quicker-faster.css`](public/assets/css/quicker-faster.css).
 - Fixed the missing stylesheet link: [`quicker-faster.css`](public/assets/css/quicker-faster.css) is now linked in [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php).
 
-**Docs updated**: [`sidebar-filter.md`](docs/components/sidebar-filter.md), [`06-navigation-system.md`](docs/architecture/06-navigation-system.md), [`07-component-catalog.md`](docs/architecture/07-component-catalog.md), [`implementation-plan.md`](docs/implementation-plan.md).
+**Docs updated**: [`sidebar-filter.md`](docs/components/sidebar-filter.md), [`06-navigation-system.md`](library/06-navigation-system.md), [`07-component-catalog.md`](library/07-component-catalog.md), [`implementation-plan.md`](project/implementation-plan.md).
 
 ---
 
 ## 2026-08-14 — Architecture Blueprint Split (17 Topic Files)
 
-The monolithic [`ai-optimized-architecture-blueprint.md`](docs/ai-optimized-architecture-blueprint.md) (~3,000 lines) was split into **17 topic files** under [`docs/architecture/`](docs/architecture/00-index.md) (`01-` through `17-*`), each focused on a single architectural concern. The original blueprint is marked **SUPERSEDED** and retained as historical reference only.
+The monolithic [`ai-optimized-architecture-blueprint.md`](project/ai-optimized-architecture-blueprint.md) (~3,000 lines) was split into **17 topic files** under [`docs/architecture/`](README.md) (`01-` through `17-*`), each focused on a single architectural concern. The original blueprint is marked **SUPERSEDED** and retained as historical reference only.
 
-- **Authoritative index**: [`00-index.md`](docs/architecture/00-index.md) now maps all 17 topic files plus `phase-5-navigation-ux.md`, with cross-references and reading orders by role.
+- **Authoritative index**: [`00-index.md`](README.md) now maps all 17 topic files plus `phase-5-navigation-ux.md`, with cross-references and reading orders by role.
 - **Status**: All 17 topic files are `✅ EXISTS`; no `⏸️ DEFERRED` topic files remain.
-- **Blueprint**: [`ai-optimized-architecture-blueprint.md`](docs/ai-optimized-architecture-blueprint.md) is marked `⚠️ SUPERSEDED`.
+- **Blueprint**: [`ai-optimized-architecture-blueprint.md`](project/ai-optimized-architecture-blueprint.md) is marked `⚠️ SUPERSEDED`.
 
 ---
 
@@ -292,7 +415,7 @@ The monolithic [`ai-optimized-architecture-blueprint.md`](docs/ai-optimized-arch
 
 ### Standalone Library: Zero Executable `App\Modules\*` References
 
-The library is now fully standalone — no executable `App\Modules\*` references remain. All previously documented hardcoded imports in [`implementation-plan.md` §11](docs/implementation-plan.md) have been resolved or confirmed already decoupled.
+The library is now fully standalone — no executable `App\Modules\*` references remain. All previously documented hardcoded imports in [`implementation-plan.md` §11](project/implementation-plan.md) have been resolved or confirmed already decoupled.
 
 - **WizardForm import swap**: [`WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php) now imports [`QuickerFaster\UILibrary\Services\ActivityLogger`](src/Services/ActivityLogger.php) instead of `App\Modules\Admin\Services\ActivityLogger`.
 - **ActivityLogWidgetProcessor decoupling**: new [`ActivityLogs\ActivityLogModelResolver`](src/Contracts/ActivityLogs/ActivityLogModelResolver.php) contract with `resolveModel(): ?string`, plus a default [`ActivityLogModelResolver`](src/Services/ActivityLogs/ActivityLogModelResolver.php) returning `config('ui-library.activity_logs.model')`.
@@ -323,7 +446,7 @@ Real-time client-side fuzzy search (word-based, case-insensitive, 150ms debounce
 ### Vanilla JS Architecture
 All client-side interactivity uses vanilla JS (IIFE in [`quicker-faster.js`](public/assets/js/quicker-faster.js)) via `data-*` attributes and `Livewire.dispatch()`. No Alpine.js `x-data` directives were introduced.
 
-**Docs**: [`phase-5-navigation-ux.md`](docs/architecture/phase-5-navigation-ux.md), [`workspace-tabs.md`](docs/components/workspace-tabs.md), [`breadcrumbs.md`](docs/components/breadcrumbs.md), [`sidebar-filter.md`](docs/components/sidebar-filter.md)
+**Docs**: [`phase-5-navigation-ux.md`](library/phase-5-navigation-ux.md), [`workspace-tabs.md`](docs/components/workspace-tabs.md), [`breadcrumbs.md`](docs/components/breadcrumbs.md), [`sidebar-filter.md`](docs/components/sidebar-filter.md)
 
 ---
 
@@ -439,7 +562,7 @@ All client-side interactivity uses vanilla JS (IIFE in [`quicker-faster.js`](pub
 
 **Fix**: Two new config keys: `show_all_contexts` and `hide_topnav_contexts`. When enabled, every context group becomes a Bootstrap dropdown trigger showing its items + Phase 1 overflow.
 
-**Files**: 8 modified + 1 new doc — see [`docs/navigation-cross-context-dropdowns.md`](docs/navigation-cross-context-dropdowns.md)
+**Files**: 8 modified + 1 new doc — see [`docs/navigation-cross-context-dropdowns.md`](project/navigation-cross-context-dropdowns.md)
 
 ---
 
@@ -470,7 +593,7 @@ Extended [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php
 **Files**: [`ModelConfigRepository.php`](src/Services/Config/ModelConfigRepository.php)
 
 #### HR Decoupling Audit (#12)
-Comprehensive `grep` audit across entire `src/` directory. All `App\Modules\Hr\*` and `App\Modules\Admin\*` references removed or abstracted behind contracts. HR-specific Livewire components deleted. 30+ files reviewed/modified. 7 remaining hardcoded imports documented in [`implementation-plan.md` §11](docs/implementation-plan.md).
+Comprehensive `grep` audit across entire `src/` directory. All `App\Modules\Hr\*` and `App\Modules\Admin\*` references removed or abstracted behind contracts. HR-specific Livewire components deleted. 30+ files reviewed/modified. 7 remaining hardcoded imports documented in [`implementation-plan.md` §11](project/implementation-plan.md).
 
 ---
 
@@ -496,10 +619,10 @@ Created 16 new Data config files for overview/dashboard pages. Updated Admin, Sy
 Added 5 missing config keys to navigation config stubs: `max_visible_items`, `promote_active_item`, `show_all_contexts`, `hide_topnav_contexts`, `breadcrumb.enabled`.
 
 #### Docs Updated
-- [`docs/implementation-plan.md`](docs/implementation-plan.md) — Added §0 "Completed Work Summary" with all 14 categories; updated statuses
-- [`docs/navigation-workspace-architecture.md`](docs/navigation-workspace-architecture.md) — Added §7 "Changelog"; updated date and status
-- [`docs/navigation-cross-context-dropdowns.md`](docs/navigation-cross-context-dropdowns.md) — Updated to reflect both Phase 1 and Phase 2 completion; added §8 "Changelog"
-- [`docs/architecture-discrepancy-analysis.md`](docs/architecture-discrepancy-analysis.md) — All 3 gap categories marked resolved; §8 recommendations updated with completion notes
+- [`docs/implementation-plan.md`](project/implementation-plan.md) — Added §0 "Completed Work Summary" with all 14 categories; updated statuses
+- [`docs/navigation-workspace-architecture.md`](project/navigation-workspace-architecture.md) — Added §7 "Changelog"; updated date and status
+- [`docs/navigation-cross-context-dropdowns.md`](project/navigation-cross-context-dropdowns.md) — Updated to reflect both Phase 1 and Phase 2 completion; added §8 "Changelog"
+- [`docs/architecture-discrepancy-analysis.md`](project/architecture-discrepancy-analysis.md) — All 3 gap categories marked resolved; §8 recommendations updated with completion notes
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — This file (new)
 
 ---
