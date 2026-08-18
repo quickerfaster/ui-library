@@ -279,7 +279,7 @@ return [
         'bottom_bar' => [
             'enabled' => true,
         ],
-        'company_provider' => \QuickerFaster\UILibrary\Services\Navigation\DefaultCompanyProvider::class,
+        'company_provider' => \QuickerFaster\UILibrary\Services\Navigation\NullCompanyProvider::class,
         'show_company_switcher' => true,
 
         /*
