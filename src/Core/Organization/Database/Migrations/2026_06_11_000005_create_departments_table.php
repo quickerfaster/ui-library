@@ -8,22 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('branches')) {
-            Schema::create('branches', function (Blueprint $table) {
+        if (!Schema::hasTable('departments')) {
+            Schema::create('departments', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('company_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('branch_id')->nullable()->constrained()->nullOnDelete();
+                $table->foreignId('parent_department_id')->nullable()->constrained('departments')->nullOnDelete();
                 $table->string('name');
                 $table->string('code', 50)->nullable();
-                $table->text('address')->nullable();
-                $table->string('city', 100)->nullable();
-                $table->string('state', 100)->nullable();
-                $table->string('country', 100)->nullable();
-                $table->string('postal_code', 20)->nullable();
-                $table->string('phone', 50)->nullable();
-                $table->string('email', 255)->nullable();
-                $table->boolean('is_headquarters')->default(false);
+                $table->text('description')->nullable();
+                $table->unsignedBigInteger('manager_id')->nullable();
                 $table->boolean('is_active')->default(true);
                 $table->json('metadata')->nullable();
+                $table->string('cost_center')->nullable();
                 $table->timestamps();
                 $table->softDeletes();
             });
@@ -32,6 +29,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('branches');
+        Schema::dropIfExists('departments');
     }
 };

@@ -116,7 +116,7 @@ return [
             'label' => 'Registration Number',
             'validation' => 'nullable|string|max:100',
         ],
-        'currency' => [
+        'currency_code' => [
             'display' => 'inline',
             'fillable' => true,
             'field_type' => 'select',
@@ -295,7 +295,7 @@ return [
             'type' => 'text',
             'validation' => ['nullable', 'string', 'max:100'],
         ],
-        'currency' => [
+        'currency_code' => [
             'label' => 'Currency',
             'type' => 'select',
             'validation' => ['nullable', 'string', 'max:3'],
@@ -342,7 +342,7 @@ return [
     ],
 
     'detail' => [
-        'fields' => ['id', 'name', 'code', 'email', 'phone', 'website', 'address', 'city', 'state', 'country', 'postal_code', 'tax_id', 'registration_number', 'currency', 'timezone', 'date_format', 'is_active', 'created_at', 'updated_at'],
+        'fields' => ['id', 'name', 'code', 'email', 'phone', 'website', 'address', 'city', 'state_code', 'country_code', 'postal_code', 'tax_id', 'registration_number', 'currency_code', 'timezone', 'date_format', 'is_active', 'created_at', 'updated_at'],
     ],
 
     'default_sort' => [

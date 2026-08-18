@@ -14,13 +14,14 @@ class Department extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-        'parent_id',
+        'parent_department_id',
         'name',
         'code',
         'description',
         'manager_id',
         'is_active',
         'metadata',
+        'cost_center',
     ];
 
     protected $casts = [
@@ -44,12 +45,12 @@ class Department extends Model
 
     public function parent(): BelongsTo
     {
-        return $this->belongsTo(Department::class, 'parent_id');
+        return $this->belongsTo(Department::class, 'parent_department_id');
     }
 
     public function children(): HasMany
     {
-        return $this->hasMany(Department::class, 'parent_id');
+        return $this->hasMany(Department::class, 'parent_department_id');
     }
 
     public function divisions(): HasMany

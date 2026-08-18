@@ -50,7 +50,7 @@ return array (
       'title' => 'Locations by Country',
       'size' => 'col-12',
       'model' => 'QuickerFaster\\UILibrary\\Core\\Organization\\Models\\Location',
-      'group_by' => 'country',
+      'group_by' => 'country_code',
       'chart_type' => 'bar',
       'description' => 'Active locations per country',
       'aggregate' => 'count',
@@ -118,7 +118,7 @@ return array (
         2 =>
         array (
           'label' => 'Country',
-          'field' => 'country',
+          'field' => 'country_code',
         ),
         3 =>
         array (
@@ -216,7 +216,7 @@ return array (
   array (
     'admin' => 'full',
     'super_admin' => 'full',
-    'hr_admin' => 'limited',
+    'organization_manager' => 'limited',
   ),
   'layout' =>
   array (

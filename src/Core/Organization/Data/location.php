@@ -69,14 +69,14 @@ return [
             'filterable' => true,
             'searchable' => true,
         ],
-        'state' => [
+        'state_code' => [
             'display' => 'inline',
             'fillable' => true,
             'field_type' => 'string',
             'label' => 'State',
             'validation' => 'nullable|string|max:100',
         ],
-        'country' => [
+        'country_code' => [
             'display' => 'inline',
             'fillable' => true,
             'field_type' => 'string',
@@ -192,9 +192,9 @@ return [
             'type' => 'text',
             'visible' => true,
         ],
-        'country' => [
+        'country_code' => [
             'label' => 'Country',
-            'field' => 'country',
+            'field' => 'country_code',
             'sortable' => true,
             'type' => 'text',
             'visible' => true,
@@ -254,12 +254,12 @@ return [
             'type' => 'text',
             'validation' => ['nullable', 'string', 'max:100'],
         ],
-        'state' => [
+        'state_code' => [
             'label' => 'State',
             'type' => 'text',
             'validation' => ['nullable', 'string', 'max:100'],
         ],
-        'country' => [
+        'country_code' => [
             'label' => 'Country',
             'type' => 'text',
             'validation' => ['nullable', 'string', 'max:100'],
@@ -325,7 +325,7 @@ return [
     ],
 
     'detail' => [
-        'fields' => ['id', 'company_id', 'name', 'code', 'type', 'address', 'city', 'state', 'country', 'postal_code', 'phone', 'email', 'timezone', 'is_headquarters', 'is_active', 'created_at', 'updated_at'],
+        'fields' => ['id', 'company_id', 'name', 'code', 'type', 'address', 'city', 'state_code', 'country_code', 'postal_code', 'phone', 'email', 'timezone', 'is_headquarters', 'is_active', 'created_at', 'updated_at'],
     ],
 
     'default_sort' => [

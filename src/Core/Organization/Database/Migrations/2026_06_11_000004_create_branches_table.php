@@ -8,23 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('locations')) {
-            Schema::create('locations', function (Blueprint $table) {
+        if (!Schema::hasTable('branches')) {
+            Schema::create('branches', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('company_id')->constrained()->cascadeOnDelete();
                 $table->string('name');
                 $table->string('code', 50)->nullable();
-                $table->string('type', 50)->default('office');
                 $table->text('address')->nullable();
                 $table->string('city', 100)->nullable();
-                $table->string('state', 100)->nullable();
-                $table->string('country', 100)->nullable();
+                $table->string('state_code', 100)->nullable();
+                $table->string('country_code', 100)->nullable();
                 $table->string('postal_code', 20)->nullable();
-                $table->decimal('latitude', 10, 7)->nullable();
-                $table->decimal('longitude', 10, 7)->nullable();
                 $table->string('phone', 50)->nullable();
                 $table->string('email', 255)->nullable();
-                $table->string('timezone', 50)->nullable();
                 $table->boolean('is_headquarters')->default(false);
                 $table->boolean('is_active')->default(true);
                 $table->json('metadata')->nullable();
@@ -36,6 +32,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('locations');
+        Schema::dropIfExists('branches');
     }
 };

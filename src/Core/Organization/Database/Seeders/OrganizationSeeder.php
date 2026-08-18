@@ -21,7 +21,7 @@ class OrganizationSeeder extends Seeder
             'name' => 'Demo Company',
             'code' => 'DEMO',
             'email' => 'info@demo.com',
-            'currency' => 'USD',
+            'currency_code' => 'USD',
             'timezone' => 'UTC',
         ]);
 

@@ -17,8 +17,6 @@ class Location extends Model
         'type',
         'address',
         'city',
-        'state',
-        'country',
         'postal_code',
         'latitude',
         'longitude',
@@ -28,11 +26,23 @@ class Location extends Model
         'is_headquarters',
         'is_active',
         'metadata',
+        'address_line_1',
+        'address_line_2',
+        'website',
+        'is_remote',
+        'capacity',
+        'opening_hours',
+        'opening_date',
+        'closing_date',
+        'country_code',
+        'state_code',
     ];
 
     protected $casts = [
         'is_headquarters' => 'boolean',
         'is_active' => 'boolean',
+        'is_remote' => 'boolean',
+        'capacity' => 'integer',
         'metadata' => 'array',
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
@@ -42,6 +52,7 @@ class Location extends Model
         'type' => 'office',
         'is_headquarters' => false,
         'is_active' => true,
+        'is_remote' => false,
     ];
 
     public function company(): BelongsTo

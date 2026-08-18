@@ -34,7 +34,7 @@ return [
             'validation' => 'nullable|exists:branches,id',
             'filterable' => true,
         ],
-        'parent_id' => [
+        'parent_department_id' => [
             'display' => 'inline',
             'fillable' => true,
             'field_type' => 'select',
@@ -156,7 +156,7 @@ return [
             'type' => 'select',
             'validation' => ['nullable', 'exists:branches,id'],
         ],
-        'parent_id' => [
+        'parent_department_id' => [
             'label' => 'Parent Department',
             'type' => 'select',
             'validation' => ['nullable', 'exists:departments,id'],
@@ -211,7 +211,7 @@ return [
     ],
 
     'detail' => [
-        'fields' => ['id', 'company_id', 'branch_id', 'parent_id', 'name', 'code', 'description', 'is_active', 'created_at', 'updated_at'],
+        'fields' => ['id', 'company_id', 'branch_id', 'parent_department_id', 'name', 'code', 'description', 'is_active', 'created_at', 'updated_at'],
     ],
 
     'default_sort' => [

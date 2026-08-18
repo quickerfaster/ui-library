@@ -212,7 +212,7 @@ return array (
   array (
     'admin' => 'full',
     'super_admin' => 'full',
-    'hr_admin' => 'limited',
+    'organization_manager' => 'limited',
   ),
   'layout' =>
   array (
