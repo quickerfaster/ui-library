@@ -31,17 +31,6 @@ return [
             'user_facing' => false,
             'depends_on' => [],
         ],
-        'organization' => [
-            'enabled' => true,
-            'label' => 'Organization',
-            'icon' => 'fa-sitemap',
-            'route' => 'organization.dashboard',
-            'order' => 100,
-            'roles' => ['*'],
-            'core' => true,
-            'user_facing' => true,
-            'depends_on' => [],
-        ],
         'common' => [
             'enabled' => true,
             'label' => 'Common',
@@ -64,6 +53,43 @@ return [
         'core' => null,     // Set by UILibraryServiceProvider at boot
         'business' => base_path('app/Modules'),
         'business_namespace' => 'App\\Modules',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Module Discovery Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Toggles for the library's convention-based auto-discovery of business
+    | modules under app/Modules.
+    |
+    | 'listeners' — When true (default), the library scans each business
+    |               module's Listeners/ directory and auto-registers the
+    |               discovered listeners.
+    |
+    | 'reports'   — When true (default), the library scans each business
+    |               module for classes implementing the Reportable contract
+    |               and auto-registers them into reports.report_types.
+    |
+    | 'workflows' — When true (default), the library merges each business
+    |               module's Config/workflows.php into workflows.definitions.
+    |
+    | 'cache_ttl' — Finite cache lifetime (seconds) for production discovery
+    |               caches. Cache keys are content-hashed from file paths and
+    |               mtimes, so they self-invalidate on deploy; the TTL is a
+    |               safety net (the library never uses cache()->forever()).
+    |
+    | Per-module opt-outs (each defaults to true and is set on the module
+    | registry entry during discovery):
+    |   'ui-library.modules.{module}.auto_register_listeners'
+    |   'ui-library.modules.{module}.auto_register_reports'
+    |   'ui-library.modules.{module}.auto_register_workflows'
+    */
+    'discovery' => [
+        'listeners' => true,
+        'reports' => true,
+        'workflows' => true,
+        'cache_ttl' => 86400,
     ],
 
     /*
@@ -280,6 +306,19 @@ return [
             'enabled' => true,
         ],
         'company_provider' => \QuickerFaster\UILibrary\Services\Navigation\NullCompanyProvider::class,
+
+        /*
+        |------------------------------------------------------------------
+        | Workspace Resolver
+        |------------------------------------------------------------------
+        |
+        | The WorkspaceResolver contract is bound from this key. The library
+        | ships with NullWorkspaceResolver (empty context — no filtering).
+        | Consuming apps can publish this config and point the key at their
+        | own resolver implementation.
+        */
+        'workspace_resolver' => \QuickerFaster\UILibrary\Services\Navigation\NullWorkspaceResolver::class,
+
         'show_company_switcher' => true,
 
         /*
@@ -518,6 +557,20 @@ return [
         | - 'none'   : no default (user must pick)
         */
         'default_mode' => 'first',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tenancy Configuration
+    |--------------------------------------------------------------------------
+    | Controls the tenant column and session key used by CompanyScope and the
+    | HasCompanyScope trait. "company" is the library's domain-agnostic tenant
+    | term (already used by CompanyProvider, the company switcher, and the
+    | company_id convention across the library).
+    */
+    'tenancy' => [
+        'column' => 'company_id',
+        'session_key' => 'current_company_id',
     ],
 
     /*
@@ -767,7 +820,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Hardening for the centralized /{module}/{view}/{id?} route pattern
-    | (see docs/architecture/15-gaps-and-recommendations.md §10.7).
+    | (see docs/library/15-gaps-and-recommendations.md §10.7).
     |
     | The catch-all route is loaded LAST by ModuleServiceProvider so that
     | module-specific routes take precedence. These settings constrain
