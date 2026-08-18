@@ -16,6 +16,7 @@ use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
 use QuickerFaster\UILibrary\Events\ModuleRegistered;
 use QuickerFaster\UILibrary\Events\ModuleBooted;
+use QuickerFaster\UILibrary\Http\Middleware\ResolveCompanyContext;
 
 class UILibraryServiceProvider extends ServiceProvider
 {
@@ -100,12 +101,19 @@ class UILibraryServiceProvider extends ServiceProvider
         // Phase 4.5: NavigationManager singleton for config-driven sidebar
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Navigation\NavigationManager::class);
 
-        // Workspace context resolver (multi-tenant / role-based navigation filtering)
+        // Workspace context resolver (multi-tenant / role-based navigation
+        // filtering). Config-driven via ui-library.navigation.workspace_resolver
+        // so consuming apps can publish ui-library.php and point it at their
+        // own implementation without re-binding the contract in a provider.
         $this->app->singleton(
             \QuickerFaster\UILibrary\Contracts\Navigation\WorkspaceResolver::class,
-            \QuickerFaster\UILibrary\Services\Navigation\NullWorkspaceResolver::class
+            config('ui-library.navigation.workspace_resolver', \QuickerFaster\UILibrary\Services\Navigation\NullWorkspaceResolver::class)
         );
 
+        // Company provider for the company switcher. Config-driven via
+        // ui-library.navigation.company_provider (the published config defaults
+        // to DefaultCompanyProvider; the fallback below only applies when the
+        // config file is absent).
         $this->app->bind(
             \QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider::class,
             config('ui-library.navigation.company_provider', \QuickerFaster\UILibrary\Services\Navigation\NullCompanyProvider::class)
@@ -144,6 +152,11 @@ class UILibraryServiceProvider extends ServiceProvider
                 ->by($request->user()?->id ?: $request->ip());
         });
 
+        // Register the optional company-context middleware. Consuming apps add
+        // 'qf.resolve-company-context' to their web/api route groups so the
+        // session tenant context is resolved at request start.
+        $this->app['router']->aliasMiddleware('qf.resolve-company-context', ResolveCompanyContext::class);
+
         // Load shared library routes (export, import, print, etc.)
         $sharedRoutesPath = __DIR__ . '/../Routes/web.php';
         if (file_exists($sharedRoutesPath)) {
@@ -154,6 +167,14 @@ class UILibraryServiceProvider extends ServiceProvider
         $sharedMigrationsPath = __DIR__ . '/../../Database/Migrations';
         if (is_dir($sharedMigrationsPath)) {
             $this->loadMigrationsFrom($sharedMigrationsPath);
+        }
+
+        // Load the minimal companies scoping migration. The remaining
+        // Organization domain (hierarchy tables, models, routes, views, and
+        // data configs) now lives in the consuming-app Organization module.
+        $organizationMigrationsPath = __DIR__ . '/../Core/Organization/Database/Migrations';
+        if (is_dir($organizationMigrationsPath)) {
+            $this->loadMigrationsFrom($organizationMigrationsPath);
         }
 
         // Phase 4.4: Register view composers
@@ -170,10 +191,6 @@ class UILibraryServiceProvider extends ServiceProvider
         event(new ModuleRegistered('system', __DIR__ . '/../Core/System',
             userFacing: config('ui-library.modules.system.user_facing', true),
             dependsOn: config('ui-library.modules.system.depends_on', []),
-        ));
-        event(new ModuleRegistered('organization', __DIR__ . '/../Core/Organization',
-            userFacing: config('ui-library.modules.organization.user_facing', true),
-            dependsOn: config('ui-library.modules.organization.depends_on', []),
         ));
 
         // 3. Fire ModuleBooted
@@ -197,7 +214,7 @@ class UILibraryServiceProvider extends ServiceProvider
         $corePath = __DIR__ . '/../Core';
 
         $first = true;
-        foreach (['Admin', 'System', 'Organization'] as $module) {
+        foreach (['Admin', 'System'] as $module) {
             $moduleLower = strtolower($module);
             $modulePath = "{$corePath}/{$module}";
 
@@ -340,6 +357,7 @@ class UILibraryServiceProvider extends ServiceProvider
             $this->commands([
                 \QuickerFaster\UILibrary\Console\Commands\GenerateScheduledReports::class,
                 \QuickerFaster\UILibrary\Console\Commands\InstallCommand::class,
+                \QuickerFaster\UILibrary\Console\Commands\DiscoverCommand::class,
             ]);
         }
     }
