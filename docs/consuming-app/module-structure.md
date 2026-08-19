@@ -1,7 +1,7 @@
 # Module Structure & Conventions
 
 > **Package**: `quicker-faster/ui-library`
-> **Last Updated**: 2026-08-17
+> **Last Updated**: 2026-08-19
 
 This document covers the complete anatomy of a business module under `app/Modules/{Module}/`, naming conventions, auto-discovery, navigation config, and related conventions. For the library-internal registration protocol, see [../library/03-module-pattern.md](../library/03-module-pattern.md).
 
@@ -362,29 +362,96 @@ return [
 
 ---
 
-## Organization Model Inheritance
+## Current Module Roster
 
-The library provides domain-agnostic Organization models under `QuickerFaster\UILibrary\Core\Organization\Models\`:
-- `Company`
-- `Department`
-- `Location`
-- `Branch`
-- `Team`
-- `BusinessUnit`
-- `Division`
+The reference implementation ships with 6 modules. All six expose overview dashboards and named overview-dashboard routes:
 
-To add domain-specific columns or behavior, your module models can extend these library classes:
+| Module | Directory | Models | Overview Dashboards | Role |
+|---|---|---|---|---|
+| **Organization** | `app/Modules/Organization/` | 7 (Company, Branch, Department, Division, BusinessUnit, Location, Team) | 7 (Dashboard, Companies, Structure, Teams, Locations, Classification, Reports) | Foundational — org hierarchy + company entity |
+| **HR** | `app/Modules/Hr/` | 15 (Employee, EmployeePosition, EmployeeProfile, JobTitle, EmployeeGroup, EmployeeJobHistory, Tag, etc.) | 3 (Organization, People, Manage) | Core people/employee |
+| **Attendance** | `app/Modules/Attendance/` | 12 (Attendance, Shift, WorkPattern, ClockEvent, AttendancePolicy, etc.) | 2 (Time, Policies) | Time tracking, shifts, clock events |
+| **Leave** | `app/Modules/Leave/` | 5 (LeaveType, LeaveRequest, LeaveBalance, LeaveApprover, LeaveOverview) | 1 (Leave) | Leave management |
+| **Payroll** | `app/Modules/Payroll/` | 11 (PayrollRun, PayrollPayslip, PayrollPolicy, PaySchedule, PayslipItem, etc.) | 1 (Payroll) | Payroll processing |
+| **Holiday** | `app/Modules/Holiday/` | 2 (Holiday, HolidayCalendar) | 1 (Holidays) | Holiday calendars |
+
+Each context group header points at its own per-context-group overview dashboard, and every dashboard is reachable via a named `{module}.dashboard-{group}-overview` route (e.g., `hr.dashboard-manage-overview`, `attendance.dashboard-time-overview`, `leave.dashboard-leave-overview`).
+
+All modules are self-contained with their own migrations, routes, views, configs, and service providers. They declare dependencies via `module.json` (`depends_on` key).
+
+## Organization Model — Now a Standalone Module
+
+The Organization domain is **no longer in the library** under `QuickerFaster\UILibrary\Core\Organization\Models\`. The library now contains only:
+
+- A minimal `Company` model (`QuickerFaster\UILibrary\Core\Organization\Models\Company`) with `$fillable = ['name', 'code']`
+- A minimal `companies` migration (id, name, code, timestamps)
+- The scoping mechanism: `CompanyScope`, `HasCompanyScope`, `ResolveCompanyContext`, `CompanyProvider` contract, `NullCompanyProvider`
+
+The full Organization domain (Company with business fields, Department, Location, Branch, Team, BusinessUnit, Division) lives in the standalone module `app/Modules/Organization/`. The module's `Company` model extends the library's minimal `Company`:
 
 ```php
-use QuickerFaster\UILibrary\Core\Organization\Models\Department as BaseDepartment;
+// app/Modules/Organization/Models/Company.php
+namespace App\Modules\Organization\Models;
 
-class Department extends BaseDepartment
+use QuickerFaster\UILibrary\Core\Organization\Models\Company as BaseCompany;
+
+class Company extends BaseCompany
 {
-    protected $table = 'departments';
-    // Add HR-specific columns, relations, methods here
+    protected $fillable = [
+        'name', 'code',
+        'subdomain', 'logo', 'email', 'phone', 'website', 'address', 'city',
+        'state_code', 'country_code', 'postal_code', 'tax_id', 'registration_number',
+        'currency_code', 'timezone', 'date_format', 'is_active', 'status',
+        'parent_company_id',
+        // ... billing fields, etc.
+    ];
+
+    public function branches() { return $this->hasMany(Branch::class); }
+    public function departments() { return $this->hasMany(Department::class); }
+    // ... other hierarchy relations
 }
 ```
 
-The library migrations (loaded via `UILibraryServiceProvider::loadMigrationsFrom()`) handle the base table creation. Your module's migrations only need to add domain-specific columns via ALTER statements.
+## ALTER TABLE Pattern for Extending Library Tables
 
-**Important:** Published copies of library migrations should NOT be kept in the consuming app's `database/migrations/`. The package auto-loads them.
+The library owns base tables; modules extend them via ALTER TABLE migrations. This pattern applies to both the Organization module and any business module that needs domain-specific columns on a library-owned table.
+
+**Example — Organization extends the library's minimal `companies` table:**
+
+```php
+// app/Modules/Organization/Database/Migrations/2026_08_18_000001_alter_companies_add_business_columns.php
+Schema::table('companies', function (Blueprint $table) {
+    if (!Schema::hasColumn('companies', 'subdomain')) {
+        $table->string('subdomain')->nullable()->after('code');
+    }
+    if (!Schema::hasColumn('companies', 'tax_id')) {
+        $table->string('tax_id')->nullable();
+    }
+    // ... additional business columns with hasColumn() guards
+});
+```
+
+**Example — HR extends the library's polymorphic `documents` table:**
+
+```php
+// app/Modules/Hr/Database/Migrations/2026_08_18_000001_alter_documents_add_hr_columns.php
+Schema::table('documents', function (Blueprint $table) {
+    if (!Schema::hasColumn('documents', 'employee_id')) {
+        $table->foreignId('employee_id')->nullable()->constrained('employees');
+    }
+    if (!Schema::hasColumn('documents', 'type')) {
+        $table->string('type')->nullable();
+    }
+    if (!Schema::hasColumn('documents', 'expiry_date')) {
+        $table->date('expiry_date')->nullable();
+    }
+});
+```
+
+Each column addition is guarded with `Schema::hasColumn()` so the migration is idempotent and safe against any legacy table state. The pattern ensures:
+
+- **One owner per table** — the library creates the base table; modules only ALTER what they extend
+- **No duplicate table creation** — `migrate --pretend` shows no conflicts
+- **Safe rollback** — modules can be removed without dropping the library-owned base table
+
+**Important:** Published copies of library migrations should NOT be kept in the consuming app's `database/migrations/`. The package auto-loads them via `UILibraryServiceProvider::loadMigrationsFrom()`.

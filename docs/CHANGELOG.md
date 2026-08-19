@@ -8,6 +8,61 @@
 
 > ⚠️ **Testing status (2026-08-16)**: The workflow/approval foundation has been implemented and unit-verified (`php -l`, config validation), but has **NOT** yet been tested end-to-end in a consuming app. Further adjustments may be needed once integrated into a real consuming app (e.g., Spatie role/permission seeding, notification template registration, workspace-scoped approver resolution, and runtime workflow execution against real entities).
 
+## 2026-08-19 — HR Navigation: People + Manage Split & Dashboard Pattern Alignment
+
+### HR People → People + Manage Context Group Split
+- Split the HR `people` context group (10 items) into two context groups:
+  - **People** (6 items, daily use): Overview, Employees, Profiles, Current Jobs, Teams, Employee Groups
+  - **Manage** (4 items, occasional/rare): Job Titles, Tags, Job History, Documents
+- Added the `manage` context group alongside the existing `Organization` and `people` groups in `app/Modules/Hr/Config/navigation.php`.
+- Added the `hr.dashboard-manage-overview` named route.
+
+### Per-Context-Group Overview Dashboards
+- Added the HR Manage overview dashboard — `app/Modules/Hr/Resources/views/dashboard-manage-overview.blade.php` + `app/Modules/Hr/Data/dashboards/dashboard_manage_overview.php` — following the Admin module's per-context-group overview pattern.
+- Confirmed all six business modules expose overview dashboards whose context-group headers point at their own dashboard view.
+
+### Named Dashboard Routes
+- All six business modules (Organization, HR, Attendance, Leave, Payroll, Holiday) now expose named overview-dashboard routes (`{module}.dashboard-{group}-overview`).
+
+### Navigation Labels & Reordering
+- Normalized navigation labels and reordered HR context items so daily-use People items precede the occasional/rare Manage items.
+
+### Missing Dashboard Views
+- Created missing overview-dashboard Blade views and data configs across the business modules.
+
+**Files**: `app/Modules/Hr/Config/navigation.php`, `app/Modules/Hr/Routes/web.php`, `app/Modules/Hr/Resources/views/dashboard-manage-overview.blade.php`, `app/Modules/Hr/Data/dashboards/dashboard_manage_overview.php`
+
+---
+
+## [Architecture Refactor — 2026-08-18]
+
+### Organization Split
+- Moved Organization domain (Company, Department, Location, Branch, Team, BusinessUnit, Division) from library `src/Core/Organization/` to standalone module `app/Modules/Organization/`
+- Library now keeps only minimal `Company` model (name, code) + `companies` table (id, name, code, timestamps) as scoping anchor
+- Library scoping mechanism preserved: `CompanyScope`, `HasCompanyScope`, `ResolveCompanyContext`, `NullCompanyProvider`, `CompanyProvider` contract
+- Organization module extends library's minimal Company with business fields via ALTER TABLE migration
+
+### HR Module Split
+- Split monolithic `app/Modules/Hr/` (45 models) into 5 sub-modules:
+  - `app/Modules/Attendance/` — 12 models (time tracking, shifts, clock events)
+  - `app/Modules/Leave/` — 5 models (leave types, requests, balances, approvers)
+  - `app/Modules/Payroll/` — 11 models (payroll runs, payslips, policies)
+  - `app/Modules/Holiday/` — 2 models (holidays, calendars)
+  - `app/Modules/Hr/` — 15 models (core employee/people, slimmed down)
+- Each module is self-contained with its own migrations, routes, views, configs, and service provider
+
+### Documents
+- Library `documents` table is now the single source of truth (polymorphic file-attachment)
+- HR module uses ALTER TABLE to add domain-specific columns (`employee_id`, `type`, `expiry_date`)
+- Pattern established: library owns base tables, modules ALTER for domain columns
+
+### Verification
+- `migrate:fresh --seed`: 72 migrations, 0 errors
+- `ui-library:discover`: 5 modules, 3 listeners, 1 workflow, 364 permissions
+- `route:list`: 158 routes
+- `check-domain-independence.sh`: PASS
+- `phpunit`: 69 tests, 181 assertions
+
 ## [Organization Domain — 2026-08-17]
 
 ### Added
