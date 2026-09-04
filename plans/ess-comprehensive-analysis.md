@@ -483,6 +483,53 @@ The **strategic gaps** (unified inbox, mobile app, benefits, learning, performan
 **Library Changes:** 3 (`src/Routes/web.php` — `/home` route `auth` middleware; `src/Config/ui-library.php` — `module_access` default; `Sidebar.php` + `TopNav.php` — roles enforcement)
 **Full Analysis:** [`module-dashboard-security-analysis.md`](plans/module-dashboard-security-analysis.md)
 
+### DataTable Detail View crudType-Aware Click Handlers ✅ (2026-09-04)
+
+**Problem:** The [`list-view.blade.php`](src/Resources/views/livewire/data-tables/partials/list-view.blade.php:1) and [`card-view.blade.php`](src/Resources/views/livewire/data-tables/partials/card-view.blade.php:1) partials used `wire:click="show({{ $record->id }})"` for all row/card clicks, which only worked for the `modal` crudType. When a DataTable was configured with `crudType: 'drawers'` or `crudType: 'pages'`, clicking a row or card would open a modal instead of the configured behavior.
+
+**Solution:** Both [`list-view.blade.php`](src/Resources/views/livewire/data-tables/partials/list-view.blade.php:11) and [`card-view.blade.php`](src/Resources/views/livewire/data-tables/partials/card-view.blade.php:12) now use `crudType`-aware click handlers:
+
+| crudType | Click Behavior | Implementation |
+|----------|---------------|----------------|
+| `drawers` | Dispatches `openDrawer` event with `qf.data-table-detail` component | `Livewire.dispatch('openDrawer', { component: 'qf.data-table-detail', params: {...}, title: 'View ...' })` |
+| `pages` | Navigates to the show URL via `window.location` | `window.location='{{ $this->getShowUrl($record->id) }}'` |
+| `modal` (default) | Opens a modal via Livewire `show()` method | `wire:click="show({{ $record->id }})"` |
+
+All click handlers use `event.target.closest('.stop-propagation')` to prevent navigation when clicking action buttons (edit, delete, bulk select, more actions dropdown). The [`row-actions.blade.php`](src/Resources/views/livewire/data-tables/partials/row-actions.blade.php:1) partial also uses `crudType`-aware rendering for Show and Edit buttons:
+
+- **Show button**: `pages` → `<a href>` link; `drawers` → `openDrawer` dispatch; `modal` → `wire:click="show()"`
+- **Edit button**: `pages` → `<a href>` route link; `drawers` → `openDrawer` dispatch with `qf.data-table-form`; `modal` → `wire:click="edit()"`
+
+**Files Modified:** [`list-view.blade.php`](src/Resources/views/livewire/data-tables/partials/list-view.blade.php:1), [`card-view.blade.php`](src/Resources/views/livewire/data-tables/partials/card-view.blade.php:1), [`row-actions.blade.php`](src/Resources/views/livewire/data-tables/partials/row-actions.blade.php:1)
+**Library Changes:** 3 blade partials — all in library
+
+### LeaveRequest Attachments → Polymorphic Documents Migration ✅ (2026-09-04)
+
+**Problem:** `LeaveRequest` had a JSON `attachments` column that bypassed the UI library's polymorphic document system. The library provides [`DocumentEngine`](src/Services/Documents/DocumentEngine.php:1) + [`documents`](Database/migrations/2026_06_12_142526_create_documents_table.php:1) table + [`Documentable`](src/Contracts/Documents/Documentable.php:1) contract for a dedicated document upload system. `LeaveRequest` already implemented `Documentable` with all 4 methods + `documents()` morphMany relationship.
+
+**Solution:**
+1. Removed `attachments` field definition from [`leave_request.php`](hr-consuming-app/app/Modules/Leave/Data/leave_request.php:147) config
+2. Removed `'attachments'` from `$fillable` and `$casts` in `LeaveRequest` model
+3. Created migration to drop `attachments` JSON column from `leave_requests` table
+4. Created [`LeaveDocumentUpload`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) Livewire component providing upload, preview, download, and delete UI on the leave request detail page
+5. `LeaveRequest` uses the [`HasDocuments`](src/Traits/Documents/HasDocuments.php:1) trait (if available) or implements [`Documentable`](src/Contracts/Documents/Documentable.php:1) directly
+**Full Details:** [`leave-module-cleanup-plan.md`](plans/leave-module-cleanup-plan.md#phase-5-migrate-attachments-to-polymorphic-documents--2026-09-04)
+
+### Document Upload as Wizard Step 2 ✅ (2026-09-04)
+
+**Problem:** The ESS leave request wizard had no step for uploading supporting documents. Employees had to submit the request first, then navigate to the leave request detail page to upload documents — a disjointed experience.
+
+**Solution:** Added document upload as wizard step 2 (between form and review), transforming the 2-step wizard (Form → Review) into a 3-step flow (Form → Documents → Review).
+
+**Implementation Details:**
+- Created [`LeaveDocumentUploadWizardStep`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUploadWizardStep.php:1) adapter component that accepts wizard-standard props (`$configKey`, `$presetData`, `$stepIndex`, `$recordId`) and resolves the `LeaveRequest` model
+- Created [`leave-document-upload-wizard-step.blade.php`](hr-consuming-app/app/Modules/Leave/Resources/views/livewire/leave-document-upload-wizard-step.blade.php:1) embedding the existing [`LeaveDocumentUpload`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) component via `@livewire('leave-document-upload', ['leaveRequest' => $leaveRequest])`
+- Registered component in [`LeaveServiceProvider`](hr-consuming-app/app/Modules/Leave/Providers/LeaveServiceProvider.php:47)
+- Updated [`employee_self_service.php`](hr-consuming-app/app/Modules/Leave/Data/wizards/employee_self_service.php:48) wizard config: added step 1 (`'Supporting Documents'` with `requiresLink => true`), renumbered review step from 1 to 2
+- Auto-advances past document step (upload is optional) via `stepFormSaved` dispatch
+
+**Architecture:** The adapter pattern keeps the existing non-wizard `LeaveDocumentUpload` component unchanged and reusable on the leave request detail page. The wizard step wrapper handles wizard-specific concerns (record resolution from preset data, `stepFormSaved` dispatch on save event).
+
 ---
 
 ## 7. Future Implementation Considerations
