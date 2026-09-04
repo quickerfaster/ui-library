@@ -2,31 +2,38 @@
 
 return [
     'context_groups' => [
-        'Dashboard' => [
+        'dashboard' => [
             'label' => 'Dashboard',
             'icon' => 'fas fa-tachometer-alt',
             'order' => 1,
             'route' => NULL,
-            'url' => 'admin/dashboard-overview',
+            'url' => 'admin/dashboard',
         ],
-        'Users & Permissions' => [
-            'label' => 'Users & Permissions',
-            'icon' => 'fas fa-users-cog',
+        'Users' => [
+            'label' => 'Users',
+            'icon' => 'fas fa-users',
             'order' => 2,
             'route' => NULL,
             'url' => 'admin/dashboard-users-overview',
         ],
+        'Access' => [
+            'label' => 'Access',
+            'icon' => 'fas fa-shield-alt',
+            'order' => 3,
+            'route' => NULL,
+            'url' => 'admin/dashboard-access-overview',
+        ],
         'Workflows' => [
             'label' => 'Workflows',
             'icon' => 'fas fa-project-diagram',
-            'order' => 3,
+            'order' => 4,
             'route' => NULL,
             'url' => 'admin/dashboard-workflows-overview',
         ],
         'Security' => [
             'label' => 'Security',
             'icon' => 'fas fa-shield-alt',
-            'order' => 4,
+            'order' => 5,
             'route' => NULL,
             'url' => 'admin/dashboard-security-overview',
         ],
@@ -53,7 +60,7 @@ return [
         ],
     ],
     'contexts' => [
-        'Dashboard' => [
+        'dashboard' => [
             [
                 'key' => 'dashboard_overview',
                 'label' => 'Overview',
@@ -100,7 +107,7 @@ return [
                 'page_title' => NULL,
             ],
         ],
-        'Users & Permissions' => [
+        'Users' => [
             [
                 'key' => 'users_overview',
                 'label' => 'Overview',
@@ -113,7 +120,7 @@ return [
             [
                 'key' => 'user',
                 'label' => 'Users',
-                'icon' => 'fas fa-users-cog',
+                'icon' => 'fas fa-user',
                 'route' => '/admin/users',
                 'permission' => 'view_user',
                 'order' => 2,
@@ -146,13 +153,15 @@ return [
                 'order' => 5,
                 'page_title' => NULL,
             ],
+        ],
+        'Access' => [
             [
-                'key' => 'session',
-                'label' => 'Sessions',
-                'icon' => 'fas fa-desktop',
-                'route' => '/admin/sessions',
-                'permission' => 'view_session',
-                'order' => 6,
+                'key' => 'access_overview',
+                'label' => 'Overview',
+                'icon' => 'fas fa-chart-bar',
+                'route' => '/admin/dashboard-access-overview',
+                'permission' => 'view_access_overview',
+                'order' => 1,
                 'page_title' => NULL,
             ],
             [
@@ -161,7 +170,7 @@ return [
                 'icon' => 'fas fa-user-shield',
                 'route' => '/admin/roles',
                 'permission' => 'view_role',
-                'order' => 7,
+                'order' => 2,
                 'page_title' => NULL,
             ],
             [
@@ -170,7 +179,7 @@ return [
                 'icon' => 'fas fa-shield-alt',
                 'route' => '/admin/access-control-management',
                 'permission' => 'view_permission',
-                'order' => 8,
+                'order' => 3,
                 'page_title' => NULL,
             ],
         ],
@@ -258,6 +267,15 @@ return [
                 'order' => 50,
                 'page_title' => NULL,
             ],
+            [
+                'key' => 'session',
+                'label' => 'Sessions',
+                'icon' => 'fas fa-desktop',
+                'route' => '/admin/sessions',
+                'permission' => 'view_session',
+                'order' => 60,
+                'page_title' => NULL,
+            ],
         ],
         'audit' => [
             [
@@ -335,6 +353,7 @@ return [
                 'permission' => 'view_notifications_overview',
                 'order' => 1,
                 'page_title' => NULL,
+                'modelName' => 'notifications_overview',
             ],
             [
                 'key' => 'notifications',
@@ -344,6 +363,7 @@ return [
                 'permission' => 'view_notification',
                 'order' => 2,
                 'page_title' => NULL,
+                'modelName' => 'notifications_index',
             ],
             [
                 'key' => 'notification_preferences',
@@ -353,6 +373,7 @@ return [
                 'permission' => 'view_notification',
                 'order' => 3,
                 'page_title' => NULL,
+                'modelName' => 'notification_preferences',
             ],
             [
                 'key' => 'notification_log',
@@ -362,6 +383,7 @@ return [
                 'permission' => 'view_notification_log',
                 'order' => 4,
                 'page_title' => 'Notification Logs',
+                'modelName' => 'notification_log',
             ],
         ],
     ],

@@ -2,11 +2,17 @@
     $isNamedRoute = isset($item['route']) && !Str::contains($item['route'], '/');
     $url = $isNamedRoute ? route($item['route']) : url($item['url'] ?? Str::kebab($item['key'] ?? $item['label']));
 
-    // Use explicit permission from config if available,
-    // otherwise derive from URL with Str::singular() fallback
+    // Permission resolution priority:
+    // 1. Explicit 'permission' key in config → check via AuthorizationService
+    // 2. Explicit 'roles' key in config → check user has any of the roles
+    // 3. Derive permission from URL with Str::singular() fallback
     $hasPermission = true;
     if (!empty($item['permission'])) {
         $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+    } elseif (!empty($item['roles'])) {
+        $roles = $item['roles'];
+        $isWildcard = ($roles === '*' || $roles === ['*']);
+        $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
     } elseif (!empty($url)) {
         $segments = explode('/', $url);
         $viewName = last($segments);

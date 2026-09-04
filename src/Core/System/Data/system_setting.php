@@ -220,4 +220,21 @@ return [
     */
     'per_page_options' => [5, 10, 25, 50],
     'default_per_page' => 10,
+
+    'switchViews' => [
+        'default' => 'list',
+        'table' => ['enabled' => true],
+        'list' => [
+            'enabled' => true,
+            'titleFields' => ['key'],
+            'subtitleFields' => ['type'],
+            'badgeField' => 'type',
+            'badgeColors' => [
+                'string' => 'primary',
+                'integer' => 'info',
+                'boolean' => 'warning',
+                'json' => 'secondary',
+            ],
+        ],
+    ],
 ];

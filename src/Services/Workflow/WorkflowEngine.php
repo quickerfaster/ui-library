@@ -5,6 +5,8 @@ namespace QuickerFaster\UILibrary\Services\Workflow;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use QuickerFaster\UILibrary\Contracts\Approvals\ApproverResolver;
 use QuickerFaster\UILibrary\Contracts\Notifications\Notifiable;
 use QuickerFaster\UILibrary\Contracts\Workflow\Workflowable;
@@ -125,6 +127,14 @@ class WorkflowEngine
             $this->resolveStepRecipientIds($workflow->currentStep, $workspaceId),
             ['workflowable_type' => $workflow->workflowable_type],
         );
+
+        // Notify the initiator that their workflow was submitted.
+        $initiatorId = $workflow->submitted_by ?? Auth::id();
+        if ($initiatorId) {
+            $this->notifyTransition($workflow, 'submitted', [$initiatorId], [
+                'workflowable_type' => $workflow->workflowable_type,
+            ]);
+        }
 
         return $workflow;
     }
@@ -564,9 +574,25 @@ class WorkflowEngine
      */
     protected function notifyTransition(Workflow $workflow, string $event, array $recipientIds, array $data = []): void
     {
+        if (empty($recipientIds)) {
+            Log::warning('Workflow notifyTransition called with empty recipientIds', [
+                'workflow_id' => $workflow->id,
+                'event' => $event,
+                'definition_key' => $workflow->definition_key,
+            ]);
+
+            return;
+        }
+
         $config = $this->notificationConfig($workflow->definition_key);
 
         if ($config === [] || (array_key_exists('enabled', $config) && !$config['enabled'])) {
+            Log::warning('Workflow notifyTransition: notification config is disabled or empty', [
+                'workflow_id' => $workflow->id,
+                'event' => $event,
+                'definition_key' => $workflow->definition_key,
+            ]);
+
             return;
         }
 
@@ -586,15 +612,27 @@ class WorkflowEngine
 
         $useAsync = (bool) config('ui-library.notifications.queue', false);
 
+        // Resolve the URL for the workflowable entity so notification
+        // consumers (TopNav, NotificationsIndex) can navigate to it.
+        $url = $this->resolveWorkflowableUrl($workflow);
+
+        // Resolve the workflowable entity to inject its attributes (e.g., title) into the notification payload.
+        $workflowable = null;
+        if ($workflow->workflowable_type && $workflow->workflowable_id) {
+            $workflowable = app($workflow->workflowable_type)->find($workflow->workflowable_id);
+        }
+
         foreach ($recipientIds as $recipientId) {
             $notifiable = $this->resolveNotifiable($recipientId);
 
             if ($notifiable instanceof Notifiable) {
-                $payload = array_merge([
+                $payload = array_merge($data, [
                     'workflow_id' => $workflow->id,
                     'workflow_key' => $workflow->definition_key,
                     'workflow_status' => $workflow->status,
-                ], $data);
+                    'url' => $url,
+                    'title' => $workflowable?->title ?? $workflowable?->name ?? null,
+                ]);
 
                 if ($useAsync) {
                     $this->notifications->dispatchAsync($notifiable, $type, $payload);
@@ -603,6 +641,27 @@ class WorkflowEngine
                 }
             }
         }
+    }
+
+    /**
+     * Resolve the URL pointing to the workflowable entity's detail page.
+     *
+     * Derives a URL from the workflowable morph type and ID using the same
+     * convention as {@see \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalRequestListView::selectWorkflow()}.
+     */
+    protected function resolveWorkflowableUrl(Workflow $workflow): string
+    {
+        if ($workflow->workflowable_type && $workflow->workflowable_id) {
+            $parts = explode('\\', $workflow->workflowable_type);
+            $modelName = end($parts);
+            $modelPlural = Str::plural(Str::kebab($modelName));
+
+            return url("/{$modelPlural}/{$workflow->workflowable_id}");
+        }
+
+        // Fallback: point to a workflow detail page so the user can still
+        // navigate and take action even when the polymorphic source is absent.
+        return url("/workflows/{$workflow->id}");
     }
 
     /**

@@ -1,4 +1,4 @@
-<x-qf::navigation-layout configKey="admin.permission" context="Users & Permissions" moduleName="admin" :overrides=[]>
+<x-qf::navigation-layout configKey="admin.permission" context="Access" moduleName="admin" :overrides=[]>
     {{-- Permissions are managed via Spatie Permission. --}}
     {{-- This view provides access control management for roles and users. --}}
     <div class="card">

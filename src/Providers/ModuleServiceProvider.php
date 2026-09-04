@@ -3,9 +3,8 @@
 namespace QuickerFaster\UILibrary\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Event;
 use QuickerFaster\UILibrary\Events\ModuleRegistered;
+use QuickerFaster\UILibrary\Services\Discovery\DiscoveryRegistrar;
 use Spatie\Onboard\Facades\Onboard;
 
 class ModuleServiceProvider extends ServiceProvider
@@ -20,6 +19,7 @@ class ModuleServiceProvider extends ServiceProvider
         $this->discoverBusinessModules();
         $this->registerModuleConfigs();
         $this->registerOnboardingConfig();
+        $this->registerNotificationChannels();
     }
 
     /**
@@ -36,12 +36,39 @@ class ModuleServiceProvider extends ServiceProvider
         $moduleDirectories = glob($businessPath . '/*', GLOB_ONLYDIR);
 
         foreach ($moduleDirectories as $directory) {
-            $moduleName = strtolower(basename($directory));
+            // Preserve the verbatim directory name for PSR-4 namespace resolution
+            // (e.g. "Hr"), while keeping a separate lowercased key for config
+            // keys, the module registry, route prefixes, and view namespaces.
+            $moduleNamespace = basename($directory);
+            $moduleName = strtolower($moduleNamespace);
 
             // Skip if already registered as Core module
-            if (config("ui-library.modules.{$moduleName}")) {
+            if (config("ui-library.modules.{$moduleName}.core", false)) {
                 continue;
             }
+
+            // Preserve explicit per-module auto-registration opt-outs that a
+            // consuming app may have published, defaulting to enabled.
+            $autoRegisterListeners = config(
+                "ui-library.modules.{$moduleName}.auto_register_listeners",
+                true
+            );
+            $autoRegisterReports = config(
+                "ui-library.modules.{$moduleName}.auto_register_reports",
+                true
+            );
+            $autoRegisterWorkflows = config(
+                "ui-library.modules.{$moduleName}.auto_register_workflows",
+                true
+            );
+            $autoRegisterPermissions = config(
+                "ui-library.modules.{$moduleName}.auto_register_permissions",
+                true
+            );
+            $autoRegisterNotifications = config(
+                "ui-library.modules.{$moduleName}.auto_register_notifications",
+                true
+            );
 
             // Register module in config
             config()->set("ui-library.modules.{$moduleName}", [
@@ -54,6 +81,11 @@ class ModuleServiceProvider extends ServiceProvider
                 'core' => false,
                 'user_facing' => true,
                 'depends_on' => [],
+                'auto_register_listeners' => $autoRegisterListeners,
+                'auto_register_reports' => $autoRegisterReports,
+                'auto_register_workflows' => $autoRegisterWorkflows,
+                'auto_register_permissions' => $autoRegisterPermissions,
+                'auto_register_notifications' => $autoRegisterNotifications,
             ]);
 
             // Read user_facing and depends_on from config
@@ -106,54 +138,18 @@ class ModuleServiceProvider extends ServiceProvider
                 $this->loadMigrationsFrom($migrationPath);
             }
 
-            // Register event listeners
-            $this->registerModuleEvents($directory, $moduleName);
+            // Register auto-discovered event listeners, Reportable implementations,
+            // and workflow definitions.
+            $discovery = app(DiscoveryRegistrar::class);
+            $discovery->registerListeners($directory, $moduleNamespace, $moduleName);
+            $discovery->registerReports($directory, $moduleNamespace, $moduleName);
+            $discovery->registerWorkflows($directory, $moduleName);
         }
 
         // Load System catch-all route LAST (from Core, not app/Modules)
         $systemCatchAll = base_path('vendor/quicker-faster/ui-library/src/Core/System/Routes/web.php');
         if (file_exists($systemCatchAll)) {
             \Route::middleware('web')->group($systemCatchAll);
-        }
-    }
-
-    /**
-     * Register event listeners from a module's Listeners directory.
-     */
-    private function registerModuleEvents(string $modulePath, string $moduleName): void
-    {
-        $listenersPath = "{$modulePath}/Listeners";
-
-        if (!is_dir($listenersPath)) {
-            return;
-        }
-
-        $cacheKey = "module_event_listeners_{$moduleName}";
-
-        if (app()->environment('production') && cache()->has($cacheKey)) {
-            foreach (cache()->get($cacheKey) as $eventClass => $listenerClass) {
-                Event::listen($eventClass, $listenerClass);
-            }
-            return;
-        }
-
-        $listenersMap = [];
-        foreach (File::allFiles($listenersPath) as $file) {
-            $listenerClass = $this->getClassFromFile($moduleName, 'Listeners', $file->getPathname());
-
-            if (!class_exists($listenerClass)) {
-                continue;
-            }
-
-            $eventClass = $this->getEventFromListener($listenerClass);
-            if ($eventClass && class_exists($eventClass)) {
-                Event::listen($eventClass, $listenerClass);
-                $listenersMap[$eventClass] = $listenerClass;
-            }
-        }
-
-        if (app()->environment('production')) {
-            cache()->forever($cacheKey, $listenersMap);
         }
     }
 
@@ -207,6 +203,15 @@ class ModuleServiceProvider extends ServiceProvider
     }
 
     /**
+     * Register auto-discovered notification channels from business modules.
+     */
+    private function registerNotificationChannels(): void
+    {
+        $discovery = app(\QuickerFaster\UILibrary\Services\Notifications\NotificationDiscoveryService::class);
+        $discovery->registerChannels();
+    }
+
+    /**
      * Register onboarding steps from config.
      */
     private function registerOnboardingConfig(): void
@@ -242,30 +247,5 @@ class ModuleServiceProvider extends ServiceProvider
         return array_filter($allModules, function ($config) {
             return ($config['enabled'] ?? false) && ($config['user_facing'] ?? false);
         });
-    }
-
-    private function getClassFromFile(string $moduleName, string $directory, string $filePath): string
-    {
-        $className = str_replace('.php', '', basename($filePath));
-        $namespacePrefix = config('ui-library.module_paths.business_namespace', 'App\\Modules');
-        return "{$namespacePrefix}\\{$moduleName}\\{$directory}\\{$className}";
-    }
-
-    private function getEventFromListener(string $class): ?string
-    {
-        try {
-            $reflection = new \ReflectionClass($class);
-            if ($reflection->hasMethod('handle')) {
-                $method = $reflection->getMethod('handle');
-                $parameters = $method->getParameters();
-                if (!empty($parameters)) {
-                    $parameterType = $parameters[0]->getType();
-                    return $parameterType ? $parameterType->getName() : null;
-                }
-            }
-        } catch (\ReflectionException $e) {
-            // Silently skip
-        }
-        return null;
     }
 }

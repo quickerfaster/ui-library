@@ -247,10 +247,11 @@ class GenerateExport implements ShouldQueue
      */
     protected function restoreCompanyContext(Export $export): void
     {
-        $companyId = $export->company_id ?? null;
+        $companyColumn = config('ui-library.tenancy.column', 'company_id');
+        $companyId = $export->{$companyColumn} ?? null;
 
         if ($companyId && $companyId !== 0) {
-            session()->put('current_company_id', $companyId);
+            session()->put(config('ui-library.tenancy.session_key', 'current_company_id'), $companyId);
         }
     }
 

@@ -1,8 +1,8 @@
 <?php
 
 return array (
-  'title' => 'Users & Permissions Overview',
-  'description' => 'Monitor user accounts, roles, permissions, and access control metrics',
+  'title' => 'Users Overview',
+  'description' => 'Monitor user accounts, invitations, user groups, and preferences',
   'widgets' =>
   array (
     0 =>
@@ -175,10 +175,16 @@ return array (
         0 =>
         array (
           'label' => 'Create',
-          'event' => 'navigate',
+          'event' => 'openDrawer',
           'params' =>
           array (
-            'url' => '/admin/users',
+            'component' => 'qf.data-table-form',
+            'params' =>
+            array (
+              'configKey' => 'admin.user',
+              'recordId' => null,
+            ),
+            'title' => 'Add New User',
           ),
           'style' => 'primary',
         ),
@@ -186,27 +192,33 @@ return array (
       'width' => 3,
     ),
     10 =>
-    array (
-      'type' => 'action_card',
-      'title' => 'Manage Roles',
-      'size' => 'col-12',
-      'icon' => 'fas fa-user-shield',
-      'description' => 'Create and configure roles',
-      'actions' =>
-      array (
-        0 =>
-        array (
-          'label' => 'Go',
-          'event' => 'navigate',
-          'params' =>
-          array (
-            'url' => '/admin/roles',
-          ),
-          'style' => 'secondary',
-        ),
-      ),
-      'width' => 3,
-    ),
+   array (
+     'type' => 'action_card',
+     'title' => 'Manage Roles',
+     'size' => 'col-12',
+     'icon' => 'fas fa-user-shield',
+     'description' => 'Create and configure roles',
+     'actions' =>
+     array (
+       0 =>
+       array (
+         'label' => 'Add Role',
+         'event' => 'openDrawer',
+         'params' =>
+         array (
+           'component' => 'qf.data-table-form',
+           'params' =>
+           array (
+             'configKey' => 'admin.role',
+             'recordId' => null,
+           ),
+           'title' => 'Add Role',
+         ),
+         'style' => 'secondary',
+       ),
+     ),
+     'width' => 3,
+   ),
   ),
   'roles' =>
   array (

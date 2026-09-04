@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Livewire\Livewire;
 use Laravel\Fortify\Fortify;
 use QuickerFaster\UILibrary\Components\Breadcrumbs;
+use QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
 use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
 use QuickerFaster\UILibrary\Events\ModuleRegistered;
@@ -68,6 +69,18 @@ class UILibraryServiceProvider extends ServiceProvider
             )
         );
 
+        // Bind the approval guard explicitly for reliable container resolution.
+        // Livewire components that depend on ApprovalGuard (e.g. ApprovalRequestListView)
+        // need this binding so the container can resolve it during mount().
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard::class,
+            function ($app) {
+                return new \QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard(
+                    $app->make(\QuickerFaster\UILibrary\Contracts\Approvals\ApproverResolver::class)
+                );
+            }
+        );
+
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Documents\DocumentEngine::class);
 
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Notifications\NotificationService::class, function ($app) {
@@ -100,6 +113,13 @@ class UILibraryServiceProvider extends ServiceProvider
 
         // Phase 4.5: NavigationManager singleton for config-driven sidebar
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Navigation\NavigationManager::class);
+
+        // Quick Actions: ActionRegistry singleton for config-driven action discovery
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\QuickActions\ActionRegistry::class);
+
+        // Quick Actions Phase 2: ActionTracker + RankingEngine singletons
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\QuickActions\ActionTracker::class);
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\QuickActions\RankingEngine::class);
 
         // Workspace context resolver (multi-tenant / role-based navigation
         // filtering). Config-driven via ui-library.navigation.workspace_resolver
@@ -229,14 +249,18 @@ class UILibraryServiceProvider extends ServiceProvider
                     $this->app['view']->addNamespace('qf-core', $viewPath);
                 }
                 $this->publishes([
-                    $viewPath => resource_path("views/vendor/ui-library/core/{$moduleLower}"),
+                    $viewPath => resource_path("views/vendor/qf-core/{$moduleLower}"),
                 ], 'ui-library-core-views');
             }
 
-            // Register routes
-            $routePath = "{$modulePath}/Routes/web.php";
-            if (file_exists($routePath)) {
-                $this->loadRoutesFrom($routePath);
+            // Register routes (skip System — ModuleServiceProvider loads it
+            // last, after business modules, so the catch-all route does not
+            // shadow module-specific routes like Organization.)
+            if ($module !== 'System') {
+                $routePath = "{$modulePath}/Routes/web.php";
+                if (file_exists($routePath)) {
+                    $this->loadRoutesFrom($routePath);
+                }
             }
 
             // Register migrations
@@ -337,6 +361,10 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.collapsible', \QuickerFaster\UILibrary\Http\Livewire\Collapsible::class);
         Livewire::component('qf.background-jobs-panel', \QuickerFaster\UILibrary\Http\Livewire\BackgroundJobsPanel::class);
         Livewire::component('qf.column-manager', \QuickerFaster\UILibrary\Http\Livewire\ColumnManager::class);
+
+        // Quick Actions
+        Livewire::component('qf.quick-actions-panel', \QuickerFaster\UILibrary\Http\Livewire\QuickActions\QuickActionsPanel::class);
+        Livewire::component('qf.clock-in-out', \QuickerFaster\UILibrary\Http\Livewire\QuickActions\ClockInOut::class);
         Livewire::component('qf.import-form', \QuickerFaster\UILibrary\Http\Livewire\DataTables\ImportForm::class);
         Livewire::component('qf.recent-exports', \QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports::class);
         Livewire::component('qf.recent-imports', \QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports::class);
@@ -344,6 +372,7 @@ class UILibraryServiceProvider extends ServiceProvider
         // Approvals
         Livewire::component('qf.approval-actions', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalActions::class);
         Livewire::component('qf.approval-history-timeline', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalHistoryTimeline::class);
+        Livewire::component('qf.approval-panel', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalPanel::class);
         Livewire::component('qf.approval-request-list', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalRequestListView::class);
 
         // Notifications
@@ -376,7 +405,7 @@ class UILibraryServiceProvider extends ServiceProvider
 
         // Views
         $this->publishes([
-            __DIR__ . '/../Resources/views' => resource_path('views/vendor/ui-library'),
+            __DIR__ . '/../Resources/views' => resource_path('views/vendor/qf'),
         ], 'ui-library-views');
 
         // Seeders (app-level DatabaseSeeder / UserSeeder for complete user & role setup)

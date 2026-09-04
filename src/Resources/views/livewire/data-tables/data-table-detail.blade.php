@@ -21,7 +21,7 @@
                   $backLabel = 'Go Back';
               }
 
-              $crudType = $this->getConfigResolver()->getConfig()['crudType'] ?? 'modal';
+              $crudType = $this->crudType;
               $simpleActions = $this->getConfigResolver()->getConfig()['simpleActions'] ?? [];
               $editRecord = in_array('edit', $simpleActions);
           @endphp

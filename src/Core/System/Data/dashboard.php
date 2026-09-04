@@ -56,10 +56,10 @@ return array (
         0 =>
         array (
           'label' => 'Start',
-          'event' => 'openSetupWizard',
+          'event' => 'navigate',
           'params' =>
           array (
-            'type' => 'setup',
+            'url' => '/setup/wizard',
           ),
           'style' => 'primary',
         ),

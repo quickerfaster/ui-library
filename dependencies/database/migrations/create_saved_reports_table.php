@@ -12,7 +12,7 @@ return new class extends Migration {
         Schema::create('saved_reports', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('config_key');           // e.g., 'hr.employee'
+            $table->string('config_key');           // e.g., 'admin.user'
             $table->string('name');
             $table->string('type');                 // 'tabular' or 'dashboard'
             $table->json('configuration');          // stores fields, filters, widgets, layout, etc.

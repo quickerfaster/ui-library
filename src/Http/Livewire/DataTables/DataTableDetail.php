@@ -21,16 +21,18 @@ class DataTableDetail extends Component
     protected array $hiddenFields = [];
     public array $returnParams = [];
     public bool $inline = false;          // If true, no modal footer
+    public ?string $crudType = null;
 
     protected ?ConfigResolver $configResolver = null;
     protected ?FieldFactory $fieldFactory = null;
 
-    public function mount(string $configKey, int $recordId, $inline = false, array $returnParams = [])
+    public function mount(string $configKey, int $recordId, $inline = false, array $returnParams = [], ?string $crudType = null)
     {
         $this->configKey = $configKey;
         $this->recordId = $recordId;
         $this->returnParams = $returnParams;
         $this->inline = $inline;
+        $this->crudType = $crudType ?? ($this->getConfigResolver()->getConfig()['crudType'] ?? 'modal');
 
         $this->loadConfiguration();
         $this->loadRecord();

@@ -36,7 +36,8 @@
         <div class="list-group list-group-flush">
             @foreach ($notifications as $notification)
                 <div class="list-group-item list-group-item-action border-bottom py-3 px-3 {{ $notification->isRead() ? 'bg-light' : '' }}"
-                     wire:key="notification-{{ $notification->id }}">
+                     wire:key="notification-{{ $notification->id }}"
+                     wire:click="navigateToNotification({{ $notification->id }})">
                     <div class="d-flex w-100 justify-content-between align-items-start">
                         <div class="me-2">
                             <i class="{{ NotificationTypeRegistry::getIcon($notification->type) }} {{ NotificationTypeRegistry::getColor($notification->type) }} fs-5"></i>

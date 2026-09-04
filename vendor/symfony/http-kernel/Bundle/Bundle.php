@@ -24,26 +24,37 @@ use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
  */
 abstract class Bundle implements BundleInterface
 {
-    protected string $name;
-    protected ExtensionInterface|false|null $extension = null;
-    protected string $path;
-    protected ?ContainerInterface $container;
-
+    protected $name;
+    protected $extension;
+    protected $path;
     private string $namespace;
 
-    public function boot(): void
+    /**
+     * @var ContainerInterface|null
+     */
+    protected $container;
+
+    /**
+     * @return void
+     */
+    public function boot()
     {
     }
 
-    public function shutdown(): void
+    /**
+     * @return void
+     */
+    public function shutdown()
     {
     }
 
     /**
      * This method can be overridden to register compilation passes,
      * other extensions, ...
+     *
+     * @return void
      */
-    public function build(ContainerBuilder $container): void
+    public function build(ContainerBuilder $container)
     {
     }
 
@@ -110,7 +121,10 @@ abstract class Bundle implements BundleInterface
         return $this->name;
     }
 
-    public function registerCommands(Application $application): void
+    /**
+     * @return void
+     */
+    public function registerCommands(Application $application)
     {
     }
 

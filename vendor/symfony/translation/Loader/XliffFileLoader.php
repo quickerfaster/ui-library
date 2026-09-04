@@ -158,6 +158,12 @@ class XliffFileLoader implements LoaderInterface
         $xml = simplexml_import_dom($dom);
         $encoding = $dom->encoding ? strtoupper($dom->encoding) : null;
 
+        $xml->registerXPathNamespace('mda', 'urn:oasis:names:tc:xliff:metadata:2.0');
+
+        foreach ($xml->xpath('//mda:meta') as $meta) {
+            $catalogue->setCatalogueMetadata($meta->attributes()['type'] ?? '', (string) $meta, $domain);
+        }
+
         $xml->registerXPathNamespace('xliff', 'urn:oasis:names:tc:xliff:document:2.0');
 
         foreach ($xml->xpath('//xliff:unit') as $unit) {
@@ -172,13 +178,6 @@ class XliffFileLoader implements LoaderInterface
                 $catalogue->set((string) $source, $target, $domain);
 
                 $metadata = [];
-                if ($segment->attributes()) {
-                    $metadata['segment-attributes'] = [];
-                    foreach ($segment->attributes() as $key => $value) {
-                        $metadata['segment-attributes'][$key] = (string) $value;
-                    }
-                }
-
                 if (isset($segment->target) && $segment->target->attributes()) {
                     $metadata['target-attributes'] = [];
                     foreach ($segment->target->attributes() as $key => $value) {
@@ -208,7 +207,7 @@ class XliffFileLoader implements LoaderInterface
      */
     private function utf8ToCharset(string $content, ?string $encoding = null): string
     {
-        if ('UTF-8' !== $encoding && $encoding) {
+        if ('UTF-8' !== $encoding && !empty($encoding)) {
             return mb_convert_encoding($content, $encoding, 'UTF-8');
         }
 

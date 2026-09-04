@@ -23,7 +23,8 @@ use Symfony\Component\Mime\Header\Headers;
  */
 class TextPart extends AbstractPart
 {
-    private const DEFAULT_ENCODERS = ['quoted-printable', 'base64', '8bit'];
+    /** @internal */
+    protected Headers $_headers;
 
     private static array $encoders = [];
 
@@ -62,8 +63,8 @@ class TextPart extends AbstractPart
         if (null === $encoding) {
             $this->encoding = $this->chooseEncoding();
         } else {
-            if (!\in_array($encoding, self::DEFAULT_ENCODERS, true) && !\array_key_exists($encoding, self::$encoders)) {
-                throw new InvalidArgumentException(\sprintf('The encoding must be one of "%s" ("%s" given).', implode('", "', array_unique(array_merge(self::DEFAULT_ENCODERS, array_keys(self::$encoders)))), $encoding));
+            if ('quoted-printable' !== $encoding && 'base64' !== $encoding && '8bit' !== $encoding) {
+                throw new InvalidArgumentException(\sprintf('The encoding must be one of "quoted-printable", "base64", or "8bit" ("%s" given).', $encoding));
             }
             $this->encoding = $encoding;
         }
@@ -210,20 +211,7 @@ class TextPart extends AbstractPart
             return self::$encoders[$this->encoding] ??= new QpContentEncoder();
         }
 
-        if ('base64' === $this->encoding) {
-            return self::$encoders[$this->encoding] ??= new Base64ContentEncoder();
-        }
-
-        return self::$encoders[$this->encoding];
-    }
-
-    public static function addEncoder(ContentEncoderInterface $encoder): void
-    {
-        if (\in_array($encoder->getName(), self::DEFAULT_ENCODERS, true)) {
-            throw new InvalidArgumentException('You are not allowed to change the default encoders ("quoted-printable", "base64", and "8bit").');
-        }
-
-        self::$encoders[$encoder->getName()] = $encoder;
+        return self::$encoders[$this->encoding] ??= new Base64ContentEncoder();
     }
 
     private function chooseEncoding(): string
@@ -235,7 +223,7 @@ class TextPart extends AbstractPart
         return 'quoted-printable';
     }
 
-    public function __serialize(): array
+    public function __sleep(): array
     {
         // convert resources to strings for serialization
         if (null !== $this->seekable) {
@@ -243,32 +231,18 @@ class TextPart extends AbstractPart
             $this->seekable = null;
         }
 
-        return [
-            '_headers' => $this->getHeaders(),
-            'body' => $this->body,
-            'charset' => $this->charset,
-            'subtype' => $this->subtype,
-            'disposition' => $this->disposition,
-            'name' => $this->name,
-            'encoding' => $this->encoding,
-        ];
+        $this->_headers = $this->getHeaders();
+
+        return ['_headers', 'body', 'charset', 'subtype', 'disposition', 'name', 'encoding'];
     }
 
-    public function __unserialize(array $data): void
+    /**
+     * @return void
+     */
+    public function __wakeup()
     {
-        if ($headers = $data['_headers'] ?? $data["\0*\0_headers"] ?? null) {
-            parent::__unserialize(['headers' => $headers]);
-        }
-
-        $this->body = $data['body'] ?? $data["\0".self::class."\0body"];
-        $this->charset = $data['charset'] ?? $data["\0".self::class."\0charset"] ?? null;
-        $this->subtype = $data['subtype'] ?? $data["\0".self::class."\0subtype"];
-        $this->disposition = $data['disposition'] ?? $data["\0".self::class."\0disposition"] ?? null;
-        $this->name = $data['name'] ?? $data["\0".self::class."\0name"] ?? null;
-        $this->encoding = $data['encoding'] ?? $data["\0".self::class."\0encoding"];
-
-        if (!\is_string($this->body) && !$this->body instanceof File) {
-            throw new \BadMethodCallException('Cannot unserialize '.__CLASS__);
-        }
+        $r = new \ReflectionProperty(AbstractPart::class, 'headers');
+        $r->setValue($this, $this->_headers);
+        unset($this->_headers);
     }
 }

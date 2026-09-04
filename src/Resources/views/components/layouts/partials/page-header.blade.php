@@ -80,7 +80,10 @@
                         params: {
                             configKey: '{{ $configKey }}',
                             inline: true,
-                            prefilledData: {{ json_encode(request()->except(['page', 'perPage', 'search', 'sort', 'activeFilters'])) }}
+                            prefilledData: {{ json_encode(array_merge(
+                                request()->query('prefill', []),
+                                request()->except(['page', 'perPage', 'search', 'sort', 'activeFilters'])
+                            )) }}
                         },
                         title: '{{ $primaryAction['label'] ?? 'New ' . $modelName }}'
                     })">

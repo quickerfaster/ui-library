@@ -1,4 +1,4 @@
-<x-qf::navigation-layout configKey="admin.permission" context="Users & Permissions" moduleName="admin" :overrides=[]>
+<x-qf::navigation-layout configKey="admin.permission" context="Access" moduleName="admin" :overrides=[]>
     <div class="row">
         <div class="col-12">
             <ul class="nav nav-tabs" id="accessControlTabs" role="tablist">

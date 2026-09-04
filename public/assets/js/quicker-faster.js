@@ -519,6 +519,83 @@
     }
 
     // ------------------------------------------------------------------
+    // Flatpickr datepicker initialisation with calendar enhancements
+    // ------------------------------------------------------------------
+    function initFlatpickr() {
+        if (typeof flatpickr === 'undefined') return;
+
+        document.querySelectorAll('[data-datepicker]').forEach(function (el) {
+            // Skip already-initialised instances
+            if (el._flatpickr) return;
+
+            var config = {
+                dateFormat: 'Y-m-d',
+                allowInput: true,
+            };
+
+            // Parse calendar enhancement config from data attribute
+            var rawConfig = el.getAttribute('data-calendar-config');
+            if (rawConfig) {
+                try {
+                    var calConfig = JSON.parse(rawConfig);
+
+                    // --- disableWeekends ---
+                    if (calConfig.disableWeekends) {
+                        config.disable = [
+                            function (date) {
+                                return (date.getDay() === 0 || date.getDay() === 6);
+                            }
+                        ];
+                    }
+
+                    // --- highlightHolidays ---
+                    if (calConfig.holidays && Object.keys(calConfig.holidays).length > 0) {
+                        // Build a set of holiday date strings for fast lookup
+                        var holidayDates = {};
+                        Object.keys(calConfig.holidays).forEach(function (d) {
+                            holidayDates[d] = calConfig.holidays[d];
+                        });
+
+                        config.onDayCreate = function (dObj, dStr, fp, dayElem) {
+                            if (holidayDates[dStr]) {
+                                dayElem.classList.add('flatpickr-holiday');
+                                dayElem.setAttribute('title', holidayDates[dStr]);
+                            }
+                        };
+                    }
+
+                    // --- showTeamAbsences ---
+                    if (calConfig.teamAbsences && calConfig.teamAbsences.length > 0) {
+                        // Ensure onDayCreate exists (may have been set by holidays)
+                        var existingOnDayCreate = config.onDayCreate || null;
+
+                        config.onDayCreate = function (dObj, dStr, fp, dayElem) {
+                            // Call previous handler if it exists
+                            if (existingOnDayCreate) {
+                                existingOnDayCreate(dObj, dStr, fp, dayElem);
+                            }
+
+                            // Find team absence for this date
+                            for (var i = 0; i < calConfig.teamAbsences.length; i++) {
+                                var absence = calConfig.teamAbsences[i];
+                                if (dStr >= absence.from && dStr <= absence.to) {
+                                    dayElem.classList.add('flatpickr-team-absence');
+                                    dayElem.setAttribute('title', absence.label);
+                                    break;
+                                }
+                            }
+                        };
+                    }
+                } catch (e) {
+                    // Silently ignore parse errors — fall back to default config
+                }
+            }
+
+            flatpickr(el, config);
+        });
+    }
+
+    // ------------------------------------------------------------------
     // Livewire bootstrap
     //
     // quicker-faster.js is loaded before @livewireScripts, so every
@@ -548,12 +625,16 @@
 
             // Re-init sidebar → workspace tab integration after Livewire morphs.
             initSidebarTabIntegration();
+
+            // Re-init flatpickr datepickers after Livewire morphs.
+            initFlatpickr();
         });
 
         initWorkspaceTabs();
         initBreadcrumbDropdowns();
         initSidebarFilter();
         initSidebarTabIntegration();
+        initFlatpickr();
     });
 
     // After a wire:navigate SPA navigation the sidebar DOM is swapped, so
@@ -580,10 +661,11 @@
         }
     });
 
-    // Ctrl+K / Cmd+K → focus the sidebar filter input (unless the user is
-    // already focused in another form field).
+    // Ctrl+Shift+K / Cmd+Shift+K → focus the sidebar filter input (unless the
+    // user is already focused in another form field).
+    // NOTE: Cmd+K is reserved for the Quick Actions command palette.
     document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === 'k' || e.key === 'K')) {
             var active = document.activeElement;
             var tag = active ? active.tagName.toLowerCase() : '';
 

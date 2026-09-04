@@ -1,4 +1,17 @@
 <div class="pt-3">
+    @if(!empty($errorMessage))
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-center" role="alert">
+                    <i class="fa-solid fa-circle-exclamation fs-4 me-3"></i>
+                    <div>
+                        <strong class="d-block">Dashboard Error</strong>
+                        <span>{{ $errorMessage }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @else
     {{--
         Optional hero banner. Dashboard config shape:
         'hero' => [
@@ -88,3 +101,4 @@
         @endforeach
     </div>
 </div>
+    @endif

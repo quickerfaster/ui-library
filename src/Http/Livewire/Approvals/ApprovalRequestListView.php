@@ -3,6 +3,7 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\Approvals;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 use QuickerFaster\UILibrary\Contracts\Approvals\ApproverLabelResolver;
@@ -30,14 +31,18 @@ class ApprovalRequestListView extends Component
 
     public int $perPage = 10;
 
+    protected ApprovalGuard $guard;
+
+    protected ApproverLabelResolver $labels;
+
     protected $paginationTheme = 'bootstrap';
 
     protected $listeners = ['refreshApprovalRequests' => '$refresh'];
 
-    public function __construct(
-        protected ApprovalGuard $guard,
-        protected ApproverLabelResolver $labels,
-    ) {
+    public function boot(): void
+    {
+        $this->guard = app(ApprovalGuard::class);
+        $this->labels = app(ApproverLabelResolver::class);
     }
 
     public function mount(string $view = 'pending', ?string $workflowKey = null, ?string $status = null): void
@@ -45,6 +50,11 @@ class ApprovalRequestListView extends Component
         $this->view = in_array($view, ['pending', 'submitted'], true) ? $view : 'pending';
         $this->workflowKey = $workflowKey;
         $this->status = $status;
+
+        // Default status to 'pending' when viewing pending approvals
+        if ($this->view === 'pending' && ($this->status === null || $this->status === '')) {
+            $this->status = 'pending';
+        }
     }
 
     public function updatedView(): void
@@ -69,7 +79,24 @@ class ApprovalRequestListView extends Component
 
     public function selectWorkflow(int $workflowId): void
     {
-        $this->dispatch('showApprovalRequest', $workflowId);
+        $workflow = Workflow::with('workflowable')->find($workflowId);
+
+        if (! $workflow || ! $workflow->workflowable_type || ! $workflow->workflowable_id) {
+            $this->dispatch('showAlert', [
+                'type' => 'error',
+                'message' => 'Unable to navigate to the workflow detail page.',
+            ]);
+
+            return;
+        }
+
+        $parts = explode('\\', $workflow->workflowable_type);
+        $modelName = end($parts);
+        $modelPlural = Str::plural(Str::kebab($modelName));
+
+        $url = url("/{$modelPlural}/{$workflow->workflowable_id}");
+
+        $this->redirect($url);
     }
 
     public function workflowLabel(Workflow $workflow): string
@@ -121,7 +148,10 @@ class ApprovalRequestListView extends Component
         $query = Workflow::query()->with(['currentStep']);
 
         if ($this->view === 'pending') {
-            $query->where('status', 'pending');
+            // Only default to 'pending' when no explicit status filter is chosen
+            if ($this->status === null) {
+                $query->where('status', 'pending');
+            }
             $this->scopePendingToApprover($query, $user);
         } else {
             $query->where('submitted_by', $user?->getAuthIdentifier());

@@ -31,7 +31,7 @@
     
     // 2. If not active yet, try model name matching (fallback for detail pages)
     if (!$isActive && !empty($currentModelName)) {
-        $itemKey = $item['key'] ?? '';
+        $itemKey = $item['modelName'] ?? $item['key'] ?? '';
         $itemLabel = $item['label'] ?? '';
         
         // Normalize model name: "SomeModelName" -> "some_model_name"
@@ -42,11 +42,25 @@
     }
 
 
-    // Use explicit permission from config if available (config-driven pattern),
-    // otherwise derive from URL with Str::singular() fallback
+    // Permission resolution priority:
+    // 1. Explicit 'permission' key in config → check via AuthorizationService
+    //    FALLBACK: If permission check fails but item has 'roles', try role-based access.
+    // 2. Explicit 'roles' key in config → check user has any of the roles
+    // 3. Derive permission from URL with Str::singular() fallback
     $hasPermission = true;
     if (!empty($item['permission'])) {
         $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+        // Fallback: if the user lacks the explicit permission but the item
+        // (or its parent context group) defines roles, try role-based access.
+        if (!$hasPermission && !empty($item['roles'])) {
+            $roles = $item['roles'];
+            $isWildcard = ($roles === '*' || $roles === ['*']);
+            $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+        }
+    } elseif (!empty($item['roles'])) {
+        $roles = $item['roles'];
+        $isWildcard = ($roles === '*' || $roles === ['*']);
+        $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
     } elseif (isset($item['route'])) {
         $segments = explode('/', $item['route']);
         $viewName = last($segments);

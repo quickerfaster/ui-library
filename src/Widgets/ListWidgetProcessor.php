@@ -70,6 +70,7 @@ class ListWidgetProcessor
             'width' => $definition['width'] ?? 6,
             'showViewAll' => $definition['show_view_all'] ?? false,
             'viewAllLink' => $definition['view_all_link'] ?? null,
+            'viewAllLinkTarget' => $definition['view_all_link_target'] ?? '_self',
         ];
     }
 

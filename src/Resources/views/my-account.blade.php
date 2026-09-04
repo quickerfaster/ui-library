@@ -1,4 +1,4 @@
-<x-qf::navigation-layout configKey="admin.user" context="Users & Permissions" moduleName="admin" :overrides="[
+<x-qf::navigation-layout configKey="admin.user" context="Users" moduleName="admin" :overrides="[
     'top_bar' => ['enabled' => true],
     'breadcrumb' => ['enabled' => false],
     'title' => ['enabled' => false],

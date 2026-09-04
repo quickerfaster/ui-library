@@ -18,15 +18,21 @@ class ApprovalHistoryTimeline extends Component
 {
     public ?int $workflowId = null;
 
+    public string $displayMode = 'full';
+
     protected $listeners = ['refreshApprovalTimeline' => '$refresh'];
 
-    public function __construct(protected ApproverLabelResolver $labels)
+    protected ApproverLabelResolver $labels;
+
+    public function boot(): void
     {
+        $this->labels = app(ApproverLabelResolver::class);
     }
 
-    public function mount(?Workflow $workflow = null, ?int $workflowId = null): void
+    public function mount(?Workflow $workflow = null, ?int $workflowId = null, string $displayMode = 'full'): void
     {
         $this->workflowId = $workflowId ?? ($workflow?->getKey() ?? null);
+        $this->displayMode = $displayMode;
     }
 
     public function render()

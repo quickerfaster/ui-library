@@ -23,6 +23,12 @@ class Wizard extends Component
     public string $description = '';
     public string $returnPath = '';
 
+    /**
+     * External preset data passed from the drawer/dashboard action card.
+     * Merged with internal wizard linking data before being forwarded to WizardForm.
+     */
+    public array $presetData = [];
+
 
     protected $listeners = [
         'stepFormSaved' => 'handleStepFormSaved',
@@ -30,8 +36,11 @@ class Wizard extends Component
         'cancelDelete' => 'cancelDelete',
     ];
 
-    public function mount(string $configKey): void
+    public string $isResumingDraft = 'false';
+
+    public function mount(string $configKey, array $presetData = []): void
     {
+        $this->presetData = $presetData;
 
         $this->configKey = $configKey;
         $this->wizardId = 'wizard-' . md5($configKey . '-' . session()->getId());
@@ -43,6 +52,23 @@ class Wizard extends Component
         $this->title = $resolver->getTitle();
         $this->description = $resolver->getDescription();
         $this->returnPath = $resolver->getReturnPath();
+
+        // Check for resume draft query parameter
+        $resumeRecordId = request()->query('resumeRecordId');
+        if ($resumeRecordId && !empty($this->steps)) {
+            $primaryModel = $this->models['primary'] ?? null;
+            if ($primaryModel) {
+                $draftRecord = $primaryModel::find($resumeRecordId);
+                if ($draftRecord && ($draftRecord->status ?? '') === 'Draft') {
+                    $this->stepData[0] = (int) $resumeRecordId;
+                    $this->primaryModelId = (int) $resumeRecordId;
+                    $this->createdRecords[] = ['model' => $primaryModel, 'id' => (int) $resumeRecordId];
+                    $this->isResumingDraft = 'true';
+                    $this->saveToSession();
+                    return;
+                }
+            }
+        }
 
         // Restore from session if exists
         if (session()->has($this->wizardId)) {
@@ -229,12 +255,17 @@ class Wizard extends Component
     }
 
     /**
-     * Build preset data for the current step (e.g., foreign keys from previous steps)
+     * Build preset data for the current step (e.g., foreign keys from previous steps).
+     *
+     * External preset data (from drawer/dashboard action cards) is merged in,
+     * with internal wizard linking data taking precedence for the same keys.
      */
     protected function getPresetDataForCurrentStep(): array
     {
         $step = $this->steps[$this->currentStep] ?? [];
-        $preset = [];
+
+        // Start with external preset data (e.g. employee_id from dashboard action card)
+        $preset = $this->presetData;
 
         if (isset($step['requiresLink']) && $step['requiresLink']) {
             // Find the source step (isLinkSource = true)

@@ -438,7 +438,7 @@ return [
     | apps can reorder, relabel, or disable columns by publishing this config.
     */
     'approvals' => [
-        'approver_resolver' => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverResolver::class,
+        'approver_resolver' => \QuickerFaster\UILibrary\Services\Approvals\WorkspaceScopedApproverResolver::class,
         'approver_label_resolver' => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverLabelResolver::class,
         'bypass_roles' => ['super_admin'],
         'list_columns' => [
@@ -449,6 +449,24 @@ return [
             'submitted_at' => ['label' => 'Submitted', 'enabled' => true],
             'actions' => ['label' => 'Actions', 'enabled' => true],
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Module Dashboard Access Control
+    |--------------------------------------------------------------------------
+    |
+    | Maps URL prefixes to allowed roles for module dashboard access.
+    | The consuming application should override this with its own
+    | business-specific role mappings.
+    |
+    | Roles use spatie/laravel-permission. Users with 'super_admin' or
+    | 'admin' roles automatically bypass all checks.
+    |
+    */
+    'module_access' => [
+        // Example: 'system' => ['super_admin'],
+        // Example: 'hr'     => ['admin', 'super_admin'],
     ],
 
     /*
@@ -890,6 +908,51 @@ return [
             'enabled' => true,
             'max_attempts' => 60,
             'decay_minutes' => 1,
+        ],
+    ],
+    'quick_actions' => [
+        'enabled' => true,
+        'roles' => '*',
+        'command_palette' => [
+            'enabled' => true,
+            'shortcut' => 'Cmd+K',
+            'placeholder' => 'Search actions, records, pages...',
+            'max_recent_items' => 5,
+            'max_action_results' => 20,
+            'fuzzy_threshold' => 0.4,
+
+            /*
+            |--------------------------------------------------------------
+            | Search button (top nav)
+            |--------------------------------------------------------------
+            | The search-icon button in the top nav opens the command
+            | palette. Icon and title are customizable here.
+            */
+            'button_icon' => 'fas fa-search',
+            'button_title' => 'Search Actions (Cmd+K)',
+        ],
+        'top_nav_button' => [
+            'enabled' => true,
+            'icon' => 'fas fa-bolt',
+            'title' => 'Quick Actions',
+            'max_items' => 8,
+            'show_badge_on_first_visit' => true,
+        ],
+        'actions' => [],
+        'tracking' => [
+            'enabled' => true,
+            'track_page_views' => true,
+            'track_record_views' => true,
+            'track_record_creates' => true,
+            'track_record_updates' => true,
+            'retention_days' => 90,
+            'max_history_per_user' => 500,
+        ],
+        'ranking' => [
+            'recency_weight' => 0.6,
+            'frequency_weight' => 0.4,
+            'half_life_days' => 7,
+            'frequency_saturation' => 5,
         ],
     ],
 ];

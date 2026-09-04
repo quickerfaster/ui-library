@@ -687,6 +687,8 @@ class WorkflowEngineTest extends TestCase
             ->andReturn(['database' => true]);
 
         $this->engine->approve($workflow);
+
+        $this->assertSame('approved', $workflow->fresh()->status);
     }
 
     /** @test */
@@ -720,6 +722,8 @@ class WorkflowEngineTest extends TestCase
         $this->notifications->shouldNotReceive('dispatch');
 
         $this->engine->approve($workflow);
+
+        $this->assertSame('approved', $workflow->fresh()->status);
     }
 
     /** @test */
@@ -752,6 +756,8 @@ class WorkflowEngineTest extends TestCase
         $this->notifications->shouldNotReceive('dispatch');
 
         $this->engine->approve($workflow);
+
+        $this->assertSame('approved', $workflow->fresh()->status);
     }
 
     // ------------------------------------------------------------------

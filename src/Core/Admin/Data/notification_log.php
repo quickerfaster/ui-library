@@ -67,10 +67,10 @@ return [
     ],
 
     'hiddenFields' => [
-        'onTable' => ['error_message', 'created_at'],
+        'onTable' => ['error_message'],
     ],
 
-    'simpleActions' => [],
+    'simpleActions' => ['show'],
 
     'controls' => [
         'addButton' => false,

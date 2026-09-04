@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Modules\Admin\Database\Seeders\QFDatabaseSeeder;
-use  Database\Seeders\UserSeeder;
+use QuickerFaster\UILibrary\Core\Admin\Database\Seeders\RoleSeeder;
+use QuickerFaster\UILibrary\Core\Admin\Database\Seeders\UserSeeder;
 use QuickerFaster\UILibrary\Services\AccessControl\AccessControlPermissionService;
 
 class DatabaseSeeder extends Seeder
@@ -16,13 +16,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        // \App\Models\User::factory(10)->create();
         $this->call([
-            QFDatabaseSeeder::class,
-            UserSeeder::class
+            RoleSeeder::class,
+            UserSeeder::class,
         ]);
 
         AccessControlPermissionService::seedPermissionNames();
-
     }
 }

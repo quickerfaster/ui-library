@@ -1,0 +1,127 @@
+# HR SaaS — AI Feature Implementation Reference
+**Stack:** Laravel + Livewire
+**MVP Scope:** Employee Management, Attendance/Clock In-Out, Payroll, Leave Management, Employee Self-Service Portal
+
+This document is a build reference for implementing AI and non-AI "smart" features across the product roadmap. It records *what to build, when to build it, whether it needs AI at all, and why* — so any future implementation work (by a human or an AI assistant) starts from settled decisions instead of re-litigating them.
+
+---
+
+## How to use this document
+
+- Treat the **"Needs AI?"** verdict as a default, not a hard rule — revisit only if new evidence (cost, data volume, accuracy) changes the tradeoff.
+- Build in the phase order given. Do not pull a Phase 3 feature forward unless Phase 1/2 are stable and shipped.
+- Every AI-labeled feature must run through **Laravel Queues**, never synchronously in the request cycle. AI latency should never block a Livewire component.
+- Where "Pure Code" is recommended, resist the temptation to route it through an LLM later just because AI is available elsewhere in the app — deterministic logic is faster, cheaper, and auditable, and payroll/compliance features specifically benefit from being provably deterministic.
+
+---
+
+## Phase 1 — MVP (build first)
+
+### 1. Document & Receipt Scanner
+- **Where:** Employee onboarding (ID upload), Payroll (expense receipts)
+- **Needs AI?** Yes
+- **Approach:** LLM with structured JSON output (e.g. `gpt-4o-mini`-class model) reading the uploaded image/PDF, returning a fixed schema (`{"total": ..., "tax": ..., "vendor": ..., "date": ...}`)
+- **Why AI:** Traditional OCR (Tesseract) extracts raw text only; it can't normalize wildly varying receipt/ID layouts into structured fields. AI handles layout variance and returns clean, predictable JSON.
+- **Implementation notes:**
+  - Dispatch to a queued job on upload; use `wire:poll` or Laravel Echo to update the Livewire form once parsed.
+  - Validate/clamp AI output server-side before writing to the DB (never trust numeric fields blindly — re-check totals, currency format, date parsing).
+  - Auto-fill the Livewire form fields but always leave them editable — treat AI output as a draft, not a final value.
+
+### 2. 24/7 Policy Concierge (Chatbot)
+- **Where:** Employee Self-Service dashboard
+- **Needs AI?** Yes
+- **Approach:** Retrieval-Augmented Generation (RAG) over the company handbook/policy documents
+- **Why AI:** Employees phrase questions conversationally ("Can I take time off if my kid is sick?"); deterministic keyword search can't reliably map that to the right handbook clause.
+- **Implementation notes:**
+  - Chunk and embed the handbook (markdown/PDF) into a vector store; retrieve top-k chunks per query before generating an answer.
+  - Constrain the system prompt to answer **only** from retrieved context — refuse or escalate to HR if the answer isn't in the source documents (avoid hallucinated policy answers, which carry legal risk).
+  - Log every Q&A pair for HR review; surface an "escalate to HR" action in the Livewire chat widget for anything the bot can't confidently answer.
+  - Re-embed documents whenever the handbook changes — build this into the document-update workflow, not as a manual afterthought.
+
+### 3. Automated Payroll Anomaly Auditor
+- **Where:** Payroll approval screen
+- **Needs AI?** **No** — use pure Laravel code
+- **Approach:** Deterministic variance check via Eloquent aggregates
+- **Why not AI:** Payroll requires mathematical precision and auditability; LLMs are probabilistic and can hallucinate numbers. A percentage-variance comparison is trivial to compute exactly.
+- **Reference logic:**
+  ```php
+  $variance = (($current_pay - $last_pay) / $last_pay) * 100;
+  if ($variance > 15) {
+      // flag for review
+  }
+  ```
+- **Implementation notes:** Flag variances per employee and per department; surface flagged rows in the Livewire payroll approval table with the specific reason (overtime spike, missing deduction, etc.) rather than a bare percentage.
+
+---
+
+## Phase 2 — Post-launch / V1.1
+
+### 4. Smart Leave Conflict & Capacity Predictor
+- **Where:** Manager leave approval screen
+- **Needs AI?** **No** — use pure Laravel code
+- **Approach:** Database aggregate query — count team members vs. approved leave overlapping the requested dates
+- **Why not AI:** This is simple counting/percentage logic against structured data. An AI call would add cost and latency for something a single query answers exactly.
+- **Implementation notes:** Show the capacity warning inline on the Livewire approval component (e.g. "3 of 5 Support reps are already off this week") before the manager clicks approve.
+
+### 5. Attendance & Clock-In Fraud Flagging
+- **Where:** Attendance management
+- **Needs AI?** No for MVP/V1.1; reconsider later for advanced behavioral detection
+- **Approach (now):** Rule-based checks — IP outside company network, geofence radius exceeded, suspicious timestamp patterns
+- **Why not AI (yet):** Simple threshold/rule checks catch the majority of buddy-punching and time-theft cases without needing a model.
+- **Future AI trigger:** Revisit only if you need to detect subtle behavioral patterns (typing/tap cadence, multi-signal correlation) that rules can't express — and only once enough historical data exists to train/validate against.
+
+---
+
+## Phase 3 — Future enterprise scale
+
+### 6. Predictive Churn & Flight-Risk Analytics
+- **Where:** Executive HR insights dashboard
+- **Needs AI?** Yes
+- **Approach:** ML model correlating multiple weak signals (sick-leave trend, login/clock-in drop-off, tenure without promotion, engagement scores)
+- **Why AI:** The signal is in the *combination and weighting* of many overlapping, non-linear variables — this is exactly what rule-based `if/else` logic handles poorly.
+- **Prerequisite:** Don't start this until Phase 1–2 data (attendance, leave, engagement surveys) has accumulated for enough months to be statistically meaningful. Building this on thin data produces unreliable, hard-to-trust scores — worse than not having the feature.
+
+### 7. Automated Shift & Overtime Optimization
+- **Where:** Shift scheduler
+- **Needs AI?** Hybrid
+- **Approach:** Solve the core scheduling problem with constraint/linear-programming algorithms (structured optimization, not ML); introduce AI later only to forecast seasonal demand (e.g. predicted foot traffic/volume) that feeds the solver's inputs.
+- **Why hybrid:** Rostering against fixed constraints (availability, labor law caps) is a solvable math problem — best handled by a constraint solver, not a language model. AI's value-add here is upstream demand forecasting, not the scheduling logic itself.
+
+---
+
+## Decision summary table
+
+| # | Feature | Phase | Needs AI? | Core approach |
+|---|---------|-------|-----------|----------------|
+| 1 | Document/Receipt Scanner | 1 | Yes | LLM structured JSON extraction |
+| 2 | Policy Concierge Chatbot | 1 | Yes | RAG over handbook |
+| 3 | Payroll Anomaly Auditor | 1 | No | Eloquent variance calc |
+| 4 | Leave Conflict/Capacity Predictor | 2 | No | DB aggregate query |
+| 5 | Clock-In Fraud Flagging | 2 | No (future: maybe) | Rule-based checks |
+| 6 | Predictive Churn/Flight Risk | 3 | Yes | ML on multi-signal correlation |
+| 7 | Shift/Overtime Optimization | 3 | Hybrid | Constraint solver + AI demand forecast |
+
+---
+
+## Technical architecture baseline (applies to every AI feature)
+
+| Component | Choice | Why |
+|---|---|---|
+| AI wrapper | `openai-php/laravel` (or equivalent Anthropic SDK wrapper) | Native Laravel integration, supports streaming into Livewire |
+| Background processing | Laravel Queues (Redis or DB driver) | Keeps the UI responsive; AI calls run async |
+| Real-time UI updates | Livewire `wire:poll` or Laravel Echo/WebSockets | Streams AI results back into the component without a page reload |
+| Monitoring | Laravel Pulse (or equivalent) | Track AI API latency and cost per feature |
+
+**Rule of thumb before adding AI to any new feature:** if the task is counting, comparing, or matching structured data you already have in the database, write it in Eloquent. Reach for AI only when the input is unstructured (free text, images, documents) or the output requires weighing many non-linear signals at once.
+
+---
+
+## Supporting rationale (why these features, condensed)
+
+- **Receipt/ID scanning:** manual data entry and reconciliation account for the majority of processing overhead in these workflows; automation cuts that overhead sharply, and expense reporting is a widely-reported pain point for employees.
+- **Policy chatbot:** HR service-delivery chat is consistently ranked as a top generative-AI priority among HR leaders, and automating routine HR Q&A frees meaningful staff time weekly.
+- **Payroll auditing:** automated validation controls in payroll processing meaningfully cut processing time and catch errors before payout.
+- **Leave capacity checks:** a large share of repetitive manager tasks can be streamlined with simple automation — no AI required to capture this value.
+- **Churn prediction:** the value comes from correlating many overlapping variables at once, which is difficult for humans to track consistently but is exactly what statistical/ML models are suited for.
+
+*(Original chat cited Deloitte, Amex Trendex, Gartner, SHRM, Nucleus Research, HBR, and Paycor as sources for these figures — verify current figures before quoting them externally, as HR/AI market stats update frequently.)*

@@ -37,7 +37,7 @@ use Symfony\Component\Finder\Iterator\SortableIterator;
  *
  * @author Fabien Potencier <fabien@symfony.com>
  *
- * @implements \IteratorAggregate<non-empty-string, SplFileInfo>
+ * @implements \IteratorAggregate<string, SplFileInfo>
  */
 class Finder implements \IteratorAggregate, \Countable
 {
@@ -399,8 +399,10 @@ class Finder implements \IteratorAggregate, \Countable
      * @see ignoreVCS()
      *
      * @param string|string[] $pattern VCS patterns to ignore
+     *
+     * @return void
      */
-    public static function addVCSPattern(string|array $pattern): void
+    public static function addVCSPattern(string|array $pattern)
     {
         foreach ((array) $pattern as $p) {
             self::$vcsPatterns[] = $p;
@@ -588,8 +590,9 @@ class Finder implements \IteratorAggregate, \Countable
      *
      * @see CustomFilterIterator
      */
-    public function filter(\Closure $closure, bool $prune = false): static
+    public function filter(\Closure $closure /* , bool $prune = false */): static
     {
+        $prune = 1 < \func_num_args() ? func_get_arg(1) : false;
         $this->filters[] = $closure;
 
         if ($prune) {
@@ -659,7 +662,7 @@ class Finder implements \IteratorAggregate, \Countable
      *
      * This method implements the IteratorAggregate interface.
      *
-     * @return \Iterator<non-empty-string, SplFileInfo>
+     * @return \Iterator<string, SplFileInfo>
      *
      * @throws \LogicException if the in() method has not been called
      */
@@ -832,7 +835,7 @@ class Finder implements \IteratorAggregate, \Countable
     /**
      * Normalizes given directory names by removing trailing slashes.
      *
-     * Excluding: (s)ftp:// or ssh2.(s)ftp:// wrapper
+     * Excluding: stream wrapper schemes such as ftp:// or s3://
      */
     private function normalizeDir(string $dir): string
     {
@@ -842,7 +845,7 @@ class Finder implements \IteratorAggregate, \Countable
 
         $dir = rtrim($dir, '/'.\DIRECTORY_SEPARATOR);
 
-        if (preg_match('#^(ssh2\.)?s?ftp://#', $dir)) {
+        if (preg_match('#^[a-zA-Z][a-zA-Z0-9.+-]*://#', $dir)) {
             $dir .= '/';
         }
 

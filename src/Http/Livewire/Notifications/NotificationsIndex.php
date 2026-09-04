@@ -95,6 +95,34 @@ class NotificationsIndex extends Component
     }
 
     /**
+     * Navigate to the URL associated with a notification.
+     *
+     * Marks the notification as read (if not already) and dispatches
+     * a Livewire navigate event to the URL stored in the notification's
+     * data payload.
+     */
+    public function navigateToNotification(int $notificationId): void
+    {
+        $notification = Notification::find($notificationId);
+
+        if (! $notification) {
+            return;
+        }
+
+        // Mark as read
+        if (! $notification->read_at) {
+            $notification->update(['read_at' => now()]);
+        }
+
+        // Navigate to the URL stored in data, if present
+        $url = $notification->data['url'] ?? null;
+
+        if ($url) {
+            $this->redirect($url);
+        }
+    }
+
+    /**
      * Mark every unread notification as read (scoped to the current user).
      */
     public function markAllAsRead(): void

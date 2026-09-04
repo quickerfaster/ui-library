@@ -1,7 +1,7 @@
 <?php
 
 return array (
-  'title' => 'User & Permission Overview',
+  'title' => 'Admin Dashboard',
   'description' => 'Monitor user accounts, roles, permissions, and access control metrics',
   'widgets' =>
   array (
@@ -212,10 +212,16 @@ return array (
         0 =>
         array (
           'label' => 'Invite',
-          'event' => 'openInviteUserModal',
+          'event' => 'openDrawer',
           'params' =>
           array (
-            'type' => 'invite',
+            'component' => 'qf.data-table-form',
+            'params' =>
+            array (
+              'configKey' => 'admin.user',
+              'recordId' => null,
+            ),
+            'title' => 'Invite User',
           ),
           'style' => 'primary',
         ),
@@ -234,10 +240,16 @@ return array (
         0 =>
         array (
           'label' => 'Create',
-          'event' => 'openRoleWizard',
+          'event' => 'openDrawer',
           'params' =>
           array (
-            'type' => 'role',
+            'component' => 'qf.data-table-form',
+            'params' =>
+            array (
+              'configKey' => 'admin.role',
+              'recordId' => null,
+            ),
+            'title' => 'Add Role',
           ),
           'style' => 'secondary',
         ),
@@ -256,10 +268,16 @@ return array (
         0 =>
         array (
           'label' => 'Create',
-          'event' => 'openPermissionWizard',
+          'event' => 'openDrawer',
           'params' =>
           array (
-            'type' => 'permission',
+            'component' => 'qf.data-table-form',
+            'params' =>
+            array (
+              'configKey' => 'admin.permission',
+              'recordId' => null,
+            ),
+            'title' => 'Add Permission',
           ),
           'style' => 'secondary',
         ),
@@ -278,10 +296,10 @@ return array (
         0 =>
         array (
           'label' => 'Sync Now',
-          'event' => 'syncPermissions',
+          'event' => 'navigate',
           'params' =>
           array (
-            'scope' => 'all',
+            'url' => '/admin/permissions',
           ),
           'style' => 'warning',
         ),

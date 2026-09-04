@@ -7,8 +7,13 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
 use QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider;
 use QuickerFaster\UILibrary\Contracts\Notifications\Notifiable;
+use QuickerFaster\UILibrary\Models\Notification;
+use QuickerFaster\UILibrary\Models\UserFavoriteAction;
 use QuickerFaster\UILibrary\Services\Notifications\NotificationService;
 use QuickerFaster\UILibrary\Events\NavigationBuilding;
+use QuickerFaster\UILibrary\Services\QuickActions\ActionRegistry;
+use QuickerFaster\UILibrary\Services\QuickActions\ActionTracker;
+use QuickerFaster\UILibrary\Services\QuickActions\RankingEngine;
 
 class TopNav extends Component
 {
@@ -77,6 +82,52 @@ class TopNav extends Component
     public bool $showNotificationsDrawer = false;
 
     // ------------------------------------------------------------------
+    //  Quick Actions Configuration
+    // ------------------------------------------------------------------
+
+    /** @var bool Whether the quick actions search button is enabled for the current user. */
+    public bool $quickActionsEnabled = true;
+
+    /** @var string Icon class for the quick actions button. */
+    public string $quickActionsIcon = 'fas fa-search';
+
+    /** @var string Title attribute for the quick actions button. */
+    public string $quickActionsTitle = 'Quick Actions (Cmd+K)';
+
+    // ------------------------------------------------------------------
+    //  Quick Actions ⚡ Button (Top Nav Dropdown)
+    // ------------------------------------------------------------------
+
+    /** @var bool Whether the quick actions ⚡ dropdown button is enabled for the current user. */
+    public bool $quickActionsButtonEnabled = true;
+
+    /** @var string Icon class for the quick actions ⚡ button. */
+    public string $quickActionsButtonIcon = 'fas fa-bolt';
+
+    /** @var string Title attribute for the quick actions ⚡ button. */
+    public string $quickActionsButtonTitle = 'Quick Actions';
+
+    /** @var int Maximum number of ranked actions shown in the ⚡ dropdown. */
+    public int $quickActionsMaxItems = 8;
+
+    /** @var array Top-ranked quick actions for the current user. */
+    public array $quickActions = [];
+
+    // ------------------------------------------------------------------
+    //  Phase 4: Favorites / Pinning
+    // ------------------------------------------------------------------
+
+    /** @var array<string> Set of favorited action IDs for the current user. */
+    public array $quickActionFavorites = [];
+
+    // ------------------------------------------------------------------
+    //  Phase 4: First-Visit Pulse
+    // ------------------------------------------------------------------
+
+    /** @var bool Whether to show the first-visit pulse animation on the ⚡ button. */
+    public bool $showQuickActionsPulse = false;
+
+    // ------------------------------------------------------------------
 
     protected CompanyProvider $companyProvider;
 
@@ -108,6 +159,10 @@ class TopNav extends Component
         $this->loadModuleSwitcherConfig();
         $this->loadBackgroundJobsConfig();
         $this->loadNotificationsConfig();
+        $this->loadQuickActionsConfig();
+        $this->loadQuickActionFavorites();
+        $this->loadQuickActions();
+        $this->loadFirstVisitPulse();
         $this->loadCompanies();
         $this->loadModules();
     }
@@ -246,6 +301,300 @@ class TopNav extends Component
     }
 
     /**
+     * Load quick actions configuration and resolve role-based access.
+     *
+     * Mirrors the background jobs, notifications, module switcher, and company
+     * switcher patterns for consistency:
+     * - Reads quick_actions.enabled / quick_actions.roles from config.
+     * - Supports '*' wildcard for all authenticated users.
+     * - Reads icon and title from config for flexible customization.
+     */
+    protected function loadQuickActionsConfig(): void
+    {
+        $config = config('ui-library.quick_actions', []);
+
+        // 1. Enabled toggle
+        $enabled = $config['enabled'] ?? true;
+        if (!$enabled) {
+            $this->quickActionsEnabled = false;
+            return;
+        }
+
+        // 2. Role check (mirrors background jobs pattern)
+        if (auth()->check()) {
+            $roles = $config['roles'] ?? '*';
+            $isWildcard = ($roles === '*' || $roles === ['*']);
+
+            if (!$isWildcard && !auth()->user()->hasAnyRole((array) $roles)) {
+                $this->quickActionsEnabled = false;
+                return;
+            }
+        }
+
+        $this->quickActionsEnabled = true;
+
+        // 3. Search button icon and title (command_palette sub-key)
+        $paletteConfig = $config['command_palette'] ?? [];
+        $this->quickActionsIcon = $paletteConfig['button_icon'] ?? 'fas fa-search';
+        $this->quickActionsTitle = $paletteConfig['button_title'] ?? 'Search Actions (Cmd+K)';
+
+        // 4. ⚡ dropdown button icon, title, and item limit (top_nav_button sub-key)
+        $buttonConfig = $config['top_nav_button'] ?? [];
+        $this->quickActionsButtonEnabled = $buttonConfig['enabled'] ?? true;
+        $this->quickActionsButtonIcon = $buttonConfig['icon'] ?? 'fas fa-bolt';
+        $this->quickActionsButtonTitle = $buttonConfig['title'] ?? 'Quick Actions';
+        $this->quickActionsMaxItems = (int) ($buttonConfig['max_items'] ?? 8);
+    }
+
+    /**
+     * Load the top-ranked quick actions for the ⚡ dropdown.
+     *
+     * Consumes the Phase 2 ranking signal (RankingEngine::score) and slices
+     * to the configured maximum item count. An empty list is returned when
+     * the button is disabled or the user is unauthenticated.
+     *
+     * Phase 4: Favorited actions are interleaved at the top.
+     */
+    protected function loadQuickActions(): void
+    {
+        if (!$this->quickActionsButtonEnabled || !auth()->check()) {
+            $this->quickActions = [];
+            return;
+        }
+
+        /** @var ActionRegistry $registry */
+        $registry = app(ActionRegistry::class);
+        $actions = $registry->authorizedFor();
+
+        /** @var RankingEngine $ranking */
+        $ranking = app(RankingEngine::class);
+        $actions = $ranking->score($actions, auth()->id());
+
+        // Phase 4: Interleave favorites at the top.
+        $actions = $this->interleaveQuickActionFavorites($actions);
+
+        $this->quickActions = array_slice($actions, 0, $this->quickActionsMaxItems);
+    }
+
+    /**
+     * Load the current user's favorited action IDs.
+     *
+     * @return void
+     */
+    protected function loadQuickActionFavorites(): void
+    {
+        $this->quickActionFavorites = [];
+
+        if (!auth()->check()) {
+            return;
+        }
+
+        $this->quickActionFavorites = UserFavoriteAction::query()
+            ->where('user_id', auth()->id())
+            ->pluck('action_id')
+            ->toArray();
+    }
+
+    /**
+     * Interleave favorited actions at the top of the list.
+     *
+     * @param  array<int, array> $actions
+     * @return array<int, array>
+     */
+    protected function interleaveQuickActionFavorites(array $actions): array
+    {
+        if (empty($this->quickActionFavorites)) {
+            return $actions;
+        }
+
+        $favoriteSet = array_flip($this->quickActionFavorites);
+
+        $pinned = [];
+        $rest = [];
+
+        foreach ($actions as $action) {
+            $id = $action['id'] ?? $action['key'] ?? null;
+            if ($id && isset($favoriteSet[$id])) {
+                $action['_pinned'] = true;
+                $pinned[] = $action;
+            } else {
+                $action['_pinned'] = false;
+                $rest[] = $action;
+            }
+        }
+
+        usort($pinned, function (array $a, array $b) {
+            $posA = array_search($a['id'] ?? $a['key'] ?? '', $this->quickActionFavorites);
+            $posB = array_search($b['id'] ?? $b['key'] ?? '', $this->quickActionFavorites);
+            return ($posA === false ? PHP_INT_MAX : $posA) <=> ($posB === false ? PHP_INT_MAX : $posB);
+        });
+
+        return array_merge($pinned, $rest);
+    }
+
+    /**
+     * Toggle a favorite/pin for the given action ID.
+     *
+     * @param  string $actionId
+     * @return void
+     */
+    public function toggleQuickActionFavorite(string $actionId): void
+    {
+        if (!auth()->check()) {
+            return;
+        }
+
+        $existing = UserFavoriteAction::query()
+            ->where('user_id', auth()->id())
+            ->where('action_id', $actionId)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+        } else {
+            UserFavoriteAction::create([
+                'user_id'   => auth()->id(),
+                'action_id' => $actionId,
+            ]);
+        }
+
+        $this->loadQuickActionFavorites();
+        $this->loadQuickActions();
+    }
+
+    /**
+     * Check whether the given action ID is favorited by the current user.
+     *
+     * @param  string $actionId
+     * @return bool
+     */
+    public function isQuickActionFavorited(string $actionId): bool
+    {
+        return in_array($actionId, $this->quickActionFavorites, true);
+    }
+
+    // ------------------------------------------------------------------
+    //  Phase 4: First-Visit Pulse
+    // ------------------------------------------------------------------
+
+    /**
+     * Determine whether to show the first-visit pulse animation on the ⚡ button.
+     *
+     * Uses a session flag so the pulse only shows once per session.
+     *
+     * @return void
+     */
+    protected function loadFirstVisitPulse(): void
+    {
+        $config = config('ui-library.quick_actions.top_nav_button', []);
+        $showBadge = $config['show_badge_on_first_visit'] ?? true;
+
+        if (!$showBadge) {
+            $this->showQuickActionsPulse = false;
+            return;
+        }
+
+        $sessionKey = 'quick_actions_first_visit_seen';
+
+        if (Session::has($sessionKey)) {
+            $this->showQuickActionsPulse = false;
+            return;
+        }
+
+        // Show pulse on first visit, then mark as seen.
+        $this->showQuickActionsPulse = true;
+        Session::put($sessionKey, true);
+    }
+
+    /**
+     * Open the quick actions command palette.
+     */
+    public function openQuickActions(): void
+    {
+        $this->dispatch('openQuickActions');
+    }
+
+    /**
+     * Execute a quick action from the ⚡ dropdown by its ID.
+     *
+     * Mirrors QuickActionsPanel::executeAction(): records the execution for
+     * personalized ranking via ActionTracker, then navigates or dispatches a
+     * Livewire event based on the action's `action` type.
+     */
+    public function executeQuickAction(string $id): void
+    {
+        /** @var ActionRegistry $registry */
+        $registry = app(ActionRegistry::class);
+        $action = $registry->findByKey($id);
+
+        if (!$action) {
+            return;
+        }
+
+        // Record this execution for personalized ranking (Phase 2).
+        $actionId = $action['id'] ?? $action['key'] ?? null;
+        if ($actionId) {
+            /** @var ActionTracker $tracker */
+            $tracker = app(ActionTracker::class);
+            $tracker->record((string) $actionId);
+        }
+
+        $type = $action['action'] ?? 'navigate';
+
+        switch ($type) {
+            case 'navigate':
+                $url = $this->resolveQuickActionUrl($action);
+                if ($url) {
+                    $this->dispatch('navigate', url: $url);
+                }
+                break;
+
+            case 'event':
+                $event = $action['livewire_event'] ?? null;
+                if ($event) {
+                    $this->dispatch($event);
+                }
+                break;
+
+            case 'drawer':
+                $event = $action['livewire_event'] ?? 'openDrawer';
+                $this->dispatch($event);
+                break;
+
+            default:
+                $url = $this->resolveQuickActionUrl($action);
+                if ($url) {
+                    $this->dispatch('navigate', url: $url);
+                }
+                break;
+        }
+    }
+
+    /**
+     * Resolve the URL for a navigation quick action.
+     */
+    protected function resolveQuickActionUrl(array $action): ?string
+    {
+        // Prefer named route
+        if (!empty($action['route'])) {
+            try {
+                return route($action['route']);
+            } catch (\Exception $e) {
+                if (str_starts_with($action['route'], '/')) {
+                    return url($action['route']);
+                }
+            }
+        }
+
+        // Fall back to direct URL
+        if (!empty($action['url'])) {
+            return url($action['url']);
+        }
+
+        return null;
+    }
+
+    /**
      * Open the notifications drawer.
      */
     public function openNotificationsDrawer(): void
@@ -336,6 +685,34 @@ class TopNav extends Component
     }
 
     /**
+     * Navigate to the URL associated with a notification.
+     *
+     * Marks the notification as read (if not already) and dispatches
+     * a Livewire navigate event to the URL stored in the notification's
+     * data payload.
+     */
+    public function navigateToNotification(int $notificationId): void
+    {
+        $notification = Notification::find($notificationId);
+
+        if (! $notification) {
+            return;
+        }
+
+        // Mark as read
+        if (! $notification->read_at) {
+            $notification->update(['read_at' => now()]);
+        }
+
+        // Navigate to the URL stored in data, if present
+        $url = $notification->data['url'] ?? null;
+
+        if ($url) {
+            $this->redirect($url);
+        }
+    }
+
+    /**
      * Livewire event listeners for real-time notification broadcasts.
      */
     public function getListeners(): array
@@ -345,6 +722,7 @@ class TopNav extends Component
 
         return [
             "echo-private:notifiable.{$id},notification.dispatched" => 'refreshUnreadCount',
+            'execute-quick-action' => 'executeQuickAction',
         ];
     }
 
@@ -589,7 +967,6 @@ class TopNav extends Component
     public function switchModule(string $moduleKey): void
     {
         session(['active_module' => $moduleKey]);
-
         $module = collect($this->modules)->firstWhere('key', $moduleKey);
         if ($module && isset($module['route'])) {
             $this->redirect(route($module['route']));

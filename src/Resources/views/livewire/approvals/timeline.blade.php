@@ -1,7 +1,7 @@
 <div>
     @if(!$workflow)
         <div class="text-muted text-center py-4">No workflow has been started yet.</div>
-    @else
+    @elseif($displayMode === 'full')
         <h6 class="mb-3">Workflow Timeline</h6>
 
         @if($actions->isEmpty())
@@ -53,6 +53,61 @@
                             </div>
                         @endif
                     </div>
+                @endforeach
+            </div>
+        @endif
+    @elseif($displayMode === 'compact')
+        @if($actions->isEmpty())
+            <div class="text-muted text-center py-3 small">No activity recorded.</div>
+        @else
+            <div class="list-group list-group-flush">
+                @foreach($actions as $action)
+                    <div class="list-group-item px-0 py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold small">{{ $action['label'] }}</span>
+                                <span class="small text-muted ms-2">
+                                    @if($action['actor'])
+                                        {{ $action['actor'] }}
+                                    @else
+                                        System
+                                    @endif
+                                    @if($action['step_name'])
+                                        &middot; {{ $action['step_name'] }}
+                                    @endif
+                                </span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <x-qf::status.approval-status-badge :status="$action['status']" />
+                                <span class="small text-muted">{{ $action['created_at']?->format('M d, H:i') }}</span>
+                            </div>
+                        </div>
+                        @if($action['comments'])
+                            <div class="small text-muted mt-1">
+                                <i class="fas fa-comment-dots me-1"></i> {{ $action['comments'] }}
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    @elseif($displayMode === 'steps-only')
+        @if($actions->isEmpty())
+            <div class="text-muted text-center py-2 small">No steps recorded.</div>
+        @else
+            <div class="d-flex flex-wrap align-items-center gap-1">
+                @foreach($actions as $action)
+                    <span class="badge bg-light text-dark border me-1">
+                        @if($action['step_name'])
+                            {{ $action['step_name'] }}
+                        @else
+                            {{ $action['label'] }}
+                        @endif
+                    </span>
+                    <x-qf::status.approval-status-badge :status="$action['status']" />
+                    @if(!$loop->last)
+                        <span class="text-muted small">&rarr;</span>
+                    @endif
                 @endforeach
             </div>
         @endif

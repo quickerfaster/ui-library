@@ -1,12 +1,533 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-08-17
-> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23) + Module Auto-Discovery + Tenancy Foundation + DataTable Record Events + HasWorkflow Trait + Resolver Config Bindings
+> **Date**: 2026-08-30
+> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23) + Module Auto-Discovery + Tenancy Foundation + DataTable Record Events + HasWorkflow Trait + Resolver Config Bindings + DataTable Runtime Bridges + Drawer Decoupled Pattern + Cross-Module Cleanup + WorkspaceScopedApproverResolver Default + Approval UI Constructor→Boot Refactor + Payroll Approval Integration
 
 ---
 
 > ⚠️ **Testing status (2026-08-16)**: The workflow/approval foundation has been implemented and unit-verified (`php -l`, config validation), but has **NOT** yet been tested end-to-end in a consuming app. Further adjustments may be needed once integrated into a real consuming app (e.g., Spatie role/permission seeding, notification template registration, workspace-scoped approver resolution, and runtime workflow execution against real entities).
+
+## ApprovalPanel Combined Component & Approval UX Polish — 2026-08-31
+
+### Library — ApprovalPanel Combined Component
+
+- **`ApprovalPanel` created** at [`src/Http/Livewire/Approvals/ApprovalPanel.php`](src/Http/Livewire/Approvals/ApprovalPanel.php) with blade view at [`src/Resources/views/livewire/approvals/approval-panel.blade.php`](src/Resources/views/livewire/approvals/approval-panel.blade.php). Combines [`ApprovalActions`](src/Http/Livewire/Approvals/ApprovalActions.php) + [`ApprovalHistoryTimeline`](src/Http/Livewire/Approvals/ApprovalHistoryTimeline.php) into a single cohesive unit with 3 display modes: `banner` (colored alert banner with actions + drawer-accessible timeline), `card` (full card wrapper with header), and `inline` (flat row of buttons). Registered as `qf.approval-panel` in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php).
+
+### Library — `displayMode` Property on Approval Components
+
+- **`ApprovalActions`** — added `$displayMode` property accepting `inline` (default), `banner`, or `card`. Banner mode renders as a colored alert with icon, status message, and action buttons. Card mode wraps content in a `.card` with `.card-header` and `.card-body`.
+- **`ApprovalHistoryTimeline`** — added `$displayMode` property accepting `full` (default), `compact`, or `steps-only`. Compact mode renders smaller avatars without comment blocks.
+
+### Library — Button Contrast Fix (Banner Mode)
+
+- **`actions.blade.php`** — banner mode buttons use `btn-light` + `text-success` (Approve), `text-danger` (Reject), and `text-dark` (Recall) for proper contrast on colored alert backgrounds.
+
+### Library — Recall Button: Comment Modal
+
+- **`ApprovalActions`** — Recall button changed from `wire:confirm="..."` to `openCommentModal('recall')`, matching the Approve/Reject pattern where a comment modal collects reviewer notes before the action executes.
+
+### Library — `ApprovalRequestListView` Status Filter Fixes
+
+- **`ApprovalRequestListView`** — fixed conflicting `WHERE` clauses on the status filter that caused incorrect result counts.
+- **`ApprovalRequestListView`** — added "All statuses" option to the status filter dropdown.
+- **`ApprovalRequestListView`** — fixed initial default status selection so the list loads with the correct filter on first render.
+- **`ApprovalRequestListView`** — page title is now reactive based on the `$status` filter value (e.g., "Pending Approvals" vs "All Approval Requests").
+
+### Library — `DefaultAuthorizationProvider` Array-Valued Condition Support
+
+- **`DefaultAuthorizationProvider::evaluateConditions()`** — now handles array-valued conditions with `in_array()` in addition to the existing scalar `===` comparison. This fixes authorization checks where a condition value is an array (e.g., multi-select field values).
+
+### Consuming App — Leave Module
+
+- **`workflows.php`** — workflow definition config created for leave request approvals.
+- **`leave-requests/show.blade.php`** — embedded [`ApprovalActions`](src/Http/Livewire/Approvals/ApprovalActions.php) and [`ApprovalHistoryTimeline`](src/Http/Livewire/Approvals/ApprovalHistoryTimeline.php) components for workflow-driven leave approval UI.
+- **`approvals.blade.php`** — dedicated approvals page with [`ApprovalRequestListView`](src/Http/Livewire/Approvals/ApprovalRequestListView.php) filtered to leave request workflows.
+- **Navigation** — added "Leave Approvals" sidebar item.
+- **Notification seeder** — seeded workflow notification templates for the leave module.
+
+### Consuming App — PayrollRun Detail Page
+
+- **Approval panel repositioned** — moved below the page title; status banner hidden when the run is under approval (the approval component renders its own status).
+- **`effectiveStatus()` helper** — added to resolve the display status considering both the business state and workflow state.
+- **Button visibility** — business action buttons (Mark Paid, Recalculate, Reports) now aligned with workflow statuses — gated on `isUnderApproval()` and workflow completion state.
+
+### Consuming App — Timeline Drawer Button Fix
+
+- **Event name fix** — `open-drawer` → `openDrawer` (the Drawer component listens for camelCase `openDrawer`, not kebab-case).
+- **Parameter name fix** — `componentParams` → `params` (the Drawer component expects `params`, not `componentParams`).
+
+### Consuming App — Stale Overrides Deleted
+
+- **Removed** vendor-published `top-nav.blade.php` override that was masking library updates.
+- **Removed** vendor-published `sidebar-item.blade.php` override that was masking library updates.
+- **Removed** vendor-published `approval-request-list.blade.php` override that was masking library updates.
+
+## WorkflowEngine Hardening & Notification Template Infrastructure — 2026-09-01
+
+### Library — WorkflowEngine Hardening
+
+- **Initiator notification on workflow start** — [`WorkflowEngine::start()`](src/Services/Workflow/WorkflowEngine.php) now dispatches a `workflow_submitted` notification to the workflow initiator (the authenticated user who started the workflow), in addition to the existing step-approver notifications. Previously, only step approvers were notified; the initiator received no confirmation.
+- **Empty recipient logging** — [`WorkflowEngine::notifyTransition()`](src/Services/Workflow/WorkflowEngine.php) now logs a warning when `$recipientIds` is empty (e.g., no users have the required role for a workflow step), preventing silent notification failures.
+- **Disabled config logging** — [`WorkflowEngine::notifyTransition()`](src/Services/Workflow/WorkflowEngine.php) now logs a warning when notification config is disabled or empty for a workflow definition.
+
+### Consuming App — Notification Template Seeding
+
+- **4 notification template seeders invoked** — [`DatabaseSeeder`](hr-consuming-app:database/seeders/DatabaseSeeder.php) now calls all 4 template seeders: [`WorkflowNotificationTemplateSeeder`](hr-consuming-app:app/Modules/Payroll/Database/Seeders/WorkflowNotificationTemplateSeeder.php) (Payroll, 8 templates), [`EssNotificationTemplateSeeder`](hr-consuming-app:app/Modules/Hr/Database/Seeders/EssNotificationTemplateSeeder.php) (HR, 12 templates), [`LeaveWorkflowNotificationTemplateSeeder`](hr-consuming-app:app/Modules/Leave/Database/Seeders/LeaveWorkflowNotificationTemplateSeeder.php) (Leave, 8 templates), and the library's built-in [`NotificationTemplateSeeder`](src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php) (8 templates). **25 total templates** across `database` and `mail` channels.
+- **Templates cover**: `workflow_submitted`, `workflow_approved`, `workflow_rejected`, `workflow_recalled`, `payslip_ready`, `leave_approved`, `leave_denied`, `leave_submitted`, `upcoming_holiday`, `clock_out_reminder`, `document_generated`, `report_ready`, and more.
+
+### Consuming App — TemplateVariableRegistry Implementation
+
+- **`NotificationVariableRegistry` created** — [`app/Services/NotificationVariableRegistry.php`](hr-consuming-app:app/Services/NotificationVariableRegistry.php) implements [`TemplateVariableRegistry`](src/Contracts/Notifications/TemplateVariableRegistry.php) with **19 notification types**, each declaring its available `{placeholder}` variables. Bound in [`AppServiceProvider`](hr-consuming-app:app/Providers/AppServiceProvider.php), replacing the library's [`DefaultTemplateVariableRegistry`](src/Services/Notifications/DefaultTemplateVariableRegistry.php).
+- **19 types covered**: `workflow_submitted`, `workflow_approved`, `workflow_rejected`, `workflow_recalled`, `payslip_ready`, `leave_approved`, `leave_denied`, `leave_submitted`, `upcoming_holiday`, `clock_out_reminder`, `document_generated`, `report_ready`, `workflow_stage_changed`, `workflow_approval`, `workflow_denied`, `workflow_cancelled`, `user_welcome`, `user_password_reset`, and more.
+
+### Consuming App — Module Self-Containment Fix
+
+- **`PayrollRoleSeeder` split into module-scoped seeders** — The root-level [`database/seeders/PayrollRoleSeeder.php`](hr-consuming-app:database/seeders/PayrollRoleSeeder.php) was deleted and replaced with two module-scoped seeders: [`PayrollRoleSeeder`](hr-consuming-app:app/Modules/Payroll/Database/Seeders/PayrollRoleSeeder.php) (creates `payroll_officer` role, assigns to test user) and [`HrRoleSeeder`](hr-consuming-app:app/Modules/Hr/Database/Seeders/HrRoleSeeder.php) (creates `hr_manager` role). This ensures each module is fully self-contained — copying `app/Modules/Payroll/` into any Laravel app with the library provides everything needed.
+
+## Per-Module UX Review & Payroll Wizard Fixes — 2026-09-01
+
+### Library — Notification Click-to-Navigate
+
+- **`navigateToNotification()` added to [`NotificationsIndex`](src/Http/Livewire/Notifications/NotificationsIndex.php) and [`TopNav`](src/Http/Livewire/Layouts/Navs/TopNav.php)** — clicking a notification now marks it as read and navigates to the related entity via `$this->redirect($url)`.
+- **`resolveWorkflowableUrl()` always returns a URL** — [`WorkflowEngine`](src/Services/Workflow/WorkflowEngine.php) now falls back to `/workflows/{id}` when `workflowable_type`/`workflowable_id` is missing, ensuring every notification has a navigable URL.
+- **URL not overridable by caller data** — `array_merge` order changed in `notifyTransition()` so library defaults (including `url`) take precedence.
+
+### Library — Dashboard Hardening
+
+- **`Dashboard::mount()` exception handling** — [`Dashboard`](src/Http/Livewire/Dashboards/Dashboard.php) now catches `InvalidArgumentException` from missing config files and renders a graceful error instead of a blank page.
+
+### Library — Admin Module Fixes (13 issues)
+
+- **19 explicit routes added** — [`Admin Routes`](src/Core/Admin/Routes/web.php) now has explicit routes for all sidebar links, eliminating catch-all dependency.
+- **`company_id` hiddenFields contradiction fixed** — [`user.php`](src/Core/Admin/Data/user.php) `company_id` removed from `hiddenFields.onTable`, `onNewForm`, `onEditForm`.
+- **4 action cards converted** — ad-hoc events (`openInviteUserModal`, `openRoleWizard`, `openPermissionWizard`, `syncPermissions`) → `openDrawer`/`navigate` in [`dashboard.php`](src/Core/Admin/Data/dashboard.php).
+- **`notification_log.php` hiddenFields** — `created_at` removed from `hiddenFields.onTable`.
+- **`role.php` guard_name** — `visible` changed to `true`.
+- **`permission.php` fieldDefinitions** — added `name` and `guard_name` fields, enabled `addButton`.
+- **2 missing views created** — `general-settings.blade.php`, `onboarding.blade.php` with explicit routes.
+
+### Library — System Module Fixes (2 issues)
+
+- **`openSetupWizard` → `navigate`** — 3 action cards in System dashboards converted from unhandled event to `/setup/wizard` navigation.
+- **Cross-module URLs fixed** — `/admin/onboarding` → `/system/onboarding`, `/admin/tours` → `/system/tours` with new views and routes.
+
+### Consuming App — Organization Module Fixes (2 issues)
+
+- **11 double-prefixed URLs fixed** — `organization/organization/` → `organization/` in [`sidebar_menu.php`](hr-consuming-app:app/Modules/Organization/Config/sidebar_menu.php) and [`top_bar_menu.php`](hr-consuming-app:app/Modules/Organization/Config/top_bar_menu.php).
+
+### Consuming App — HR Module Fixes (12 issues)
+
+- **5 double-prefixed URLs** — `/hr/hr/` → `/hr/` in `top-nav-links.blade.php`.
+- **Missing views created** — `teams.blade.php`, `tags.blade.php`, `my-documents.blade.php`, `team-calendar.blade.php`.
+- **12 index routes added** — explicit routes for all data table pages.
+- **`xxxxxx/` scaffold directory deleted** — 32 orphaned files removed.
+- **Bottom bar malformed Blade fixed** — `}}` in class attributes + missing leading `/` on hrefs.
+
+### Consuming App — Attendance Module Fixes (20+ issues)
+
+- **13 hiddenFields contradictions fixed** — `company_id`, `attendance_id`, `assignable_type` removed from `hiddenFields.onTable` across 13 configs.
+- **12 wrong model references** — `App\Modules\Hr\Models\*` → `App\Modules\Attendance\Models\*` in 2 dashboards.
+- **6 wrong URL prefixes** — `/hr/` → `/attendance/` in `view_all_link` URLs.
+- **5 ad-hoc events converted** — `openClockModal`, `openPolicyWizard`, `openWorkPatternWizard`, `openBulkPatternAssignment` → `navigate`/`openDrawer`.
+- **2 missing routes added** — `adjust-attendance`, `attendance-work-sessions`.
+
+### Consuming App — Leave Module Fixes (7 issues)
+
+- **Denied/Rejected mismatch** — dashboard stat filters changed from `'Rejected'` to `'Denied'`.
+- **2 broken URLs fixed** — `/leave/my-leave-balance` → `/leave/my-leave`, `/leave/leave-request` → `/leave/leave-requests`.
+- **`openLeaveWizard` → `navigate`** — ad-hoc event converted.
+- **11 missing CRUD views created** — create/show/edit placeholders for leave-types, leave-requests, leave-balances, leave-approvers.
+- **3 missing index routes added**.
+
+### Consuming App — Payroll Module Fixes (10 issues)
+
+- **12 wrong model references** — `App\Modules\Hr\Models\*` → `App\Modules\Payroll\Models\*` in `dashboard_payroll_overview.php`.
+- **10 hiddenFields contradictions fixed** — `company_id` removed from `hiddenFields.onTable` across 10 configs.
+- **5 missing routes added** — `approvals`, `payroll-run-adjustments`, `employee-adjustment-profiles`, `payslip-items`, `payroll-policy-assignments`, `payroll-wizard`.
+- **Route name mismatch** — `payroll.payroll-employees.edit` → `payroll.payroll-runs.edit`.
+- **`PayrollExecutiveSummary` Livewire component registered**.
+- **`approved_by` → `approved_by_user_id`** in hiddenFields.
+
+### Consuming App — Holiday Module Fixes (3 issues)
+
+- **Orphan route documented** — `/holiday/dashboard` kept but noted as not in sidebar.
+- **Missing leading `/`** — context group URL fixed.
+- **Empty `system_info` field group removed**.
+
+### Consuming App — Payroll Wizard Fixes (2 issues)
+
+- **CSRF "Page Expired"** — wizard route moved inside `web` + `auth` middleware group in [`web.php`](hr-consuming-app:app/Modules/Payroll/Routes/web.php).
+- **"All Company" mode** — `?:` operator replaced with strict `!== null` check in [`PayrollRunWizard.php`](hr-consuming-app:app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunWizard.php) to preserve `company_id = 0`.
+
+### Consuming App — Stale View Fix
+
+- **Views republished** — `php artisan vendor:publish --tag=ui-library-views --force` to sync notification blade changes to consuming app.
+
+## CompanyProvider Implementation (Consuming Application) — 2026-08-30
+
+### Library
+
+- **`CompanyProvider` implemented** in a consuming application (`App\YourModule\Providers\YourModelCompanyProvider`). The library itself ships with `NullCompanyProvider` as the default no-op — the consuming app provides the first real-world implementation.
+- **Binds** in the module's own service provider — self-contained within the module, following the modular binding pattern (each module owns its contract bindings).
+- **Resolves** user→company chain: `User → YourModel (by user_id) → Company (by company_id)` — no `company_id` column on the `users` table. The `CompanyProvider` contract lets each app resolve the company however it needs.
+- **Enables** company switcher in TopNav via `loadCompanies()` and `switchCompany()`.
+
+### Documentation
+
+- **Updated** [`multi-tenancy.md`](docs/consuming-app/multi-tenancy.md) — reframed as "Company Scoping & Multi-Company" with: multi-tenancy vs multi-company distinction at the top, three-layer model reference from [`27-architecture-boundary.md`](docs/library/27-architecture-boundary.md), Mermaid sequence diagram of the session-based company scoping flow, and clarification that `users` table does not need `company_id`.
+- **Created** [`multi-tenancy-vs-multi-company.md`](docs/consuming-app/multi-tenancy-vs-multi-company.md) — concise reference distinguishing database-level multi-tenancy (deployment concern) from column-level multi-company (library mechanism), with an enablement checklist.
+- **Updated** [`contracts.md`](docs/consuming-app/contracts.md) §6 — CompanyProvider cookbook now shows the modular binding pattern (module ServiceProvider, not AppServiceProvider) with a generic implementation example.
+- **Updated** [`consuming-app/README.md`](docs/consuming-app/README.md) — added link to new `multi-tenancy-vs-multi-company.md`.
+
+## Workflow/Approval Foundation Polish & Consuming-App Integration — 2026-08-30
+
+### Library — Approver Resolution
+
+- **`WorkspaceScopedApproverResolver` created** as the new default approver resolver at [`src/Services/Approvals/WorkspaceScopedApproverResolver.php`](src/Services/Approvals/WorkspaceScopedApproverResolver.php). Resolves approvers within a single workspace scope — splits `$roleIds` into integers (pass-through user IDs) and strings (role names), queries Spatie roles by name, filters users by workspace membership via `belongsToWorkspace()`, and falls back to session/authenticated-user workspace when `$workspaceId` is null. Returns empty (not global) when no workspace-scoped approvers exist — safe default prevents cross-workspace approval leakage.
+- **`config/ui-library.php`** — `approvals.approver_resolver` default changed from [`DefaultApproverResolver`](src/Services/Approvals/DefaultApproverResolver.php) to [`WorkspaceScopedApproverResolver`](src/Services/Approvals/WorkspaceScopedApproverResolver.php). The old `DefaultApproverResolver` is still available for single-tenant apps that want global role resolution.
+- **`UILibraryServiceProvider.php`** — added explicit [`ApprovalGuard`](src/Services/Approvals/ApprovalGuard.php) singleton binding so consuming apps can resolve it from the container.
+
+### Library — Approval UI Components (Constructor → Boot Refactor)
+
+- **`ApprovalRequestListView.php`** — removed `__construct()`, moved all dependency resolution to `boot()`. Added `selectWorkflow()` method that redirects to the workflowable entity's detail page instead of rendering inline. This follows the Livewire best practice of avoiding constructor injection for Livewire components.
+- **`ApprovalActions.php`** — removed `__construct()`, moved dependency resolution to `boot()`.
+- **`ApprovalHistoryTimeline.php`** — removed `__construct()`, moved dependency resolution to `boot()`.
+
+### Library — Blade & Config Fixes
+
+- **`sidebar-item.blade.php`** — `$item['key']` → `$item['modelName'] ?? $item['key']` fallback. When a navigation item has a `modelName` (e.g., for DataTable config resolution), it is used as the sidebar key; otherwise falls back to the item key.
+- **`Admin navigation.php`** — added `modelName` keys to Notifications context items (`notifications` and `notification-preferences`) so the sidebar correctly resolves their DataTable configs.
+- **`Admin notifications.blade.php`** + **`notification-preferences.blade.php`** — removed incorrect `configKey` prop that was causing DataTable resolution failures.
+- **`DefaultAuthorizationProvider.php`** — `evaluateConditions()` now handles array values with `in_array()` in addition to scalar `===` comparison. This fixes authorization checks where a condition value is an array (e.g., multi-select field values).
+
+### Consuming App — HR Module
+
+- **`HrsCompanyProvider`** created in `app/Modules/Hr/Providers/` — implements [`CompanyProvider`](src/Contracts/Navigation/CompanyProvider.php) to resolve the user→company chain through HR domain models. Bound in `HrsServiceProvider::register()`.
+- **`HrsApproverResolver`** created in `app/Modules/Hr/Providers/` — a consuming-app-specific override of [`ApproverResolver`](src/Contracts/Approvals/ApproverResolver.php) for cases where the library's default `WorkspaceScopedApproverResolver` doesn't match the app's user model (e.g., when `company_id` is not on the `users` table). Bound in `HrsServiceProvider::register()`.
+
+### Consuming App — Payroll Module
+
+- **Payroll `approvals.blade.php`** created — a dedicated approvals page for the Payroll module with [`ApprovalRequestListView`](src/Http/Livewire/Approvals/ApprovalRequestListView.php) filtered to `definition-key="payroll_run"`. Navigation config updated with a "Payroll Approvals" sidebar item.
+- **`WorkflowNotificationTemplateSeeder`** created — seeds the four `workflow_*` notification templates (`workflow_submitted`, `workflow_approved`, `workflow_rejected`, `workflow_recalled`) for `database` and `mail` channels.
+- **PayrollRun detail page** updated — embedded [`ApprovalActions`](src/Http/Livewire/Approvals/ApprovalActions.php) and [`ApprovalHistoryTimeline`](src/Http/Livewire/Approvals/ApprovalHistoryTimeline.php) components for workflow-driven approve/reject/recall UI and step-by-step progress visualization.
+- **Stale overrides deleted** — removed vendor-published `top-nav.blade.php` and `sidebar-item.blade.php` overrides that were masking library updates.
+- **Payroll `show.blade.php` config key fix** — corrected a corrupted config key (`\u0001` → `payroll`) that was causing DataTable resolution failures.
+
+### Documentation
+
+- **Updated** [`20-reference-workspace-scoped-approver-resolver.md`](docs/consuming-app/20-reference-workspace-scoped-approver-resolver.md) — reframed from "how to write your own" to "the library now ships this as default; override only if your User model differs."
+- **Updated** [`contracts.md`](docs/consuming-app/contracts.md) §8 — noted the new `WorkspaceScopedApproverResolver` default and fixed the incorrect `resolveApprovers()` method signature to match the actual [`ApproverResolver::resolve()`](src/Contracts/Approvals/ApproverResolver.php) contract.
+- **Updated** [`08-contracts-and-interfaces.md`](docs/library/08-contracts-and-interfaces.md) — added missing `ApproverResolver` and `ApproverLabelResolver` contract sections with full signatures and default implementation references.
+- **Updated** [`18-workflow-approval-testing-checklist.md`](docs/consuming-app/18-workflow-approval-testing-checklist.md) — §2.3 and §4.1 updated to reference `WorkspaceScopedApproverResolver` as the new default; clarified that consuming apps only need a custom resolver when their User model doesn't have `company_id`.
+- **Updated** [`payroll-approval-implementation-plan.md`](plans/payroll-approval-implementation-plan.md) — marked completed items with implementation notes on what was actually built vs planned.
+
+## DataTable Runtime Bridges, Drawer Decoupled Pattern & Cross-Module Cleanup — 2026-08-27
+
+### Library
+
+- **Drawer decoupled pattern**: `wire:click="$dispatch('openDrawer', {component, params, title})"` — the Drawer listens for `openDrawer`/`closeDrawer`/`formSaved`, so buttons can open a form drawer without embedding a `<livewire:qf.drawer>` wrapper.
+- **View publish path fix**: `ui-library-views` publishes to `resources/views/vendor/qf/`, and `ui-library-core-views` publishes core module (Admin/System) views to `resources/views/vendor/qf-core/{module}/`.
+- **Row-actions Show link**: now uses `getShowUrl()`, carrying pagination/filter/sort context to detail pages.
+- **`?filter[]` bridge**: `?filter[field]=value` (implies `=`) and `?filter[field][operator]=value` with operators `=`, `!=`, `>`, `<`, `>=`, `<=`, `like`, `not like`, `between`; relative dates (`today`, `+N days`, `-N days`) resolved for `datepicker`/`datetimepicker` fields.
+- **`?hiddenFields[]` bridge**: `?hiddenFields[onTable][]=field` hides columns/fields via query string.
+- **Dynamic page title**: `:page-title` prop on DataTable; the blade `@script` sets `document.title` and the heading.
+- **`view_all_link_target`**: List widget config key (`_self`/`_blank`); `rel="noopener noreferrer"` is added for `_blank`.
+- **`between` operator fix**: FilterService routes `between` through `whereBetween()`.
+
+### Consuming-App Patterns
+
+- **Cross-module config keys**: after a module split, use the owning module prefix (e.g. `payroll.payroll_payslip`, not `hr.payroll_payslip`).
+- **Cross-module model FQCNs**: Eloquent relationships and config `model` values must use the owning module namespace (e.g. `App\Modules\YourModule\Models\YourModel`, not a stale reference to a pre-split namespace).
+- **Dashboard "View all" link pattern**: `?filter[employee_id]={{ employee_id }}&hiddenFields[onTable][]=employee_id` with `view_all_link_target: '_blank'` and an `employee_id` dashboard parameter.
+- **Parent refresh after Drawer save**: `formSaved` listener pattern (`'formSaved' => 'refreshEmployee'`).
+- **Self-service edit suppression**: `@if($this->canEdit())` guard pattern for edit buttons in self-service mode.
+
+## My Profile, Cross-Module Namespace Cleanup & Payroll Fixes — 2026-08-28
+
+### Library
+
+- **PolicyCalculationBuilder JSON key alignment**: `DataTableForm::validatePolicyCalculationLogic()` reads `individual_value` and `organization_value` from the JSON. The consuming app's `PolicyCalculationBuilder::buildJson()` now emits these keys alongside the legacy `employee_value`/`employer_value` keys.
+
+### Consuming App
+
+- **My Profile feature**: New `my-profile.blade.php` resolves current user's employee and mounts `qf.employee-detail` in self-service mode. Added to sidebar "My Portal" context group and user dropdown.
+- **Cross-module view namespace cleanup**: Payroll module: 16 stale `hr::livewire.payroll.*` → `payroll::livewire.payroll.*` references fixed. Hr module: 4 stale `hr::attendance-*` → `attendance::attendance-*` route references fixed. All modules scanned, zero remaining stale cross-module references.
+- **Payroll URL prefix fixes**: 10 `/hr/payroll-*` URLs corrected to `/payroll/*` across 6 files (wizard, runs, payslips).
+- **Payroll routes middleware fix**: CRUD routes wrapped in `Route::middleware(['web', 'auth'])` to fix 403 Unauthenticated for authenticated users.
+- **CompanyProvider analysis**: Documented that the company switcher requires a real `CompanyProvider` implementation (currently `NullCompanyProvider`). User→model→Company relationship chain documented.
+- **Top-nav quick actions fix**: Stale `top-nav.blade.php` vendor override updated with Quick Actions UI (command palette + ranked dropdown).
+
+## Per-Instance DataTable Overrides, prefill[] Convention & Drawer Polish — 2026-08-27
+
+### Library
+
+- **Per-instance `crudType`, `simpleActions`, `moreActions` overrides**: `DataTable` now accepts `$crudType`, `$simpleActions`, `$moreActions` mount params (null defaults = use config). `render()` resolves override first, falls back to config. Properties set before blade renders. Source: [`DataTable.php`](src/Http/Livewire/DataTables/DataTable.php:51).
+- **`prefill[]` query-parameter convention**: `?prefill[field_name]=value` pre-fills Add form fields. The page-header merges `request()->query('prefill', [])` into `prefilledData`. Source: [`page-header.blade.php`](src/Resources/views/components/layouts/partials/page-header.blade.php:83).
+- **Drawer inline form save behavior**: When `$inline = true` (Drawer context), `DataTableForm::save()` skips the alert dispatch and does NOT redirect after save. The Drawer closes via `formSaved` event. Source: [`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php:849,860).
+- **Drawer Discard Changes**: Dispatches `closeDrawer` instead of navigating, closing the Drawer without a page change.
+- **Drawer close animation**: `Drawer::close()` dispatches `drawerClosed` (triggers `bsDrawer.hide()` with animation). Content clears after animation via `drawerHidden` → `cleanup()`. No self-referential `closeDrawer` dispatch. Source: [`Drawer.php`](src/Http/Livewire/Drawer.php:46), [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php:307,323).
+- **Document model**: Auto-sets `documentable_type`, `file_path`, `file_name`, `uploaded_at` on upload.
+
+### Consuming-App Patterns
+
+- **Per-instance overrides**: `@livewire('qf.data-table', ['configKey' => '...', 'crudType' => 'drawers'])` for embedded tables; `simpleActions` to suppress Edit/Delete per instance.
+- **Prefill convention**: `?prefill[employee_id]=42` pre-selects employee #42 in the Add form drawer.
+
+## [Module UX Polish — 2026-08-19]
+
+### Context Group Splits
+- HR: People → People + Manage (operational vs administrative)
+- Payroll: → Processing + Configuration
+- Attendance: Time → Time + Scheduling + Policies
+- Leave: → Requests + Configuration
+
+### Dashboards
+- Aligned all 6 modules to the Admin module's per-context-group overview dashboard pattern
+- Enriched overall dashboards with stat cards, charts, trends, lists, grouped lists, and action cards
+- Payroll: 19 widgets; Attendance: 18 widgets; Leave + Holiday: enriched
+- Organization: enriched general dashboard with 12 stat cards, 3 charts, 3 trends, 7 lists, 6 action cards — matching Payroll/Attendance/HR richness
+
+### Named Routes
+- Added {module}.dashboard named routes for all 6 modules
+- Added per-context-group overview dashboard routes
+
+### Fixes
+- Fixed manage-context sidebar items redirecting to people context
+- Fixed leave-types missing index view + route
+- Fixed holiday dashboard calendar_id column reference
+- Fixed duplicate Organization migrations
+- Fixed duplicate "Dashboard" tab in Organization top nav — library's [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) had an unconditional hardcoded Dashboard tab colliding with Organization's `dashboard` context group; added `@if (!isset($this->items['dashboard']))` guard
+- Fixed 404s on Organization Reports sidebar links (`/organization/reports/{companies,departments,locations,growth}`) — added 4 routes + 4 views in consuming app
+- Fixed 404s on Audit context group pages (Activity Log, Login History, System Events, Exports) — created 4 minimal views in [`src/Core/Admin/Resources/views/admin/`](src/Core/Admin/Resources/views/admin/) in the library
+
+### Organization Report Views
+- Converted 4 Organization report Blade views from full dashboard renders to minimal placeholder pages matching the audit-view pattern, with per-page headings and future-implementation descriptions
+
+### Documentation
+- Created [`docs/project/organization-reports-future-differentiation.md`](docs/project/organization-reports-future-differentiation.md) documenting the 4 report pages as placeholders with per-page future intent
+
+### Mobile Navigation & Permission Guards
+- Added `canAccessView()` permission checks to mobile/overflow inline rendering in [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) — mobile "More" dropdown and overflow tabs now respect the same permission model as desktop tabs
+- Added case-sensitivity guard for `'Dashboard'` context key in [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) — the hardcoded Dashboard tab guard now uses exact-case `'Dashboard'` matching to prevent false duplicates when a module defines a `dashboard` (lowercase) context group
+
+### Admin Navigation — Context Group Split
+- Split "Users & Permissions" (8 items) into three context groups:
+  - **Users** (5 items): Overview, Users, Invitations, User Groups, User Preferences
+  - **Access** (3 items): Roles, Access Control, Sessions
+  - **Security** — Sessions moved out, now focused on 2FA, API tokens, audit policy
+- Created analysis doc at [`docs/project/admin-navigation-context-group-split.md`](docs/project/admin-navigation-context-group-split.md)
+- Fixed Admin Dashboard link: `admin/dashboard-overview` → `admin/dashboard`
+- Fixed Admin Dashboard active-state: `context="dashboard"` → `context="Dashboard"` in blade view for case-sensitive context matching
+
+### Admin Sidebar 404 Audit
+- Audited all Admin sidebar links for missing views and routes
+- Created 16 placeholder Blade views for missing pages across Users, Access, Security, Audit, and Settings context groups
+- Added 10 missing routes for admin pages
+- Created catalog at [`docs/project/admin-placeholder-pages.md`](docs/project/admin-placeholder-pages.md) documenting all placeholder views, their routes, and future implementation intent
+
+### Dashboard Title Standardization
+- Created naming standard at [`docs/project/module-dashboard-naming-standard.md`](docs/project/module-dashboard-naming-standard.md) — all general dashboard titles follow `"{Module} Dashboard"` pattern
+- Standardized 4 module dashboard titles: Organization (`"Organization Dashboard"`), HR (`"HR Dashboard"`), Leave (`"Leave Dashboard"`), Admin (`"Admin Dashboard"`)
+
+### Drawer Integration
+- Created analysis at [`docs/project/dashboard-drawer-integration-analysis.md`](docs/project/dashboard-drawer-integration-analysis.md) — cataloged 93 action cards across 8 modules, identified 22 "Easy Win" drawer candidates
+- Converted 23 dashboard action cards from `navigate` events to `openDrawer` events across Organization, HR, Leave, Holiday, and Attendance modules
+- Fixed [`action_card.blade.php`](src/Resources/views/widgets/action_card.blade.php): changed `wire:click` to `$dispatch` for `openDrawer` events — ensures drawer parameters (component, params, title) are passed as named arguments rather than a single JSON object
+- **Task AL** — Converted 21 "Possible" action cards from `navigate` + `url` to `openDrawer` events; changed 13 data table configs from `pages`/`modals` to `drawers` crudType. 2 cards excluded (custom wizards). ⚠️ Some converted cards still do not open the drawer — likely causes: missing `crudType` on the data table config, incorrect `configKey`, or the entity's form doesn't support drawer rendering. Needs investigation per card (tracked in [`navigation-ux-backlog.md`](docs/project/navigation-ux-backlog.md)).
+
+### Quick Actions Design
+- Created feature design doc at [`docs/project/quick-actions-feature-design.md`](docs/project/quick-actions-feature-design.md) — full specification for a Cmd+K command palette, top-nav ⚡ button, dashboard widget, and per-module action registration system
+
+### Quick Actions (Command Palette) — Phase 1 MVP
+- **Task V**: Command palette MVP — new [`ActionRegistry`](src/Services/QuickActions/ActionRegistry.php) service discovers quick-actions configs from Core and business modules via the same 3-tier priority chain as NavigationManager; [`QuickActionsPanel`](src/Http/Livewire/QuickActions/QuickActionsPanel.php) Livewire component with modal overlay, server-side search, and 3 action types (`navigate`, `event`, `drawer`); [`quick-actions-panel.blade.php`](src/Resources/views/livewire/quick-actions/quick-actions-panel.blade.php) Blade view with inline scoped CSS and category-grouped results; [`quick-actions.js`](public/assets/js/quick-actions.js) vanilla JS with Cmd+K/Ctrl+K global listener, client-side `include`/`match` filtering, arrow key navigation, Enter to select, Escape to close, Livewire re-render survival; [`quick-actions.php`](src/Core/Admin/Config/quick-actions.php) library config with 8 admin actions; modifications to [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php) (singleton binding + `qf.quick-actions-panel` Livewire registration), [`ui-library.php`](src/Config/ui-library.php) (new `quick_actions` config section with `command_palette`, `top_nav_button`, `tracking`, `ranking` keys), [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php) (`loadQuickActionsConfig()` + `openQuickActions()` + `quickActionsEnabled`/`quickActionsIcon`/`quickActionsTitle` properties), [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) (search button in right-side icon area), [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php) (conditional panel include + JS asset reference)
+- **Task W**: [`ActionRegistry::normalizeActions()`](src/Services/QuickActions/ActionRegistry.php:170) closure fix — replaced `array_map` with `foreach` to avoid scope issues with `$this` inside closures
+- **Task X**: Panel single-root fix — wrapped the command palette blade content in a single `<div>` root element to satisfy Livewire's single-root requirement
+- **Task Y**: Panel action loading fix — changed [`QuickActionsPanel::loadActions()`](src/Http/Livewire/QuickActions/QuickActionsPanel.php:80) from `authorizedFor()` to `all()` so all registered actions load into the JS data attribute for client-side filtering; authorization is still enforced server-side when executing
+- **Task Z**: Quick actions registered for all 7 remaining modules (System, Organization, HR, Attendance, Leave, Payroll, Holiday) — 40 new actions across consuming-app modules (6 System, 6 Organization, 6 HR, 6 Attendance, 6 Leave, 6 Payroll, 4 Holiday), 48 total across library + consuming app
+- **Task AA**: URL path fallback fix — [`QuickActionsPanel::resolveActionUrl()`](src/Http/Livewire/QuickActions/QuickActionsPanel.php:213) now handles both named routes (via `route()`) and URL paths (catches `Exception` for non-named routes, falls back to `url()` when the `route` value starts with `/`)
+
+### Quick Actions (Tracking + Ranking) — Task AE (2026-08-20)
+
+Phase 2 of the Quick Actions feature — personalized ranking driven by usage tracking.
+
+- **New migration** [`2026_08_20_000001_create_user_action_histories_table.php`](Database/Migrations/2026_08_20_000001_create_user_action_histories_table.php) — `user_action_histories` table (`id`, `user_id` FK cascade, `action_id`, nullable `executed_at`, timestamps, `[user_id, action_id]` index)
+- **New model** [`UserActionHistory`](src/Models/UserActionHistory.php) — fillable `user_id`/`action_id`/`executed_at`; `user()` relation resolves the user model via `config('ui-library.user.model')`
+- **New service** [`ActionTracker`](src/Services/QuickActions/ActionTracker.php) — `record($actionId, $userId = null)` inserts one history row per palette execution, gated by `ui-library.quick_actions.tracking.enabled`
+- **New service** [`RankingEngine`](src/Services/QuickActions/RankingEngine.php) — `score($actions, $userId = null)` orders actions by `score = 0.6 × recency_factor + 0.4 × frequency_factor`; `recency_factor = exp(-days_since / 7)` (half-life), `frequency_factor = 1 - exp(-count / 5)` (saturation). Never-executed actions score 0 and fall to the bottom but still appear (stable sort preserves original order on ties)
+- **Modified** [`QuickActionsPanel`](src/Http/Livewire/QuickActions/QuickActionsPanel.php) — `loadActions()` runs actions through `RankingEngine` when authenticated; `executeAction()` records each execution via `ActionTracker`
+- **Modified** [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php) — registered `ActionTracker` + `RankingEngine` singletons
+- **Modified** [`ui-library.php`](src/Config/ui-library.php) — `tracking` + `ranking` config defaults (`recency_weight` 0.6, `frequency_weight` 0.4, `half_life_days` 7, `frequency_saturation` 5)
+
+### Quick Actions (⚡ Button + Dashboard Widget) — Task AG (2026-08-20)
+
+Phase 3 of the Quick Actions feature — top-nav ⚡ button dropdown + dashboard widget, completing the feature's core UX entry points.
+
+- **New widget processor** [`QuickActionsWidgetProcessor`](src/Widgets/QuickActionsWidgetProcessor.php) — returns `type: 'quick_actions'` with the current user's top-ranked frequent actions from [`RankingEngine`](src/Services/QuickActions/RankingEngine.php)
+- **New widget view** [`quick_actions.blade.php`](src/Resources/views/widgets/quick_actions.blade.php) — card widget listing ranked action rows (clickable, executes the action)
+- **Modified** [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php) — added ⚡ button properties (`quickActionsEnabled`, `quickActionsIcon`, `quickActionsTitle`), `loadQuickActions()` method that fetches top-ranked actions from `RankingEngine`, `executeQuickAction()` method, and `execute-quick-action` listener
+- **Modified** [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) — ⚡ dropdown button in right-side icon area with top N ranked actions and "More actions…" link to the full command palette
+- **Modified** [`WidgetProcessor`](src/Services/Widgets/WidgetProcessor.php) — registered `'quick_actions' => QuickActionsWidgetProcessor::class` in `$map`
+- **Modified** [`ui-library.php`](src/Config/ui-library.php) — ⚡ button + command palette config defaults
+
+### Quick Actions (Phase 4 — Favorites, Shortcuts, Analytics) — Task AI (2026-08-20)
+
+Phase 4 of the Quick Actions feature — user favorites/pinning, keyboard shortcut badges, analytics, and first-visit discoverability.
+
+- **New migration** [`2026_08_20_000002_create_user_favorite_actions_table.php`](Database/Migrations/2026_08_20_000002_create_user_favorite_actions_table.php) — `user_favorite_actions` table (`id`, `user_id` FK cascade, `action_id`, timestamps, `[user_id, action_id]` unique index)
+- **New model** [`UserFavoriteAction`](src/Models/UserFavoriteAction.php) — fillable `user_id`/`action_id`; `user()` relation resolves via `config('ui-library.user.model')`
+- **New partial** [`action-item.blade.php`](src/Resources/views/livewire/quick-actions/partials/action-item.blade.php) — reusable action row with star toggle, shortcut badge, icon, label, and category
+- **Modified** [`QuickActionsPanel.php`](src/Http/Livewire/QuickActions/QuickActionsPanel.php) — `toggleFavorite()` method, `$favoriteActionIds` computed property, pinned actions always appear at top regardless of ranking score; `executeAction()` records execution via `ActionTracker`
+- **Modified** [`TopNav.php`](src/Http/Livewire/Layouts/Navs/TopNav.php) — `loadQuickActions()` now respects favorites (pinned actions float to top of ⚡ dropdown)
+- **Modified** [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) — ⚡ button gains first-visit pulse animation (CSS keyframe + `hasSeenQuickActions` session flag)
+- **Modified** [`QuickActionsWidgetProcessor.php`](src/Widgets/QuickActionsWidgetProcessor.php) — widget now shows pinned actions first, then ranked frequent actions
+- **Modified** [`quick_actions.blade.php`](src/Resources/views/widgets/quick_actions.blade.php) — star toggle + shortcut badges in widget rows
+- **Modified** [`quicker-faster.js`](public/assets/js/quicker-faster.js) — first-visit pulse animation trigger on ⚡ button
+- **Modified** [`ui-library.php`](src/Config/ui-library.php) — `favorites` config key (`enabled`, `max_pinned`)
+
+### Keyboard Shortcut Fixes — Task AJ (2026-08-20)
+
+Attempted to fix sidebar search shortcut and Cmd+1..9 browser conflicts. Changes made but **not yet working** — likely stale JS asset cache in the consuming app.
+
+- **Modified** [`quicker-faster.js`](public/assets/js/quicker-faster.js) — changed sidebar filter shortcut from `Cmd+K` to `Cmd+Shift+K` to avoid conflict with the command palette
+- **Modified** [`quick-actions.js`](public/assets/js/quick-actions.js) — changed quick launch shortcuts from `Cmd+1..9` to `Cmd+Shift+1..9` to avoid browser tab-switching conflicts
+- **Modified** [`QuickActionsPanel.php`](src/Http/Livewire/QuickActions/QuickActionsPanel.php) — updated shortcut badges from `⌘1` to `⌘⇧1`
+- **Modified** [`quick-actions-panel.blade.php`](src/Resources/views/livewire/quick-actions/quick-actions-panel.blade.php) — updated footer hint to show `⌘⇧1`–`⌘⇧9`
+- **Re-published** JS assets to the consuming app's `public/vendor/ui-library/` directory
+
+**⚠️ Known issues (moved to backlog):**
+1. `Cmd+Shift+K` still opens quick actions instead of sidebar search — sidebar filter shortcut not working
+2. `Cmd+Shift+1..9` do nothing — quick launch shortcuts don't trigger
+3. Likely root cause: stale JS asset cache in the consuming app; may need hard cache-busting or browser cache clear
+
+### P0 Quick Wins — Task AC (2026-08-20)
+
+- **Admin case-sensitivity normalized** — normalized `'Dashboard'` → `'dashboard'` across:
+  - [`src/Core/Admin/Config/navigation.php`](src/Core/Admin/Config/navigation.php) (`context_groups` key + `contexts`)
+  - 6 Blade views ([`dashboard`](src/Core/Admin/Resources/views/admin/dashboard.blade.php), [`dashboard-overview`](src/Core/Admin/Resources/views/admin/dashboard-overview.blade.php), and 4 `dashboard/*` sub-views)
+  - [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php) — hardcoded Dashboard tab guard simplified to a single `!isset($this->items['dashboard'])` check
+- **Admin dashboard 404s fixed** — added explicit named routes to [`src/Core/Admin/Routes/web.php`](src/Core/Admin/Routes/web.php) for `admin/dashboard-overview` and `admin/dashboard-security-overview`
+- **System quick-actions config confirmed** — the System module's quick-actions config already exists with 5 actions (no change needed)
+
+### Employee Self Service (ESS) — Phase 1: My Portal Dashboard + Navigation Foundation — Task AQ (2026-08-20)
+
+ESS Phase 1 delivers the "My Portal" employee dashboard — a unified, role-gated landing page that aggregates employee-scoped widgets from multiple modules. This is the foundation for the full ESS feature set (Phases 2–4 outlined in [`employee-self-service-design.md`](docs/project/employee-self-service-design.md)).
+
+**New files (consuming app):**
+- [`dashboard_my_portal.php`](hr-consuming-app:app/Modules/Hr/Data/dashboards/dashboard_my_portal.php) — 11 widgets: 1× `profile_header` (employee photo, name, department, manager, hire date), 4× `stat` (Leave Balance, Hours This Week, Pending Approvals, Upcoming Holidays), 4× `action_card` (Request Leave, Clock In/Out, View Payslip, Update My Info), 1× `activity_log` (Recent Activity feed), 1× `quick_actions` (Frequent Actions widget). Roles gated to `employee, manager`.
+- [`my-portal.blade.php`](hr-consuming-app:app/Modules/Hr/Resources/views/hr/my-portal.blade.php) — Blade view with `<x-qf::navigation-layout context="my-portal">`
+
+**Modified files (consuming app):**
+- [`navigation.php`](hr-consuming-app:app/Modules/Hr/Config/navigation.php) — added `my-portal` context group (order 1) with `roles: ['employee', 'manager']` and 6 context items: Overview, My Leave, My Attendance, My Payslips, My Account, My Preferences
+- [`web.php`](hr-consuming-app:app/Modules/Hr/Routes/web.php) — added `GET /hr/my-portal` → `hr.dashboard-my-portal-overview`
+- [`quick-actions.php`](hr-consuming-app:app/Modules/Hr/Config/quick-actions.php) — added 7 employee-scoped quick actions under "Self Service" category: Request Leave, Clock In, View Latest Payslip, Update My Info, View My Schedule, My Documents, My Preferences
+
+**No library changes required** — all infrastructure (dashboard widget grid, navigation layout, quick actions, widget processors) already exists in the library.
+
+**Design doc**: [`docs/project/employee-self-service-design.md`](docs/project/employee-self-service-design.md) §4–§5
+
+### Employee Self Service (ESS) — Phase 2: Employee-Scoped Views — Task AS (2026-08-20)
+
+ESS Phase 2 delivers employee-scoped "my-*" views in each domain module, accessible from the My Portal sidebar.
+
+**New files (consuming app):**
+- [`my-leave.blade.php`](hr-consuming-app:app/Modules/Leave/Resources/views/leave/my-leave.blade.php) — data table of employee's leave requests filtered by `employee_id`, with "New Request" button linking to leave wizard
+- [`my-attendance.blade.php`](hr-consuming-app:app/Modules/Attendance/Resources/views/attendance/my-attendance.blade.php) — data table of employee's attendance records + clock events, with Clock In/Out button
+- [`my-payslips.blade.php`](hr-consuming-app:app/Modules/Payroll/Resources/views/payroll/my-payslips.blade.php) — data table of employee's payslips with View/Download actions
+
+**Modified files (consuming app):**
+- [`navigation.php`](hr-consuming-app:app/Modules/Hr/Config/navigation.php) — 3 sidebar items (My Leave, My Attendance, My Payslips) in `my-portal` context group now resolve to the new views
+- [`web.php`](hr-consuming-app:app/Modules/Leave/Routes/web.php) — added `GET /leave/my-leave` → `leave.my-leave`
+- [`web.php`](hr-consuming-app:app/Modules/Attendance/Routes/web.php) — added `GET /attendance/my-attendance` → `attendance.my-attendance`
+- [`web.php`](hr-consuming-app:app/Modules/Payroll/Routes/web.php) — added `GET /payroll/my-payslips` → `payroll.my-payslips`
+
+**No library changes required.**
+
+### Employee Self Service (ESS) — Phase 3: Interactive Features — Task AT (2026-08-20)
+
+ESS Phase 3 delivers interactive ESS features: clock in/out toggle, leave request wizard wiring, and payslip download.
+
+**New files (library):**
+- [`ClockEventRecorder.php`](src/Contracts/Attendance/ClockEventRecorder.php) — library contract defining `clockIn(int $employeeId): ClockEvent` and `clockOut(int $employeeId): ClockEvent` interfaces
+- [`ClockInOut.php`](src/Http/Livewire/Widgets/ClockInOut.php) — standalone Livewire component that queries latest `ClockEvent`, shows current status ("Clocked In since 8:00 AM" or "Not clocked in"), provides a large toggle button, dispatches `clockIn()`/`clockOut()` methods, emits `clockEventRecorded` event
+- [`clock-in-out.blade.php`](src/Resources/views/livewire/widgets/clock-in-out.blade.php) — Blade view with prominent button, status text, and last-event timestamp
+
+**New files (consuming app):**
+- `ClockEventRecorderService.php` — consuming-app service implementing the `ClockEventRecorder` contract, creates `ClockEvent` records via the module's model
+
+**Modified files (consuming app):**
+- Module service provider — binds `ClockEventRecorder` contract to the consuming app's implementation
+- [`dashboard_my_portal.php`](hr-consuming-app:app/Modules/Hr/Data/dashboards/dashboard_my_portal.php) — Clock In/Out action_card now opens `qf.clock-in-out` in a drawer; `ClockInOut` component renders above the dashboard widget grid
+- [`my-portal.blade.php`](hr-consuming-app:app/Modules/Hr/Resources/views/hr/my-portal.blade.php) — includes the `ClockInOut` Livewire component above the dashboard
+
+**Library change required**: `ClockEventRecorder` contract + `ClockInOut` Livewire component. This is the only library change needed across all ESS phases.
+
+### Employee Self Service (ESS) — Phase 4: Notifications & Polish — Task AT (2026-08-20)
+
+ESS Phase 4 delivers proactive notifications, the "Team Who's Out" widget, and cross-module dashboard aggregation.
+
+**New files (library):**
+- [`TeamWhoIsOutWidgetProcessor.php`](src/Widgets/TeamWhoIsOutWidgetProcessor.php) — queries approved leave requests overlapping today, filtered by the employee's department/team; returns a list of colleagues with leave type and dates
+- [`team_whos_out.blade.php`](src/Resources/views/widgets/team_whos_out.blade.php) — renders a compact list with avatars, names, and leave dates
+- [`CompositeDashboardResolver.php`](src/Services/Config/Dashboards/CompositeDashboardResolver.php) — accepts multiple dashboard config keys, merges their widget definitions, resolves placeholders across all modules, and returns a unified widget array
+
+**Modified files (library):**
+- [`WidgetProcessor.php`](src/Services/Widgets/WidgetProcessor.php) — registered `'team_whos_out' => TeamWhoIsOutWidgetProcessor::class` in `$map`
+
+**New files (consuming app):**
+- [`EssNotificationTemplateSeeder.php`](hr-consuming-app:app/Modules/Hr/Database/Seeders/EssNotificationTemplateSeeder.php) — seeds 12 notification templates: `payslip_ready` (Payroll), `leave_approved`/`leave_denied`/`leave_submitted` (Leave), `upcoming_holiday` (Holiday), `clock_out_reminder` (Attendance), plus 6 additional ESS event templates
+
+**Modified files (consuming app):**
+- [`dashboard_my_portal.php`](hr-consuming-app:app/Modules/Hr/Data/dashboards/dashboard_my_portal.php) — added `team_whos_out` widget showing colleagues on leave today
+
+**Design doc**: [`docs/project/employee-self-service-design.md`](docs/project/employee-self-service-design.md) — all 4 phases now complete.
+
+### Sidebar Link 404 Resolution — Task AW (2026-08-20)
+
+Completed the sidebar link audit fix: all 43 previously-404 sidebar links across System (34 URLs) and Organization (4 URLs + 3 dashboard sub-pages + 2 additional) now return 200.
+
+**System Module — 30 placeholder views + 9 routes:**
+- Created placeholder Blade views under [`src/Core/System/Resources/views/system/`](src/Core/System/Resources/views/system/) covering Dashboard (5 views: overview, platform-health, recent-activity, usage-statistics, notifications), Accounts (6 views: overview, accounts, account-groups, account-statuses, invitations, account-activity), Subscriptions (7 views: overview, subscriptions, trials, renewals, invoices, payments, subscription-history), Plans (6 views: overview, plans, features, limits, pricing, promotions), Applications (6 views: overview, installed-applications, marketplace, dependencies, versions, updates), System Settings (8 sub-views: branding, localization, email, notifications, storage, security, backups, system-logs), and Setup (1 view: wizard)
+- Added 9 named routes in [`src/Core/System/Routes/web.php`](src/Core/System/Routes/web.php)
+- System module: 2→36 URLs now return 200; 0 remain as 404
+
+**Organization Module — 4 placeholder views + 4 routes (consuming app):**
+- Created placeholder views for `organization/dashboard/{organization-summary,growth,recent-changes}` and `organization/organization-chart`
+- Added 4 routes in the consuming app's Organization routes file
+- Organization module: 14→18 URLs now return 200; 0 remain as 404
+
+**Post-resolution audit**: 100 URLs return 200, 52 return 403 (permission-restricted), **0 return 404**. Updated [`docs/project/sidebar-link-audit.md`](docs/project/sidebar-link-audit.md) with resolution details and final per-module breakdown.
+
+**No library API changes** — all placeholder views follow the existing minimal "Coming Soon" pattern established in Admin sidebar audit work.
+
+### Component Restoration — Task BE (2026-08-20)
+
+Restored the `qf.employee-detail` Livewire component from a backup of the original HR module.
+
+- **New files (consuming app):**
+  - [`EmployeeDetail.php`](hr-consuming-app:app/Modules/Hr/Http/Livewire/EmployeeDetail.php) — displays employee detail information
+  - [`employee-detail.blade.php`](hr-consuming-app:app/Modules/Hr/Resources/views/livewire/employee-detail.blade.php) — Blade view for employee detail
+- **Modified files (consuming app):**
+  - Module service provider — registered `qf.employee-detail` Livewire component
+
+### Component Restoration — Task BF (2026-08-20)
+
+Restored the `qf.searchable-employee-dropdown` Livewire component and conducted a full audit of all Payroll module Livewire components.
+
+- **New files (consuming app):**
+  - [`SearchableEmployeeDropdown.php`](hr-consuming-app:app/Modules/Hr/Http/Livewire/SearchableEmployeeDropdown.php) — searchable employee dropdown with server-side filtering
+  - [`searchable-employee-dropdown.blade.php`](hr-consuming-app:app/Modules/Hr/Resources/views/livewire/searchable-employee-dropdown.blade.php) — Blade view for the dropdown
+- **Component audit**: Discovered and registered 6 missing Payroll Livewire components in [`PayrollServiceProvider.php`](hr-consuming-app:app/Modules/Payroll/Providers/PayrollServiceProvider.php). Skipped `TaxBandsRepeater` (no usage found).
+- **Total restored components**: 8 across both tasks (2 HR + 6 Payroll)
+
+### Bug Fix: `/employees/1` 404 — Task BG (2026-08-20)
+
+Fixed two issues causing a 404 on employee detail pages (`/employees/{id}`).
+
+- **Library**: [`ResolvesModels.php`](src/Concerns/ResolvesModels.php) — added a `$companyId === 0` guard to skip the `WHERE company_id` clause when no company is set, preventing the company-scoping query from filtering out records when company context is absent
+- **Consuming app**: [`EmployeeDetail.php`](hr-consuming-app:app/Modules/Hr/Http/Livewire/EmployeeDetail.php) — fixed config key from `hr.employee_payroll_profile` to `payroll.employee_payroll_profile` (the config lives in the Payroll module after the HR split)
+
+---
 
 ## 2026-08-19 — HR Navigation: People + Manage Split & Dashboard Pattern Alignment
 
@@ -78,7 +599,7 @@
 - Dashboard role configs: `hr_admin`→`organization_manager` (domain-neutral)
 
 ### Fixed
-- Removed duplicate Organization migrations from HR consuming app's `database/migrations/` (now loaded exclusively from package via `UILibraryServiceProvider::loadMigrationsFrom()`)
+- Removed duplicate Organization migrations from the consuming app's `database/migrations/` (now loaded exclusively from package via `UILibraryServiceProvider::loadMigrationsFrom()`)
 - Extended `scripts/check-domain-independence.sh` DOMAIN_TERMS to catch role-name leakage (`hr_admin|hr_manager|hr_staff|hr_supervisor`)
 
 ### Verification (all passing)
@@ -648,7 +1169,7 @@ Extended [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php
 **Files**: [`ModelConfigRepository.php`](src/Services/Config/ModelConfigRepository.php)
 
 #### HR Decoupling Audit (#12)
-Comprehensive `grep` audit across entire `src/` directory. All `App\Modules\Hr\*` and `App\Modules\Admin\*` references removed or abstracted behind contracts. HR-specific Livewire components deleted. 30+ files reviewed/modified. 7 remaining hardcoded imports documented in [`implementation-plan.md` §11](project/implementation-plan.md).
+Comprehensive `grep` audit across entire `src/` directory. All consuming-app module references removed or abstracted behind contracts. Domain-specific Livewire components deleted. 30+ files reviewed/modified. 7 remaining hardcoded imports documented in [`implementation-plan.md` §11](project/implementation-plan.md).
 
 ---
 
@@ -703,9 +1224,9 @@ Added 5 missing config keys to navigation config stubs: `max_visible_items`, `pr
 ---
 
 ### My Account & My Preferences Views (#17)
-**Problem**: "My Account" and "My Preferences" pages existed only in the HR application. These are generic user-facing pages that belong in the library.
+**Problem**: "My Account" and "My Preferences" pages existed only in a consuming application. These are generic user-facing pages that belong in the library.
 
-**Fix**: Migrated both views from the HR app to the library:
+**Fix**: Migrated both views from the consuming app to the library:
 - **My Account**: Profile editing (name, email, avatar), password change, account status
 - **My Preferences**: Notification preferences, language, timezone, date format, theme
 
@@ -980,8 +1501,8 @@ Both views use the standard DataTableForm pattern with config-driven field defin
 ### 2026-08-08 — Phase 2.5 Complete Decoupling
 - ApprovalEngine decoupled via `ApprovalModelResolver` contract
 - TopNav decoupled via `CompanyProvider` contract
-- EmployeeDocumentService moved to HR app
-- HR Custom Livewire components deleted
+- Domain-specific document services moved to consuming app
+- Domain-specific Livewire components deleted
 
 ---
 

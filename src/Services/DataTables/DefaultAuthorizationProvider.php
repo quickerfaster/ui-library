@@ -206,9 +206,17 @@ class DefaultAuthorizationProvider implements DataTableAuthorizationProvider
             return true;
         }
 
-        // Support simple 'field' => 'value' equality checks
+        // Support 'field' => 'value' equality checks and 'field' => ['value1', 'value2'] array checks
         foreach ($condition as $field => $expected) {
-            if (!isset($record->$field) || $record->$field != $expected) {
+            if (!isset($record->$field)) {
+                return false;
+            }
+
+            $conditionMet = is_array($expected)
+                ? in_array($record->$field, $expected, true)
+                : $record->$field == $expected;
+
+            if (!$conditionMet) {
                 return false;
             }
         }

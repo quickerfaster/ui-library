@@ -1,22 +1,21 @@
 <div>
     @if(!$workflow)
         <div class="text-muted">No workflow found.</div>
-    @else
+    @elseif($displayMode === 'card')
         <div class="d-flex flex-wrap gap-2 align-items-center">
             @if($workflow->isPending())
                 @if($canApprove)
-                    <button wire:click="openCommentModal('approve')" class="btn btn-success btn-sm">
+                    <button wire:click="openCommentModal('approve')" class="btn btn-outline-success btn-sm">
                         <i class="fas fa-check-circle me-1"></i> Approve
                     </button>
                 @endif
                 @if($canReject)
-                    <button wire:click="openCommentModal('reject')" class="btn btn-danger btn-sm">
+                    <button wire:click="openCommentModal('reject')" class="btn btn-outline-danger btn-sm">
                         <i class="fas fa-times-circle me-1"></i> Reject
                     </button>
                 @endif
                 @if($canRecall)
-                    <button wire:click="recall" class="btn btn-warning btn-sm"
-                            wire:confirm="Are you sure you want to recall this workflow?">
+                    <button wire:click="openCommentModal('recall')" class="btn btn-outline-warning btn-sm">
                         <i class="fas fa-undo-alt me-1"></i> Recall
                     </button>
                 @endif
@@ -43,6 +42,74 @@
                 @endforeach
             </div>
         @endif
+    @elseif($displayMode === 'banner')
+        @php
+            $bannerClass = match($workflow->status) {
+                'pending' => 'alert-warning',
+                'in_progress' => 'alert-info',
+                'approved', 'completed' => 'alert-success',
+                'rejected' => 'alert-danger',
+                'cancelled', 'recalled' => 'alert-secondary',
+                default => 'alert-warning',
+            };
+            $bannerIcon = match($workflow->status) {
+                'pending' => 'fa-clock',
+                'in_progress' => 'fa-spinner',
+                'approved', 'completed' => 'fa-check-circle',
+                'rejected' => 'fa-times-circle',
+                'cancelled', 'recalled' => 'fa-undo-alt',
+                default => 'fa-clock',
+            };
+        @endphp
+        <div class="alert {{ $bannerClass }} d-flex flex-wrap align-items-center justify-content-between mb-0 py-2 px-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fas {{ $bannerIcon }}"></i>
+                <strong>{{ ucfirst($workflow->status) }} Approval</strong>
+                @if($workflow->currentStep)
+                    &mdash; <span>Step: {{ $workflow->currentStep->name }}</span>
+                @endif
+            </div>
+            <div class="d-flex gap-1">
+                @if($workflow->isPending())
+                    @if($canReject)
+                        <button wire:click="openCommentModal('reject')" class="btn btn-light btn-sm text-danger">
+                            <i class="fas fa-times-circle me-1"></i> Reject
+                        </button>
+                    @endif
+                    @if($canApprove)
+                        <button wire:click="openCommentModal('approve')" class="btn btn-light btn-sm text-success">
+                            <i class="fas fa-check-circle me-1"></i> Approve
+                        </button>
+                    @endif
+                    @if($canRecall)
+                        <button wire:click="openCommentModal('recall')" class="btn btn-light btn-sm text-dark">
+                            <i class="fas fa-undo-alt me-1"></i> Recall
+                        </button>
+                    @endif
+                @endif
+            </div>
+        </div>
+    @elseif($displayMode === 'inline')
+        <div class="d-inline-flex align-items-center gap-2">
+            @if($workflow->isPending())
+                @if($canApprove)
+                    <button wire:click="openCommentModal('approve')" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-check-circle me-1"></i> Approve
+                    </button>
+                @endif
+                @if($canReject)
+                    <button wire:click="openCommentModal('reject')" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-times-circle me-1"></i> Reject
+                    </button>
+                @endif
+                @if($canRecall)
+                    <button wire:click="openCommentModal('recall')" class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-undo-alt me-1"></i> Recall
+                    </button>
+                @endif
+            @endif
+            <x-qf::status.approval-status-badge :status="$workflow->status" />
+        </div>
     @endif
 
     {{-- Comment Modal (Bootstrap 5, no Alpine) --}}

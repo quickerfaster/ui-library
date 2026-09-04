@@ -78,10 +78,10 @@ return array (
         0 =>
         array (
           'label' => 'Start',
-          'event' => 'openSetupWizard',
+          'event' => 'navigate',
           'params' =>
           array (
-            'type' => 'setup',
+            'url' => '/setup/wizard',
           ),
           'style' => 'secondary',
         ),
@@ -103,7 +103,7 @@ return array (
           'event' => 'navigate',
           'params' =>
           array (
-            'url' => '/admin/onboarding',
+            'url' => '/system/onboarding',
           ),
           'style' => 'secondary',
         ),

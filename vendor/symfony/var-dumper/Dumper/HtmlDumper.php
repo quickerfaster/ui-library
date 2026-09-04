@@ -29,7 +29,6 @@ class HtmlDumper extends CliDumper
             'default' => 'background-color:#18171B; color:#FF8400; line-height:1.2em; font:12px Menlo, Monaco, Consolas, monospace; word-wrap: break-word; white-space: pre-wrap; position:relative; z-index:99999; word-break: break-all',
             'num' => 'font-weight:bold; color:#1299DA',
             'const' => 'font-weight:bold',
-            'virtual' => 'font-style:italic',
             'str' => 'font-weight:bold; color:#56DB3A',
             'note' => 'color:#1299DA',
             'ref' => 'color:#A0A0A0',
@@ -46,7 +45,6 @@ class HtmlDumper extends CliDumper
             'default' => 'background:none; color:#CC7832; line-height:1.2em; font:12px Menlo, Monaco, Consolas, monospace; word-wrap: break-word; white-space: pre-wrap; position:relative; z-index:99999; word-break: break-all',
             'num' => 'font-weight:bold; color:#1299DA',
             'const' => 'font-weight:bold',
-            'virtual' => 'font-style:italic',
             'str' => 'font-weight:bold; color:#629755;',
             'note' => 'color:#6897BB',
             'ref' => 'color:#6E6E6E',
@@ -61,13 +59,14 @@ class HtmlDumper extends CliDumper
         ],
     ];
 
-    protected ?string $dumpHeader = null;
-    protected string $dumpPrefix = '<pre class=sf-dump id=%s data-indent-pad="%s">';
-    protected string $dumpSuffix = '</pre><script>Sfdump(%s)</script>';
-    protected string $dumpId;
-    protected bool $colors = true;
+    protected $dumpHeader;
+    protected $dumpPrefix = '<pre class=sf-dump id=%s data-indent-pad="%s">';
+    protected $dumpSuffix = '</pre><script>Sfdump(%s)</script>';
+    protected $dumpId = 'sf-dump';
+    protected $colors = true;
     protected $headerIsDumped = false;
-    protected int $lastDepth = -1;
+    protected $lastDepth = -1;
+    protected $styles;
 
     private array $displayOptions = [
         'maxDepth' => 1,
@@ -84,13 +83,19 @@ class HtmlDumper extends CliDumper
         $this->styles = static::$themes['dark'] ?? self::$themes['dark'];
     }
 
-    public function setStyles(array $styles): void
+    /**
+     * @return void
+     */
+    public function setStyles(array $styles)
     {
         $this->headerIsDumped = false;
         $this->styles = $styles + $this->styles;
     }
 
-    public function setTheme(string $themeName): void
+    /**
+     * @return void
+     */
+    public function setTheme(string $themeName)
     {
         if (!isset(static::$themes[$themeName])) {
             throw new \InvalidArgumentException(\sprintf('Theme "%s" does not exist in class "%s".', $themeName, static::class));
@@ -103,8 +108,10 @@ class HtmlDumper extends CliDumper
      * Configures display options.
      *
      * @param array $displayOptions A map of display options to customize the behavior
+     *
+     * @return void
      */
-    public function setDisplayOptions(array $displayOptions): void
+    public function setDisplayOptions(array $displayOptions)
     {
         $this->headerIsDumped = false;
         $this->displayOptions = $displayOptions + $this->displayOptions;
@@ -112,16 +119,20 @@ class HtmlDumper extends CliDumper
 
     /**
      * Sets an HTML header that will be dumped once in the output stream.
+     *
+     * @return void
      */
-    public function setDumpHeader(?string $header): void
+    public function setDumpHeader(?string $header)
     {
         $this->dumpHeader = $header;
     }
 
     /**
      * Sets an HTML prefix and suffix that will encapse every single dump.
+     *
+     * @return void
      */
-    public function setDumpBoundaries(string $prefix, string $suffix): void
+    public function setDumpBoundaries(string $prefix, string $suffix)
     {
         $this->dumpPrefix = $prefix;
         $this->dumpSuffix = $suffix;
@@ -138,8 +149,10 @@ class HtmlDumper extends CliDumper
 
     /**
      * Dumps the HTML header.
+     *
+     * @return string
      */
-    protected function getDumpHeader(): string
+    protected function getDumpHeader()
     {
         $this->headerIsDumped = $this->outputStream ?? $this->lineDumper;
 
@@ -150,6 +163,7 @@ class HtmlDumper extends CliDumper
         $line = str_replace('{$options}', json_encode($this->displayOptions, \JSON_FORCE_OBJECT), <<<'EOHTML'
             <script>
             Sfdump = window.Sfdump || (function (doc) {
+
             doc.documentElement.classList.add('sf-js-enabled');
 
             var rxEsc = /([.*+?^${}()|\[\]\/\\])/g,
@@ -767,7 +781,10 @@ class HtmlDumper extends CliDumper
         return $this->dumpHeader = preg_replace('/\s+/', ' ', $line).'</style>'.$this->dumpHeader;
     }
 
-    public function dumpString(Cursor $cursor, string $str, bool $bin, int $cut): void
+    /**
+     * @return void
+     */
+    public function dumpString(Cursor $cursor, string $str, bool $bin, int $cut)
     {
         if ('' === $str && isset($cursor->attr['img-data'], $cursor->attr['content-type'])) {
             $this->dumpKey($cursor);
@@ -782,7 +799,10 @@ class HtmlDumper extends CliDumper
         }
     }
 
-    public function enterHash(Cursor $cursor, int $type, string|int|null $class, bool $hasChild): void
+    /**
+     * @return void
+     */
+    public function enterHash(Cursor $cursor, int $type, string|int|null $class, bool $hasChild)
     {
         if (Cursor::HASH_OBJECT === $type) {
             $cursor->attr['depth'] = $cursor->depth;
@@ -810,7 +830,10 @@ class HtmlDumper extends CliDumper
         }
     }
 
-    public function leaveHash(Cursor $cursor, int $type, string|int|null $class, bool $hasChild, int $cut): void
+    /**
+     * @return void
+     */
+    public function leaveHash(Cursor $cursor, int $type, string|int|null $class, bool $hasChild, int $cut)
     {
         $this->dumpEllipsis($cursor, $hasChild, $cut);
         if ($hasChild) {
@@ -883,7 +906,7 @@ class HtmlDumper extends CliDumper
             1 === \count($dumpClasses) ? '' : '"',
             implode(' ', $dumpClasses),
             $dumpTitle ? ' title="'.$dumpTitle.'"' : '',
-            preg_replace_callback(static::$controlCharsRx, function ($c) use ($map) {
+            preg_replace_callback(static::$controlCharsRx, static function ($c) use ($map) {
                 $s = $b = '<span class="sf-dump-default';
                 $c = $c[$i = 0];
                 if ($ns = "\r" === $c[$i] || "\n" === $c[$i]) {
@@ -907,9 +930,7 @@ class HtmlDumper extends CliDumper
         );
 
         if (!($attr['binary'] ?? false)) {
-            $v = preg_replace_callback(static::$unicodeCharsRx, function ($c) {
-                return '<span class=sf-dump-default>\u{'.strtoupper(dechex(mb_ord($c[0]))).'}</span>';
-            }, $v);
+            $v = preg_replace_callback(static::$unicodeCharsRx, static fn ($c) => '<span class=sf-dump-default>\u{'.strtoupper(dechex(mb_ord($c[0]))).'}</span>', $v);
         }
 
         if (isset($attr['file']) && $href = $this->getSourceLink($attr['file'], $attr['line'] ?? 0)) {
@@ -928,14 +949,14 @@ class HtmlDumper extends CliDumper
         if ('label' === $style) {
             $v .= ' ';
         }
-        if ($attr['virtual'] ?? false) {
-            $v = '<span class=sf-dump-virtual>'.$v.'</span>';
-        }
 
         return $v;
     }
 
-    protected function dumpLine(int $depth, bool $endOfValue = false): void
+    /**
+     * @return void
+     */
+    protected function dumpLine(int $depth, bool $endOfValue = false)
     {
         if (-1 === $this->lastDepth) {
             $this->line = \sprintf($this->dumpPrefix, $this->dumpId, $this->indentPad).$this->line;

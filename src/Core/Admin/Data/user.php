@@ -105,7 +105,6 @@ return [
       '4' => 'created_at',
       '5' => 'updated_at',
       '6' => 'deleted_at',
-      '7' => 'company_id',
     ],
     'onNewForm' => [
       '0' => 'email_verified_at',
@@ -113,13 +112,11 @@ return [
       '2' => 'created_at',
       '3' => 'updated_at',
       '4' => 'deleted_at',
-      '5' => 'company_id',
     ],
     'onEditForm' => [
       '0' => 'remember_token',
       '1' => 'email_verified_at',
       '2' => 'deleted_at',
-      '3' => 'company_id',
     ],
     'onQuery' => [
       '0' => 'password_confirmation',

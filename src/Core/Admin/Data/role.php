@@ -99,7 +99,7 @@ return [
             'field' => 'guard_name',
             'sortable' => true,
             'type' => 'badge',
-            'visible' => false,
+            'visible' => true,
         ],
         'created_at' => [
             'label' => 'Created',
@@ -136,9 +136,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'hiddenFields' => [
-        'onTable' => [
-            '0' => 'updated_at',
-        ],
+        'onTable' => [],
         'onNewForm' => [],
         'onEditForm' => [],
         'onQuery' => [],
@@ -207,18 +205,33 @@ return [
     ],
 
     'isTransaction' => false,
-    'crudType' => 'modals',
+    'crudType' => 'drawers',
     'includeControllers' => false,
     'tableDefaultFields' => [
-        '0' => 'name',
-        '1' => 'guard_name',
+        '0' => 'id',
+        '1' => 'name',
+        '2' => 'guard_name',
+        '3' => 'created_at',
     ],
     'addRoutes' => false,
     'dispatchEvents' => false,
     'detailComponent' => '',
     'fieldGroups' => [],
     'moreActions' => [],
-    'switchViews' => [],
+    'switchViews' => [
+        'default' => 'list',
+        'table' => ['enabled' => true],
+        'list' => [
+            'enabled' => true,
+            'titleFields' => ['name'],
+            'subtitleFields' => ['guard_name'],
+            'badgeField' => 'guard_name',
+            'badgeColors' => [
+                'web' => 'primary',
+                'api' => 'info',
+            ],
+        ],
+    ],
     'relations' => [],
     'report' => [],
 ];

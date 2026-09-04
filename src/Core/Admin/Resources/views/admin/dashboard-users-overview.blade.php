@@ -1,7 +1,7 @@
-<x-qf::navigation-layout 
-    configKey="admin.dashboards.dashboard_users_overview" 
-    context="Users & Permissions" 
-    moduleName="admin" 
+<x-qf::navigation-layout
+    configKey="admin.dashboards.dashboard_users_overview"
+    context="Users"
+    moduleName="admin"
     :overrides="[
         'top_bar' => ['enabled' => true],
         'breadcrumb' => ['enabled' => false],

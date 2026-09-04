@@ -166,6 +166,23 @@ class NavigationLayout extends Component
         foreach ($this->contextItems as $group => &$items) {
             $items = $this->filterVisibleItems($items);
         }
+
+        // Propagate context group 'roles' to items for Blade-level role checking.
+        // When a group has 'roles' defined (e.g., ['employee', 'manager']),
+        // items inherit those roles so the sidebar-item template can fall back
+        // to role-based access when the user lacks the item's explicit permission.
+        foreach ($this->contextItems as $group => &$items) {
+            $groupRoles = $this->contextGroups[$group]['roles'] ?? null;
+            if (!empty($groupRoles)) {
+                foreach ($items as &$item) {
+                    if (empty($item['roles'])) {
+                        $item['roles'] = $groupRoles;
+                    }
+                }
+                unset($item);
+            }
+        }
+        unset($items);
         $this->sharedHeaderItems = $this->filterVisibleItems($this->sharedHeaderItems);
         $this->sharedFooterItems = $this->filterVisibleItems($this->sharedFooterItems);
         $this->sharedTopLeft = $this->filterVisibleItems($this->sharedTopLeft);
@@ -428,7 +445,7 @@ class NavigationLayout extends Component
 
         // 1. Published override (highest priority — consuming app's explicit customization)
         $publishedPath = resource_path(
-            "views/vendor/ui-library/core/" . strtolower($moduleName) . "/Config/navigation.php"
+            "views/vendor/qf-core/" . strtolower($moduleName) . "/Config/navigation.php"
         );
         if (file_exists($publishedPath)) {
             return $publishedPath;

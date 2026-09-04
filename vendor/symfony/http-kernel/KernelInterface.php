@@ -33,20 +33,26 @@ interface KernelInterface extends HttpKernelInterface
 
     /**
      * Loads the container configuration.
+     *
+     * @return void
      */
-    public function registerContainerConfiguration(LoaderInterface $loader): void;
+    public function registerContainerConfiguration(LoaderInterface $loader);
 
     /**
      * Boots the current kernel.
+     *
+     * @return void
      */
-    public function boot(): void;
+    public function boot();
 
     /**
      * Shutdowns the kernel.
      *
      * This method is mainly useful when doing functional testing.
+     *
+     * @return void
      */
-    public function shutdown(): void;
+    public function shutdown();
 
     /**
      * Gets the registered bundle instances.
@@ -107,9 +113,9 @@ interface KernelInterface extends HttpKernelInterface
     /**
      * Gets the cache directory.
      *
-     * This directory should be used for caches that are written at runtime.
+     * Since Symfony 5.2, the cache directory should be used for caches that are written at runtime.
      * For caches and artifacts that can be warmed at compile-time and deployed as read-only,
-     * use the "build directory" returned by the {@see getBuildDir()} method.
+     * use the new "build directory" returned by the {@see getBuildDir()} method.
      */
     public function getCacheDir(): string;
 
@@ -117,19 +123,9 @@ interface KernelInterface extends HttpKernelInterface
      * Returns the build directory.
      *
      * This directory should be used to store build artifacts, and can be read-only at runtime.
-     * System caches written at runtime should be stored in the "cache directory" ({@see KernelInterface::getCacheDir()}).
-     * Application caches that are shared between all front-end servers should be stored
-     * in the "share directory" ({@see KernelInterface::getShareDir()}).
+     * Caches written at runtime should be stored in the "cache directory" ({@see KernelInterface::getCacheDir()}).
      */
     public function getBuildDir(): string;
-
-    /**
-     * Returns the share directory.
-     *
-     * This directory should be used to store data that is shared between all front-end servers.
-     * This typically fits application caches.
-     */
-    public function getShareDir(): ?string;
 
     /**
      * Gets the log directory.

@@ -55,7 +55,7 @@ return [
         'onTable' => ['description', 'notifications', 'created_at', 'updated_at'],
     ],
 
-    'simpleActions' => [],
+    'simpleActions' => ['show'],
 
     'moreActions' => [
         [
@@ -76,7 +76,7 @@ return [
     ],
 
     'switchViews' => [
-        'default' => 'table',
+        'default' => 'list',
         'table' => ['enabled' => true],
         'list' => [
             'enabled' => true,

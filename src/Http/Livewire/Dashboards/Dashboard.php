@@ -2,6 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\Dashboards;
 
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Config\Dashboards\DashboardResolver;
 use QuickerFaster\UILibrary\Services\Widgets\WidgetProcessor;
@@ -20,12 +21,30 @@ class Dashboard extends Component
     /** @var array Custom widget definitions (overrides config file) */
     public array $customWidgets = [];
 
+    /** @var string|null Error message when dashboard config cannot be loaded. */
+    public ?string $errorMessage = null;
+
     public function mount(string $configKey, array $parameters = [], array $customWidgets = [])
     {
         $this->configKey = $configKey;
         $this->parameters = $parameters;
         $this->customWidgets = $customWidgets;
-        $this->loadDashboard();
+
+        try {
+            $this->loadDashboard();
+        } catch (\InvalidArgumentException $e) {
+            $this->errorMessage = 'Dashboard configuration not found: ' . $this->configKey;
+            Log::error($e->getMessage(), [
+                'configKey' => $this->configKey,
+                'exception' => $e,
+            ]);
+        } catch (\Exception $e) {
+            $this->errorMessage = 'An unexpected error occurred while loading the dashboard: ' . $this->configKey;
+            Log::error($e->getMessage(), [
+                'configKey' => $this->configKey,
+                'exception' => $e,
+            ]);
+        }
     }
 
     protected function getResolver(): DashboardResolver
@@ -67,6 +86,7 @@ class Dashboard extends Component
             'description' => $this->description,
             'hero' => $this->hero,
             'stats' => $this->stats,
+            'errorMessage' => $this->errorMessage,
         ]);
     }
 }

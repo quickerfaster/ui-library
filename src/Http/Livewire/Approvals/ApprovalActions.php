@@ -23,6 +23,8 @@ class ApprovalActions extends Component
 {
     public ?int $workflowId = null;
 
+    public string $displayMode = 'card';
+
     public bool $showCommentModal = false;
 
     public string $actionType = '';
@@ -31,17 +33,26 @@ class ApprovalActions extends Component
 
     protected $listeners = ['refreshApprovalActions' => '$refresh'];
 
-    public function __construct(
-        protected WorkflowEngine $engine,
-        protected ApprovalGuard $guard,
-        protected ApproverResolver $approvers,
-        protected ApproverLabelResolver $labels,
-    ) {
+    protected WorkflowEngine $engine;
+
+    protected ApprovalGuard $guard;
+
+    protected ApproverResolver $approvers;
+
+    protected ApproverLabelResolver $labels;
+
+    public function boot(): void
+    {
+        $this->engine = app(WorkflowEngine::class);
+        $this->guard = app(ApprovalGuard::class);
+        $this->approvers = app(ApproverResolver::class);
+        $this->labels = app(ApproverLabelResolver::class);
     }
 
-    public function mount(?Workflow $workflow = null, ?int $workflowId = null): void
+    public function mount(?Workflow $workflow = null, ?int $workflowId = null, string $displayMode = 'card'): void
     {
         $this->workflowId = $workflowId ?? ($workflow?->getKey() ?? null);
+        $this->displayMode = $displayMode;
     }
 
     public function openCommentModal(string $action): void
@@ -57,6 +68,8 @@ class ApprovalActions extends Component
             $this->approve($this->comments);
         } elseif ($this->actionType === 'reject') {
             $this->reject($this->comments);
+        } elseif ($this->actionType === 'recall') {
+            $this->recall();
         }
     }
 
@@ -112,6 +125,7 @@ class ApprovalActions extends Component
             $this->dispatch('refreshApprovalActions');
             $this->dispatch('refreshApprovalTimeline');
             $this->dispatch('refreshApprovalRequests');
+            $this->dispatch('refreshDetail');
             $this->notify($message, 'success');
         } catch (AuthorizationException $e) {
             $this->notify($e->getMessage(), 'error');

@@ -43,7 +43,7 @@ Route::group(['middleware' => 'web'], function () {
         ->where('provider', 'google|github');
 
     // Home / Dashboard — polished welcome page from the library
-    Route::get('/home', function () {
+    Route::middleware(['auth'])->get('/home', function () {
         return view(config('ui-library.home_view', 'qf::home'));
     })->name('home');
 

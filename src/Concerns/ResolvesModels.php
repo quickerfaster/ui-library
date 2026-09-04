@@ -124,18 +124,25 @@ trait ResolvesModels
      * bypass the session-based global scope, then applies an explicit
      * company_id WHERE clause.
      *
+     * When $companyId is 0, no company scope is applied (All Companies mode),
+     * consistent with checkCompanyAccess().
+     *
      * @param  string      $modelClass  Fully-qualified model class name
      * @param  int|string  $id          Primary key value
-     * @param  int         $companyId   Company ID to scope to
+     * @param  int         $companyId   Company ID to scope to (0 = all companies)
      * @return Model|null
      */
     public function resolveModelForCompany(string $modelClass, $id, int $companyId): ?Model
     {
-        return $this->resolveModel($modelClass, $id, [
-            function ($query) use ($companyId) {
+        $scopes = [];
+
+        if ($companyId !== 0) {
+            $scopes[] = function ($query) use ($companyId) {
                 return $query->where('company_id', $companyId);
-            },
-        ]);
+            };
+        }
+
+        return $this->resolveModel($modelClass, $id, $scopes);
     }
 
     /**

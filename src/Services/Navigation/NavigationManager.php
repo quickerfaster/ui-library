@@ -562,7 +562,7 @@ class NavigationManager
 
         // 1. Published override in the consuming app (highest priority — explicit customization)
         $publishedPath = resource_path(
-            'views/vendor/ui-library/core/' . strtolower($moduleName) . '/Config/navigation.php'
+            'views/vendor/qf-core/' . strtolower($moduleName) . '/Config/navigation.php'
         );
         if (file_exists($publishedPath)) {
             return $publishedPath;

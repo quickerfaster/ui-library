@@ -75,6 +75,7 @@
                     </li>
                 @endif
 
+                @if (!isset($this->items['dashboard']))
                 <li class="nav-item " wire:key="nav-item-Policies">
                     <a href="/{{ $currentModule }}/dashboard"
                         class="nav-link {{ 'dashboard' === $activeContext ? 'active fw-bold text-primary' : '' }}">
@@ -82,6 +83,7 @@
                         <span>Dashboard</span>
                     </a>
                 </li>
+                @endif
 
 
                 @php
@@ -128,7 +130,24 @@
                                         $url = $isNamedRoute
                                             ? route($item['route'])
                                             : url($item['url'] ?? Str::kebab($key));
+
+                                        // Permission check — same logic as top-nav-item.blade.php
+                                        $hasPermission = true;
+                                        if (!empty($item['permission'])) {
+                                            $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+                                        } elseif (!empty($item['roles'])) {
+                                            $roles = $item['roles'];
+                                            $isWildcard = ($roles === '*' || $roles === ['*']);
+                                            $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                                        } elseif (!empty($url)) {
+                                            $segments = explode('/', $url);
+                                            $viewName = last($segments);
+                                            $viewName = str_replace('dashboard-', '', $viewName);
+                                            $permission = 'view_' . \Illuminate\Support\Str::singular(str_replace('-', '_', $viewName));
+                                            $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($permission);
+                                        }
                                     @endphp
+                                    @if ($hasPermission)
                                     <li wire:key="overflow-item-{{ $key }}">
                                         <a href="{{ $url }}"
                                             class="dropdown-item d-flex align-items-center {{ $key === $activeContext ? 'active fw-bold text-primary' : '' }}">
@@ -138,6 +157,7 @@
                                             <span>{{ $item['label'] }}</span>
                                         </a>
                                     </li>
+                                    @endif
                                 @endforeach
                             </ul>
                         </li>
@@ -157,7 +177,24 @@
                                 $url = $isNamedRoute
                                     ? route($item['route'])
                                     : url($item['url'] ?? Str::kebab($key));
+
+                                // Permission check — same logic as top-nav-item.blade.php
+                                $hasPermission = true;
+                                if (!empty($item['permission'])) {
+                                    $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+                                } elseif (!empty($item['roles'])) {
+                                    $roles = $item['roles'];
+                                    $isWildcard = ($roles === '*' || $roles === ['*']);
+                                    $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                                } elseif (!empty($url)) {
+                                    $segments = explode('/', $url);
+                                    $viewName = last($segments);
+                                    $viewName = str_replace('dashboard-', '', $viewName);
+                                    $permission = 'view_' . \Illuminate\Support\Str::singular(str_replace('-', '_', $viewName));
+                                    $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($permission);
+                                }
                             @endphp
+                            @if ($hasPermission)
                             <a href="{{ $url }}"
                                 class="btn btn-light btn-sm {{ $key === $activeContext ? 'active' : '' }}"
                                 wire:key="mobile-item-{{ $key }}">
@@ -166,6 +203,7 @@
                                 @endif
                                 <span>{{ $item['label'] }}</span>
                             </a>
+                            @endif
                         @endforeach
 
                         @if ($this->overflowMobile->isNotEmpty())
@@ -179,7 +217,24 @@
                                             $url = $isNamedRoute
                                                 ? route($item['route'])
                                                 : url($item['url'] ?? Str::kebab($key));
+
+                                            // Permission check — same logic as top-nav-item.blade.php
+                                            $hasPermission = true;
+                                            if (!empty($item['permission'])) {
+                                                $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+                                            } elseif (!empty($item['roles'])) {
+                                                $roles = $item['roles'];
+                                                $isWildcard = ($roles === '*' || $roles === ['*']);
+                                                $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                                            } elseif (!empty($url)) {
+                                                $segments = explode('/', $url);
+                                                $viewName = last($segments);
+                                                $viewName = str_replace('dashboard-', '', $viewName);
+                                                $permission = 'view_' . \Illuminate\Support\Str::singular(str_replace('-', '_', $viewName));
+                                                $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($permission);
+                                            }
                                         @endphp
+                                        @if ($hasPermission)
                                         <li wire:key="mobile-overflow-item-{{ $key }}">
                                             <a href="{{ $url }}" class="dropdown-item d-flex align-items-center">
                                                 @if (!empty($item['icon']))
@@ -188,6 +243,7 @@
                                                 <span>{{ $item['label'] }}</span>
                                             </a>
                                         </li>
+                                        @endif
                                     @endforeach
                                 </ul>
                             </div>
@@ -261,6 +317,83 @@
                     wire:click.prevent="openBackgroundJobsDrawer" title="{{ $backgroundJobsTitle }}">
                     <i class="{{ $backgroundJobsIcon }}"></i>
                 </a>
+                @endif
+
+                {{-- Quick Actions (Command Palette) --}}
+                @if ($quickActionsEnabled)
+                <a href="#" class="px-2 py-1 my-0 me-1"
+                    wire:click.prevent="openQuickActions" title="{{ $quickActionsTitle }}">
+                    <i class="{{ $quickActionsIcon }}"></i>
+                </a>
+                @endif
+
+                {{-- Quick Actions ⚡ Button (Top Ranked Actions Dropdown) --}}
+                @if ($quickActionsButtonEnabled)
+                <div class="dropdown me-1" id="quick-actions-dropdown" wire:key="quick-actions-dropdown">
+                    <a href="#" class="px-2 py-1 my-0 position-relative dropdown-toggle {{ $showQuickActionsPulse ? 'qa-pulse' : '' }}"
+                        data-bs-toggle="dropdown" aria-label="Quick Actions" aria-expanded="false"
+                        title="{{ $quickActionsButtonTitle }}">
+                        <i class="{{ $quickActionsButtonIcon }}"></i>
+                        @if ($showQuickActionsPulse)
+                        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-warning border border-light rounded-circle" style="width: 8px; height: 8px;">
+                            <span class="visually-hidden">New</span>
+                        </span>
+                        @endif
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2 mt-2" style="min-width: 300px;">
+                        <li>
+                            <h6 class="dropdown-header ps-2 text-uppercase text-xs font-weight-bolder opacity-6">
+                                <i class="{{ $quickActionsButtonIcon }} me-1"></i>{{ $quickActionsButtonTitle }}
+                            </h6>
+                        </li>
+
+                        @forelse ($quickActions as $action)
+                            @php
+                                $actionId = $action['id'] ?? $action['key'] ?? '';
+                                $isFav = in_array($actionId, $quickActionFavorites, true);
+                            @endphp
+                            <li wire:key="quick-action-{{ $actionId }}">
+                                <div class="dropdown-item border-radius-md d-flex align-items-center pe-1">
+                                    <a href="#"
+                                        class="d-flex align-items-center text-decoration-none flex-grow-1 min-width-0"
+                                        wire:click.prevent="executeQuickAction('{{ $actionId }}')">
+                                        <span class="icon-shape icon-xs rounded-2 bg-gradient-warning text-white d-inline-flex align-items-center justify-content-center me-2" style="width: 28px; height: 28px; flex-shrink: 0;">
+                                            <i class="fa-solid {{ $action['icon'] ?? 'fas fa-bolt' }}"></i>
+                                        </span>
+                                        <span class="min-width-0">
+                                            <span class="d-block text-sm fw-medium text-dark text-truncate">{{ $action['label'] }}</span>
+                                            @if (!empty($action['description']))
+                                                <span class="d-block text-xs text-muted text-truncate">{{ $action['description'] }}</span>
+                                            @endif
+                                        </span>
+                                    </a>
+                                    {{-- Star Toggle --}}
+                                    <button type="button"
+                                        class="btn btn-sm border-0 p-1 ms-1 {{ $isFav ? 'text-warning' : 'text-muted' }}"
+                                        wire:click.stop="toggleQuickActionFavorite('{{ $actionId }}')"
+                                        title="{{ $isFav ? 'Unpin' : 'Pin' }}"
+                                        style="flex-shrink: 0;">
+                                        <i class="{{ $isFav ? 'fas' : 'far' }} fa-star fa-sm"></i>
+                                    </button>
+                                </div>
+                            </li>
+                        @empty
+                            <li>
+                                <span class="dropdown-item-text text-muted text-sm">
+                                    No actions available yet.
+                                </span>
+                            </li>
+                        @endforelse
+
+                        <li><hr class="dropdown-divider my-1"></li>
+                        <li>
+                            <a href="#" class="dropdown-item text-sm text-primary fw-semibold"
+                                wire:click.prevent="openQuickActions">
+                                More actions… <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
                 @endif
 
                                 
@@ -391,7 +524,8 @@
                 <div class="list-group list-group-flush" style="max-height: calc(100vh - 120px); overflow-y: auto;">
                     @foreach ($unreadNotifications as $notification)
                         <div class="list-group-item list-group-item-action border-bottom py-3 px-3"
-                             wire:key="notification-{{ $notification->id }}">
+                             wire:key="notification-{{ $notification->id }}"
+                             wire:click="navigateToNotification({{ $notification->id }})">
                             <div class="d-flex w-100 justify-content-between align-items-start">
                                 <div class="me-2">
                                     <i class="{{ NotificationTypeRegistry::getIcon($notification->type) }} {{ NotificationTypeRegistry::getColor($notification->type) }} fs-5"></i>

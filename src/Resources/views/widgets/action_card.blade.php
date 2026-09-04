@@ -23,7 +23,7 @@
                 $buttonClass = $action['style'] ?? 'primary';
             @endphp
             <button
-                wire:click="{{ $action['event'] }}({{ json_encode($action['params'] ?? []) }})"
+                wire:click="$dispatch('{{ $action['event'] }}', {{ json_encode($action['params'] ?? []) }})"
                 class="btn btn-{{ $buttonClass }} btn-sm"
             >
                 {{ $action['label'] }}

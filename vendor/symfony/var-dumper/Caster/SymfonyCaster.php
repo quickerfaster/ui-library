@@ -12,7 +12,6 @@
 namespace Symfony\Component\VarDumper\Caster;
 
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Uid\TimeBasedUidInterface;
 use Symfony\Component\Uid\Ulid;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\VarDumper\Cloner\Stub;
@@ -20,8 +19,6 @@ use Symfony\Component\VarExporter\Internal\LazyObjectState;
 
 /**
  * @final
- *
- * @internal
  */
 class SymfonyCaster
 {
@@ -34,7 +31,10 @@ class SymfonyCaster
         'format' => 'getRequestFormat',
     ];
 
-    public static function castRequest(Request $request, array $a, Stub $stub, bool $isNested): array
+    /**
+     * @return array
+     */
+    public static function castRequest(Request $request, array $a, Stub $stub, bool $isNested)
     {
         $clone = null;
 
@@ -49,17 +49,23 @@ class SymfonyCaster
         return $a;
     }
 
-    public static function castHttpClient($client, array $a, Stub $stub, bool $isNested): array
+    /**
+     * @return array
+     */
+    public static function castHttpClient($client, array $a, Stub $stub, bool $isNested)
     {
         $multiKey = \sprintf("\0%s\0multi", $client::class);
-        if (isset($a[$multiKey]) && !$a[$multiKey] instanceof Stub) {
+        if (isset($a[$multiKey])) {
             $a[$multiKey] = new CutStub($a[$multiKey]);
         }
 
         return $a;
     }
 
-    public static function castHttpClientResponse($response, array $a, Stub $stub, bool $isNested): array
+    /**
+     * @return array
+     */
+    public static function castHttpClientResponse($response, array $a, Stub $stub, bool $isNested)
     {
         $stub->cut += \count($a);
         $a = [];
@@ -71,7 +77,10 @@ class SymfonyCaster
         return $a;
     }
 
-    public static function castLazyObjectState($state, array $a, Stub $stub, bool $isNested): array
+    /**
+     * @return array
+     */
+    public static function castLazyObjectState($state, array $a, Stub $stub, bool $isNested)
     {
         if (!$isNested) {
             return $a;
@@ -98,24 +107,32 @@ class SymfonyCaster
         return $a;
     }
 
-    public static function castUuid(Uuid $uuid, array $a, Stub $stub, bool $isNested): array
+    /**
+     * @return array
+     */
+    public static function castUuid(Uuid $uuid, array $a, Stub $stub, bool $isNested)
     {
         $a[Caster::PREFIX_VIRTUAL.'toBase58'] = $uuid->toBase58();
         $a[Caster::PREFIX_VIRTUAL.'toBase32'] = $uuid->toBase32();
 
-        if ($uuid instanceof TimeBasedUidInterface) {
+        // symfony/uid >= 5.3
+        if (method_exists($uuid, 'getDateTime')) {
             $a[Caster::PREFIX_VIRTUAL.'time'] = $uuid->getDateTime()->format('Y-m-d H:i:s.u \U\T\C');
         }
 
         return $a;
     }
 
-    public static function castUlid(Ulid $ulid, array $a, Stub $stub, bool $isNested): array
+    /**
+     * @return array
+     */
+    public static function castUlid(Ulid $ulid, array $a, Stub $stub, bool $isNested)
     {
         $a[Caster::PREFIX_VIRTUAL.'toBase58'] = $ulid->toBase58();
         $a[Caster::PREFIX_VIRTUAL.'toRfc4122'] = $ulid->toRfc4122();
 
-        if ($ulid instanceof TimeBasedUidInterface) {
+        // symfony/uid >= 5.3
+        if (method_exists($ulid, 'getDateTime')) {
             $a[Caster::PREFIX_VIRTUAL.'time'] = $ulid->getDateTime()->format('Y-m-d H:i:s.v \U\T\C');
         }
 

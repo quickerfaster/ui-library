@@ -10,6 +10,11 @@
             "QuickerFaster\\UILibrary\\Core\\": "src/Core/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "QuickerFaster\\UILibrary\\Tests\\": "tests/"
+        }
+    },
     "extra": {
         "laravel": {
             "providers": [

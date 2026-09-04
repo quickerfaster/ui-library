@@ -34,7 +34,7 @@
 
     @if($data['showViewAll'] && $data['viewAllLink'])
         <div class="mt-3 text-end">
-            <a href="{{ $data['viewAllLink'] }}" class="btn btn-sm btn-link">View All</a>
+            <a href="{{ $data['viewAllLink'] }}" target="{{ $data['viewAllLinkTarget'] ?? '_self' }}" class="btn btn-sm btn-link" @if(($data['viewAllLinkTarget'] ?? '_self') === '_blank') rel="noopener noreferrer" @endif>View All</a>
         </div>
     @endif
 </div>

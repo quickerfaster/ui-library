@@ -38,13 +38,14 @@ use Symfony\Component\VarDumper\Server\DumpServer;
 #[AsCommand(name: 'server:dump', description: 'Start a dump server that collects and displays dumps in a single place')]
 class ServerDumpCommand extends Command
 {
+    private DumpServer $server;
+
     /** @var DumpDescriptorInterface[] */
     private array $descriptors;
 
-    public function __construct(
-        private DumpServer $server,
-        array $descriptors = [],
-    ) {
+    public function __construct(DumpServer $server, array $descriptors = [])
+    {
+        $this->server = $server;
         $this->descriptors = $descriptors + [
             'cli' => new CliDescriptor(new CliDumper()),
             'html' => new HtmlDescriptor(new HtmlDumper()),
@@ -63,7 +64,7 @@ class ServerDumpCommand extends Command
 
                   <info>php %command.full_name%</info>
 
-                You can consult dumped data in HTML format in your browser by providing the <info>--format=html</info> option
+                You can consult dumped data in HTML format in your browser by providing the <comment>--format=html</comment> option
                 and redirecting the output to a file:
 
                   <info>php %command.full_name% --format="html" > dump.html</info>
@@ -90,7 +91,7 @@ class ServerDumpCommand extends Command
         $errorIo->success(\sprintf('Server listening on %s', $this->server->getHost()));
         $errorIo->comment('Quit the server with CONTROL-C.');
 
-        $this->server->listen(function (Data $data, array $context, int $clientId) use ($descriptor, $io) {
+        $this->server->listen(static function (Data $data, array $context, int $clientId) use ($descriptor, $io) {
             $descriptor->describe($io, $data, $context, $clientId);
         });
 

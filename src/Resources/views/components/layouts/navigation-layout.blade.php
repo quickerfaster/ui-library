@@ -220,10 +220,16 @@
         {{-- <livewire:qf:drawer :configKey="$configKey" /> --}}
         <livewire:qf.drawer />
 
+        {{-- Quick Actions Command Palette --}}
+        @if (config('ui-library.quick_actions.enabled', true))
+            <livewire:qf.quick-actions-panel wire:key="quick-actions-panel" />
+        @endif
+
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
         </script>
         <script src="{{ asset('vendor/ui-library/assets/js/quicker-faster.js') }}"></script>
+        <script src="{{ asset('vendor/ui-library/assets/js/quick-actions.js') }}"></script>
 
 
         @livewireScripts
@@ -249,6 +255,7 @@
             Livewire.on('doReload', () => {
                 window.location.reload();
             });
+
         </script>
 
 
@@ -298,8 +305,8 @@
 
                 // When the offcanvas is fully hidden (after close animation)
                 drawerElement.addEventListener('hidden.bs.offcanvas', function() {
-                    // Tell Livewire that the drawer is closed (sync state)
-                    Livewire.dispatch('closeDrawer');
+                    // Tell Livewire to clear drawer content now that animation is complete
+                    Livewire.dispatch('drawerHidden');
                 });
 
                 // When the offcanvas is shown, do nothing special – just ensure Livewire knows it's open
@@ -313,8 +320,10 @@
                     bsDrawer.show();
                 });
 
-                // Also listen for a custom close event in case Livewire calls closeDrawer
-                Livewire.on('closeDrawer', () => {
+                // Listen for drawerClosed to trigger the offcanvas hide animation.
+                // (closeDrawer is reserved for external triggers like the Discard button
+                //  and routes to Drawer::close() via $listeners, which dispatches drawerClosed.)
+                Livewire.on('drawerClosed', () => {
                     bsDrawer.hide();
                 });
             }

@@ -19,6 +19,9 @@ use QuickerFaster\UILibrary\Traits\FieldTypes\HasHintField;
 use QuickerFaster\UILibrary\Traits\HasAutoGenerateFields;
 use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 use QuickerFaster\UILibrary\Concerns\ResolvesModels;
+use QuickerFaster\UILibrary\Events\DataTableRecordSaved;
+use QuickerFaster\UILibrary\Contracts\Workflow\Workflowable;
+use QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine;
 
 class DataTableForm extends Component
 {
@@ -53,6 +56,7 @@ class DataTableForm extends Component
     public array $searchResults = [];     // Holds search results per field
     public array $selectedLabels = [];    // Holds labels of selected options for display
     public array $returnParams = [];
+    public ?string $crudType = null;
 
     public array $allowedGroups = []; // The group of form field on the DatTable form
 
@@ -86,7 +90,8 @@ class DataTableForm extends Component
         ?string $modalId = null,
         array $returnParams = [],
         array $allowedGroups = [],
-        array $prefilledData = []   // new parameter
+        array $prefilledData = [],   // new parameter
+        ?string $crudType = null
     ): void {
         $this->configKey = $configKey;
         $this->recordId = $recordId;
@@ -95,6 +100,7 @@ class DataTableForm extends Component
         $this->returnParams = $returnParams;
         $this->allowedGroups = $allowedGroups;
         $this->prefilledData = $prefilledData;
+        $this->crudType = $crudType ?? ($this->getConfigResolver()->getConfig()['crudType'] ?? 'modal');
 
         $this->loadConfiguration();
         $this->initializeFields();
@@ -814,23 +820,65 @@ protected function hydrateMorphToSelectFields(): void
                 $old = array_intersect_key($original, $changed);
                 $new = array_intersect_key($data, $changed);
                 ActivityLogger::updated($logName, $record, $old, $new);
+
+                event(new DataTableRecordSaved(
+                    oldRecord: $old,
+                    newRecord: $new,
+                    model: $this->modelClass,
+                    action: DataTableRecordSaved::ACTION_UPDATED,
+                    component: $this,
+                ));
             } else {
                 ActivityLogger::created($logName, $record, $data);
+
+                event(new DataTableRecordSaved(
+                    oldRecord: null,
+                    newRecord: $record->toArray(),
+                    model: $this->modelClass,
+                    action: DataTableRecordSaved::ACTION_CREATED,
+                    component: $this,
+                ));
             }
 
 
             // Sync relationships
             $this->syncRelationships($record);
 
+            // Auto-start workflow for new records that implement Workflowable
+            // Skip workflow for draft records — they will be started when submitted
+            if (!$this->isEditMode && $record instanceof Workflowable) {
+                $status = $record->status ?? ($data['status'] ?? null);
+                if ($status !== 'Draft') {
+                    try {
+                        $definitionKey = $record->getWorkflowDefinitionKey();
+                        $engine = app(WorkflowEngine::class);
+                        $definition = $engine->getDefinition($definitionKey);
+
+                        if ($definition !== null) {
+                            $engine->start($record, $record->getWorkflowContext());
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('DataTableForm: workflow auto-start failed', [
+                            'model' => get_class($record),
+                            'id' => $record->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
             // Emit success event
             $this->dispatch('formSaved', $this->recordId, $this->isEditMode);
             $this->dispatch('refreshDataTable');
 
-            // Show success feedback to user
-            $this->dispatch('showAlert', [
-                'type' => 'success',
-                'message' => $this->isEditMode ? 'Record updated successfully.' : 'Record created successfully.',
-            ]);
+            // Show success feedback to user (skip when inline — the drawer's parent
+            // page listens for 'formSaved' and shows its own confirmation)
+            if (!$this->inline) {
+                $this->dispatch('showAlert', [
+                    'type' => 'success',
+                    'message' => $this->isEditMode ? 'Record updated successfully.' : 'Record created successfully.',
+                ]);
+            }
 
             // Refresh record globally
             $refreshEventName = "refresh" . \Str::plural($this->getConfigResolver()->getModelName());
@@ -839,11 +887,9 @@ protected function hydrateMorphToSelectFields(): void
 
             if (!$this->inline) {
                 $this->dispatch('closeModal', $this->modalId);
-            } else {
-                $module = strtolower($this->getConfigResolver()->getModuleName());
-                $modelPlural = \Str::plural(\Str::kebab($this->getConfigResolver()->getModelName()));
-                return redirect()->to(url("/{$module}/{$modelPlural}?" . http_build_query($this->returnParams)));
             }
+            // When inline (e.g., hosted in a Drawer): don't navigate away.
+            // The Drawer listens for 'formSaved' and auto-closes itself.
 
             // Reset form for new records
             if (!$this->isEditMode) {
@@ -1419,3 +1465,4 @@ protected function hydrateMorphToSelectFields(): void
     }
 }
 
+ 

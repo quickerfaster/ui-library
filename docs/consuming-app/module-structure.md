@@ -62,12 +62,28 @@ At minimum, every module must include:
 | `Database/Migrations/` | Module-specific migrations | When the module owns its own tables |
 | `Database/Seeders/` | Module-specific seeders | When the module needs seed data |
 | `Http/Controllers/` | Custom controllers | When the module needs custom route handlers |
-| `Http/Livewire/` | Custom Livewire components | When the module needs custom UI components |
+| `Http/Livewire/` | Custom Livewire components | When the module needs custom UI components (e.g., `LeaveWizardForm` extends library `WizardForm`) |
 | `Http/Requests/` | Form request classes | When the module needs custom validation |
 | `Listeners/` | Event listeners | When the module reacts to library or application events |
 | `Reports/` | Reportable implementations | When the module provides scheduled reports |
-| `Services/` | Business logic services | When the module has complex business logic |
+| `Services/` | Business logic services | When the module has complex business logic (e.g., `LeaveBalanceResolver`, `LeaveCalendarEnhancementProvider`) |
 | `Traits/` | Module-specific traits | When the module has reusable concerns |
+
+**Real-world example — Leave module:** The Leave module uses both `Http/Livewire/` and `Services/`:
+
+```
+app/Modules/Leave/
+├── Http/
+│   └── Livewire/
+│       └── LeaveWizardForm.php          # Extends library WizardForm, overrides domain methods
+├── Services/
+│   ├── LeaveBalanceResolver.php         # Balance calculation logic
+│   └── LeaveCalendarEnhancementProvider.php  # Implements CalendarEnhancementProvider contract
+```
+
+[`LeaveWizardForm`](hr-consuming-app:app/Modules/Leave/Http/Livewire/LeaveWizardForm.php) demonstrates the **subclass pattern**: it extends the library's [`WizardForm`](../../src/Http/Livewire/Wizards/WizardForm.php) and overrides `getAvailableLeaveTypes()`, `checkLeaveBalance()`, `checkDateConflicts()`, `detectDateConflicts()`, `getLeaveTypeInfo()`, and `calculateWorkingDays()` with leave-specific logic. The library base class provides generic wizard infrastructure; the consuming-app subclass supplies domain behavior.
+
+[`LeaveCalendarEnhancementProvider`](hr-consuming-app:app/Modules/Leave/Services/LeaveCalendarEnhancementProvider.php) demonstrates the **contract pattern**: it implements the library's [`CalendarEnhancementProvider`](../../src/Contracts/FieldTypes/CalendarEnhancementProvider.php) contract, providing holiday and team-absence data to the library's [`DatepickerField`](../../src/Components/FieldTypes/DatepickerField.php) without the library ever referencing a domain model.
 
 ### 1.3 Naming Conventions
 
@@ -80,9 +96,45 @@ At minimum, every module must include:
 | Dashboard config key | `{lowercase_module}_{filename}` | `billing_revenue_overview` |
 | Report config key | `{lowercase_module}_{filename}` | `billing_monthly_summary` |
 | Livewire component alias | `qf.{kebab-case}` | `qf.data-table`, `qf.invoice-form` |
+
+> **⚠️ Service Provider Registration Required**: Unlike other auto-discovered assets (listeners, reports, workflows), Livewire components are **not** auto-discovered by the library's `ModuleServiceProvider`. Every Livewire component must be explicitly registered in the module's service provider `boot()` method via `Livewire::component('alias', ComponentClass::class)`. Use the same naming prefix convention as existing components in that module (e.g., `qf.` prefix for HR module components, bare names for Leave module components). See [Pre-Coding Checklist](pre-coding-checklist.md) §B.
 | Blade component tag | `<x-qf::{kebab-case}>` | `<x-qf::text-field>` |
 | Model namespace | `App\Modules\{ModuleName}\Models` | `App\Modules\Billing\Models\Invoice` |
 | Listener namespace | `App\Modules\{ModuleName}\Listeners` | `App\Modules\Billing\Listeners\InvoiceSavedListener` |
+
+### Cross-Module References After a Module Split
+
+After a monolithic module is split into sub-modules, references that once pointed at the old module must be updated to the **owning** module. Two rules apply:
+
+1. **Config keys must use the owning module prefix** — the key resolves to `app/Modules/{Module}/Data/{file}.php`, so it must match where the file now lives. Examples:
+   - `payroll.payroll_payslip` (not `hr.payroll_payslip`)
+   - `attendance.employee_work_pattern` (not `hr.employee_work_pattern`)
+
+2. **Model FQCNs must use the owning module namespace** — use the namespace where the model class actually lives. This applies to:
+   - Eloquent relationships (`belongsTo`, `hasMany`, etc.)
+   - Data-config `model` and `relationship.model` values
+   - `use` imports
+
+   Example: `App\Modules\Hr\Models\Employee` (not `App\Modules\Attendance\Models\Employee`).
+
+3. **View namespace references must use the owning module's namespace** — `render()` methods and route files that reference Blade views must use the module that owns the view. Examples:
+   - `payroll::livewire.payroll.payroll-wizard` (not `hr::livewire.payroll.payroll-wizard`)
+   - `attendance::attendance-index` (not `hr::attendance-index`)
+
+4. **URL references must use the owning module's prefix** — navigation configs, data configs, and blade files that reference URLs must use the module that owns the route. Examples:
+   - `/payroll/payroll-wizard` (not `/hr/payroll-wizard`)
+   - `/attendance/attendance-index` (not `/hr/attendance-index`)
+
+### Catch-All Route Awareness
+
+The library provides a catch-all route (`/{module}/{view}/{id?}`) that automatically resolves blade views. **Views rendered by this route are rendered directly by Laravel, not by Livewire.** This means:
+
+- **Only `$id` is available** as a variable (from the optional `{id}` segment)
+- **Livewire state is NOT available** — `$activeTab`, `$formData`, etc. will be undefined
+- **Pattern**: Create a thin wrapper blade that uses `@livewire('component-name')` to delegate to a Livewire component
+- **Livewire component views** must live in `Resources/views/livewire/` subdirectory
+
+See [Pre-Coding Checklist](pre-coding-checklist.md) §A for the correct pattern.
 
 ---
 
@@ -371,7 +423,7 @@ The reference implementation ships with 6 modules. All six expose overview dashb
 | **Organization** | `app/Modules/Organization/` | 7 (Company, Branch, Department, Division, BusinessUnit, Location, Team) | 7 (Dashboard, Companies, Structure, Teams, Locations, Classification, Reports) | Foundational — org hierarchy + company entity |
 | **HR** | `app/Modules/Hr/` | 15 (Employee, EmployeePosition, EmployeeProfile, JobTitle, EmployeeGroup, EmployeeJobHistory, Tag, etc.) | 3 (Organization, People, Manage) | Core people/employee |
 | **Attendance** | `app/Modules/Attendance/` | 12 (Attendance, Shift, WorkPattern, ClockEvent, AttendancePolicy, etc.) | 2 (Time, Policies) | Time tracking, shifts, clock events |
-| **Leave** | `app/Modules/Leave/` | 5 (LeaveType, LeaveRequest, LeaveBalance, LeaveApprover, LeaveOverview) | 1 (Leave) | Leave management |
+| **Leave** | `app/Modules/Leave/` | 4 (LeaveType, LeaveRequest, LeaveBalance, LeaveOverview) | 1 (Leave) | Leave management |
 | **Payroll** | `app/Modules/Payroll/` | 11 (PayrollRun, PayrollPayslip, PayrollPolicy, PaySchedule, PayslipItem, etc.) | 1 (Payroll) | Payroll processing |
 | **Holiday** | `app/Modules/Holiday/` | 2 (Holiday, HolidayCalendar) | 1 (Holidays) | Holiday calendars |
 

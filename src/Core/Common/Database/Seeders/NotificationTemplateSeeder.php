@@ -4,11 +4,13 @@ namespace QuickerFaster\UILibrary\Core\Common\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use QuickerFaster\UILibrary\Models\NotificationTemplate;
+use QuickerFaster\UILibrary\Services\Notifications\NotificationDiscoveryService;
 
 class NotificationTemplateSeeder extends Seeder
 {
     public function run(): void
     {
+        // Built-in library templates
         $templates = [
             // Document templates
             ['type' => 'document_generated', 'channel' => 'database', 'subject' => 'Document Generated', 'body_template' => 'Your document "{name}" has been generated.', 'locale' => 'en'],
@@ -31,6 +33,11 @@ class NotificationTemplateSeeder extends Seeder
             // Legacy — kept for backward compatibility with existing data
             ['type' => 'workflow_stage_changed', 'channel' => 'database', 'subject' => 'Workflow Update', 'body_template' => 'Workflow "{workflow_name}" moved to stage "{stage_name}".', 'locale' => 'en'],
         ];
+
+        // Auto-discover business-module notification templates
+        $discovery = app(NotificationDiscoveryService::class);
+        $discovered = $discovery->discover();
+        $templates = array_merge($templates, $discovered['templates']);
 
         foreach ($templates as $template) {
             NotificationTemplate::firstOrCreate(

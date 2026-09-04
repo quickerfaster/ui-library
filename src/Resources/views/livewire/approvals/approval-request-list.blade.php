@@ -4,11 +4,11 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
                     <h6 class="mb-0">
-                        <i class="fas {{ $view === 'pending' ? 'fa-inbox' : 'fa-paper-plane' }} me-1"></i>
-                        {{ $view === 'pending' ? 'Pending Approvals' : 'Submitted Requests' }}
+                        <i class="fas {{ match($status) { 'pending' => 'fa-inbox', 'approved' => 'fa-check-circle', 'rejected' => 'fa-times-circle', default => 'fa-list' } }} me-1"></i>
+                        {{ match($status) { 'pending' => 'Pending Approvals', 'approved' => 'Approved', 'rejected' => 'Rejected', default => 'All Approvals' } }}
                     </h6>
                     <small class="text-muted">
-                        {{ $view === 'pending' ? 'Workflows awaiting your action.' : 'Workflows you initiated.' }}
+                        {{ match($status) { 'pending' => 'Workflows awaiting your action.', 'approved' => 'Workflows that have been approved.', 'rejected' => 'Workflows that were rejected.', default => 'All workflow requests.' } }}
                     </small>
                 </div>
 

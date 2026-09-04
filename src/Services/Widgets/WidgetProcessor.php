@@ -13,6 +13,8 @@ use QuickerFaster\UILibrary\Widgets\ProfileHeaderWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\ProgressWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\TrendWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\GroupedListWidgetProcessor;
+use QuickerFaster\UILibrary\Widgets\QuickActionsWidgetProcessor;
+use QuickerFaster\UILibrary\Widgets\TeamWhoIsOutWidgetProcessor;
 
 class WidgetProcessor
 {
@@ -22,13 +24,15 @@ class WidgetProcessor
         'list'        => ListWidgetProcessor::class,
         'grouped_list' => GroupedListWidgetProcessor::class,
 
-        'progress'    => ProgressWidgetProcessor::class, 
+        'progress'    => ProgressWidgetProcessor::class,
         'metric'      => MetricWidgetProcessor::class,
         'trend'       => TrendWidgetProcessor::class,
         'onboarding'  => OnboardingWidgetProcessor::class,
         'action_card' => ActionCardWidgetProcessor::class,
         'activity_log' => ActivityLogWidgetProcessor::class,
         'profile_header' => ProfileHeaderWidgetProcessor::class,
+        'quick_actions' => QuickActionsWidgetProcessor::class,
+        'team_whos_out' => TeamWhoIsOutWidgetProcessor::class,
 
 
 

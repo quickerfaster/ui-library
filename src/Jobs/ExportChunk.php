@@ -294,12 +294,13 @@ class ExportChunk implements ShouldQueue
      */
     protected function restoreCompanyContext(Export $export): void
     {
-        $companyId = $export->company_id ?? null;
+        $companyColumn = config('ui-library.tenancy.column', 'company_id');
+        $companyId = $export->{$companyColumn} ?? null;
 
         // Only set session if the export has a specific company context.
         // 0 and null both mean "no filter" in CompanyScope's logic.
         if ($companyId && $companyId !== 0) {
-            session()->put('current_company_id', $companyId);
+            session()->put(config('ui-library.tenancy.session_key', 'current_company_id'), $companyId);
         }
         // If 0 or null, leave session empty so CompanyScope applies no filter.
     }

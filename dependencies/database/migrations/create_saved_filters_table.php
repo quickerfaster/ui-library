@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('saved_filters', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('config_key');   // e.g., 'hr.attendance'
+            $table->string('config_key');   // e.g., 'admin.user'
             $table->string('name');
             $table->json('filters');
             $table->boolean('is_global')->default(false);  // share with team

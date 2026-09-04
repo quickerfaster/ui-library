@@ -11,6 +11,52 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/system/settings', function () {
         return view('qf-core::system.settings');
     })->name('system.settings');
+
+    // System Settings sub-pages (3-segment URLs not handled by catch-all)
+    Route::get('/system/settings/branding', function () {
+        return view('qf-core::system.settings.branding');
+    })->name('system.settings.branding');
+
+    Route::get('/system/settings/localization', function () {
+        return view('qf-core::system.settings.localization');
+    })->name('system.settings.localization');
+
+    Route::get('/system/settings/email', function () {
+        return view('qf-core::system.settings.email');
+    })->name('system.settings.email');
+
+    Route::get('/system/settings/notifications', function () {
+        return view('qf-core::system.settings.notifications');
+    })->name('system.settings.notifications');
+
+    Route::get('/system/settings/storage', function () {
+        return view('qf-core::system.settings.storage');
+    })->name('system.settings.storage');
+
+    Route::get('/system/settings/security', function () {
+        return view('qf-core::system.settings.security');
+    })->name('system.settings.security');
+
+    Route::get('/system/settings/backups', function () {
+        return view('qf-core::system.settings.backups');
+    })->name('system.settings.backups');
+
+    Route::get('/system/settings/system-logs', function () {
+        return view('qf-core::system.settings.system-logs');
+    })->name('system.settings.system-logs');
+
+    // Setup wizard (module "setup" not in catch-all allowed_modules)
+    Route::get('/setup/wizard', function () {
+        return view('qf-core::system.setup.wizard');
+    })->name('system.setup.wizard');
+
+    Route::get('/system/onboarding', function () {
+        return view('qf-core::system.onboarding');
+    })->name('system.onboarding');
+
+    Route::get('/system/tours', function () {
+        return view('qf-core::system.tours');
+    })->name('system.tours');
 });
 
 // Catch-all route for business modules (loaded LAST by ModuleServiceProvider)

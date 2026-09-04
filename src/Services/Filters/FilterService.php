@@ -36,7 +36,11 @@ class FilterService
                 if ($this->validateRelationChain($modelInstance, $parts)) {
                     $relation = implode('.', $parts);
                     $query->whereHas($relation, function ($q) use ($column, $operator, $value) {
-                        $q->where($column, $operator, $value);
+                        if ($operator === 'between' && is_array($value) && count($value) === 2) {
+                            $q->whereBetween($column, $value);
+                        } else {
+                            $q->where($column, $operator, $value);
+                        }
                     });
                 }
             } else {
@@ -44,7 +48,12 @@ class FilterService
                 if (!empty($fieldDefinitions) && !array_key_exists($field, $fieldDefinitions)) {
                     continue;
                 }
-                $query->where($field, $operator, $value);
+
+                if ($operator === 'between' && is_array($value) && count($value) === 2) {
+                    $query->whereBetween($field, $value);
+                } else {
+                    $query->where($field, $operator, $value);
+                }
             }
         }
     }
