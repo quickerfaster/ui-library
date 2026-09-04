@@ -228,7 +228,7 @@ This layout mirrors **Workday's "My Worklet"** and **BambooHR's "Home"** dashboa
 | **Bulk Approvals** | ❌ | ✅ | ✅ | ✅ | **Missing** |
 | **Approval Delegation** | ❌ | ✅ | ✅ | ✅ | **Missing** |
 | **Approval Escalation** | ❌ | ❌ | ✅ | ✅ | **Missing** |
-| **Document Self-Service** | ✅ (2026-09-04) | ✅ | ✅ | ✅ | **On par** — LeaveRequest attachments migrated from JSON column to polymorphic [`DocumentEngine`](src/Services/Documents/DocumentEngine.php:1) + [`documents`](Database/migrations/2026_06_12_142526_create_documents_table.php:1) table via [`Documentable`](src/Contracts/Documents/Documentable.php:1) contract |
+| **Document Self-Service** | ✅ (2026-09-04) | ✅ | ✅ | ✅ | **On par** — LeaveRequest attachments migrated from JSON column to polymorphic [`DocumentEngine`](src/Services/Documents/DocumentEngine.php:1) + [`documents`](Database/migrations/2026_06_12_142526_create_documents_table.php:1) table via [`Documentable`](src/Contracts/Documents/Documentable.php:1) contract. [`LeaveDocumentUpload`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) Livewire component provides upload, preview, download, and delete UI on the leave request detail page. |
 | **Config-Driven Architecture** | ✅ Fully declarative | ❌ Hard-coded | ⚠️ Metadata-driven | ✅ Metadata-driven | **Ahead** |
 
 ---
