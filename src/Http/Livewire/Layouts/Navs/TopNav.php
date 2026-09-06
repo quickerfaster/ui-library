@@ -14,6 +14,7 @@ use QuickerFaster\UILibrary\Events\NavigationBuilding;
 use QuickerFaster\UILibrary\Services\QuickActions\ActionRegistry;
 use QuickerFaster\UILibrary\Services\QuickActions\ActionTracker;
 use QuickerFaster\UILibrary\Services\QuickActions\RankingEngine;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 
 class TopNav extends Component
 {
@@ -1012,7 +1013,32 @@ class TopNav extends Component
                     continue;
                 }
             }
-
+    
+            // ------------------------------------------------------------------
+            //  module_access filtering
+            // ------------------------------------------------------------------
+            // If the module key is listed in config('ui-library.module_access'),
+            // the current user must have one of the allowed roles (or be an
+            // admin bypass). Modules NOT listed in module_access are shown to
+            // everyone (backward compatibility).
+            $moduleAccess = config('ui-library.module_access', []);
+            if (isset($moduleAccess[$key])) {
+                $user = auth()->user();
+    
+                if (! $user) {
+                    continue;
+                }
+    
+                // Admin bypass: super_admin, admin, company_admin see all modules.
+                if (! AuthorizationService::isBypassAllowed($user)) {
+                    $allowedRoles = (array) $moduleAccess[$key];
+    
+                    if (! $user->hasAnyRole(...$allowedRoles)) {
+                        continue;
+                    }
+                }
+            }
+    
             $modules[$key] = array_merge($config, ['key' => $key]);
         }
 
