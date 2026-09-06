@@ -8,7 +8,7 @@ use QuickerFaster\UILibrary\Services\Config\Wizards\WizardConfigResolver;
 
 class Wizard extends Component
 {
-    public string $configKey;           // e.g. "hr.employee_onboarding"
+    public string $configKey;           // e.g. "module.wizard_name"
     public string $wizardId;             // unique per user/session
     public array $steps = [];
     public array $models = [];
@@ -23,6 +23,12 @@ class Wizard extends Component
     public string $description = '';
     public string $returnPath = '';
 
+    /**
+     * External preset data passed from the drawer/dashboard action card.
+     * Merged with internal wizard linking data before being forwarded to WizardForm.
+     */
+    public array $presetData = [];
+
 
     protected $listeners = [
         'stepFormSaved' => 'handleStepFormSaved',
@@ -30,8 +36,11 @@ class Wizard extends Component
         'cancelDelete' => 'cancelDelete',
     ];
 
-    public function mount(string $configKey): void
+    public string $isResumingDraft = 'false';
+
+    public function mount(string $configKey, array $presetData = []): void
     {
+        $this->presetData = $presetData;
 
         $this->configKey = $configKey;
         $this->wizardId = 'wizard-' . md5($configKey . '-' . session()->getId());
@@ -43,6 +52,23 @@ class Wizard extends Component
         $this->title = $resolver->getTitle();
         $this->description = $resolver->getDescription();
         $this->returnPath = $resolver->getReturnPath();
+
+        // Check for resume draft query parameter
+        $resumeRecordId = request()->query('resumeRecordId');
+        if ($resumeRecordId && !empty($this->steps)) {
+            $primaryModel = $this->models['primary'] ?? null;
+            if ($primaryModel) {
+                $draftRecord = $primaryModel::find($resumeRecordId);
+                if ($draftRecord && ($draftRecord->status ?? '') === 'Draft') {
+                    $this->stepData[0] = (int) $resumeRecordId;
+                    $this->primaryModelId = (int) $resumeRecordId;
+                    $this->createdRecords[] = ['model' => $primaryModel, 'id' => (int) $resumeRecordId];
+                    $this->isResumingDraft = 'true';
+                    $this->saveToSession();
+                    return;
+                }
+            }
+        }
 
         // Restore from session if exists
         if (session()->has($this->wizardId)) {
@@ -101,11 +127,17 @@ class Wizard extends Component
     public function handleStepFormSaved(int $recordId, int $stepIndex): void
     {
         $step = $this->steps[$stepIndex];
-        $modelClass = $step['model'];
+
+        // Store the record ID for this step (used by customComponent steps for document tracking)
         $this->stepData[$stepIndex] = $recordId;
-        $this->createdRecords[] = ['model' => $modelClass, 'id' => $recordId];
-        if ($modelClass === $this->models["primary"]) // Keep the ref to the primaryModelId
-            $this->primaryModelId = $recordId;
+
+        // Only track created records for model-backed steps
+        if (isset($step['model'])) {
+            $modelClass = $step['model'];
+            $this->createdRecords[] = ['model' => $modelClass, 'id' => $recordId];
+            if ($modelClass === $this->models["primary"]) // Keep the ref to the primaryModelId
+                $this->primaryModelId = $recordId;
+        }
 
         $this->saveToSession();
         $this->advance();
@@ -139,11 +171,11 @@ class Wizard extends Component
     // In your Wizard component, enhance dispatchCompletionEvent to support multiple placeholders
     public function dispatchCompletionEvent(string $eventName, array $params): void
     {
-        // Replace placeholders like {employee_id}, {position_id} with actual record IDs
+        // Replace placeholders like {record_id}, {category_id} with actual record IDs
         $placeholders = [
             '{id}' => $this->primaryModelId,
-            // '{employee_id}' => $this->stepData[0] ?? null,   // assuming step 0 is Employee
-            // '{position_id}' => $this->stepData[1] ?? null,   // assuming step 1 is EmployeePosition
+            // '{record_id}' => $this->stepData[0] ?? null,   // assuming step 0 is Record
+            // '{category_id}' => $this->stepData[1] ?? null, // assuming step 1 is Category
         ];
 
         array_walk_recursive($params, function (&$value) use ($placeholders) {
@@ -220,8 +252,8 @@ class Wizard extends Component
 
     protected function isFormStep(array $step): bool
     {
-        return isset($step['model']) && !isset($step['isReview']); // review step has no model
-    }
+        return (isset($step['model']) || isset($step['customComponent'])) && !isset($step['isReview']); // review step has no model
+   }
 
     protected function getChildComponentId(): string
     {
@@ -229,12 +261,17 @@ class Wizard extends Component
     }
 
     /**
-     * Build preset data for the current step (e.g., foreign keys from previous steps)
+     * Build preset data for the current step (e.g., foreign keys from previous steps).
+     *
+     * External preset data (from drawer/dashboard action cards) is merged in,
+     * with internal wizard linking data taking precedence for the same keys.
      */
-    protected function getPresetDataForCurrentStep(): array
+    public function getPresetDataForCurrentStep(): array
     {
         $step = $this->steps[$this->currentStep] ?? [];
-        $preset = [];
+
+        // Start with external preset data (e.g. employee_id from dashboard action card)
+        $preset = $this->presetData;
 
         if (isset($step['requiresLink']) && $step['requiresLink']) {
             // Find the source step (isLinkSource = true)
@@ -243,7 +280,7 @@ class Wizard extends Component
                     $sourceRecordId = $this->stepData[$index] ?? null;
                     if ($sourceRecordId) {
                         $linkFields = (new WizardConfigResolver($this->configKey))->getLinkFields();
-                        $foreignKey = $linkFields['databaseField'] ?? 'employee_id';
+                        $foreignKey = $linkFields['databaseField'] ?? 'record_id';
                         $preset[$foreignKey] = $sourceRecordId;
                     }
                     break;
@@ -256,7 +293,7 @@ class Wizard extends Component
 
     /**
      * Convert a model class to a config key that ConfigResolver understands.
-     * Assumes models are in App\Modules\{Module}\Models and config keys are like "hr.employee".
+     * Assumes models are in App\Modules\{Module}\Models and config keys are like "module.resource".
      */
     protected function getModelConfigKey(string $modelClass): string
     {
@@ -282,7 +319,7 @@ class Wizard extends Component
     public function render()
     {
         $currentStepConfig = $this->steps[$this->currentStep] ?? null;
-        $isReviewStep = $currentStepConfig && !isset($currentStepConfig['model']); // no model = review
+        $isReviewStep = $currentStepConfig && !isset($currentStepConfig['model']) && !isset($currentStepConfig['customComponent']);
 
         return view('qf::livewire.wizards.wizard', [
             'currentStepConfig' => $currentStepConfig,

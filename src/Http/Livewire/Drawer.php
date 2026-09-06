@@ -15,6 +15,7 @@ class Drawer extends Component
         'openDrawer' => 'open',
         'closeDrawer' => 'close',
         'formSaved' => 'close',          // optional: auto‑close after save
+        'drawerHidden' => 'cleanup',     // clear content AFTER offcanvas slide-out animation
     ];
 
     /**
@@ -44,11 +45,22 @@ class Drawer extends Component
 
     public function close(): void
     {
+        // Dispatch drawerClosed to trigger JS → bsDrawer.hide() with animation.
+        // Do NOT dispatch closeDrawer here — that event is in $listeners and would
+        // route back to close(), creating an infinite loop.
+        $this->dispatch('drawerClosed');
+    }
+
+    /**
+     * Clear drawer content after the offcanvas slide-out animation completes.
+     * Called by the 'drawerHidden' event dispatched from hidden.bs.offcanvas.
+     */
+    public function cleanup(): void
+    {
         $this->isOpen = false;
         $this->component = null;
         $this->componentParams = [];
         $this->title = '';
-        $this->dispatch('drawerClosed');
     }
 
     /**

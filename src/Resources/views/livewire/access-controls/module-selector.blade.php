@@ -1,44 +1,42 @@
+<div class="d-flex flex-wrap align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <label for="access-control-scope" class="form-label mb-0 text-xs fw-bold text-uppercase text-secondary">
+            Role
+        </label>
+        <select
+            id="access-control-scope"
+            class="form-select form-select-sm"
+            wire:model.live="selectedScopeId"
+        >
+            <option value="">-- Select Role --</option>
+            @foreach($scopeNames as $scopeId => $scopeName)
+                <option value="{{ $scopeId }}">{{ $scopeName }}</option>
+            @endforeach
+        </select>
+    </div>
 
-<div class="row g-2">
-    @hasanyrole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES)
+    <div class="d-flex align-items-center gap-2">
+        <label for="access-control-module" class="form-label mb-0 text-xs fw-bold text-uppercase text-secondary">
+            Module
+        </label>
+        <select
+            id="access-control-module"
+            class="form-select form-select-sm"
+            wire:model.live="selectedModule"
+        >
+            <option value="">-- Select Module --</option>
+            @foreach($moduleNames as $moduleName)
+                <option value="{{ $moduleName }}">{{ ucfirst($moduleName) }}</option>
+            @endforeach
+        </select>
+    </div>
 
-        <!-- Scope Selection Dropdown -->
-        <div class="input-group col-12 w-100 col-sm-auto w-sm-auto">
-            <select id="scopeSelect" wire:model.live.500ms="selectedScopeId"  class="form-select rounded-pill p-1 ps-3 pe-sm-5 px-sm-4 m-0 small-control"  >
-                <option value="">Select {{strtolower($selectedScopeName)}}...</option>
-                @foreach($scopeNames as $id => $scopeName)
-                    <option value="{{ $id }}">{{ $scopeName }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Module Selection Dropdown (Conditional) -->
-        @if (!$isUrlAccess)
-            <div  class="input-group col-12 w-100 col-sm-auto w-sm-auto" >
-                <select id="moduleSelect" wire:model.live.500ms="selectedModule" class="form-select rounded-pill p-1 ps-3 pe-sm-5 px-sm-4 m-0 small-control">
-                    <option value="">Select module...</option>
-                    @foreach($moduleNames as $moduleName)
-                        <option value="{{ strtolower($moduleName) }}">{{ $moduleName }}</option>
-                    @endforeach
-                </select>
-            </div>
-        @endif
-
-
-        <!-- Navigation Button -->
-        <div x-data class="col-12 w-100 col-sm-auto w-sm-auto" style="height: 2em" >
-            <button
-                style="height: 2.5em"
-                wire:click="manageAccessControl"
-                :class="$wire.selectedScopeId && $wire.selectedModule? 'btn-primary': 'btn-secondary'"
-                class="btn rounded-pill py-0 small-control"
-                :disabled="!$wire.selectedScopeId || !$wire.selectedModule">
-                OK
-            </button>
-        </div>
-
-    @endhasanyrole
+    <button
+        type="button"
+        class="btn btn-sm btn-primary rounded-pill px-3 text-uppercase fw-bold"
+        wire:click="manageAccessControl"
+        wire:loading.attr="disabled"
+    >
+        OK
+    </button>
 </div>
-
-
-

@@ -16,13 +16,16 @@
 
 
     {{-- Your CSS assets (from config) --}}
-    <link id="pagestyle" href="{{ config('ui-library.theme.css') }}" rel="stylesheet" />
+    @if (config('ui-library.theme.css'))
+        <link id="pagestyle" href="{{ config('ui-library.theme.css') }}" rel="stylesheet" />
+    @endif
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" />
+    <link id="qf-styles" href="{{ asset('vendor/ui-library/assets/css/quicker-faster.css') }}?v=1.0.4" rel="stylesheet" />
 
 
 
 
-    <link id="pagestyle" href="{{ asset('bootstrap/assets/css/soft-ui-dashboard.css?v=1.0.3') }}" rel="stylesheet" />
+    <link id="pagestyle" href="{{ asset('vendor/ui-library/bootstrap/assets/css/soft-ui-dashboard.css?v=1.0.3') }}" rel="stylesheet" />
     {{--  }}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous"> --}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
         integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
@@ -118,17 +121,19 @@
 
 <body>
 
-    <body>
-
 
 
 
         {{-- Top Bar --}}
         @if ($layoutConfig['top_bar']['enabled'] ?? true)
             <livewire:qf.top-nav :items="$contextGroups" :activeContext="$activeContext" :moduleName="$moduleName" :leftShared="$sharedTopLeft"
-                :rightShared="$sharedTopRight" wire:key="top-nav-{{ $moduleName }}" />
+                :rightShared="$sharedTopRight" :hideTopnavContexts="$hideTopnavContexts ?? false" wire:key="top-nav-{{ $moduleName }}" />
         @endif
 
+        {{-- Workspace Tabs (browser-style tab strip) --}}
+        @if (config('ui-library.layout.workspace_tabs.enabled', true))
+            <livewire:qf.workspace-tabs />
+        @endif
 
         {{-- Desktop context area --}}
         <div class="d-none d-md-block mt-5">
@@ -141,8 +146,17 @@
 
                 {{-- Horizontal mode: menu above content --}}
                 @if ($showContextMenu)
-                    <livewire:qf.horizontal-context-menu :currentModelName="$currentModelName" :items="$contextItems[$activeContext] ?? []" :position="$contextMenuPosition"
-                        :allowTypeSwitch="$allowMenuTypeSwitch" wire:key="horizontal-menu-{{ $moduleName }}-{{ $activeContext }}" />
+                    <livewire:qf.horizontal-context-menu
+                        :currentModelName="$currentModelName"
+                        :items="$contextItems[$activeContext] ?? []"
+                        :position="$contextMenuPosition"
+                        :allowTypeSwitch="$allowMenuTypeSwitch"
+                        :maxVisibleItems="$maxVisibleItems"
+                        :contextGroups="$contextGroups"
+                        :contextItems="$contextItems"
+                        :activeContext="$activeContext"
+                        :showAllContexts="$showAllContexts ?? false"
+                        wire:key="horizontal-menu-{{ $moduleName }}-{{ $activeContext }}" />
                 @endif
 
                 <main class="px-4" style="min-width: 0;">
@@ -152,12 +166,22 @@
                 </main>
             @else
                 {{-- Sidebar mode: side‑by‑side --}}
+                @php
+                    $showSidebar = $layoutConfig['sidebar']['enabled'] ?? true;
+                @endphp
                 <div class="d-flex align-items-start main-content-wrapper">
 
-                    @if ($showContextMenu)
+                    @if ($showContextMenu && $showSidebar)
+                        @php
+                            $activeCtxGroup = $contextGroups[$activeContext] ?? [];
+                        @endphp
                         <livewire:qf.sidebar :items="$contextItems[$activeContext] ?? []" :state="$sidebarState" :headerItems="$sharedHeaderItems" :footerItems="$sharedFooterItems"
                             :currentModelName="$currentModelName" :allowTypeSwitch="$allowMenuTypeSwitch"
                             :settingsContext="$settingsContext" :moduleName="$moduleName"
+                            :activeContext="$activeContext ?? null"
+                            :contextGroupLabel="$activeCtxGroup['label'] ?? $activeContext"
+                            :contextGroupIcon="$activeCtxGroup['icon'] ?? 'fa-folder'"
+                            :contextGroupConfig="$activeCtxGroup"
                             wire:key="sidebar-menu-{{ $moduleName }}-{{ $activeContext }}" />
                     @endif
 
@@ -196,10 +220,16 @@
         {{-- <livewire:qf:drawer :configKey="$configKey" /> --}}
         <livewire:qf.drawer />
 
+        {{-- Quick Actions Command Palette --}}
+        @if (config('ui-library.quick_actions.enabled', true))
+            <livewire:qf.quick-actions-panel wire:key="quick-actions-panel" />
+        @endif
+
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
         </script>
-        <script src="{{ asset('assets/js/quicker-faster.js') }}"></script>
+        <script src="{{ asset('vendor/ui-library/assets/js/quicker-faster.js') }}"></script>
+        <script src="{{ asset('vendor/ui-library/assets/js/quick-actions.js') }}"></script>
 
 
         @livewireScripts
@@ -225,6 +255,7 @@
             Livewire.on('doReload', () => {
                 window.location.reload();
             });
+
         </script>
 
 
@@ -274,8 +305,8 @@
 
                 // When the offcanvas is fully hidden (after close animation)
                 drawerElement.addEventListener('hidden.bs.offcanvas', function() {
-                    // Tell Livewire that the drawer is closed (sync state)
-                    Livewire.dispatch('closeDrawer');
+                    // Tell Livewire to clear drawer content now that animation is complete
+                    Livewire.dispatch('drawerHidden');
                 });
 
                 // When the offcanvas is shown, do nothing special – just ensure Livewire knows it's open
@@ -289,8 +320,10 @@
                     bsDrawer.show();
                 });
 
-                // Also listen for a custom close event in case Livewire calls closeDrawer
-                Livewire.on('closeDrawer', () => {
+                // Listen for drawerClosed to trigger the offcanvas hide animation.
+                // (closeDrawer is reserved for external triggers like the Discard button
+                //  and routes to Drawer::close() via $listeners, which dispatches drawerClosed.)
+                Livewire.on('drawerClosed', () => {
                     bsDrawer.hide();
                 });
             }

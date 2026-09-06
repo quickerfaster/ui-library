@@ -1,7 +1,7 @@
 @props(['data'])
 @if($data['inProgress'] || $data['showCompleted'])
-<div class="card mb-4 border-primary">
-    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+<div class="card mb-4 border-0 shadow-sm rounded-4 overflow-hidden">
+    <div class="card-header bg-gradient-{{ $data['color'] }} text-white d-flex justify-content-between align-items-center border-0">
         <div>
             @if($data['icon'])
                 <i class="{{ $data['icon'] }} me-2"></i>

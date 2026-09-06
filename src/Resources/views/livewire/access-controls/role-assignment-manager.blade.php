@@ -1,5 +1,5 @@
 <x-qf::dashboards.default-dashboard>
-    @hasanyrole(\App\Modules\Admin\Services\AuthorizationService::ADMIN_ROLES)
+    @hasanyrole(\QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::ADMIN_ROLES)
         <x-slot name="mainTitle">Assign Roles to Users</x-slot>
         <x-slot name="subtitle">Select a user and choose which roles they should have.</x-slot>
 

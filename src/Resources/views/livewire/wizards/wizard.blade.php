@@ -72,7 +72,20 @@
                             'stepData' => $stepData,
                             'steps' => $steps,
                             'configKey' => $configKey,
+                            'currentStepConfig' => $currentStepConfig,
                         ])
+                    @elseif (isset($steps[$currentStep]['customComponent']))
+                        @php
+                            $recordId = $stepData[$currentStep] ?? null;
+                            $presetData = $this->getPresetDataForCurrentStep();
+                        @endphp
+                        <livewire:{{ $steps[$currentStep]['customComponent'] }}
+                            :configKey="$configKey"
+                            :stepIndex="$currentStep"
+                            :recordId="$recordId"
+                            :presetData="$presetData"
+                            :wizardId="$wizardId"
+                            :wire:key="'custom-step-'.$currentStep" />
                     @else
                         @php
                             $step = $steps[$currentStep];
@@ -80,9 +93,15 @@
                             $presetData = $this->getPresetDataForCurrentStep();
                             $stepGroups = $step['groups'] ?? [];
                             $recordId = $stepData[$currentStep] ?? null;
+                            $customValidation = $step['customValidation'] ?? [];
+                            $dynamicFields = $step['dynamicFields'] ?? [];
                         @endphp
-                        <livewire:qf.wizard-form :configKey="$modelConfigKey" :presetData="$presetData" :stepIndex="$currentStep" :stepGroups="$stepGroups"
-                            :recordId="$recordId" :wire:key="'step-form-'.$currentStep" />
+                        @php
+                            $formComponent = $step['formComponent'] ?? 'qf.wizard-form';
+                            $draftSuccessMessage = $step['draftSuccessMessage'] ?? null;
+                        @endphp
+                        <livewire:{{ $formComponent }} :configKey="$modelConfigKey" :presetData="$presetData" :stepIndex="$currentStep" :stepGroups="$stepGroups"
+                            :recordId="$recordId" :customValidation="$customValidation" :dynamicFields="$dynamicFields" :draftSuccessMessage="$draftSuccessMessage" :wire:key="'step-form-'.$currentStep" />
                     @endif
                 </div>
             </div>
@@ -106,9 +125,19 @@
                             Complete Setup
                         </button>
                     @else
-                        <button type="button" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold" wire:click="next">
-                            Save & Continue <i class="fas fa-chevron-right ms-2"></i>
-                        </button>
+                        @if ($isResumingDraft === 'true')
+                            <button type="button" class="btn btn-success btn-lg px-5 shadow-sm fw-bold" wire:click="next">
+                                <i class="fas fa-paper-plane me-1"></i> Submit Request
+                            </button>
+                        @else
+                            <button type="button" class="btn btn-outline-secondary btn-lg px-4 shadow-sm fw-bold me-2"
+                                wire:click="$dispatch('saveDraftForm', {stepIndex: {{ $currentStep }}})">
+                                <i class="fas fa-save me-1"></i> Save Draft
+                            </button>
+                            <button type="button" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold" wire:click="next">
+                                Save & Continue <i class="fas fa-chevron-right ms-2"></i>
+                            </button>
+                        @endif
                     @endif
                 </div>
             </div>

@@ -2,7 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\Wizards;
 
-use App\Modules\Admin\Services\ActivityLogger;
+use QuickerFaster\UILibrary\Services\ActivityLogger;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Validator;
@@ -21,10 +21,13 @@ class WizardForm extends Component
 
     public string $configKey;
     public array $presetData = [];
+    public array $presetFields = [];
     public int $stepIndex;
     public ?int $recordId = null;
     public bool $isEditMode = false;
     public array $stepGroups = [];
+    public array $customValidation = [];
+    public array $dynamicFields = [];
 
     // Internal state
     public array $fields = [];
@@ -33,6 +36,12 @@ class WizardForm extends Component
     public array $hiddenFields = [];
     public array $relations = [];
     public string $modelClass;
+
+    // Real-time conflict warnings (non-blocking, shown in UI)
+    public array $conflictWarnings = [];
+
+    // Configurable draft success message (override in wizard step config)
+    public string $draftSuccessMessage = 'Record saved as draft.';
 
     // For searchable selects
     public array $searches = [];
@@ -44,17 +53,25 @@ class WizardForm extends Component
 
     public $listeners = [
         'saveStepForm' => 'save',
+        'saveDraftForm' => 'saveDraft',
     ];
 
-    public function mount(string $configKey, array $presetData = [], int $stepIndex = 0, ?int $recordId = null): void
+    public function mount(string $configKey, array $presetData = [], int $stepIndex = 0, ?int $recordId = null, array $customValidation = [], array $dynamicFields = [], ?string $draftSuccessMessage = null): void
     {
         $this->configKey = $configKey;
         $this->presetData = $presetData;
         $this->stepIndex = $stepIndex;
         $this->recordId = $recordId;
+        $this->customValidation = $customValidation;
+        $this->dynamicFields = $dynamicFields;
+
+        if ($draftSuccessMessage !== null) {
+            $this->draftSuccessMessage = $draftSuccessMessage;
+        }
 
         // Single listener for all step save events
         $this->listeners['saveStepForm'] = 'handleSaveStepForm';
+        $this->listeners['saveDraftForm'] = 'handleSaveDraftForm';
 
         $this->loadConfiguration();
         $this->initializeFields();
@@ -76,6 +93,16 @@ class WizardForm extends Component
         }
     }
 
+    /**
+     * Handle the saveDraftForm event – only proceed if the step index matches.
+     */
+    public function handleSaveDraftForm($stepIndex): void
+    {
+        if ($stepIndex == $this->stepIndex) {
+            $this->saveDraft();
+        }
+    }
+
 
 
     protected function loadRecord(): void
@@ -92,7 +119,16 @@ class WizardForm extends Component
         }
 
         if (!empty($this->relations)) {
-            $record->load(array_keys($this->relations));
+            // Only eager-load relations that actually exist on the model.
+            // This prevents crashes when a config defines a relation (e.g. a
+            // module-specific relation like HR's 'profile') that the underlying
+            // model class doesn't implement.
+            $validRelations = array_filter($this->relations, function ($relationConfig, $relationName) use ($record) {
+                return method_exists($record, $relationName);
+            }, ARRAY_FILTER_USE_BOTH);
+            if (!empty($validRelations)) {
+                $record->load(array_keys($validRelations));
+            }
         }
 
         foreach ($this->fieldDefinitions as $field => $definition) {
@@ -197,6 +233,9 @@ class WizardForm extends Component
             }
         }
 
+        // Process dynamic field options (loadOptionsFrom)
+        $this->loadDynamicOptions();
+
         // Initialise selectedLabels for searchable selects
         foreach ($this->fieldDefinitions as $field => $definition) {
             if (($definition['field_type'] ?? '') === 'livewire-searchable-select') {
@@ -206,11 +245,40 @@ class WizardForm extends Component
         }
     }
 
+    /**
+     * Process dynamicFields config: for each field with 'loadOptionsFrom',
+     * call the named method on $this and inject the returned options into
+     * the field definition so SelectField::getOptions() picks them up.
+     *
+     * Also removes any 'relationship' key from the field definition so that
+     * the dynamic options take precedence over relationship-based loading.
+     */
+    protected function loadDynamicOptions(): void
+    {
+        foreach ($this->dynamicFields as $fieldName => $dynamicConfig) {
+            if (!isset($dynamicConfig['loadOptionsFrom'])) {
+                continue;
+            }
+
+            $method = $dynamicConfig['loadOptionsFrom'];
+
+            if (method_exists($this, $method)) {
+                $options = $this->{$method}($fieldName);
+                if (is_array($options) && isset($this->fieldDefinitions[$fieldName])) {
+                    $this->fieldDefinitions[$fieldName]['options'] = $options;
+                    // Remove relationship so dynamic options take precedence
+                    unset($this->fieldDefinitions[$fieldName]['relationship']);
+                }
+            }
+        }
+    }
+
     protected function applyPresetData(): void
     {
         foreach ($this->presetData as $field => $value) {
             if (array_key_exists($field, $this->fields)) {
                 $this->fields[$field] = $value;
+                $this->presetFields[$field] = true;
 
                 // Update selectedLabels for searchable selects
                 if (($this->fieldDefinitions[$field]['field_type'] ?? '') === 'livewire-searchable-select') {
@@ -219,6 +287,14 @@ class WizardForm extends Component
                 }
             }
         }
+    }
+
+    /**
+     * Check if a field was set via preset data (should be rendered as read-only).
+     */
+    public function isPresetField(string $fieldName): bool
+    {
+        return !empty($this->presetFields[$fieldName]);
     }
 
     // ---------- Searchable Select Logic ----------
@@ -311,7 +387,9 @@ class WizardForm extends Component
             return;
         }
 
-        DB::transaction(function () {
+        $wasEdit = $this->isEditMode;
+
+        DB::transaction(function () use ($wasEdit) {
             if ($this->isEditMode) {
                 $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
             } else {
@@ -350,6 +428,11 @@ class WizardForm extends Component
                 }
             }
 
+            // When submitting a draft, transition status from Draft to Pending
+            if ($this->isEditMode && ($record->status ?? '') === 'Draft') {
+                $data['status'] = 'Pending';
+            }
+
             if ($this->isEditMode) {
                 $record->update($data);
             } else {
@@ -381,7 +464,132 @@ class WizardForm extends Component
 
             $this->syncRelationships($record);
 
+            // Auto-start workflow for records that implement Workflowable
+            // Skip if status is Draft (drafts are saved without workflow)
+            if ($record instanceof \QuickerFaster\UILibrary\Contracts\Workflow\Workflowable) {
+                $status = $record->status ?? ($data['status'] ?? null);
+                if ($status !== 'Draft') {
+                    try {
+                        $definitionKey = $record->getWorkflowDefinitionKey();
+                        $engine = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class);
+                        $definition = $engine->getDefinition($definitionKey);
+
+                        if ($definition !== null) {
+                            $engine->start($record, $record->getWorkflowContext());
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('WizardForm: workflow auto-start failed', [
+                            'model' => get_class($record),
+                            'id' => $record->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
             $this->dispatch('stepFormSaved', $record->id, $this->stepIndex);
+
+            // Show success feedback to user
+            $this->dispatch('showAlert', [
+                'type' => 'success',
+                'message' => $wasEdit ? 'Record updated successfully.' : 'Record created successfully.',
+            ]);
+        });
+    }
+
+    /**
+     * Save the current step as a draft without triggering workflow.
+     * Uses minimal validation — only required fields are checked.
+     */
+    public function saveDraft(): void
+    {
+        // Minimal validation: only check required fields
+        $rules = [];
+        foreach ($this->fieldDefinitions as $field => $def) {
+            if (isset($def['validation']) && !$this->isFieldHidden($field, $this->isEditMode ? 'onEditForm' : 'onNewForm')) {
+                $rule = $def['validation'];
+                // For draft, make all fields nullable except those explicitly required
+                // Strip 'required' from rules to allow partial saves
+                $parts = explode('|', $rule);
+                $parts = array_filter($parts, fn($p) => !str_starts_with($p, 'required'));
+                if (!empty($parts)) {
+                    $rules[$field] = implode('|', $parts);
+                }
+            }
+        }
+
+        if (!empty($rules)) {
+            $validator = Validator::make($this->fields, $rules);
+            if ($validator->fails()) {
+                $this->resetErrorBag();
+                foreach ($validator->errors()->messages() as $key => $errors) {
+                    foreach ($errors as $error) {
+                        $this->addError($key, $error);
+                    }
+                }
+                return;
+            }
+        }
+
+        DB::transaction(function () {
+            if ($this->isEditMode) {
+                $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
+            } else {
+                $record = new $this->modelClass();
+            }
+
+            $formType = $this->isEditMode ? 'onEditForm' : 'onNewForm';
+            $hiddenForForm = $this->hiddenFields[$formType] ?? [];
+
+            if (\Illuminate\Support\Facades\Session::get('current_company_id') === 0) {
+                $hiddenForForm = array_diff($hiddenForForm, ['company_id']);
+            }
+
+            $allowedFields = array_diff(
+                array_keys($this->fieldDefinitions),
+                $hiddenForForm,
+                $this->hiddenFields['onQuery'] ?? []
+            );
+            $data = array_intersect_key($this->fields, array_flip($allowedFields));
+
+            $data = $this->handleFileUploads($record, $data);
+
+            foreach ($this->fieldDefinitions as $field => $def) {
+                if (isset($def['multiSelect']) && !isset($def['relationship']) && isset($data[$field]) && is_array($data[$field])) {
+                    $data[$field] = implode(',', $data[$field]);
+                }
+            }
+
+            // Force status to Draft
+            $data['status'] = 'Draft';
+
+            if (!$this->isEditMode) {
+                $companyId = \Illuminate\Support\Facades\Session::get('current_company_id');
+                if ($companyId && $companyId !== 0 && \Illuminate\Support\Facades\Schema::hasColumn($record->getTable(), 'company_id')) {
+                    $data['company_id'] = $companyId;
+                }
+            }
+
+            if ($this->isEditMode) {
+                $record->update($data);
+                ActivityLogger::updated($this->configKey, $record, $record->getOriginal(), $data);
+            } else {
+                $record = $record->create($data);
+                $this->recordId = $record->id;
+                $this->isEditMode = true;
+                ActivityLogger::created($this->configKey, $record, $data);
+            }
+
+            $this->syncRelationships($record);
+
+            // Dispatch stepFormSaved so the wizard tracks the record ID
+            $this->dispatch('stepFormSaved', $record->id, $this->stepIndex);
+
+            // Show draft-specific success message
+            $this->dispatch('showAlert', [
+                'type' => 'success',
+                'message' => $this->draftSuccessMessage,
+            ]);
         });
     }
 
@@ -430,6 +638,82 @@ class WizardForm extends Component
                 }
             }
         }
+
+        // Run custom validation methods defined in the wizard step config
+        if (empty($this->getErrorBag()->toArray())) {
+            foreach ($this->customValidation as $method) {
+                if (method_exists($this, $method)) {
+                    $this->{$method}();
+                }
+            }
+        }
+    }
+
+    /**
+     * Custom validation: check that the employee has sufficient leave balance.
+     *
+     * Override in consuming app subclass with domain-specific logic.
+     */
+    protected function checkLeaveBalance(): void
+    {
+        // Stub — override in consuming app subclass
+    }
+
+    /**
+     * Custom validation: check for overlapping approved leave requests.
+     *
+     * Override in consuming app subclass with domain-specific logic.
+     */
+    protected function checkDateConflicts(): void
+    {
+        // Stub — override in consuming app subclass
+    }
+
+    /**
+     * Livewire hook: fires when any field in the `fields` array is updated.
+     *
+     * When start_date or end_date changes, run real-time conflict detection
+     * and store warnings in $conflictWarnings for display in the blade.
+     */
+    public function updatedFields($value, $nested): void
+    {
+        if (in_array($nested, ['start_date', 'end_date'], true)) {
+            $this->detectDateConflicts();
+        }
+    }
+
+    /**
+     * Real-time conflict detection for the UI (non-blocking warning).
+     *
+     * Override in consuming app subclass with domain-specific logic.
+     */
+    protected function detectDateConflicts(): void
+    {
+        // Stub — override in consuming app subclass
+    }
+
+    /**
+     * Calculate the number of working days (Mon-Fri) between two dates.
+     */
+    protected function calculateWorkingDays(string $startDate, string $endDate): float
+    {
+        $start = \Carbon\Carbon::parse($startDate);
+        $end = \Carbon\Carbon::parse($endDate);
+        $days = 0;
+
+        while ($start->lte($end)) {
+            if (!$start->isWeekend()) {
+                $days++;
+            }
+            $start->addDay();
+        }
+
+        // P2: Half-day support — if is_half_day is true, return 0.5 per working day
+        if (!empty($this->fields['is_half_day'])) {
+            return $days * 0.5;
+        }
+
+        return (float) $days;
     }
 
     protected function handleFileUploads($record, array $data): array
@@ -496,6 +780,75 @@ class WizardForm extends Component
                 }
             }
         }
+    }
+
+    /**
+     * Get available leave types with balance info for the dropdown.
+     *
+     * Override in consuming app subclass with domain-specific logic.
+     */
+    public function getAvailableLeaveTypes(string $fieldName): array
+    {
+        // Stub — override in consuming app subclass
+        return [];
+    }
+
+    /**
+     * P1-2: Get working days count between start_date and end_date.
+     *
+     * Returns null if either date is missing, otherwise the count of Mon-Fri days.
+     */
+    public function getWorkingDaysCount(): ?float
+    {
+        $startDate = $this->fields['start_date'] ?? null;
+        $endDate = $this->fields['end_date'] ?? null;
+
+        if (!$startDate || !$endDate) {
+            return null;
+        }
+
+        return $this->calculateWorkingDays($startDate, $endDate);
+    }
+
+    /**
+     * Get leave type info for the currently selected leave_type_id.
+     *
+     * Override in consuming app subclass with domain-specific logic.
+     */
+    public function getLeaveTypeInfo(): ?array
+    {
+        // Stub — override in consuming app subclass
+        return null;
+    }
+
+    /**
+     * Get field info for the hints system (showInfo hint).
+     *
+     * Override in consuming app subclass.
+     */
+    public function getFieldInfo(string $fieldName): ?array
+    {
+        return null;
+    }
+
+    /**
+     * Get field duration for the hints system (showDuration hint).
+     *
+     * Override in consuming app subclass.
+     */
+    public function getFieldDuration(string $fieldName): ?float
+    {
+        return null;
+    }
+
+    /**
+     * Get field conflicts for the hints system (showConflicts hint).
+     *
+     * Override in consuming app subclass.
+     */
+    public function getFieldConflicts(string $fieldName): array
+    {
+        return [];
     }
 
     // ---------- Render ----------

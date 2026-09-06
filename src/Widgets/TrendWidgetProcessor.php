@@ -66,6 +66,7 @@ class TrendWidgetProcessor
             'type'            => 'trend',
             'title'           => $definition['title'] ?? 'Trend',
             'icon'            => $definition['icon'] ?? null,
+            'color'           => $definition['color'] ?? 'info',
             'labels'          => $labels,
             'values'          => $values,
             'change'          => $change,

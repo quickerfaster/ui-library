@@ -1,14 +1,25 @@
 @props(['data'])
-<div class="card h-100">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="text-muted mb-2">{{ $data['title'] }}</h6>
-                <h3 class="mb-0">{{ $data['value'] }}</h3>
+
+@php
+    ob_start();
+@endphp
+
+<div class="card-body p-3 p-lg-4">
+    <div class="d-flex align-items-center">
+        @if(!empty($data['icon']))
+            <div class="icon-shape icon-md rounded-3 bg-gradient-{{ $data['color'] }} text-white me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; flex-shrink: 0;">
+                <i class="fa-solid {{ $data['icon'] }}"></i>
             </div>
-            @if($data['icon'] ?? null)
-                <i class="{{ $data['icon'] }} fa-2x text-primary"></i>
-            @endif
+        @endif
+        <div class="min-width-0">
+            <p class="text-sm text-secondary mb-0 text-uppercase fw-semibold">{{ $data['title'] }}</p>
+            <h5 class="fw-bolder mb-0">{{ $data['value'] }}</h5>
         </div>
     </div>
 </div>
+
+@php
+    $body = ob_get_clean();
+@endphp
+
+@include('qf::widgets.partials.card', ['data' => $data, 'body' => $body])

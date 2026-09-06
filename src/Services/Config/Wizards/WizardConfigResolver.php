@@ -9,7 +9,7 @@ class WizardConfigResolver
     protected array $config;
 
     /**
-     * @param string $wizardKey  Format: "module.wizards.wizard_name", e.g. "hr.wizards.employee_onboarding"
+     * @param string $wizardKey  Format: "module.wizards.wizard_name", e.g. "module.wizards.wizard_name"
      * @param ModelConfigRepository|null $repository
      */
     public function __construct(string $wizardKey, ?ModelConfigRepository $repository = null)

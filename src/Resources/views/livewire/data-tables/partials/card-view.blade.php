@@ -1,11 +1,27 @@
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 card-view-grid">
 
+    @php
+        $crudType = $crudType ?? 'modal';
+        $modelName = $modelName ?? '';
+    @endphp
 
     @forelse($records as $record)
 
         <div class="col" wire:key="card-{{ $record->id }}">
             <div class="card h-100 border-0 shadow-sm transition-all hover-lift overflow-hidden position-relative"
-                onclick="if(!event.target.closest('.stop-propagation')) { window.location='{{ $this->getShowUrl($record->id) }}' }"
+                @if ($crudType === 'drawers')
+                    onclick="if(!event.target.closest('.stop-propagation')) {
+                        Livewire.dispatch('openDrawer', {
+                            component: 'qf.data-table-detail',
+                            params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}' },
+                            title: 'View {{ $modelName }}'
+                        })
+                    }"
+                @elseif ($crudType === 'pages')
+                    onclick="if(!event.target.closest('.stop-propagation')) { window.location='{{ $this->getShowUrl($record->id) }}' }"
+                @else
+                    wire:click="show({{ $record->id }})"
+                @endif
                 style="cursor: pointer; border-radius: 12px;">
 
                 {{-- 1. TOP-LEFT BULK SELECTION --}}
@@ -41,7 +57,7 @@
                     {{-- Floating Badge (Top-Right) --}}
                     @if (!empty($viewConfig['badgeField']))
                         @php
-                            // Safely access nested data like 'employeePosition.employment_status'
+                            // Safely access nested data like 'recordPosition.employment_status'
                             $val = data_get($record, $viewConfig['badgeField']);
 
                             // Map the value to the configured color

@@ -7,10 +7,14 @@ use Livewire\WithPagination;
 use QuickerFaster\UILibrary\Services\Config\ConfigResolver;
 use QuickerFaster\UILibrary\Factories\FieldTypes\FieldFactory;
 use QuickerFaster\UILibrary\Traits\DataTables\HasColumnPreferences;
-use App\Modules\Admin\Services\ActivityLogger;
+// TODO: Pre-Phase 4 Remediation — ActivityLogger was decoupled.
+// Consuming apps should listen for DataTable events (e.g., RecordUpdated, RecordDeleted)
+// and perform audit logging in their own listeners.
+// See: docs/pre-phase-4-remediation-plan.md Section 2.1.4
 use QuickerFaster\UILibrary\Services\Search\SearchEngine;
-use App\Modules\Admin\Services\AuthorizationService;
+use QuickerFaster\UILibrary\Contracts\DataTables\DataTableAuthorizationProvider;
 use QuickerFaster\UILibrary\Traits\Filters\AppliesFilters;
+use QuickerFaster\UILibrary\Events\DataTableRecordSaved;
 
 
 
@@ -44,7 +48,9 @@ class DataTable extends Component
     public array $searchableFields = [];
     public array $columns = [];
 
-    public array $moreActions = [];
+    public ?string $crudType = null;
+    public ?array $simpleActions = null;
+    public ?array $moreActions = null;
     public array $bulkActions = [];
     public array $filesActions = [];
     public array $activeFilters = [];
@@ -59,6 +65,8 @@ class DataTable extends Component
     public bool $columnDropdownOpen = false;
 
     public bool $enforceFilters = false;
+
+    public ?string $pageTitle = null;
 
 
     public bool $editable = false;              // master switch
@@ -81,7 +89,7 @@ class DataTable extends Component
     public string $density = 'comfortable';      // 'comfortable' or 'compact'
     public bool $showInlineEditing = false;     // mirror of $editable, used in View menu
 
-    protected AuthorizationService $authService;
+    protected DataTableAuthorizationProvider $authService;
 
 
 
@@ -105,14 +113,34 @@ class DataTable extends Component
         array $hiddenFields = [],
         array $queryFilters = [],
         array $pageQueryFilters = [],
-        array $customColumns = []  // <-- NEW
+        array $customColumns = [],  // <-- NEW
+        ?string $pageTitle = null,
+        ?string $crudType = null,
+        ?array $simpleActions = null,
+        ?array $moreActions = null
     ) {
 
         $this->configKey = $configKey;
         $this->hiddenFields = $hiddenFields;
+
+        $hiddenFieldsParam = request()->query('hiddenFields', []);
+        if (is_array($hiddenFieldsParam)) {
+            foreach ($hiddenFieldsParam as $context => $fields) {
+                if (is_array($fields)) {
+                    foreach ($fields as $field) {
+                        $this->hiddenFields[$context][] = $field;
+                    }
+                }
+            }
+        }
+
         $this->queryFilters = $queryFilters;
         $this->pageQueryFilters = $pageQueryFilters;
         $this->customColumns = $customColumns; // <-- NEW
+        $this->pageTitle = $pageTitle;
+        $this->crudType = $crudType;
+        $this->simpleActions = $simpleActions;
+        $this->moreActions = $moreActions;
 
         $this->initializeFromConfig();
         $this->initializeComponent();
@@ -191,14 +219,88 @@ class DataTable extends Component
         // $this->perPage = $settings->get('pagination.per_page', 15);
         // $this->sort = $settings->get('default_sort', ['field' => 'id', 'direction' => 'asc']);
 
+        $filterParam = request()->query('filter', []);
+        if (is_array($filterParam)) {
+            foreach ($filterParam as $field => $value) {
+                // Backward compatible: ?filter[field]=value (scalar)
+                if (!is_array($value)) {
+                    $this->queryFilters[] = [$field, '=', $value];
+                    continue;
+                }
+
+                // Extended: ?filter[field][operator]=value
+                foreach ($value as $operator => $filterValue) {
+                    $allowedOperators = ['=', '!=', '>', '<', '>=', '<=', 'like', 'not like', 'between'];
+                    if (!in_array($operator, $allowedOperators, true)) {
+                        continue;
+                    }
+
+                    $resolvedValue = $this->resolveFilterValue($field, $operator, $filterValue);
+                    $this->queryFilters[] = [$field, $operator, $resolvedValue];
+                }
+            }
+        }
+
         if ($this->trashedFilter != 'without') // Initilise only applied  trashed filters
             $this->syncTrashedFilterToActiveFilters();
 
 
     }
 
+    /**
+     * Resolve a query-string filter value, expanding `between` arrays and
+     * resolving relative date strings for date/datetime fields.
+     *
+     * @param  string  $field
+     * @param  string  $operator
+     * @param  mixed   $value
+     * @return mixed
+     */
+    protected function resolveFilterValue(string $field, string $operator, $value)
+    {
+        if ($operator === 'between' && is_array($value)) {
+            return array_map(fn ($bound) => $this->resolveRelativeDate($field, $bound), $value);
+        }
 
-    public function boot(AuthorizationService $authService)
+        if (is_array($value)) {
+            return $value;
+        }
+
+        return $this->resolveRelativeDate($field, $value);
+    }
+
+    /**
+     * Resolve relative date strings (`today`, `+N days`, `-N days`) for
+     * datepicker/datetimepicker fields. Non-date values pass through untouched.
+     *
+     * @param  string  $field
+     * @param  mixed   $value
+     * @return mixed
+     */
+    protected function resolveRelativeDate(string $field, $value)
+    {
+        $fieldType = $this->allFieldDefinitions[$field]['field_type'] ?? null;
+
+        if (!in_array($fieldType, ['datepicker', 'datetimepicker'], true) || !is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = trim($value);
+
+        if (!preg_match('/^today$|^[+-]\s*\d+\s*days?$/i', $trimmed)) {
+            return $value;
+        }
+
+        $timestamp = strtotime($trimmed);
+        if ($timestamp === false) {
+            return $value;
+        }
+
+        return date($fieldType === 'datetimepicker' ? 'Y-m-d H:i:s' : 'Y-m-d', $timestamp);
+    }
+
+
+    public function boot(DataTableAuthorizationProvider $authService)
     {
         $this->authService = $authService;
     }
@@ -257,7 +359,7 @@ class DataTable extends Component
 
     public function setViewMode(string $mode): void
     {
-        if (in_array($mode, ['table', 'list', 'card']) && isset($this->getConfigResolver()->getSwitchViews()[$mode])) {
+        if (in_array($mode, ['table', 'list', 'card', 'monthly']) && isset($this->getConfigResolver()->getSwitchViews()[$mode])) {
             $this->viewMode = $mode;
             session(["view_preference.{$this->configKey}" => $mode]);
             $this->resetPage();
@@ -434,8 +536,9 @@ class DataTable extends Component
         $record->$field = $value;
         $record->save();
 
-        // Log activity
-        ActivityLogger::updated($this->configKey, $record, [$field => $oldValue], [$field => $value]);
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+        // Consuming apps should listen for DataTable events to perform audit logging.
+        // See: docs/pre-phase-4-remediation-plan.md Section 2.1.4
 
         // Clear all temporary data for this row
         unset($this->editMode[$rowKey]);
@@ -558,7 +661,7 @@ class DataTable extends Component
         }
 
         // 2. Intelligent fallback: try common relation paths (supports dot notation)
-        $relationPaths = ['employeeProfile', 'profile', 'avatar', 'employee.employeeProfile'];
+        $relationPaths = ['profile', 'avatar', 'record.profile'];
         $fields = ['photo', 'avatar_url', 'image', 'picture', 'profile_photo', 'avatar'];
 
         foreach ($relationPaths as $path) {
@@ -1037,11 +1140,13 @@ class DataTable extends Component
         // Initialize viewConfig early so getViewConfigRelations() can extract
         // relations for eager-loading before getRecordsProperty() builds the query.
         $switchViews = $resolver->getSwitchViews();
-        if ($this->viewMode === 'list' || $this->viewMode === 'card') {
+        if ($this->viewMode === 'list' || $this->viewMode === 'card' || $this->viewMode === 'monthly') {
             $this->viewConfig = $switchViews[$this->viewMode] ?? [];
         }
 
-        $this->moreActions = $resolver->getMoreActions();
+        if ($this->moreActions === null) {
+            $this->moreActions = $resolver->getMoreActions();
+        }
 
         $controls = $resolver->getControls();
         $this->bulkActions = $this->parseBulkActions($controls['bulkActions'] ?? []);
@@ -1334,7 +1439,7 @@ class DataTable extends Component
 
     public function toggleViewMode(): void
     {
-        $allowedModes = ['table', 'list', 'card'];
+        $allowedModes = ['table', 'list', 'card', 'monthly'];
         $modes = array_keys($this->getConfigResolver()->getConfig()["switchViews"]);
 
         // Filter and then RESET the keys (0, 1, 2...)
@@ -1363,7 +1468,7 @@ class DataTable extends Component
     // Inside your Livewire component
     public function getNextViewModeProperty()
     {
-        $allowedModes = ['table', 'list', 'card'];
+        $allowedModes = ['table', 'list', 'card', 'monthly'];
         $modes = array_values(array_intersect(
             array_keys($this->getConfigResolver()->getConfig()["switchViews"]),
             $allowedModes
@@ -1405,7 +1510,7 @@ class DataTable extends Component
 
         // ✅ 1b. ENSURE FOREIGN KEYS FOR VIEW CONFIG RELATIONS ARE SELECTED
         // Without the FK in the SELECT, eager-loading fails because Laravel
-        // can't resolve the relationship (e.g. employee_id for employee.first_name).
+        // can't resolve the relationship (e.g. record_id for record.first_name).
         $viewRelations = $this->getViewConfigRelations();
         if (!empty($viewRelations)) {
             $configRelations = $resolver->getRelations();
@@ -1570,7 +1675,17 @@ class DataTable extends Component
         }
 
         $record->restore();
-        ActivityLogger::log($this->configKey, 'restored', $record, [], [], 'Record restored');
+
+        event(new DataTableRecordSaved(
+            oldRecord: null,
+            newRecord: $record->toArray(),
+            model: $modelClass,
+            action: DataTableRecordSaved::ACTION_RESTORED,
+            component: $this,
+        ));
+
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+        // Consuming apps should listen for DataTable events to perform audit logging.
         $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record restored.', 'autoClose' => true]);
         $this->dispatch('refreshDataTable');
     }
@@ -1594,7 +1709,17 @@ class DataTable extends Component
 
         $old = $record->toArray();
         $record->forceDelete();
-        ActivityLogger::deleted($this->configKey, $record, $old, true);
+
+        event(new DataTableRecordSaved(
+            oldRecord: $old,
+            newRecord: null,
+            model: $modelClass,
+            action: DataTableRecordSaved::ACTION_DELETED,
+            component: $this,
+        ));
+
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+        // Consuming apps should listen for DataTable events to perform audit logging.
         $this->dispatch('showAlert', ['type' => 'success', 'message' => 'Record permanently deleted.', 'autoClose' => true]);
         $this->dispatch('refreshDataTable');
     }
@@ -1712,7 +1837,8 @@ class DataTable extends Component
 
 
         // Check permission with record
-        if (!$this->authService->canPerformAction(auth()->user(), $action, $record)) {
+        $permission = is_array($action) ? ($action['action'] ?? $action['permission'] ?? '') : $action;
+        if (!$this->authService->canPerformAction(auth()->user(), $permission, $record)) {
             $this->dispatch('showAlert', [
                 'type' => 'warning',
                 'message' => 'You do not have permission to perform this action.',
@@ -1803,14 +1929,8 @@ class DataTable extends Component
             $record->$field = $value;
             $record->save();
 
-            ActivityLogger::log(
-                $this->configKey,
-                $action['log_action'] ?? 'custom_action',
-                $record,
-                $oldValues,
-                [$field => $value],
-                $action['successMessage'] ?? 'Custom action executed'
-            );
+            // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
+            // Consuming apps should listen for DataTable events to perform audit logging.
 
             $this->dispatch('showAlert', ['type' => 'success', 'message' => $action['successMessage'] ?? 'Record updated successfully.', 'autoClose' => true]);
             $this->dispatch('$refresh');
@@ -1830,6 +1950,14 @@ class DataTable extends Component
             $params = $this->buildParams($action['params'] ?? [], $record);
             $this->dispatch($eventName, ...$params);
             $this->dispatch('showAlert', ['type' => 'success', 'message' => $action['successMessage'] ?? 'Action triggered.', 'autoClose' => true]);
+            return;
+        }
+
+        // Resume action: redirect to wizard with draft record ID
+        if ($act === 'resume') {
+            $wizardUrl = $action['wizardUrl'] ?? '/';
+            $url = $wizardUrl . '?resumeRecordId=' . $recordId;
+            $this->dispatch('open-url-new-tab', $url);
             return;
         }
 
@@ -1862,21 +1990,25 @@ protected function checkConditions(array $action, $record): bool
 
     protected function replacePlaceholders($value, $record)
     {
-        if (!is_string($value))
-            return $value;
+        if (is_string($value)) {
+            return preg_replace_callback('/\{([^}]+)\}/', function ($matches) use ($record) {
+                return data_get($record, $matches[1], '');
+            }, $value);
+        }
 
-        return preg_replace_callback('/\{([^}]+)\}/', function ($matches) use ($record) {
-            return data_get($record, $matches[1], '');
-        }, $value);
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $value[$key] = $this->replacePlaceholders($item, $record);
+            }
+            return $value;
+        }
+
+        return $value;
     }
 
     protected function buildParams(array $params, $record): array
     {
-        $result = [];
-        foreach ($params as $key => $value) {
-            $result[$key] = $this->replacePlaceholders($value, $record);
-        }
-        return $result;
+        return $this->replacePlaceholders($params, $record);
     }
 
     protected function generateActionUrl(array $action, $record): ?string
@@ -2017,7 +2149,7 @@ protected function checkConditions(array $action, $record): bool
     {
         $modelClass = $this->getConfigResolver()->getModel();
         $count = $modelClass::onlyTrashed()->whereIn('id', $ids)->restore();
-        ActivityLogger::log($this->configKey, 'bulk_restored', null, [], ['ids' => $ids], $count . ' records restored');
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
         $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records restored.', 'autoClose' => true]);
     }
 
@@ -2027,7 +2159,7 @@ protected function checkConditions(array $action, $record): bool
         $records = $modelClass::withTrashed()->whereIn('id', $ids)->get();
         $count = $records->count();
         foreach ($records as $record) {
-            ActivityLogger::deleted($this->configKey, $record, $record->toArray(), true);
+            // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
             $record->forceDelete();
         }
         $this->dispatch('showAlert', ['type' => 'success', 'message' => $count . ' records permanently deleted.', 'autoClose' => true]);
@@ -2045,7 +2177,7 @@ protected function checkConditions(array $action, $record): bool
 
         if ($softDelete) {
             $modelClass::whereIn('id', $ids)->delete(); // soft delete
-            ActivityLogger::log($this->configKey, 'bulk_soft_deleted', null, [], ['ids' => $ids], count($ids) . ' records moved to trash');
+            // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
             $this->dispatch('showAlert', ['type' => 'success', 'message' => count($ids) . ' records moved to trash.', 'autoClose' => true]);
         } else {
             $modelClass::whereIn('id', $ids)->delete(); // hard delete
@@ -2146,8 +2278,18 @@ protected function checkConditions(array $action, $record): bool
             return;
         }
 
-        ActivityLogger::deleted($this->configKey, $record, $record->toArray());
+        $old = $record->toArray();
+
+        // TODO: Pre-Phase 4 Remediation — ActivityLogger decoupled.
         $record->delete();
+
+        event(new DataTableRecordSaved(
+            oldRecord: $old,
+            newRecord: null,
+            model: $modelClass,
+            action: DataTableRecordSaved::ACTION_DELETED,
+            component: $this,
+        ));
 
         $this->dispatch('showAlert', [
             'type' => 'success',
@@ -2382,7 +2524,7 @@ protected function checkConditions(array $action, $record): bool
         $switchViews = $resolver->getSwitchViews();
 
         $viewConfig = [];
-        if ($this->viewMode === 'list' || $this->viewMode === 'card') {
+        if ($this->viewMode === 'list' || $this->viewMode === 'card' || $this->viewMode === 'monthly') {
             $viewConfig = $switchViews[$this->viewMode] ?? [];
         }
 
@@ -2390,8 +2532,13 @@ protected function checkConditions(array $action, $record): bool
 
 
         $controls = $resolver->getControls();
-        $simpleActions = $resolver->getConfig()['simpleActions'] ?? [];
-        $crudType = $resolver->getConfig()['crudType'] ?? false;
+        $simpleActions = $this->simpleActions ?? ($resolver->getConfig()['simpleActions'] ?? []);
+        $crudType = $this->crudType ?? ($resolver->getConfig()['crudType'] ?? false);
+        $moreActions = $this->moreActions ?? $resolver->getMoreActions();
+
+        $this->simpleActions = $simpleActions;
+        $this->crudType = $crudType;
+        $this->moreActions = $moreActions;
 
         return view('qf::livewire.data-tables.data-table', [
             'records' => $this->records,
@@ -2403,6 +2550,7 @@ protected function checkConditions(array $action, $record): bool
             'crudType' => $crudType,
             'controls' => $controls,
             'simpleActions' => $simpleActions,
+            'moreActions' => $moreActions,
             'bulkActions' => $this->bulkActions,
             'filesActions' => $this->filesActions,
             'modelName' => $resolver->getModelName(),

@@ -3,8 +3,8 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\AccessControls;
 
 use Livewire\Component;
-use App\Models\User;
-use App\Modules\Admin\Models\Role;
+use QuickerFaster\UILibrary\Models\Role;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 use Illuminate\Support\Collection;
 
 class RoleAssignmentManager extends Component
@@ -16,6 +16,16 @@ class RoleAssignmentManager extends Component
     public bool $showSuccess = false;
     public string $successMessage = '';
     public string $errorMessage = '';
+
+    /**
+     * Resolve the configured User model class.
+     */
+    protected function userModel(): string
+    {
+        return config('ui-library.user.model')
+            ?? config('auth.providers.users.model')
+            ?? 'App\\Models\\User';
+    }
 
     public function mount()
     {
@@ -29,7 +39,8 @@ class RoleAssignmentManager extends Component
     protected function getManageableUsers(): Collection
     {
         $currentUser = auth()->user();
-        $allUsers = User::with('roles')->orderBy('name')->get();
+        $userModel = $this->userModel();
+        $allUsers = $userModel::with('roles')->orderBy('name')->get();
 
         // Super admin can manage everyone
         if ($currentUser->hasRole('super_admin')) {
@@ -37,7 +48,7 @@ class RoleAssignmentManager extends Component
         }
 
         // Company admin: cannot manage users with super_admin or company_admin roles
-        $excludedRoleNames = ['super_admin', 'company_admin'];
+        $excludedRoleNames = AuthorizationService::COMPANY_ADMIN_ROLES_ARRAY;
 
         return $allUsers->reject(function ($user) use ($excludedRoleNames) {
             return $user->roles->contains(fn($role) => in_array($role->name, $excludedRoleNames));
@@ -57,7 +68,7 @@ class RoleAssignmentManager extends Component
         }
 
         // Company admin cannot assign super_admin or company_admin roles
-        $forbiddenRoles = ['super_admin', 'company_admin'];
+        $forbiddenRoles = AuthorizationService::COMPANY_ADMIN_ROLES_ARRAY;
 
         return $allRoles->reject(fn($role) => in_array($role->name, $forbiddenRoles));
     }
@@ -72,7 +83,8 @@ class RoleAssignmentManager extends Component
             return;
         }
 
-        $user = User::with('roles')->find($userId);
+        $userModel = $this->userModel();
+        $user = $userModel::with('roles')->find($userId);
         if (!$this->isUserManageable($user)) {
             $this->errorMessage = 'You are not allowed to assign roles to this user.';
             $this->selectedUserId = null;
@@ -112,7 +124,8 @@ class RoleAssignmentManager extends Component
             return;
         }
 
-        $user = User::with('roles')->find($this->selectedUserId);
+        $userModel = $this->userModel();
+        $user = $userModel::with('roles')->find($this->selectedUserId);
         if (!$this->isUserManageable($user)) {
             $this->errorMessage = 'You are not allowed to modify roles for this user.';
             return;

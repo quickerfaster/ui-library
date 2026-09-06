@@ -17,15 +17,15 @@ Snippets:
 
 
 
-    Model name: Employee Profile
+    Model name: Profile
     Snippets:
 
-        use Illuminate\Support\Facades\Storage; 
+        use Illuminate\Support\Facades\Storage;
         protected static function booted()
         {
-            static::forceDeleting(function ($employee) {
-                if ($employee->photo && Storage::disk('public')->exists($employee->photo)) {
-                    Storage::disk('public')->delete($employee->photo);
+            static::forceDeleting(function ($profile) {
+                if ($profile->photo && Storage::disk('public')->exists($profile->photo)) {
+                    Storage::disk('public')->delete($profile->photo);
                 }
             });
         }

@@ -29,6 +29,7 @@ class OnboardingWidgetProcessor
             'title'            => $definition['title'] ?? 'Welcome!',
             'description'      => $definition['description'] ?? 'Complete these steps to get started',
             'icon'             => $definition['icon'] ?? 'fas fa-rocket',
+            'color'            => $definition['color'] ?? 'primary',
             'inProgress'       => $inProgress,
             'percentage'       => $percentage,
             'steps'            => $steps,

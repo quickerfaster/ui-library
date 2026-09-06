@@ -3,411 +3,249 @@
 namespace QuickerFaster\UILibrary\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\File;
-use Illuminate\Contracts\Http\Kernel;
-use QuickerFaster\UILibrary\Http\Middleware\CheckSetup;
+use QuickerFaster\UILibrary\Events\ModuleRegistered;
+use QuickerFaster\UILibrary\Services\Discovery\DiscoveryRegistrar;
 use Spatie\Onboard\Facades\Onboard;
-
-
-use ReflectionClass;
-use ReflectionException;
-
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Log;
-
-
 
 class ModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-
+        //
     }
 
-
-    public function boot(Kernel $kernel)
+    public function boot(): void
     {
-        $this->registerPublishables();
-        $this->registerModuleConfig();
-        $this->setupModules();
-
-        /****************** UNLOCK THE APPLICATION SETUP MIDDLEWARE ********************/
-        // Appends to the end of the 'web' middleware group. 
-        // alternatively: $kernel->appendMiddlewareToGroup() 
-        // $kernel->appendMiddlewareToGroup('web', CheckSetup::class);
-
-        $this->registerAppOnboardingCnfig();
+        $this->discoverBusinessModules();
+        $this->registerModuleConfigs();
+        $this->registerOnboardingConfig();
+        $this->registerNotificationChannels();
     }
 
-
-    private function registerAppOnboardingCnfig()
+    /**
+     * Discover business modules in app/Modules/ and register them.
+     */
+    private function discoverBusinessModules(): void
     {
+        $businessPath = base_path('app/Modules');
 
+        if (!is_dir($businessPath)) {
+            return;
+        }
+
+        $moduleDirectories = glob($businessPath . '/*', GLOB_ONLYDIR);
+
+        foreach ($moduleDirectories as $directory) {
+            // Preserve the verbatim directory name for PSR-4 namespace resolution
+            // (e.g. "Hr"), while keeping a separate lowercased key for config
+            // keys, the module registry, route prefixes, and view namespaces.
+            $moduleNamespace = basename($directory);
+            $moduleName = strtolower($moduleNamespace);
+
+            // Skip if already registered as Core module
+            if (config("ui-library.modules.{$moduleName}.core", false)) {
+                continue;
+            }
+
+            // Preserve explicit per-module auto-registration opt-outs that a
+            // consuming app may have published, defaulting to enabled.
+            $autoRegisterListeners = config(
+                "ui-library.modules.{$moduleName}.auto_register_listeners",
+                true
+            );
+            $autoRegisterReports = config(
+                "ui-library.modules.{$moduleName}.auto_register_reports",
+                true
+            );
+            $autoRegisterWorkflows = config(
+                "ui-library.modules.{$moduleName}.auto_register_workflows",
+                true
+            );
+            $autoRegisterPermissions = config(
+                "ui-library.modules.{$moduleName}.auto_register_permissions",
+                true
+            );
+            $autoRegisterNotifications = config(
+                "ui-library.modules.{$moduleName}.auto_register_notifications",
+                true
+            );
+
+            // Register module in config
+            config()->set("ui-library.modules.{$moduleName}", [
+                'enabled' => true,
+                'label' => ucfirst($moduleName),
+                'icon' => 'fa-cube',
+                'route' => "{$moduleName}.dashboard",
+                'order' => 100,
+                'roles' => ['*'],
+                'core' => false,
+                'user_facing' => true,
+                'depends_on' => [],
+                'auto_register_listeners' => $autoRegisterListeners,
+                'auto_register_reports' => $autoRegisterReports,
+                'auto_register_workflows' => $autoRegisterWorkflows,
+                'auto_register_permissions' => $autoRegisterPermissions,
+                'auto_register_notifications' => $autoRegisterNotifications,
+            ]);
+
+            // Read user_facing and depends_on from config
+            $userFacing = config("ui-library.modules.{$moduleName}.user_facing", true);
+            $dependsOn = config("ui-library.modules.{$moduleName}.depends_on", []);
+
+            // Validate depends_on modules are enabled
+            foreach ($dependsOn as $dependency) {
+                if (!config("ui-library.modules.{$dependency}.enabled", false)) {
+                    throw new \RuntimeException(
+                        "Module '{$moduleName}' depends on '{$dependency}', but it is not enabled."
+                    );
+                }
+            }
+
+            // Fire event
+            event(new ModuleRegistered($moduleName, $directory, $userFacing, $dependsOn));
+
+            // Allow this business module to be resolved via the catch-all route.
+            // Core modules are already present in the config allow-list; app-level
+            // modules are appended here so consuming apps do not need to publish
+            // the config just to enable their own modules.
+            $allowedModules = config('ui-library.catch_all.allowed_modules', []);
+            if (!in_array($moduleName, $allowedModules, true)) {
+                $allowedModules[] = $moduleName;
+                config()->set('ui-library.catch_all.allowed_modules', $allowedModules);
+            }
+
+            // Register views
+            $viewPath = "{$directory}/Resources/views";
+            if (is_dir($viewPath)) {
+                $this->loadViewsFrom($viewPath, $moduleName);
+            }
+
+            // Register routes (web)
+            $webRoutePath = "{$directory}/Routes/web.php";
+            if (file_exists($webRoutePath)) {
+                \Route::middleware('web')->group($webRoutePath);
+            }
+
+            // Register routes (api)
+            $apiRoutePath = "{$directory}/Routes/api.php";
+            if (file_exists($apiRoutePath)) {
+                \Route::prefix('api')->middleware('api')->group($apiRoutePath);
+            }
+
+            // Register migrations
+            $migrationPath = "{$directory}/Database/Migrations";
+            if (is_dir($migrationPath)) {
+                $this->loadMigrationsFrom($migrationPath);
+            }
+
+            // Register auto-discovered event listeners, Reportable implementations,
+            // and workflow definitions.
+            $discovery = app(DiscoveryRegistrar::class);
+            $discovery->registerListeners($directory, $moduleNamespace, $moduleName);
+            $discovery->registerReports($directory, $moduleNamespace, $moduleName);
+            $discovery->registerWorkflows($directory, $moduleName);
+        }
+
+        // Load System catch-all route LAST (from Core, not app/Modules)
+        $systemCatchAll = base_path('vendor/quicker-faster/ui-library/src/Core/System/Routes/web.php');
+        if (file_exists($systemCatchAll)) {
+            \Route::middleware('web')->group($systemCatchAll);
+        }
+    }
+
+    /**
+     * Register module configs (dashboard, report, global).
+     */
+    private function registerModuleConfigs(): void
+    {
+        $modulePaths = [
+            base_path('vendor/quicker-faster/ui-library/src/Core'),
+            base_path('app/Modules'),
+        ];
+
+        foreach ($modulePaths as $basePath) {
+            if (!is_dir($basePath)) continue;
+
+            // Dashboard configs
+            $dashboardFiles = glob($basePath . '/*/Data/Dashboards/*.php');
+            foreach ($dashboardFiles as $path) {
+                $module = strtolower(basename(dirname(dirname(dirname($path)))));
+                $file = pathinfo($path, PATHINFO_FILENAME);
+                $this->mergeConfigFrom($path, "{$module}_{$file}");
+            }
+
+            // Report configs
+            $reportFiles = glob($basePath . '/*/Data/reports/*.php');
+            $reportKeys = [];
+            foreach ($reportFiles as $path) {
+                $module = strtolower(basename(dirname(dirname(dirname($path)))));
+                $file = pathinfo($path, PATHINFO_FILENAME);
+                $key = "{$module}_{$file}";
+                $this->mergeConfigFrom($path, $key);
+                $reportKeys[] = $key;
+            }
+            if (!empty($reportKeys)) {
+                $existing = config('reports.registered', []);
+                config(['reports.registered' => array_merge($existing, $reportKeys)]);
+            }
+        }
+
+        // Global configs from Core Common
+        $commonConfigPath = base_path('vendor/quicker-faster/ui-library/src/Core/Common/Config');
+        if (is_dir($commonConfigPath)) {
+            foreach (['app_setup', 'app_tour', 'app_onboarding', 'app_general_settings'] as $config) {
+                $path = "{$commonConfigPath}/{$config}.php";
+                if (file_exists($path)) {
+                    $this->mergeConfigFrom($path, $config);
+                }
+            }
+        }
+    }
+
+    /**
+     * Register auto-discovered notification channels from business modules.
+     */
+    private function registerNotificationChannels(): void
+    {
+        $discovery = app(\QuickerFaster\UILibrary\Services\Notifications\NotificationDiscoveryService::class);
+        $discovery->registerChannels();
+    }
+
+    /**
+     * Register onboarding steps from config.
+     */
+    private function registerOnboardingConfig(): void
+    {
         $steps = config('app_onboarding.steps', []);
 
         foreach ($steps as $step) {
             Onboard::addStep($step['title'])
                 ->link($step['link'])
                 ->cta($step['cta'])
-                ->completeIf(function (\App\Models\User $user) use ($step) {
-                    // If a model is given, check if at least one record exists globally
+                ->completeIf(function ($user) use ($step) {
                     if (isset($step['model'])) {
                         return $step['model']::exists();
                     }
 
-                    // If a condition class is given, resolve and invoke it
                     if (isset($step['condition'])) {
                         $condition = app($step['condition']);
                         return $condition($user);
                     }
 
-                    // Default to false if nothing is defined
                     return false;
                 });
         }
     }
 
-
-
-
-
-
-    private function registerPublishables()
-    {
-        // Assets
-        $this->publishes([
-            //__DIR__ . '/../../resources/assets' => public_path('vendor/qf'),
-            __DIR__ . '/../../public' => public_path('/'),
-        ], 'qf-public-assets');
-
-
-        $this->publishes([
-            __DIR__ . '/../Modules' => app_path('Modules'),
-        ], 'qf-modules');
-    }
-
-
-    private function setupModules()
-    {
-        // Path to your modules (e.g., app/Modules)
-        $modulePath = base_path('app/Modules');
-
-        if (!is_dir($modulePath)) {
-            return;
-        }
-
-        $this->registerModuleViewAlias($modulePath);
-        $this->registerModuleRoutes($modulePath);
-        $this->registerModuleMigrations($modulePath);
-        $this->registerModuleEvents($modulePath);
-
-
-    }
-
-
-
-
-
-
-
-
-
-/**
- * Automatically register event listeners from all modules.
- * Uses caching in production for better performance.
- *
- * @param string $modulePath Absolute path to the app/Modules directory
- */
-private function registerModuleEvents($modulePath)
-{
-    if (!is_dir($modulePath)) {
-        return;
-    }
-
-    $cacheKey = 'module_event_listeners';
-
-    // In production, use cached listener map
-    if (app()->environment('production') && cache()->has($cacheKey)) {
-        $listenersMap = cache()->get($cacheKey);
-        foreach ($listenersMap as $eventClass => $listenerClass) {
-            Event::listen($eventClass, $listenerClass);
-        }
-        return;
-    }
-
-    // Scan modules and build listener map
-    $listenersMap = [];
-    $moduleDirectories = glob($modulePath . '/*', GLOB_ONLYDIR);
-
-    foreach ($moduleDirectories as $directory) {
-        $moduleName = basename($directory);
-        $listenersPath = $directory . '/Listeners';
-
-        if (!is_dir($listenersPath)) {
-            continue;
-        }
-
-        $listenerFiles = File::allFiles($listenersPath);
-
-        foreach ($listenerFiles as $file) {
-            $listenerClass = $this->getClassFromFile($moduleName, 'Listeners', $file->getPathname());
-
-            if (!class_exists($listenerClass)) {
-                continue;
-            }
-
-            $eventClass = $this->getEventFromListener($listenerClass);
-            if ($eventClass && class_exists($eventClass)) {
-                Event::listen($eventClass, $listenerClass);
-                $listenersMap[$eventClass] = $listenerClass;
-                // Log::info("Registered event listener: {$listenerClass} for event: {$eventClass}");
-            }
-        }
-    }
-
-    // Store the map in cache for production
-    if (app()->environment('production')) {
-        cache()->forever($cacheKey, $listenersMap);
-    }
-}
-
-
-
-
     /**
-     * Extract the fully-qualified class name from a file.
+     * Get only modules marked as user-facing.
      */
-    protected function getClassFromFile($moduleName, $directory, $filePath)
+    public function getUserFacingModules(): array
     {
-        $className = str_replace('.php', '', basename($filePath));
-        return "App\\Modules\\{$moduleName}\\{$directory}\\{$className}";
+        $allModules = config('ui-library.modules', []);
+
+        return array_filter($allModules, function ($config) {
+            return ($config['enabled'] ?? false) && ($config['user_facing'] ?? false);
+        });
     }
-
-
-    /**
-     * Detect the event from a listener.
-     */
-    protected function getEventFromListener($class)
-    {
-        try {
-            $reflection = new \ReflectionClass($class);
-
-            // Ensure the class has a handle method
-            if ($reflection->hasMethod('handle')) {
-                $method = $reflection->getMethod('handle');
-                $parameters = $method->getParameters();
-
-                // Extract the event type from the first argument
-                if (!empty($parameters)) {
-                    $parameterType = $parameters[0]->getType();
-                    return $parameterType ? $parameterType->getName() : null;
-                }
-            }
-        } catch (\ReflectionException $e) {
-            //dd("Error");
-            //\Log::error("Reflection error for class {$class}: " . $e->getMessage());
-        }
-
-        return null;
-    }
-
-
-
-
-
-
-
-    private function registerModuleViewAlias($modulePath)
-    {
-        // 1. Get all module directories (e.g., app/Modules/Hr, app/Modules/Admin)
-        $moduleDirectories = glob($modulePath . '/*', GLOB_ONLYDIR);
-
-        foreach ($moduleDirectories as $directory) {
-            // 2. Get the Module Name from the folder name
-            $moduleName = basename($directory); // e.g., "Admin"
-
-            // 3. Define the path to the views folder
-            $viewPath = $directory . '/Resources/views';
-
-            // 4. Check if the folder exists
-            if (File::isDirectory($viewPath)) {
-                // 5. Register the namespace (e.g., "admin" or "hr")
-                $alias = strtolower($moduleName);
-                // Standard Laravel way to register views in a provider
-                $this->loadViewsFrom($viewPath, $alias);
-
-
-            }
-        }
-    }
-
-
-
-    private function registerModuleRoutes($modulePath)
-    {
-        if (!is_dir($modulePath)) {
-            return;
-        }
-
-        // Load library's routes FIRST so the named route exists
-        if (File::exists(__DIR__ . '/../Routes/web.php'))
-            $this->loadRoutesFrom(__DIR__ . '/../Routes/web.php');
-        if (File::exists(__DIR__ . '/../Routes/api.php'))
-            $this->loadRoutesFrom(__DIR__ . '/../Routes/api.php');
-
-        // Find all config files: app/Modules/{ModuleName}/Config/{file}.php
-        // $configFiles = glob($modulePath . '/*/Routes/*.php'); web.php and api.php
-        $webRoutePath = glob($modulePath . '/*/Routes/web.php');
-        foreach ($webRoutePath as $path) {
-            // Load Routes
-            // loads the module’s routes file (web.php), if it exists,
-            //so you don’t have to manually include each route file for every module.
-            // Suspend loading the 'system' modules's routes to avoid conflicts
-            $moduleName = strtolower(basename(dirname(dirname($path))));
-            if ($moduleName != 'system') {
-                //$this->loadRoutesFrom($path);
-                if (File::exists($path))
-                    \Route::middleware('web')->group($path);
-            }
-        }
-
-
-        // Load module's api routes 
-        $apiFiles = glob($modulePath . '/*/Routes/api.php');
-        foreach ($apiFiles as $path) {
-            // Get module name correctly
-            $moduleName = strtolower(basename(dirname(dirname($path))));
-
-            if ($moduleName !== 'system') {
-                if (File::exists($path)) {
-                    // It is standard practice to add the 'api' prefix here too
-                    \Route::prefix('api')->middleware('api')->group($path);
-                }
-            }
-        }
-
-
-
-
-        // Now loade the 'system' module's routes
-        // Dynamic route loading for the 'system' module should be done last to avoid conflicts
-        if (File::exists(app_path("Modules/System/Routes/web.php"))) {
-            \Route::middleware('web')->group(app_path("Modules/System/Routes/web.php"));
-        }
-
-
-        // System Api loading
-        if (File::exists(app_path("Modules/System/Routes/api.php"))) {
-            \Route::prefix('api')->middleware('api')->group(app_path("Modules/System/Routes/api.php"));
-        }
-
-    }
-
-
-    private function registerModuleConfig()
-    {
-
-        $modulePath = app_path('Modules');
-        //$this->mergeModuleConfigs($modulePath);
-        // $this->mergeDashboardConfigs($modulePath);
-        // $this->mergeReportConfigs($modulePath);
-
-
-        // Merge gloal config
-        if (File::exists("{$modulePath}/app_setup.php"))
-            $this->mergeConfigFrom("{$modulePath}/app_setup.php", "app_setup");
-        if (File::exists("{$modulePath}/app_tour.php"))
-            $this->mergeConfigFrom("{$modulePath}/app_tour.php", "app_tour");
-        if (File::exists("{$modulePath}/app_onboarding.php"))
-            $this->mergeConfigFrom("{$modulePath}/app_onboarding.php", "app_onboarding");
-        if (File::exists("{$modulePath}/app_general_settings.php"))
-            $this->mergeConfigFrom("{$modulePath}/app_general_settings.php", "app_general_settings");
-
-    }
-
-
-    /*private function mergeModuleConfigs($modulePath)
-    {
-        // Find all .php files in Modules/{Name}/Data/
-        $configFiles = glob($modulePath . '/* /Data/*.php');
-
-        foreach ($configFiles as $path) {
-            // Get the module name (e.g., 'Hr') and filename (e.g., 'employee')
-            $module = strtolower(basename(dirname(dirname($path))));
-            $file = pathinfo($path, PATHINFO_FILENAME);
-
-            // Create the key: 'hr_employee'
-            $key = "{$module}_{$file}";
-
-            $this->mergeConfigFrom($path, $key);
-        }
-    }*/
-
-
-    private function mergeDashboardConfigs($modulePath)
-    {
-        // Find all .php files in Modules/{Name}/Data/Dashboard
-        $configFiles = glob($modulePath . '/*/Data/Dashboards/*.php');
-
-        foreach ($configFiles as $path) {
-            // Get the module name (e.g., 'Hr') and filename (e.g., 'employee')
-            $module = strtolower(basename(dirname(dirname(dirname($path)))));
-            $file = pathinfo($path, PATHINFO_FILENAME);
-
-            // Create the key: 'hr_employee'
-            $key = "{$module}_{$file}";
-            //dd($path, $key);
-            $this->mergeConfigFrom($path, $key);
-        }
-    }
-
-
-    /**
-     * Merge report configuration files from all modules.
-     *
-     * @param string $modulePath Path to the Modules directory (e.g., app_path('Modules'))
-     */
-    private function mergeReportConfigs($modulePath)
-    {
-        $configFiles = glob($modulePath . '/*/Data/reports/*.php');
-        $reportKeys = [];
-
-        foreach ($configFiles as $path) {
-            $module = strtolower(basename(dirname(dirname(dirname($path)))));
-            $file = pathinfo($path, PATHINFO_FILENAME);
-            $key = "{$module}_{$file}";
-
-            $this->mergeConfigFrom($path, $key);
-            $reportKeys[] = $key;
-        }
-
-        if (!empty($reportKeys)) {
-            config(['reports.registered' => $reportKeys]);
-        }
-    }
-
-
-
-
-    private function registerModuleMigrations($modulePath)
-    {
-        // 1. Get all module directories (e.g., app/Modules/Hr, app/Modules/Admin)
-        $moduleDirectories = glob($modulePath . '/*', GLOB_ONLYDIR);
-
-        foreach ($moduleDirectories as $directory) {
-            // 2. Define the path to the migrations folder
-            $migrationsPath = $directory . '/Database/Migrations';
-
-            // 3. Check if the folder exists and register the whole directory
-            if (File::isDirectory($migrationsPath)) {
-                $this->loadMigrationsFrom($migrationsPath);
-            }
-        }
-    }
-
-
-
-
-
-
 }

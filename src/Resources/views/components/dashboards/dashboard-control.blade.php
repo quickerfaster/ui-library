@@ -24,11 +24,4 @@
     </div>
 
 
-    {{--<select wire:model.live.500ms="selectedProcessId" id="time_duration"
-        class="col form-select  rounded-pill p-1 ps-3  px-sm-3 m-1 small-control">
-        <option value="" disabled>Select Process...</option>
-        @foreach (App\Modules\Production\Models\ProductionProcess::all() as $process )
-            <option value="{{$process->id}}">{{ucfirst($process->name)}}</option>
-        @endforeach
-    </select>--}}
 </div>

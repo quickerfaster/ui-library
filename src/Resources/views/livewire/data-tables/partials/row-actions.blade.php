@@ -5,12 +5,13 @@
     $queryParams = $queryParams ?? [];
     $isPage = $crudType === 'pages';
     $user = auth()->user();
-    $authService = app(\App\Modules\Admin\Services\AuthorizationService::class);
+    $authService = app(\QuickerFaster\UILibrary\Services\DataTables\DefaultAuthorizationProvider::class);
 
     // Pre‑filter moreActions to only those the user can perform
     $visibleMoreActions = [];
     foreach ($moreActions as $index => $action) {
-        if ($authService->canPerformAction($user, $action, $record)) {
+        $permission = is_array($action) ? ($action['action'] ?? $action['permission'] ?? '') : $action;
+        if ($authService->canPerformAction($user, $permission, $record)) {
             $visibleMoreActions[] = ['index' => $index, 'action' => $action];
         }
     }
@@ -25,15 +26,15 @@
         {{-- SHOW action --}}
         @if (in_array('show', $simpleActions) && $authService->canView($user, $record))
             @if ($isPage)
-                <a href="{{ route($routePrefix . '.show', ['id' => $record->id] + $queryParams) }}"
+                <a href="{{ $this->getShowUrl($record->id) }}"
                     class="{{ $btnClass }} text-info-hover" title="View">
                     <i class="fas fa-eye"></i>
                 </a>
             @elseif ($crudType === 'drawers')
                 <button type="button"
                     wire:click="$dispatch('openDrawer', { 
-                        component: 'qf.data-table-detail', 
-                        params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true },
+                        component: 'qf.data-table-detail',
+                        params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}' },
                         title: 'View {{ $modelName }}'
                     })"
                     class="{{ $btnClass }} text-info-hover" title="View">
@@ -57,8 +58,8 @@
             @elseif ($crudType === 'drawers')
                 <button type="button"
                     wire:click="$dispatch('openDrawer', { 
-                        component: 'qf.data-table-form', 
-                        params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true },
+                        component: 'qf.data-table-form',
+                        params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}' },
                         title: 'Edit {{ $modelName }}'
                     })"
                     class="{{ $btnClass }} text-primary-hover" title="Edit">
@@ -139,15 +140,34 @@
                     @php
                         $index = $item['index'];
                         $action = $item['action'];
+                        $routeName = $action['route'] ?? null;
+                        $routeParam = $action['routeParam'] ?? 'id';
+                        $url = $action['url'] ?? null;
+                        $isDirectLink = !empty($routeName) || !empty($url);
                     @endphp
                     <li>
-                        <a class="dropdown-item d-flex align-items-center py-2" href="#"
-                            wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
-                            @if (!empty($action['icon']))
-                                <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
-                            @endif
-                            <span class="small">{{ $action['title'] }}</span>
-                        </a>
+                        @if ($isDirectLink)
+                            @php
+                                $href = $routeName
+                                    ? route($routeName, [$routeParam => $record->id])
+                                    : ($url . '/' . $record->id);
+                            @endphp
+                            <a class="dropdown-item d-flex align-items-center py-2" href="{{ $href }}"
+                                @if (!empty($action['newTab'])) target="_blank" rel="noopener noreferrer" @endif>
+                                @if (!empty($action['icon']))
+                                    <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
+                                @endif
+                                <span class="small">{{ $action['title'] }}</span>
+                            </a>
+                        @else
+                            <a class="dropdown-item d-flex align-items-center py-2" href="#"
+                                wire:click.prevent="handleRowAction({{ $index }}, {{ $record->id }})">
+                                @if (!empty($action['icon']))
+                                    <i class="{{ $action['icon'] }} opacity-50 me-2" style="width: 1.25rem;"></i>
+                                @endif
+                                <span class="small">{{ $action['title'] }}</span>
+                            </a>
+                        @endif
                     </li>
                     @if (!empty($action['appendSeparator']))
                         <li><hr class="dropdown-divider opacity-50"></li>

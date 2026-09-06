@@ -52,7 +52,7 @@ class ProcessImportChunk implements ShouldQueue
 
     /**
      * Explicit queue and connection so these jobs always land on the
-     * same queue/connection as payroll jobs, allowing a single worker.sh
+     * same queue/connection as background jobs, allowing a single worker.sh
      * to serve both.
      */
     public $queue = 'default';
@@ -320,10 +320,11 @@ class ProcessImportChunk implements ShouldQueue
      */
     protected function restoreCompanyContext(Import $import): void
     {
-        $companyId = $import->company_id ?? null;
+        $companyColumn = config('ui-library.tenancy.column', 'company_id');
+        $companyId = $import->{$companyColumn} ?? null;
 
         if ($companyId && $companyId !== 0) {
-            session()->put('current_company_id', $companyId);
+            session()->put(config('ui-library.tenancy.session_key', 'current_company_id'), $companyId);
         }
     }
 

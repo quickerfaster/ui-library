@@ -64,11 +64,13 @@ class ListWidgetProcessor
             'title' => $definition['title'] ?? 'List',
             'description' => $definition['description'] ?? '',
             'icon' => $definition['icon'] ?? null,
+            'color' => $definition['color'] ?? 'primary',
             'columns' => $columns,
             'items' => $items,
             'width' => $definition['width'] ?? 6,
             'showViewAll' => $definition['show_view_all'] ?? false,
             'viewAllLink' => $definition['view_all_link'] ?? null,
+            'viewAllLinkTarget' => $definition['view_all_link_target'] ?? '_self',
         ];
     }
 

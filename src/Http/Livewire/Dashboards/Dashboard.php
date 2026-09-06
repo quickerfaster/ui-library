@@ -2,6 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Http\Livewire\Dashboards;
 
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use QuickerFaster\UILibrary\Services\Config\Dashboards\DashboardResolver;
 use QuickerFaster\UILibrary\Services\Widgets\WidgetProcessor;
@@ -14,16 +15,36 @@ class Dashboard extends Component
     public array $parameters = [];
     public string $title = '';
     public string $description = '';
+    public array $hero = [];
+    public array $stats = [];
 
     /** @var array Custom widget definitions (overrides config file) */
     public array $customWidgets = [];
+
+    /** @var string|null Error message when dashboard config cannot be loaded. */
+    public ?string $errorMessage = null;
 
     public function mount(string $configKey, array $parameters = [], array $customWidgets = [])
     {
         $this->configKey = $configKey;
         $this->parameters = $parameters;
         $this->customWidgets = $customWidgets;
-        $this->loadDashboard();
+
+        try {
+            $this->loadDashboard();
+        } catch (\InvalidArgumentException $e) {
+            $this->errorMessage = 'Dashboard configuration not found: ' . $this->configKey;
+            Log::error($e->getMessage(), [
+                'configKey' => $this->configKey,
+                'exception' => $e,
+            ]);
+        } catch (\Exception $e) {
+            $this->errorMessage = 'An unexpected error occurred while loading the dashboard: ' . $this->configKey;
+            Log::error($e->getMessage(), [
+                'configKey' => $this->configKey,
+                'exception' => $e,
+            ]);
+        }
     }
 
     protected function getResolver(): DashboardResolver
@@ -37,6 +58,8 @@ class Dashboard extends Component
         if (!empty($this->customWidgets)) {
             $this->title = $this->customWidgets['title'] ?? '';
             $this->description = $this->customWidgets['description'] ?? '';
+            $this->hero = $this->customWidgets['hero'] ?? [];
+            $this->stats = $this->customWidgets['stats'] ?? [];
             $this->layout = $this->customWidgets['layout'] ?? ['columns' => 12, 'gutter' => 3];
             $widgetDefinitions = $this->customWidgets['widgets'] ?? [];
         } else {
@@ -44,6 +67,8 @@ class Dashboard extends Component
             $config = $resolver->getConfig();
             $this->title = $config['title'] ?? '';
             $this->description = $config['description'] ?? '';
+            $this->hero = $resolver->getHero();
+            $this->stats = $resolver->getStats();
             $this->layout = $config['layout'] ?? ['columns' => 12, 'gutter' => 3];
             $widgetDefinitions = $config['widgets'] ?? [];
         }
@@ -59,6 +84,9 @@ class Dashboard extends Component
             'layout' => $this->layout,
             'title' => $this->title,
             'description' => $this->description,
+            'hero' => $this->hero,
+            'stats' => $this->stats,
+            'errorMessage' => $this->errorMessage,
         ]);
     }
 }

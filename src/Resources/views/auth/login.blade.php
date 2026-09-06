@@ -43,15 +43,15 @@
                 </form>
 
                 <!-- Social Login Buttons (optional) -->
-                @if(config('quicker-faster-ui.socialite.enabled', false))
+                @if(config('ui-library.socialite.enabled', false))
                     <hr>
                     <div class="d-grid gap-2">
-                        @if(config('quicker-faster-ui.socialite.providers.google', false))
+                        @if(config('ui-library.socialite.providers.google.enabled', false))
                             <a href="{{ route('socialite.redirect', 'google') }}" class="btn btn-outline-dark">
                                 <i class="bi bi-google"></i> {{ __('Login with Google') }}
                             </a>
                         @endif
-                        @if(config('quicker-faster-ui.socialite.providers.github', false))
+                        @if(config('ui-library.socialite.providers.github.enabled', false))
                             <a href="{{ route('socialite.redirect', 'github') }}" class="btn btn-outline-dark">
                                 <i class="bi bi-github"></i> {{ __('Login with GitHub') }}
                             </a>

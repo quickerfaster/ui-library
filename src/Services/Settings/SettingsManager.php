@@ -51,8 +51,21 @@ class SettingsManager
     protected function getContextHash(): string
     {
         $userId = auth()->id() ?? 'guest';
-        $module = request()->route('module') ?? session('active_module') ?? 'system';
-        $companyId = \Illuminate\Support\Facades\Session::get('current_company_id', '0');
-        return md5($userId . '_' . $module . '_' . $companyId);
+        $module = request()->route('module')
+            ?? session('active_module')
+            ?? config('ui-library.settings.default_module', 'system');
+
+        $contextKeys = config('ui-library.settings.context_keys', ['user_id', 'module']);
+        $parts = [];
+
+        foreach ($contextKeys as $key) {
+            $parts[] = match ($key) {
+                'user_id' => $userId,
+                'module' => $module,
+                default => session($key, request()->get($key, '0')),
+            };
+        }
+
+        return md5(implode('_', $parts));
     }
 }

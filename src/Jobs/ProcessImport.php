@@ -46,7 +46,7 @@ class ProcessImport implements ShouldQueue
 
     /**
      * Explicit queue and connection so these jobs always land on the
-     * same queue/connection as payroll jobs, allowing a single worker.sh
+     * same queue/connection as background jobs, allowing a single worker.sh
      * to serve both.
      */
     public $queue = 'default';

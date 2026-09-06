@@ -48,7 +48,7 @@
             <div class="mb-3">
                 <label class="form-label">Report Name</label>
                 <input type="text" wire:model="reportName" class="form-control"
-                    placeholder="e.g., Active Employees List">
+                    placeholder="e.g., Active Records List">
                 @error('reportName')
                     <span class="text-danger small">{{ $message }}</span>
                 @enderror

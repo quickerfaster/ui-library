@@ -3,8 +3,8 @@
 namespace QuickerFaster\UILibrary\Http\Livewire\AccessControls;
 
 use Livewire\Component;
-use App\Modules\Admin\Models\Role;
-use App\Modules\Admin\Models\User;
+use QuickerFaster\UILibrary\Models\Role;
+use App\Models\User;
 use Illuminate\Support\Str;
 use QuickerFaster\UILibrary\Services\PermissionSyncService;
 
@@ -143,6 +143,6 @@ public function getScopesProperty()
     private function getResourceNames(): array
     {
         // Use your existing logic (scanning modules)
-        return ['Employee', 'Store', 'HumanResource']; // example
+        return ['Record', 'Store', 'Inventory']; // example
     }
 }

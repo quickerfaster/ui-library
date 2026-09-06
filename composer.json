@@ -1,29 +1,48 @@
 {
     "name": "quicker-faster/ui-library",
-    "description": "A Laravel livewier ui components",
+    "description": "A config-driven Laravel UI library with Livewire 3, Fortify auth, and module auto-discovery",
     "type": "library",
     "license": "MIT",
+    "version": "2.0.0",
     "autoload": {
         "psr-4": {
-            "QuickerFaster\\UILibrary\\": "src/"
+            "QuickerFaster\\UILibrary\\": "src/",
+            "QuickerFaster\\UILibrary\\Core\\": "src/Core/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "QuickerFaster\\UILibrary\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "QuickerFaster\\UILibrary\\Providers\\UILibraryServiceProvider",
+                "QuickerFaster\\UILibrary\\Providers\\ModuleServiceProvider",
+                "QuickerFaster\\UILibrary\\Providers\\FortifyServiceProvider"
+            ]
         }
     },
     "require": {
+        "php": "^8.1",
         "livewire/livewire": "^3",
         "barryvdh/laravel-dompdf": "^3.0",
         "maatwebsite/excel": "^3.1",
-
         "laravel/fortify": "^1.0",
         "laravel/socialite": "^5.0",
-
         "spatie/laravel-permission": "^6.21",
         "spatie/laravel-onboard": "^2.6"
-
     },
-
-
+    "require-dev": {
+        "orchestra/testbench": "^8.0",
+        "phpunit/phpunit": "^10.0"
+    },
     "minimum-stability": "dev",
-    "prefer-stable": true
-
-
+    "prefer-stable": true,
+    "scripts": {
+        "install-ui-library": [
+            "@php artisan ui-library:install"
+        ]
+    }
 }

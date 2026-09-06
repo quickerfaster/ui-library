@@ -17,16 +17,16 @@ use Illuminate\Support\Facades\Session;
  * Usage in a Livewire component:
  *   use ResolvesModels;
  *
- *   $record = $this->resolveModel(PayrollRun::class, $this->payrollRunId);
+ *   $record = $this->resolveModel(Invoice::class, $this->invoiceId);
  *   if (!$record) {
- *       $this->flashAndRedirect('error', 'Payroll run not found.', 'payroll-runs.index');
+ *       $this->flashAndRedirect('error', 'Invoice not found.', 'invoices.index');
  *       return;
  *   }
  *
  * Usage in a controller:
  *   use ResolvesModels;
  *
- *   $record = $this->resolveModelOrFail(Employee::class, $id);
+ *   $record = $this->resolveModelOrFail(Record::class, $id);
  */
 trait ResolvesModels
 {
@@ -60,7 +60,11 @@ trait ResolvesModels
         }
 
         // Build the query
-        $query = $modelClass::withoutCompanyScope();
+        // Use withoutCompanyScope() if available (multi-tenant apps),
+        // otherwise fall back to a plain query (standard models).
+        $query = method_exists($modelClass, 'withoutCompanyScope')
+            ? $modelClass::withoutCompanyScope()
+            : $modelClass::query();
 
         // Apply additional scopes
         foreach ($scopes as $scope) {
@@ -120,18 +124,25 @@ trait ResolvesModels
      * bypass the session-based global scope, then applies an explicit
      * company_id WHERE clause.
      *
+     * When $companyId is 0, no company scope is applied (All Companies mode),
+     * consistent with checkCompanyAccess().
+     *
      * @param  string      $modelClass  Fully-qualified model class name
      * @param  int|string  $id          Primary key value
-     * @param  int         $companyId   Company ID to scope to
+     * @param  int         $companyId   Company ID to scope to (0 = all companies)
      * @return Model|null
      */
     public function resolveModelForCompany(string $modelClass, $id, int $companyId): ?Model
     {
-        return $this->resolveModel($modelClass, $id, [
-            function ($query) use ($companyId) {
+        $scopes = [];
+
+        if ($companyId !== 0) {
+            $scopes[] = function ($query) use ($companyId) {
                 return $query->where('company_id', $companyId);
-            },
-        ]);
+            };
+        }
+
+        return $this->resolveModel($modelClass, $id, $scopes);
     }
 
     /**
@@ -204,7 +215,7 @@ trait ResolvesModels
      * been deleted or is no longer accessible. Prevents the user from
      * being stuck with stale wizard state.
      *
-     * @param  string $wizardId      Session key for the wizard (e.g., 'payroll-wizard-' . auth()->id())
+     * @param  string $wizardId      Session key for the wizard (e.g., 'invoice-wizard-' . auth()->id())
      * @param  string $errorMessage  User-facing error message
      * @param  string $fallbackRoute Route to redirect to
      * @param  array  $params        Optional route parameters

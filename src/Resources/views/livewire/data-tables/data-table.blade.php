@@ -1,5 +1,15 @@
 <div>
 
+    @if($pageTitle)
+    @script
+    <script>
+        document.title = @js($pageTitle);
+        const heading = document.querySelector('h1.h3.mb-0');
+        if (heading) heading.textContent = @js($pageTitle);
+    </script>
+    @endscript
+    @endif
+
     {{-- <livewire:qf.filter-panel :configKey="$configKey" wire:key="filters-{{ $configKey }}" /> --}}
 
 
@@ -87,6 +97,17 @@
                                 <i class="fas fa-check {{ $viewMode === 'card' ? 'text-primary' : 'invisible' }}"></i>
                             </a>
                         </li>
+                        @if (isset($switchViews['monthly']))
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
+                                wire:click.prevent="setViewMode('monthly')">
+                                <span class="{{ $viewMode === 'monthly' ? 'fw-bold text-primary' : '' }}">
+                                    <i class="fas fa-calendar-alt me-2"></i>Monthly
+                                </span>
+                                <i class="fas fa-check {{ $viewMode === 'monthly' ? 'text-primary' : 'invisible' }}"></i>
+                            </a>
+                        </li>
+                        @endif
 
                         <li>
                             <hr class="dropdown-divider">
@@ -451,11 +472,27 @@
             'controls' => $controls,
             'bulkSelection' => $bulkSelection,
             'configKey' => $configKey,
+            'crudType' => $crudType,
+            'modelName' => $modelName,
         ])
 
         {{-- Card View --}}
     @elseif($viewMode === 'card')
         @include('qf::livewire.data-tables.partials.card-view', [
+            'records' => $records,
+            'viewConfig' => $viewConfig,
+            'simpleActions' => $simpleActions,
+            'moreActions' => $moreActions,
+            'controls' => $controls,
+            'bulkSelection' => $bulkSelection,
+            'configKey' => $configKey,
+            'crudType' => $crudType,
+            'modelName' => $modelName,
+        ])
+
+        {{-- Monthly View --}}
+    @elseif($viewMode === 'monthly')
+        @include('qf::livewire.data-tables.partials.monthly-view', [
             'records' => $records,
             'viewConfig' => $viewConfig,
             'simpleActions' => $simpleActions,

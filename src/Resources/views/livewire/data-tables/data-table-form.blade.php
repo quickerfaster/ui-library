@@ -14,7 +14,7 @@
             $queryString = !empty($params) ? '?' . http_build_query($params) : '';
             $backUrl = url("/{$module}/{$modelPlural}" . $queryString);
 
-            $crudType = $this->getConfigResolver()->getConfig()['crudType'] ?? 'modal';
+            $crudType = $this->crudType;
 
         @endphp
 
@@ -126,9 +126,10 @@
                             );
                         @endphp
 
-                        <a href="{{ $backUrl }}" class="btn btn-link text-muted text-decoration-none fw-bold p-0">
+                        <button type="button" wire:click="$dispatch('closeDrawer')"
+                            class="btn btn-link text-muted text-decoration-none fw-bold p-0">
                             <i class="fas fa-arrow-left me-1"></i> Discard Changes
-                        </a>
+                        </button>
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold">

@@ -6,7 +6,9 @@
     if ($isAllCompanies) {
         $currentCompanyName = 'All Companies';
     } elseif ($companyId) {
-        $currentCompanyName = optional(\App\Modules\Hr\Models\Company::find($companyId))->name;
+        $companyProvider = app(\QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider::class);
+        $company = $companyProvider->getCompanies(auth()->user())->firstWhere('id', $companyId);
+        $currentCompanyName = $company->name ?? null;
     }
 
     $asBadge = $asBadge ?? false;

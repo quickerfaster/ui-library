@@ -2,375 +2,435 @@
 
 namespace QuickerFaster\UILibrary\Providers;
 
-use QuickerFaster\UILibrary\Http\Livewire\AccessControls\AccessControlManager;
-use App\Modules\Admin\Http\Livewire\AccessControls\ModuleSelector;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Str;
-use Laravel\Fortify\Fortify;
-
-
-use Livewire\Livewire;
-use QuickerFaster\UILibrary\Http\Livewire\Custom\EmployeeDetail;
-use QuickerFaster\UILibrary\Http\Livewire\Dashboards\Dashboard;
-use QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTable;
-use QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTableForm;
-use QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTableDetail;
-use QuickerFaster\UILibrary\Http\Livewire\DataTables\ImportForm;
-
-use QuickerFaster\UILibrary\Http\Livewire\DocumentPreview;
-use QuickerFaster\UILibrary\Http\Livewire\Drawer;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\ExportProgress;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\FormModal;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\DetailModal;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\AlertModal;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\ExportModal;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\ImportModal;
-
-use QuickerFaster\UILibrary\Http\Livewire\Wizards\Wizard;
-use QuickerFaster\UILibrary\Http\Livewire\Wizards\WizardForm;
-
-use QuickerFaster\UILibrary\Http\Livewire\FilterPanel;
-
-
-use QuickerFaster\UILibrary\Services\Iimpors\ImportProcessor;
-use QuickerFaster\UILibrary\Commands\QuickerFasterInstallUI;
-use QuickerFaster\UILibrary\Commands\CleanExports;
-use QuickerFaster\UILibrary\Commands\CleanImportErrors;
-
-use QuickerFaster\UILibrary\Http\Livewire\Buttons\ToggleButton;
-use QuickerFaster\UILibrary\Http\Livewire\Buttons\ToggleButtonGroup;
-use QuickerFaster\UILibrary\Http\Livewire\Layouts\NavigationLayout;
-use QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\BottomBar;
-use QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\HorizontalContextMenu;
-use QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\MenuRenderer;
-use QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\Sidebar;
-use QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\TopNav;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\DocumentPreviewModal;
-use QuickerFaster\UILibrary\Http\Livewire\SetupChecklist;
-use QuickerFaster\UILibrary\Http\Livewire\Wizards\SetupWizard;
-use QuickerFaster\UILibrary\Http\Livewire\Modals\CropImageModal;
-use QuickerFaster\UILibrary\Http\Livewire\Reports\ReportBuilder;
-use QuickerFaster\UILibrary\Http\Livewire\Reports\ReportIndex;
-use QuickerFaster\UILibrary\Http\Livewire\Reports\ReportViewer;
-use QuickerFaster\UILibrary\Http\Livewire\Settings\SettingsPanel;
-
-
 use Illuminate\Support\Facades\Blade;
-use QuickerFaster\UILibrary\Http\Livewire\Custom\SearchableEmployeeDropdown;
-use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Livewire\Livewire;
+use Laravel\Fortify\Fortify;
+use QuickerFaster\UILibrary\Components\Breadcrumbs;
+use QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard;
 use QuickerFaster\UILibrary\Services\Settings\SettingsManager;
-
-
-
-use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionGroup;
-use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionManager;
-use QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionToggle;
-use QuickerFaster\UILibrary\Http\Livewire\BackgroundJobsPanel;
-use QuickerFaster\UILibrary\Http\Livewire\Buttons\Toggle;
-use QuickerFaster\UILibrary\Http\Livewire\Collapsible;
-use QuickerFaster\UILibrary\Http\Livewire\ColumnManager;
-use QuickerFaster\UILibrary\Http\Livewire\Custom\TaxBandsRepeater;
-use QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports;
-use QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports;
-use QuickerFaster\UILibrary\Http\Livewire\SearchPanel;
-use Illuminate\Database\Eloquent\Relations\Relation;
-use QuickerFaster\UILibrary\Http\Livewire\AccessControls\RoleAssignmentManager;
-use QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalActions;
-use QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalHistoryTimeline;
-
+use QuickerFaster\UILibrary\Services\Config\ModelConfigRepository;
+use QuickerFaster\UILibrary\Events\ModuleRegistered;
+use QuickerFaster\UILibrary\Events\ModuleBooted;
+use QuickerFaster\UILibrary\Http\Middleware\ResolveCompanyContext;
 
 class UILibraryServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Bind ImportProcessor if needed
-        $this->app->singleton(ImportProcessor::class);
-        $this->registerSettingsResolver();
-        $this->registerPublicFolder();
+        // Merge default config
+        $this->mergeConfigFrom(__DIR__ . '/../Config/ui-library.php', 'ui-library');
 
-        $this->app->singleton(ModelConfigRepository::class);
-
-    }
-
-
-
-
-    public function boot()
-    {
-
-        $this->registerCommands();
-        $this->registerLivewireComponents();
-        $this->registerPublishables();
-        $this->registerFortifyViews();
-        $this->registerSocialiteProviders();
-
-
-        // Register view path
-        $viewPath = __DIR__ . '/../Resources/views';
-        if (is_dir($viewPath)) {
-            $this->loadViewsFrom($viewPath, 'qf');
-            // Use aliasComponent to map the namespace view to a tag
-            \Blade::component('qf::layouts.app', 'layout');
-            \Blade::component('qf::layouts.guest', 'guest-layout');
-            \Blade::component('qf::components.breadcrumb', 'breadcrumb');
-
-        }
-
-        \Blade::componentNamespace('QuickerFaster\\UILibrary\\Components', 'qf');
-
-        // Register a settings blade dirctive
-        // Usage: @setting('date_format', 'Y-m-d')
-        Blade::directive('setting', function ($expression) {
-            return "<?php echo app(\\QuickerFaster\\UILibrary\\Services\\Settings\\SettingsManager::class)->get({$expression}); ?>";
-        });
-
-
-
-
-        // Merge package config with application's configcomp
-        $configPath = __DIR__ . '/../Config/quicker-faster-ui.php';
-        $this->mergeConfigFrom($configPath, 'quicker-faster-ui');
-
-        // Translations
-        $this->loadTranslationsFrom(__DIR__ . '/../Resources/lang', 'qf');
-
-
-
-    
-
-    }
-
-
-    private function registerSettingsResolver()
-    {
+        // Bind core services
         $this->app->singleton(SettingsManager::class, function ($app) {
             $manager = new SettingsManager();
 
-            // Priority 1: User preferences
-            $manager->addResolver('user', function ($key) {
-                return auth()->user()?->getSetting($key);
-            });
-
-            // Priority 2: Account/Company settings
-            $manager->addResolver('company', function ($key) {
-                $companyId = \Illuminate\Support\Facades\Session::get('current_company_id') ?? auth()->user()?->company_id;
-                if ($companyId) {
-                    $company = \App\Modules\Hr\Models\Company::find($companyId);
-                    return $company?->getSetting($key);
+            // Register resolvers from config
+            $resolvers = config('ui-library.settings.resolvers', []);
+            foreach ($resolvers as $name => $resolver) {
+                if ($resolver && is_callable($resolver)) {
+                    $manager->addResolver($name, $resolver);
                 }
-                return null;
-            });
-
-            // Priority 3: System defaults
-            $manager->addResolver('system', function ($key) {
-                $system = \App\Modules\System\Models\System::find(1);
-                return $system?->getSetting($key);
-            });
+            }
 
             return $manager;
         });
-    }
 
+        $this->app->singleton(ModelConfigRepository::class);
 
-    private function registerPublicFolder()
-    {
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\ActivityLogs\ActivityLogModelResolver::class,
+            \QuickerFaster\UILibrary\Services\ActivityLogs\ActivityLogModelResolver::class
+        );
+
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class);
+
+        // Bind the approval contracts to their default implementations.
+        // Consuming applications can override these by publishing the config
+        // and pointing the keys at their own resolver implementations.
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\Approvals\ApproverResolver::class,
+            config(
+                'ui-library.approvals.approver_resolver',
+                \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverResolver::class
+            )
+        );
+
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\Approvals\ApproverLabelResolver::class,
+            config(
+                'ui-library.approvals.approver_label_resolver',
+                \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverLabelResolver::class
+            )
+        );
+
+        // Bind the approval guard explicitly for reliable container resolution.
+        // Livewire components that depend on ApprovalGuard (e.g. ApprovalRequestListView)
+        // need this binding so the container can resolve it during mount().
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard::class,
+            function ($app) {
+                return new \QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard(
+                    $app->make(\QuickerFaster\UILibrary\Contracts\Approvals\ApproverResolver::class)
+                );
+            }
+        );
+
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Documents\DocumentEngine::class);
+
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Notifications\NotificationService::class, function ($app) {
+            $service = new \QuickerFaster\UILibrary\Services\Notifications\NotificationService();
+
+            foreach (config('ui-library.notifications.channels', []) as $name => $class) {
+                $service->registerChannel($name, new $class());
+            }
+
+            return $service;
+        });
+
+        // NotificationActionRegistry — singleton so consuming apps can register
+        // handlers in their own service providers.
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Notifications\NotificationActionRegistry::class);
+
+        // TemplateVariableRegistry — config-driven default, overridable by
+        // consuming apps via config('ui-library.notifications.template_variables').
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\Notifications\TemplateVariableRegistry::class,
+            \QuickerFaster\UILibrary\Services\Notifications\DefaultTemplateVariableRegistry::class
+        );
+
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Reports\ReportEngine::class);
+
+        $this->app->singleton(
+            \QuickerFaster\UILibrary\Contracts\ReferenceData\ReferenceDataProvider::class,
+            \QuickerFaster\UILibrary\Services\ReferenceData\ReferenceDataService::class
+        );
+
+        // Phase 4.5: NavigationManager singleton for config-driven sidebar
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Navigation\NavigationManager::class);
+
+        // Quick Actions: ActionRegistry singleton for config-driven action discovery
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\QuickActions\ActionRegistry::class);
+
+        // Quick Actions Phase 2: ActionTracker + RankingEngine singletons
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\QuickActions\ActionTracker::class);
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\QuickActions\RankingEngine::class);
+
+        // Workspace context resolver (multi-tenant / role-based navigation
+        // filtering). Config-driven via ui-library.navigation.workspace_resolver
+        // so consuming apps can publish ui-library.php and point it at their
+        // own implementation without re-binding the contract in a provider.
+        $this->app->singleton(
+            \QuickerFaster\UILibrary\Contracts\Navigation\WorkspaceResolver::class,
+            config('ui-library.navigation.workspace_resolver', \QuickerFaster\UILibrary\Services\Navigation\NullWorkspaceResolver::class)
+        );
+
+        // Company provider for the company switcher. Config-driven via
+        // ui-library.navigation.company_provider (the published config defaults
+        // to DefaultCompanyProvider; the fallback below only applies when the
+        // config file is absent).
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider::class,
+            config('ui-library.navigation.company_provider', \QuickerFaster\UILibrary\Services\Navigation\NullCompanyProvider::class)
+        );
+
+        // Bind DataTable authorization provider (configurable, defaults to Spatie Permission-based)
+        $this->app->bind(
+            \QuickerFaster\UILibrary\Contracts\DataTables\DataTableAuthorizationProvider::class,
+            config('ui-library.datatables.authorization_provider', \QuickerFaster\UILibrary\Services\DataTables\DefaultAuthorizationProvider::class)
+        );
+
+        // Bind ModelDiscovery service for access control model scanning
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\AccessControl\ModelDiscovery::class);
+
+        // Bind public path for shared hosting compatibility
         $this->app->bind('path.public', function () {
-            // If we are on the server, the public folder is likely '../public_html' 
-            // relative to the app core.
             $sharedHostingPath = base_path('../public_html');
-
             if (is_dir($sharedHostingPath)) {
                 return $sharedHostingPath;
             }
-
-            // Fallback for local development
             return base_path('public');
         });
     }
 
+    public function boot(): void
+    {
+        // Set Core module path in config
+        config()->set('ui-library.module_paths.core', __DIR__ . '/../Core');
 
-    private function registerCommands()
+        // Register the named rate limiter used by the catch-all route.
+        RateLimiter::for('qf-catch-all', function (Request $request) {
+            $maxAttempts = (int) config('ui-library.catch_all.rate_limiting.max_attempts', 60);
+            $decayMinutes = (int) config('ui-library.catch_all.rate_limiting.decay_minutes', 1);
+
+            return Limit::perMinutes($decayMinutes, $maxAttempts)
+                ->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Register the optional company-context middleware. Consuming apps add
+        // 'qf.resolve-company-context' to their web/api route groups so the
+        // session tenant context is resolved at request start.
+        $this->app['router']->aliasMiddleware('qf.resolve-company-context', ResolveCompanyContext::class);
+
+        // Load shared library routes (export, import, print, etc.)
+        $sharedRoutesPath = __DIR__ . '/../Routes/web.php';
+        if (file_exists($sharedRoutesPath)) {
+            $this->loadRoutesFrom($sharedRoutesPath);
+        }
+
+        // Load shared library migrations
+        $sharedMigrationsPath = __DIR__ . '/../../Database/Migrations';
+        if (is_dir($sharedMigrationsPath)) {
+            $this->loadMigrationsFrom($sharedMigrationsPath);
+        }
+
+        // Load the minimal companies scoping migration. The remaining
+        // Organization domain (hierarchy tables, models, routes, views, and
+        // data configs) now lives in the consuming-app Organization module.
+        $organizationMigrationsPath = __DIR__ . '/../Core/Organization/Database/Migrations';
+        if (is_dir($organizationMigrationsPath)) {
+            $this->loadMigrationsFrom($organizationMigrationsPath);
+        }
+
+        // Phase 4.4: Register view composers
+        $this->registerViewComposers();
+
+        // 1. Boot Core modules (Admin, System)
+        $this->bootCoreModules();
+
+        // 2. Fire ModuleRegistered for each Core module
+        event(new ModuleRegistered('admin', __DIR__ . '/../Core/Admin',
+            userFacing: config('ui-library.modules.admin.user_facing', true),
+            dependsOn: config('ui-library.modules.admin.depends_on', []),
+        ));
+        event(new ModuleRegistered('system', __DIR__ . '/../Core/System',
+            userFacing: config('ui-library.modules.system.user_facing', true),
+            dependsOn: config('ui-library.modules.system.depends_on', []),
+        ));
+
+        // 3. Fire ModuleBooted
+        event(new ModuleBooted());
+
+        // 4. Register views, components, Livewire, commands
+        $this->registerViews();
+        $this->registerBladeComponents();
+        $this->registerLivewireComponents();
+        $this->registerCommands();
+        $this->registerPublishables();
+        $this->registerFortifyViews();
+        $this->registerSocialiteProviders();
+        $this->registerBladeDirectives();
+        $this->registerEventListeners();
+        $this->registerTranslations();
+    }
+
+    private function bootCoreModules(): void
+    {
+        $corePath = __DIR__ . '/../Core';
+
+        $first = true;
+        foreach (['Admin', 'System'] as $module) {
+            $moduleLower = strtolower($module);
+            $modulePath = "{$corePath}/{$module}";
+
+            // Register views under single 'qf-core' namespace
+            // Routes use view('qf-core::admin.dashboard') → namespace qf-core, view admin/dashboard
+            $viewPath = "{$modulePath}/Resources/views";
+            if (is_dir($viewPath)) {
+                if ($first) {
+                    $this->loadViewsFrom($viewPath, 'qf-core');
+                    $first = false;
+                } else {
+                    $this->app['view']->addNamespace('qf-core', $viewPath);
+                }
+                $this->publishes([
+                    $viewPath => resource_path("views/vendor/qf-core/{$moduleLower}"),
+                ], 'ui-library-core-views');
+            }
+
+            // Register routes (skip System — ModuleServiceProvider loads it
+            // last, after business modules, so the catch-all route does not
+            // shadow module-specific routes like Organization.)
+            if ($module !== 'System') {
+                $routePath = "{$modulePath}/Routes/web.php";
+                if (file_exists($routePath)) {
+                    $this->loadRoutesFrom($routePath);
+                }
+            }
+
+            // Register migrations
+            $migrationPath = "{$modulePath}/Database/Migrations";
+            if (is_dir($migrationPath)) {
+                $this->loadMigrationsFrom($migrationPath);
+                $this->publishes([
+                    $migrationPath => database_path('migrations'),
+                ], 'ui-library-migrations');
+            }
+        }
+    }
+
+    private function registerViews(): void
+    {
+        $viewPath = __DIR__ . '/../Resources/views';
+        if (is_dir($viewPath)) {
+            $this->loadViewsFrom($viewPath, 'qf');
+        }
+    }
+
+    private function registerBladeComponents(): void
+    {
+        Blade::component('qf::layouts.app', 'layout');
+        Blade::component('qf::layouts.guest', 'guest-layout');
+        Blade::component('qf::components.breadcrumb', 'breadcrumb');
+        Blade::component(Breadcrumbs::class, 'breadcrumbs');
+        Blade::componentNamespace('QuickerFaster\\UILibrary\\Components', 'qf');
+    }
+
+    private function registerLivewireComponents(): void
+    {
+        // Layout
+        Livewire::component('qf.top-nav', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\TopNav::class);
+        Livewire::component('qf.sidebar', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\Sidebar::class);
+        Livewire::component('qf.bottom-bar', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\BottomBar::class);
+        Livewire::component('qf.navigation-layout', \QuickerFaster\UILibrary\Http\Livewire\Layouts\NavigationLayout::class);
+        Livewire::component('qf.horizontal-context-menu', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\HorizontalContextMenu::class);
+        Livewire::component('qf.menu-renderer', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\MenuRenderer::class);
+        Livewire::component('qf.module-switcher', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\ModuleSwitcher::class);
+        Livewire::component('qf.workspace-tabs', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\WorkspaceTabs::class);
+
+        // DataTables
+        Livewire::component('qf.data-table', \QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTable::class);
+        Livewire::component('qf.data-table-form', \QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTableForm::class);
+        Livewire::component('qf.data-table-detail', \QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTableDetail::class);
+
+        // Modals
+        Livewire::component('qf.form-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\FormModal::class);
+        Livewire::component('qf.detail-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\DetailModal::class);
+        Livewire::component('qf.alert-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\AlertModal::class);
+        Livewire::component('qf.import-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\ImportModal::class);
+        Livewire::component('qf.export-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\ExportModal::class);
+        Livewire::component('qf.export-progress', \QuickerFaster\UILibrary\Http\Livewire\Modals\ExportProgress::class);
+        Livewire::component('qf.document-preview-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\DocumentPreviewModal::class);
+        Livewire::component('qf.crop-image-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\CropImageModal::class);
+
+        // Wizards
+        Livewire::component('qf.wizard', \QuickerFaster\UILibrary\Http\Livewire\Wizards\Wizard::class);
+        Livewire::component('qf.setup-wizard', \QuickerFaster\UILibrary\Http\Livewire\Wizards\SetupWizard::class);
+        Livewire::component('qf.setup-checklist', \QuickerFaster\UILibrary\Http\Livewire\SetupChecklist::class);
+        Livewire::component('qf.wizard-form', \QuickerFaster\UILibrary\Http\Livewire\Wizards\WizardForm::class);
+
+        // Workflows
+        Livewire::component('qf.workflow-definition-wizard', \QuickerFaster\UILibrary\Http\Livewire\Workflows\WorkflowDefinitionWizard::class);
+        // Deprecated: replaced by qf.data-table with configKey="admin.workflow_definition"
+        // Livewire::component('qf.workflow-definition-list', \QuickerFaster\UILibrary\Http\Livewire\Workflows\WorkflowDefinitionList::class);
+        Livewire::component('qf.reviewer-chain-builder', \QuickerFaster\UILibrary\Http\Livewire\Workflows\ReviewerChainBuilder::class);
+
+        // Dashboard
+        Livewire::component('qf.dashboard', \QuickerFaster\UILibrary\Http\Livewire\Dashboards\Dashboard::class);
+
+        // Access Control
+        Livewire::component('qf.access-control-manager', \QuickerFaster\UILibrary\Http\Livewire\AccessControls\AccessControlManager::class);
+        Livewire::component('qf.module-selector', \QuickerFaster\UILibrary\Http\Livewire\AccessControls\ModuleSelector::class);
+        Livewire::component('qf.role-assignment-manager', \QuickerFaster\UILibrary\Http\Livewire\AccessControls\RoleAssignmentManager::class);
+        Livewire::component('qf.permission-manager', \QuickerFaster\UILibrary\Http\Livewire\AccessControls\PermissionManager::class);
+
+        // Buttons
+        Livewire::component('qf.toggle-button', \QuickerFaster\UILibrary\Http\Livewire\Buttons\ToggleButton::class);
+        Livewire::component('qf.toggle-button-group', \QuickerFaster\UILibrary\Http\Livewire\Buttons\ToggleButtonGroup::class);
+
+        // Documents
+        Livewire::component('qf.document-preview', \QuickerFaster\UILibrary\Http\Livewire\DocumentPreview::class);
+
+        // Reports
+        Livewire::component('qf.report-index', \QuickerFaster\UILibrary\Http\Livewire\Reports\ReportIndex::class);
+        Livewire::component('qf.report-viewer', \QuickerFaster\UILibrary\Http\Livewire\Reports\ReportViewer::class);
+        Livewire::component('qf.report-builder', \QuickerFaster\UILibrary\Http\Livewire\Reports\ReportBuilder::class);
+
+        // Settings
+        Livewire::component('qf.settings-panel', \QuickerFaster\UILibrary\Http\Livewire\Settings\SettingsPanel::class);
+
+        // Misc
+        Livewire::component('qf.drawer', \QuickerFaster\UILibrary\Http\Livewire\Drawer::class);
+        Livewire::component('qf.filter-panel', \QuickerFaster\UILibrary\Http\Livewire\FilterPanel::class);
+        Livewire::component('qf.search-panel', \QuickerFaster\UILibrary\Http\Livewire\SearchPanel::class);
+        Livewire::component('qf.collapsible', \QuickerFaster\UILibrary\Http\Livewire\Collapsible::class);
+        Livewire::component('qf.background-jobs-panel', \QuickerFaster\UILibrary\Http\Livewire\BackgroundJobsPanel::class);
+        Livewire::component('qf.column-manager', \QuickerFaster\UILibrary\Http\Livewire\ColumnManager::class);
+
+        // Quick Actions
+        Livewire::component('qf.quick-actions-panel', \QuickerFaster\UILibrary\Http\Livewire\QuickActions\QuickActionsPanel::class);
+        Livewire::component('qf.clock-in-out', \QuickerFaster\UILibrary\Http\Livewire\QuickActions\ClockInOut::class);
+        Livewire::component('qf.import-form', \QuickerFaster\UILibrary\Http\Livewire\DataTables\ImportForm::class);
+        Livewire::component('qf.recent-exports', \QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports::class);
+        Livewire::component('qf.recent-imports', \QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports::class);
+
+        // Approvals
+        Livewire::component('qf.approval-actions', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalActions::class);
+        Livewire::component('qf.approval-history-timeline', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalHistoryTimeline::class);
+        Livewire::component('qf.approval-panel', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalPanel::class);
+        Livewire::component('qf.approval-request-list', \QuickerFaster\UILibrary\Http\Livewire\Approvals\ApprovalRequestListView::class);
+
+        // Notifications
+        Livewire::component('qf.notifications-index', \QuickerFaster\UILibrary\Http\Livewire\Notifications\NotificationsIndex::class);
+        Livewire::component('qf.notification-preferences', \QuickerFaster\UILibrary\Http\Livewire\Notifications\NotificationPreferences::class);
+    }
+
+    private function registerCommands(): void
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                QuickerFasterInstallUI::class,
-                CleanExports::class,
-                CleanImportErrors::class,
+                \QuickerFaster\UILibrary\Console\Commands\GenerateScheduledReports::class,
+                \QuickerFaster\UILibrary\Console\Commands\InstallCommand::class,
+                \QuickerFaster\UILibrary\Console\Commands\DiscoverCommand::class,
             ]);
         }
     }
 
-
-    private function registerLivewireComponents()
+    private function registerPublishables(): void
     {
-        Livewire::component('qf.data-table', DataTable::class);
-        Livewire::component('qf.data-table-form', DataTableForm::class);
-        Livewire::component('qf.form-modal', FormModal::class);
+        // Config
+        $this->publishes([
+            __DIR__ . '/../Config/ui-library.php' => config_path('ui-library.php'),
+        ], 'ui-library-config');
 
-        Livewire::component('qf.data-table-detail', DataTableDetail::class);
-        Livewire::component('qf.detail-modal', DetailModal::class);
-        Livewire::component('qf.alert-modal', AlertModal::class);
+        // Assets
+        $this->publishes([
+            __DIR__ . '/../../public' => public_path('vendor/ui-library'),
+        ], 'ui-library-assets');
 
-        // Files Import
-        Livewire::component('qf.import-modal', ImportModal::class);
-        Livewire::component('qf.import-form', ImportForm::class);
+        // Views
+        $this->publishes([
+            __DIR__ . '/../Resources/views' => resource_path('views/vendor/qf'),
+        ], 'ui-library-views');
 
-        // File Export/Imports
-        Livewire::component('qf.export-modal', ExportModal::class);
-        Livewire::component('qf.export-progress', ExportProgress::class);
-        Livewire::component('qf.recent-exports', RecentExports::class);
-        Livewire::component('qf.recent-imports', RecentImports::class);
-
-        // Wizard
-        Livewire::component('qf.wizard', Wizard::class);
-        Livewire::component('qf.setup-wizard', SetupWizard::class);
-        Livewire::component('qf.setup-checklist', SetupChecklist::class);
-        Livewire::component('qf.wizard-form', WizardForm::class);
-
-
-        Livewire::component('qf.dashboard', Dashboard::class);
-
-        // Layout
-        Livewire::component('qf.top-nav', TopNav::class);
-        Livewire::component('qf.sidebar', Sidebar::class);
-        Livewire::component('qf.bottom-bar', BottomBar::class);
-
-        Livewire::component('qf.navigation-layout', NavigationLayout::class);
-        Livewire::component('qf.horizontal-context-menu', HorizontalContextMenu::class);
-
-        // Access control
-        Livewire::component('qf.access-control-manager', AccessControlManager::class);
-        Livewire::component('qf.module-selector', ModuleSelector::class);
-        Livewire::component('qf.role-assignment-manager', RoleAssignmentManager::class);
-
-        // Buttons
-        Livewire::component('qf.toggle-button', ToggleButton::class);
-        Livewire::component('qf.toggle-button-group', ToggleButtonGroup::class);
-
-        //Custom
-        Livewire::component('qf.employee-detail', EmployeeDetail::class);
-        Livewire::component('qf.searchable-employee-dropdown', SearchableEmployeeDropdown::class);
-        Livewire::component('qf.tax-bands-repeater', TaxBandsRepeater::class);
-
-        Livewire::component('qf.employee-detail', EmployeeDetail::class);
-        Livewire::component('qf.menu-renderer', MenuRenderer::class);
-
-
-        // Document
-        Livewire::component('qf.document-preview-modal', DocumentPreviewModal::class);
-        Livewire::component('qf.document-preview', DocumentPreview::class);
-        Livewire::component('qf.crop-image-modal', CropImageModal::class);
-
-
-        // Reports 
-        Livewire::component('qf.report-index', ReportIndex::class);
-        Livewire::component('qf.report-viewer', ReportViewer::class);
-        Livewire::component('qf.report-builder', ReportBuilder::class);
-
-
-        // Settings 
-        Livewire::component('qf.settings-panel', SettingsPanel::class);
-
-        // Drawer
-        Livewire::component('qf.drawer', Drawer::class);
-
-        // Search & Filters
-        Livewire::component('qf.filter-panel', FilterPanel::class);
-        Livewire::component('qf.search-panel', SearchPanel::class);
-
-
-        Livewire::component('qf.collapsible', Collapsible::class);
-        Livewire::component('qf.background-jobs-panel', BackgroundJobsPanel::class);
-        Livewire::component('qf.column-manager', ColumnManager::class);
-
-
-        // Livewire::component('qf.permission-toggle', PermissionToggle::class);
-        // Livewire::component('qf.permission-group', PermissionGroup::class);
-        Livewire::component('qf.permission-manager', PermissionManager::class);
-        Livewire::component('qf.approval-actions', ApprovalActions::class);
-        Livewire::component('qf.approval-history-timeline', ApprovalHistoryTimeline::class);
-        // Livewire::component('qf.toggle', Toggle::class);
-
-
-
-
-
-
-        // Inside the boot method of UILibraryServiceProvider
-        $components = [
-            'qf.payroll-wizard-adjustments' => [
-                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollWizardAdjustments.php',
-                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardAdjustments::class,
-            ],
-            'qf.payroll-wizard-preview' => [
-                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollWizardPreview.php',
-                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollWizardPreview::class,
-            ],
-            'qf.payroll-run-wizard' => [
-                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollRunWizard.php',
-                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollRunWizard::class,
-            ],
-            'qf.payroll-run-detail' => [
-                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayrollRunDetail.php',
-                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayrollRunDetail::class,
-            ],
-            'qf.payslip-items' => [
-                'path' => 'Modules/Hr/Http/Livewire/Payroll/PayslipItems.php',
-                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PayslipItems::class,
-            ],
-            'qf.policy-calculation-builder' => [
-                'path' => 'Modules/Hr/Http/Livewire/Payroll/PolicyCalculationBuilder.php',
-                'class' => \App\Modules\Hr\Http\Livewire\Payroll\PolicyCalculationBuilder::class,
-            ],
-
-        ];
-
-        foreach ($components as $alias => $config) {
-            // Check the physical file structure directly on disk
-            if (file_exists(app_path($config['path']))) {
-                Livewire::component($alias, $config['class']);
-            }
-        }
-
-
-
-
-
+        // Seeders (app-level DatabaseSeeder / UserSeeder for complete user & role setup)
+        $this->publishes([
+            __DIR__ . '/../../dependencies/database/seeders' => database_path('seeders'),
+        ], 'ui-library-seeders');
     }
 
-
-
-
-
-
-
-    private function registerPublishables()
+    private function registerFortifyViews(): void
     {
-        // Publish views with a custom tag
-        $this->publishes([
-            __DIR__ . '/../Resources/views' => resource_path('views/vendor/quicker-faster-ui'),
-        ], 'quicker-faster-ui-views');
-
-        // Publish configuration
-        $this->publishes([
-            __DIR__ . '/Config/quicker-faster-ui.php' => config_path('quicker-faster-ui.php'),
-        ], 'quicker-faster-ui-config');
+        Fortify::loginView(fn() => view('qf::auth.login'));
+        Fortify::registerView(fn() => view('qf::auth.register'));
+        Fortify::requestPasswordResetLinkView(fn() => view('qf::auth.forgot-password'));
+        Fortify::resetPasswordView(fn() => view('qf::auth.reset-password'));
     }
 
-
-
-    private function registerSocialiteProviders()
+    private function registerSocialiteProviders(): void
     {
-        // Inject socialite package's Google config into the global 'services' array
-        // List of providers you support
         $providers = ['google', 'github'];
         foreach ($providers as $provider) {
-            if (config("quicker-faster-ui.socialite.providers.{$provider}.enabled")) {
+            if (config("ui-library.socialite.providers.{$provider}.enabled")) {
                 config([
                     "services.{$provider}" => [
                         'client_id' => env(strtoupper($provider) . '_CLIENT_ID'),
                         'client_secret' => env(strtoupper($provider) . '_CLIENT_SECRET'),
-                        // Set redirect to env value or empty string. The empty string will be overridden in the controller.
                         'redirect' => env(strtoupper($provider) . '_REDIRECT_URI', ''),
                     ],
                 ]);
@@ -378,29 +438,41 @@ class UILibraryServiceProvider extends ServiceProvider
         }
     }
 
-    private function registerFortifyViews()
+    private function registerBladeDirectives(): void
     {
-
-        Fortify::loginView(function () {
-            return view('qf::auth.login');
-        });
-
-        Fortify::registerView(function () {
-            return view('qf::auth.register');
-        });
-
-        Fortify::requestPasswordResetLinkView(function () {
-            return view('qf::auth.forgot-password');
-        });
-
-        Fortify::resetPasswordView(function () {
-            return view('qf::auth.reset-password');
+        Blade::directive('setting', function ($expression) {
+            return "<?php echo app(\\QuickerFaster\\UILibrary\\Services\\Settings\\SettingsManager::class)->get({$expression}); ?>";
         });
     }
 
+    /**
+     * Register library-level event listeners that are not auto-discovered
+     * from module Listeners directories by ModuleServiceProvider.
+     */
+    private function registerEventListeners(): void
+    {
+        Event::listen(
+            \QuickerFaster\UILibrary\Events\ToggleButtonEvent::class,
+            \QuickerFaster\UILibrary\Listeners\ToggleButtonListener::class
+        );
 
+        Event::subscribe(\QuickerFaster\UILibrary\Listeners\NotificationEventSubscriber::class);
+    }
 
+    /**
+     * Phase 4.4: Register view composers for injecting data into views.
+     */
+    private function registerViewComposers(): void
+    {
+        // Attach SidebarComposer to the sidebar Livewire view
+        View::composer(
+            'qf::livewire.navs.sidebar',
+            \QuickerFaster\UILibrary\Http\ViewComposers\SidebarComposer::class
+        );
+    }
 
-
-
+    private function registerTranslations(): void
+    {
+        $this->loadTranslationsFrom(__DIR__ . '/../Resources/lang', 'qf');
+    }
 }

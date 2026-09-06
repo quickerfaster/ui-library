@@ -10,7 +10,7 @@ class MenuRenderer extends Component
     public int $counter = 0;
 
     public string $moduleName;
-    public string $activeContext;
+    public ?string $activeContext = null;
     public array $contextItems;
     public string $contextMenuPosition;
     public bool $allowMenuTypeSwitch;
@@ -18,17 +18,25 @@ class MenuRenderer extends Component
     public array $sharedHeaderItems;
     public array $sharedFooterItems;
 
+    /** @var string|null */
+    public $currentModelName = null;
+
+    /** @var string|null */
+    public $settingsContext = null;
+
     protected $listeners = ['menuTypeSwitched' => 'switchMenuType'];
 
     public function mount(
         string $moduleName,
-        string $activeContext,
+        ?string $activeContext = null,
         array $contextItems,
         string $contextMenuPosition,
         bool $allowMenuTypeSwitch,
         string $sidebarState,
         array $sharedHeaderItems,
-        array $sharedFooterItems
+        array $sharedFooterItems,
+        ?string $currentModelName = null,
+        ?string $settingsContext = null
     ) {
         $this->moduleName = $moduleName;
         $this->activeContext = $activeContext;
@@ -38,6 +46,8 @@ class MenuRenderer extends Component
         $this->sidebarState = $sidebarState;
         $this->sharedHeaderItems = $sharedHeaderItems;
         $this->sharedFooterItems = $sharedFooterItems;
+        $this->currentModelName = $currentModelName;
+        $this->settingsContext = $settingsContext;
 
         // Read from session (set by switch buttons)
         $this->menuType = session('context_menu_type', 'sidebar');

@@ -13,6 +13,9 @@
             :headerItems="$sharedHeaderItems"
             :footerItems="$sharedFooterItems"
             :allowTypeSwitch="$allowMenuTypeSwitch"
+            :currentModelName="$currentModelName ?? null"
+            :settingsContext="$settingsContext ?? null"
+            :moduleName="$moduleName"
             wire:key="sidebar-menu-{{ $counter }}"
         />
     @endif

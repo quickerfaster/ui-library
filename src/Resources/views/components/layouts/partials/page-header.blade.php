@@ -11,7 +11,8 @@
         @php
             $primaryAction = null;
             $secondaryActions = collect();
-            $addButtonConfig = $configResolver->getControls()['addButton'] ?? null;
+            $addButtonConfig = $configResolver ? ($configResolver->getControls()['addButton'] ?? null) : null;
+            $modelName = $configResolver ? $configResolver->getModelName() : null;
 
             // Capture current list state
             $stateParams = request()->only(['page', 'perPage', 'search', 'sort', 'activeFilters']);
@@ -20,7 +21,7 @@
             /**
              * Helper to resolve URL and inject state
              */
-            $resolveUrl = function ($control) use ($queryString, $configResolver) {
+            $resolveUrl = function ($control) use ($queryString, $modelName) {
                 if (!$control) {
                     return '#';
                 }
@@ -31,7 +32,7 @@
                 } elseif (!empty($control['route'])) {
                     $base = route($control['route']);
                 } else {
-                    $modelPlural = \Str::plural(\Str::kebab($configResolver->getModelName()));
+                    $modelPlural = \Str::plural(\Str::kebab($modelName));
                     $base = "/{$modelPlural}/create";
                 }
 
@@ -46,7 +47,7 @@
             if ($addButtonConfig === true) {
                 // Simple boolean true → create a default primary action
                 $primaryAction = [
-                    'label' => 'New ' . $configResolver->getModelName(),
+                    'label' => 'New ' . $modelName,
                     'icon' => 'fas fa-plus-circle',
                     'primary' => true,
                 ];
@@ -70,7 +71,7 @@
                     <a href="{{ $finalCreateUrl }}" wire:navigate
                         class="btn btn-sm btn-primary bg-gradient-primary d-inline-flex align-items-center">
                         <i class="{{ $primaryAction['icon'] ?? 'fas fa-plus-circle' }} me-1"></i>
-                        {{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}
+                        {{ $primaryAction['label'] ?? 'New ' . $modelName }}
                     </a>
                 @elseif ($crudType === 'drawers')
                     <button type="button" class="btn btn-sm btn-primary bg-gradient-primary"
@@ -79,18 +80,21 @@
                         params: {
                             configKey: '{{ $configKey }}',
                             inline: true,
-                            prefilledData: {{ json_encode(request()->except(['page', 'perPage', 'search', 'sort', 'activeFilters'])) }}
+                            prefilledData: {{ json_encode(array_merge(
+                                request()->query('prefill', []),
+                                request()->except(['page', 'perPage', 'search', 'sort', 'activeFilters'])
+                            )) }}
                         },
-                        title: '{{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}'
+                        title: '{{ $primaryAction['label'] ?? 'New ' . $modelName }}'
                     })">
                         <i class="{{ $primaryAction['icon'] ?? 'fas fa-plus-circle' }} me-1"></i>
-                        {{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}
+                        {{ $primaryAction['label'] ?? 'New ' . $modelName }}
                     </button>
                 @else
                     <button type="button" class="btn btn-sm btn-primary bg-gradient-primary"
                         onclick="Livewire.dispatch('openAddModal', { configKey: '{{ $configKey }}' })">
                         <i class="{{ $primaryAction['icon'] ?? 'fas fa-plus-circle' }} me-1"></i>
-                        {{ $primaryAction['label'] ?? 'New ' . $configResolver->getModelName() }}
+                        {{ $primaryAction['label'] ?? 'New ' . $modelName }}
                     </button>
                 @endif
 
@@ -118,5 +122,5 @@
 @endif
 
 @if ($layoutConfig['breadcrumb']['enabled'] ?? true)
-    <x-breadcrumb :items="$breadcrumbItems" />
+    <x-breadcrumbs :segments="$breadcrumbItems" :maxVisible="4" />
 @endif

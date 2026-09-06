@@ -2,14 +2,12 @@
 
 namespace QuickerFaster\UILibrary\Services\BankFiles;
 
-use App\Modules\Hr\Models\PayrollRun;
-
 class NIBSSGenerator implements BankFileGenerator
 {
     protected string $originatorId = '123456789012';  // 12-digit
     protected string $settlementBank = '000';         // Settlement bank code
 
-    public function generate(PayrollRun $run): string
+    public function generate($run): string
     {
         $lines = [];
 
@@ -18,14 +16,14 @@ class NIBSSGenerator implements BankFileGenerator
 
         // Detail records
         $seq = 1;
-        foreach ($run->payslips as $payslip) {
-            $employee = $payslip->employee;
-            $profile = $employee->payrollProfile;
-            if (!$profile || !$profile->bank_account_number || !$profile->bank_code) {
+        foreach ($run->payments as $payment) {
+            $recipient = $payment->recipient;
+            $bankAccount = $recipient->bankAccount;
+            if (!$bankAccount || !$bankAccount->bank_account_number || !$bankAccount->bank_code) {
                 continue;
             }
 
-            $lines[] = $this->formatDetail($payslip, $profile, $seq++);
+            $lines[] = $this->formatDetail($payment, $bankAccount, $run, $seq++);
         }
 
         // Trailer record
@@ -34,7 +32,7 @@ class NIBSSGenerator implements BankFileGenerator
         return implode("\r\n", $lines);
     }
 
-    protected function formatHeader(PayrollRun $run): string
+    protected function formatHeader($run): string
     {
         return sprintf(
             "NIBSS%12s%4s%2s%2s%6s%8s",
@@ -47,13 +45,13 @@ class NIBSSGenerator implements BankFileGenerator
         );
     }
 
-    protected function formatDetail($payslip, $profile, int $seq): string
+    protected function formatDetail($payment, $bankAccount, $run, int $seq): string
     {
-        $bankCode = str_pad($profile->bank_code, 3, '0', STR_PAD_LEFT);
-        $account = str_pad($profile->bank_account_number, 10, '0', STR_PAD_LEFT);
-        $amount = str_pad(round($payslip->net_pay), 12, '0', STR_PAD_LEFT);
-        $name = str_pad(substr($profile->bank_account_name ?? $payslip->employee->full_name, 0, 30), 30, ' ');
-        $narration = str_pad('PAYROLL-' . $run->id, 20, ' ', STR_PAD_RIGHT);
+        $bankCode = str_pad($bankAccount->bank_code, 3, '0', STR_PAD_LEFT);
+        $account = str_pad($bankAccount->bank_account_number, 10, '0', STR_PAD_LEFT);
+        $amount = str_pad(round($payment->amount), 12, '0', STR_PAD_LEFT);
+        $name = str_pad(substr($bankAccount->bank_account_name ?? $payment->recipient->full_name, 0, 30), 30, ' ');
+        $narration = str_pad('PAYMENT-' . $run->id, 20, ' ', STR_PAD_RIGHT);
 
         return sprintf(
             "%3s%10s%012d%-30s%-20s%-8s%-2s%04d",
@@ -68,9 +66,9 @@ class NIBSSGenerator implements BankFileGenerator
         );
     }
 
-    protected function formatTrailer(PayrollRun $run, int $count): string
+    protected function formatTrailer($run, int $count): string
     {
-        $totalAmount = round($run->total_cash_required);
+        $totalAmount = round($run->total_amount);
         return sprintf(
             "%03d%012d%-30s%06d%-8s%-2s",
             $count,
@@ -82,9 +80,9 @@ class NIBSSGenerator implements BankFileGenerator
         );
     }
 
-    public function getFileName(PayrollRun $run): string
+    public function getFileName($run): string
     {
-        return "nibss_{$run->id}_{$run->period_end->format('Ymd')}.txt";
+        return "nibss_{$run->id}_{$run->end_date->format('Ymd')}.txt";
     }
 
     public function getMimeType(): string

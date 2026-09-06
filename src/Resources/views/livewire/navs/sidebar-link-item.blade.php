@@ -1,5 +1,7 @@
 
-<li class="nav-item">
+<li class="nav-item"
+    data-filterable
+    data-filter-text="{{ strtolower($item['label'] ?? '') }} {{ strtolower($item['key'] ?? '') }} {{ strtolower($activeContext ?? '') }}">
     <a href="#"
         class="nav-link {{ $anchorClasses?? '' }} {{ $item['key'] === $activeContext ? 'active fw-semibold' : '' }}"
         wire:click.prevent="selectContext('{{ $item['key'] }}')" target="{{$target??''}}">

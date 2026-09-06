@@ -32,7 +32,6 @@ Route::get('/', function () {
 
 
 
-
 Route::group(['middleware' => 'web'], function () {
     Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
         ->name('socialite.redirect')
@@ -43,11 +42,10 @@ Route::group(['middleware' => 'web'], function () {
         ->name('socialite.callback')
         ->where('provider', 'google|github');
 
-    // for now let default to he main dashboard
-    Route::get('/home', function () {
-        // return view('qf::home');
-        return view('hr::dashboard');
-    });
+    // Home / Dashboard — polished welcome page from the library
+    Route::middleware(['auth'])->get('/home', function () {
+        return view(config('ui-library.home_view', 'qf::home'));
+    })->name('home');
 
     Route::get('/export/data', [ExportController::class, 'export'])->name('export.data');
     Route::get('/export/all', [ExportController::class, 'exportAll'])->name('export.all');
@@ -78,7 +76,7 @@ Route::group(['middleware' => 'web'], function () {
 
     Route::get('/user/restart-tour', function (Request $request) {
         $request->user()->update(['has_seen_tour' => false]);
-        return redirect()->to('/hr/dashboard'); // Redirect to where the tour lives
+        return redirect()->route(config('ui-library.home_route', 'admin.dashboard'));
     })->middleware('auth')->name('tour.restart');
 
 
@@ -90,15 +88,33 @@ Route::group(['middleware' => 'web'], function () {
             ->name('generic.print');
     });
 
+    // Phase 4.4: Organization/Company switching
+    Route::middleware(['auth'])->group(function () {
+        Route::post('/switch-company/{company}',
+            [\QuickerFaster\UILibrary\Http\Controllers\OrganizationSwitchController::class, '__invoke'])
+            ->name('company.switch')
+            ->where('company', '[0-9]+');
+    });
 
     Route::middleware(['auth'])->group(function () {
-        Route::get('/my-profile', [\App\Modules\Hr\Http\Controllers\EmployeeProfileController::class, 'show'])
-            ->name('hr.employee.profile');
+        Route::get('/my-profile', function () {
+            return redirect()->route(config('ui-library.home_route', 'admin.dashboard'));
+        })->name('profile');
 
         Route::get('/my-preferences', function () {
-            return view('hr::my-preferences');
+            return view('qf::my-preferences');
         })->name('my-preferences');
+
+        Route::get('/my-account', function () {
+            return view('qf::my-account');
+        })->name('my-account');
+
+        Route::get('/notifications', function () {
+            return view('qf::notifications');
+        })->name('notifications.index');
     });
+
+
 
 
 
@@ -119,12 +135,10 @@ Route::group(['middleware' => 'web'], function () {
 
 
 
+
     Route::get('/test-components', function () {
         return view('testing');
     });
 
 
 });
-
-
-

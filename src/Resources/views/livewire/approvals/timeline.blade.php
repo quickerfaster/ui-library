@@ -1,57 +1,115 @@
 <div>
-    @if(!$request)
-        <div class="text-muted text-center py-4">No approval request has been submitted yet.</div>
-    @else
-        <h6 class="mb-3">Approval Timeline</h6>
-        <div class="list-group">
-            @foreach($tiers as $tier)
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>{{ $tier->name }}</strong>
-                            @if($tier->status === 'approved')
-                                <i class="fas fa-check-circle text-success ms-2"></i>
-                            @elseif($tier->status === 'rejected')
-                                <i class="fas fa-times-circle text-danger ms-2"></i>
-                            @elseif($tier->status === 'pending')
-                                <i class="fas fa-clock text-warning ms-2"></i>
-                            @endif
-                        </div>
-                        <x-qf::status.approval-status-badge :status="$tier->status" />
-                    </div>
-                    @if($tier->approved_by)
-                        <div class="small text-muted mt-1">
-                            <i class="fas fa-user me-1"></i> {{ optional($tier->approver)->name ?? 'User ID: '.$tier->approved_by }}
-                            @if($tier->approved_at)
-                                on {{ $tier->approved_at->format('M d, Y H:i') }}
-                            @endif
-                        </div>
-                    @endif
-                    @if($tier->comments)
-                        <div class="alert alert-light mt-2 mb-0 small">
-                            <i class="fas fa-comment-dots me-1"></i> {{ $tier->comments }}
-                        </div>
-                    @endif
-                </div>
-            @endforeach
+    @if(!$workflow)
+        <div class="text-muted text-center py-4">No workflow has been started yet.</div>
+    @elseif($displayMode === 'full')
+        <h6 class="mb-3">Workflow Timeline</h6>
 
-            {{-- Log entries (optional) --}}
-            @if($request->logs->count())
-                <div class="list-group-item bg-light">
-                    <details>
-                        <summary class="small text-muted">Activity Log</summary>
-                        <div class="mt-2" style="font-size: 0.8rem;">
-                            @foreach($request->logs as $log)
-                                <div class="mb-1">
-                                    <i class="fas fa-history me-1"></i>
-                                    {{ $log->action }} by {{ optional($log->user)->name ?? 'System' }}
-                                    on {{ $log->created_at->format('M d, Y H:i') }}
+        @if($actions->isEmpty())
+            <div class="text-muted text-center py-4">
+                <i class="fas fa-clock fa-2x mb-2 d-block opacity-50"></i>
+                No activity recorded for this workflow.
+            </div>
+        @else
+            <div class="list-group">
+                @foreach($actions as $action)
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex align-items-center">
+                                @if($action['actor_avatar'])
+                                    <img src="{{ $action['actor_avatar'] }}"
+                                         alt="{{ $action['actor'] }}"
+                                         class="rounded-circle me-2"
+                                         width="28" height="28">
+                                @else
+                                    <span class="rounded-circle me-2 d-inline-flex align-items-center justify-content-center bg-secondary text-white"
+                                          style="width:28px;height:28px;">
+                                        <i class="fas fa-user fa-xs"></i>
+                                    </span>
+                                @endif
+                                <div>
+                                    <div class="fw-semibold">{{ $action['label'] }}</div>
+                                    <div class="small text-muted">
+                                        @if($action['actor'])
+                                            {{ $action['actor'] }}
+                                        @else
+                                            System
+                                        @endif
+                                        @if($action['step_name'])
+                                            &middot; {{ $action['step_name'] }}
+                                        @endif
+                                    </div>
                                 </div>
-                            @endforeach
+                            </div>
+                            <div class="text-end">
+                                <x-qf::status.approval-status-badge :status="$action['status']" />
+                                <div class="small text-muted mt-1">
+                                    {{ $action['created_at']?->format('M d, Y H:i') }}
+                                </div>
+                            </div>
                         </div>
-                    </details>
-                </div>
-            @endif
-        </div>
+                        @if($action['comments'])
+                            <div class="alert alert-light mt-2 mb-0 small">
+                                <i class="fas fa-comment-dots me-1"></i> {{ $action['comments'] }}
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    @elseif($displayMode === 'compact')
+        @if($actions->isEmpty())
+            <div class="text-muted text-center py-3 small">No activity recorded.</div>
+        @else
+            <div class="list-group list-group-flush">
+                @foreach($actions as $action)
+                    <div class="list-group-item px-0 py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold small">{{ $action['label'] }}</span>
+                                <span class="small text-muted ms-2">
+                                    @if($action['actor'])
+                                        {{ $action['actor'] }}
+                                    @else
+                                        System
+                                    @endif
+                                    @if($action['step_name'])
+                                        &middot; {{ $action['step_name'] }}
+                                    @endif
+                                </span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <x-qf::status.approval-status-badge :status="$action['status']" />
+                                <span class="small text-muted">{{ $action['created_at']?->format('M d, H:i') }}</span>
+                            </div>
+                        </div>
+                        @if($action['comments'])
+                            <div class="small text-muted mt-1">
+                                <i class="fas fa-comment-dots me-1"></i> {{ $action['comments'] }}
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    @elseif($displayMode === 'steps-only')
+        @if($actions->isEmpty())
+            <div class="text-muted text-center py-2 small">No steps recorded.</div>
+        @else
+            <div class="d-flex flex-wrap align-items-center gap-1">
+                @foreach($actions as $action)
+                    <span class="badge bg-light text-dark border me-1">
+                        @if($action['step_name'])
+                            {{ $action['step_name'] }}
+                        @else
+                            {{ $action['label'] }}
+                        @endif
+                    </span>
+                    <x-qf::status.approval-status-badge :status="$action['status']" />
+                    @if(!$loop->last)
+                        <span class="text-muted small">&rarr;</span>
+                    @endif
+                @endforeach
+            </div>
+        @endif
     @endif
 </div>

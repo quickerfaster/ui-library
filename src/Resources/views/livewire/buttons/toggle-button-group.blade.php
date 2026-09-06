@@ -3,7 +3,7 @@
 
     <div class="card-header pb-0 px-3">
         <div class="row d-flex justify-content-between ps-3 pe-5 px-md-4" id="">
-            <a class="col-11" data-bs-toggle="collapse" href="#component-{{$componentId}}" role="button" aria-expanded="false"
+            <a class="col-11 d-flex align-items-center collapse-chevron-trigger" data-bs-toggle="collapse" href="#component-{{$componentId}}" role="button" aria-expanded="false"
                 aria-controls="collapseExample">
 
 
@@ -13,6 +13,7 @@
                     'description' => $description,
                     'icon' => $icon,
                 ])
+                <i class="fas fa-chevron-down collapse-chevron ms-auto me-2"></i>
             </a>
             <div class="col-1 pe-3">
                 <div class="form-check form-switch">
@@ -42,6 +43,7 @@
                   class="list-group-item border-0 rounded rounded-3  bg-gray-100  m-2 p-0"
                 >
                     <livewire:qf.toggle-button
+                        wire:key="toggle-btn-{{ $version }}-{{ $button['componentId'] }}"
                         :is-card="true"
                         :title="$button['title']?? ''"
                         :subtitle="$button['subtitle']?? ''"

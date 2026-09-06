@@ -2,7 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Widgets;
 
-use App\Modules\Admin\Models\ActivityLog;
+use QuickerFaster\UILibrary\Contracts\ActivityLogs\ActivityLogModelResolver;
 
 class ActivityLogWidgetProcessor
 {
@@ -12,34 +12,40 @@ class ActivityLogWidgetProcessor
         $logName = $definition['log_name'] ?? null;
         $actions = $definition['actions'] ?? null;
 
-        $query = ActivityLog::with(['causer', 'subject'])->orderBy('created_at', 'desc');
+        $model = app(ActivityLogModelResolver::class)->resolveModel();
+        $items = collect();
 
-        if ($logName) {
-            $query->where('log_name', $logName);
+        if ($model && class_exists($model)) {
+            $query = $model::with(['causer', 'subject'])->orderBy('created_at', 'desc');
+
+            if ($logName) {
+                $query->where('log_name', $logName);
+            }
+            if ($actions && is_array($actions)) {
+                $query->whereIn('action', $actions);
+            }
+
+            $activities = $query->limit($limit)->get();
+
+            $items = $activities->map(function ($log) {
+                return [
+                    'timestamp'   => $log->created_at->diffForHumans(),
+                    'action'      => $log->action,
+                    'action_label'=> ucfirst($log->action),
+                    'description' => $log->description ?: $this->defaultDescription($log),
+                    'causer_name' => $log->causer?->name ?? 'System',
+                    'subject_type'=> class_basename($log->subject_type ?? ''),
+                    'subject_id'  => $log->subject_id,
+                    'changes'     => $this->formatChanges($log),
+                ];
+            });
         }
-        if ($actions && is_array($actions)) {
-            $query->whereIn('action', $actions);
-        }
-
-        $activities = $query->limit($limit)->get();
-
-        $items = $activities->map(function ($log) {
-            return [
-                'timestamp'   => $log->created_at->diffForHumans(),
-                'action'      => $log->action,
-                'action_label'=> ucfirst($log->action),
-                'description' => $log->description ?: $this->defaultDescription($log),
-                'causer_name' => $log->causer?->name ?? 'System',
-                'subject_type'=> class_basename($log->subject_type ?? ''),
-                'subject_id'  => $log->subject_id,
-                'changes'     => $this->formatChanges($log),
-            ];
-        });
 
         return [
             'type'          => 'activity_log',
             'title'         => $definition['title'] ?? 'Recent Activity',
             'icon'          => $definition['icon'] ?? 'fas fa-history',
+            'color'         => $definition['color'] ?? 'info',
             'items'         => $items,
             'width'         => $definition['width'] ?? 6,
             'show_view_all' => $definition['show_view_all'] ?? false,
@@ -47,7 +53,7 @@ class ActivityLogWidgetProcessor
         ];
     }
 
-    protected function defaultDescription(ActivityLog $log): string
+    protected function defaultDescription($log): string
     {
         $subjectName = class_basename($log->subject_type);
         $subjectId = $log->subject_id;
@@ -59,7 +65,7 @@ class ActivityLogWidgetProcessor
         };
     }
 
-    protected function formatChanges(ActivityLog $log): ?string
+    protected function formatChanges($log): ?string
     {
         if ($log->action !== 'updated' || empty($log->old_values)) {
             return null;
