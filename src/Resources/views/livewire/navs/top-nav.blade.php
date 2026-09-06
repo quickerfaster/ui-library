@@ -135,6 +135,14 @@
                                         $hasPermission = true;
                                         if (!empty($item['permission'])) {
                                             $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+                                            // FALLBACK: if permission check fails but item has roles, try role-based access
+                                            if (!$hasPermission && !empty($item['roles'])) {
+                                                $roles = $item['roles'];
+                                                $isWildcard = ($roles === '*' || $roles === ['*']);
+                                                $hasPermission = $isWildcard
+                                                    || \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed(auth()->user())
+                                                    || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                                            }
                                         } elseif (!empty($item['roles'])) {
                                             $roles = $item['roles'];
                                             $isWildcard = ($roles === '*' || $roles === ['*']);
@@ -182,6 +190,14 @@
                                 $hasPermission = true;
                                 if (!empty($item['permission'])) {
                                     $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+                                    // FALLBACK: if permission check fails but item has roles, try role-based access
+                                    if (!$hasPermission && !empty($item['roles'])) {
+                                        $roles = $item['roles'];
+                                        $isWildcard = ($roles === '*' || $roles === ['*']);
+                                        $hasPermission = $isWildcard
+                                            || \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed(auth()->user())
+                                            || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                                    }
                                 } elseif (!empty($item['roles'])) {
                                     $roles = $item['roles'];
                                     $isWildcard = ($roles === '*' || $roles === ['*']);
@@ -222,6 +238,14 @@
                                             $hasPermission = true;
                                             if (!empty($item['permission'])) {
                                                 $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+                                                // FALLBACK: if permission check fails but item has roles, try role-based access
+                                                if (!$hasPermission && !empty($item['roles'])) {
+                                                    $roles = $item['roles'];
+                                                    $isWildcard = ($roles === '*' || $roles === ['*']);
+                                                    $hasPermission = $isWildcard
+                                                        || \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed(auth()->user())
+                                                        || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                                                }
                                             } elseif (!empty($item['roles'])) {
                                                 $roles = $item['roles'];
                                                 $isWildcard = ($roles === '*' || $roles === ['*']);
