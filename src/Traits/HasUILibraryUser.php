@@ -2,6 +2,9 @@
 
 namespace QuickerFaster\UILibrary\Traits;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use QuickerFaster\UILibrary\Core\Organization\Models\Company;
+
 /**
  * Meta-trait that bundles all required library behaviours for the consuming
  * application's User model.
@@ -58,6 +61,18 @@ trait HasUILibraryUser
             $this->fillable,
             self::REQUIRED_FILLABLE
         )));
+    }
+
+    /**
+     * The company this user belongs to.
+     *
+     * The consuming app's Company model (e.g. App\Modules\Organization\Models\Company)
+     * extends the library's base Company model, so Eloquent's polymorphic resolution
+     * will return the correct subclass instance.
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id');
     }
 
     // Future traits to be composed here:
