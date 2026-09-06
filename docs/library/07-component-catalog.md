@@ -20,10 +20,28 @@ All components are registered in [`UILibraryServiceProvider::registerLivewireCom
 
 | Component | Alias | Class | Purpose |
 |-----------|-------|-------|---------|
-| DataTable | `qf.data-table` | `DataTable` | Paginated, searchable, sortable, filterable table with export/import controls. Mount params: `$pageTitle`, `$hiddenFields`, `$queryFilters`, `$pageQueryFilters`, `$customColumns` |
+| DataTable | `qf.data-table` | `DataTable` | Paginated, searchable, sortable, filterable table with export/import controls. Mount params: `$pageTitle`, `$hiddenFields`, `$queryFilters`, `$pageQueryFilters`, `$customColumns`, `$crudType`, `$simpleActions`, `$moreActions` |
 | DataTableForm | `qf.data-table-form` | `DataTableForm` | Create/edit form rendered from field definitions |
 | DataTableDetail | `qf.data-table-detail` | `DataTableDetail` | Read-only detail view with grouped sections |
 | ImportForm | `qf.import-form` | `ImportForm` | File upload and column mapping for imports |
+
+> **DataTable crudType modes**: The DataTable supports three `crudType` modes that control how create/read/update/delete operations render:
+>
+> | crudType | Show (Detail) | Edit | Create | Row/Card Click |
+> |----------|--------------|------|--------|---------------|
+> | `modal` (default) | Bootstrap modal via `wire:click="show()"` | Modal via `wire:click="edit()"` | Modal via `wire:click="create()"` | `wire:click="show()"` |
+> | `drawers` | Slide-over drawer via `openDrawer` event | Drawer via `openDrawer` event | Drawer via `openDrawer` event | `openDrawer` event |
+> | `pages` | Dedicated page via `<a href>` | Dedicated page via `<a href>` | Dedicated page via `<a href>` | `window.location` navigation |
+>
+> The `crudType` is set in the data config (`'crudType' => 'drawers'`) and can be overridden per-instance via the `:crud-type` mount prop. The [`list-view.blade.php`](../../src/Resources/views/livewire/data-tables/partials/list-view.blade.php:11), [`card-view.blade.php`](../../src/Resources/views/livewire/data-tables/partials/card-view.blade.php:12), and [`row-actions.blade.php`](../../src/Resources/views/livewire/data-tables/partials/row-actions.blade.php:1) partials are all `crudType`-aware, using `.stop-propagation` CSS class to prevent action button clicks from triggering the parent row/card click handler.
+>
+> **DataTable switchViews**: The DataTable supports alternative view modes configured via the `switchViews` config key:
+> - `table` — standard paginated table (always available)
+> - `list` — compact list rows with avatar, title, subtitle, badge ([`list-view.blade.php`](../../src/Resources/views/livewire/data-tables/partials/list-view.blade.php:1))
+> - `cards` — card grid with image/icon header, body, footer actions ([`card-view.blade.php`](../../src/Resources/views/livewire/data-tables/partials/card-view.blade.php:1))
+> - `monthly` — groups records by month with timeline cards ([`monthly-view.blade.php`](../../src/Resources/views/livewire/data-tables/partials/monthly-view.blade.php:1))
+>
+> Users switch between views from a dropdown in the table header. Each view mode is only shown in the dropdown when its config key is present in `switchViews`.
 
 #### Modals
 

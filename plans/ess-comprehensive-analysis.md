@@ -515,20 +515,21 @@ All click handlers use `event.target.closest('.stop-propagation')` to prevent na
 5. `LeaveRequest` uses the [`HasDocuments`](src/Traits/Documents/HasDocuments.php:1) trait (if available) or implements [`Documentable`](src/Contracts/Documents/Documentable.php:1) directly
 **Full Details:** [`leave-module-cleanup-plan.md`](plans/leave-module-cleanup-plan.md#phase-5-migrate-attachments-to-polymorphic-documents--2026-09-04)
 
-### Document Upload as Wizard Step 2 ✅ (2026-09-04)
+### Document Upload — Detail Page Approach ✅ (2026-09-04, revised 2026-09-04)
 
-**Problem:** The ESS leave request wizard had no step for uploading supporting documents. Employees had to submit the request first, then navigate to the leave request detail page to upload documents — a disjointed experience.
+**Problem:** The ESS leave request wizard had no step for uploading supporting documents. Employees had to submit the request first, then navigate to the leave request detail page to upload documents.
 
-**Solution:** Added document upload as wizard step 2 (between form and review), transforming the 2-step wizard (Form → Review) into a 3-step flow (Form → Documents → Review).
+**Initial Attempt (Reverted):** A wizard step 2 ("Supporting Documents") was added between the form and review steps, creating a 3-step flow (Form → Documents → Review). This approach proved problematic with multiple bugs related to cross-component model serialization and wizard state management.
+
+**Final Solution:** Removed the wizard step entirely. Document upload is available exclusively on the leave request detail page via the [`LeaveDocumentUpload`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) component, embedded in [`data-table-detail.blade.php`](hr-consuming-app/resources/views/vendor/qf/livewire/data-tables/data-table-detail.blade.php:107). The wizard reverted to 2 steps (Form → Review).
 
 **Implementation Details:**
-- Created [`LeaveDocumentUploadWizardStep`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUploadWizardStep.php:1) adapter component that accepts wizard-standard props (`$configKey`, `$presetData`, `$stepIndex`, `$recordId`) and resolves the `LeaveRequest` model
-- Created [`leave-document-upload-wizard-step.blade.php`](hr-consuming-app/app/Modules/Leave/Resources/views/livewire/leave-document-upload-wizard-step.blade.php:1) embedding the existing [`LeaveDocumentUpload`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) component via `@livewire('leave-document-upload', ['leaveRequest' => $leaveRequest])`
-- Registered component in [`LeaveServiceProvider`](hr-consuming-app/app/Modules/Leave/Providers/LeaveServiceProvider.php:47)
-- Updated [`employee_self_service.php`](hr-consuming-app/app/Modules/Leave/Data/wizards/employee_self_service.php:48) wizard config: added step 1 (`'Supporting Documents'` with `requiresLink => true`), renumbered review step from 1 to 2
-- Auto-advances past document step (upload is optional) via `stepFormSaved` dispatch
+- [`LeaveDocumentUpload`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) accepts both `int` ID and `LeaveRequest` model instance in `mount()`, providing upload, preview, download, and delete UI
+- The detail page conditionally renders the component when `configKey === 'leave.leave_request'`
+- The wizard completion screen includes an "Upload Documents" action linking to `/leave-requests/{id}` (the detail page)
+- Deleted: [`LeaveDocumentUploadWizardStep.php`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUploadWizardStep.php), [`leave-document-upload-wizard-step.blade.php`](hr-consuming-app/app/Modules/Leave/Resources/views/livewire/leave-document-upload-wizard-step.blade.php), and the component registration in [`LeaveServiceProvider.php`](hr-consuming-app/app/Modules/Leave/Providers/LeaveServiceProvider.php:47)
 
-**Architecture:** The adapter pattern keeps the existing non-wizard `LeaveDocumentUpload` component unchanged and reusable on the leave request detail page. The wizard step wrapper handles wizard-specific concerns (record resolution from preset data, `stepFormSaved` dispatch on save event).
+**Architecture:** The detail page approach is simpler and more reliable — no cross-component serialization issues, no wizard state management complexity. Employees submit the leave request first, then upload documents from the detail page (accessible via the completion screen action or the My Leaves data table).
 
 ---
 

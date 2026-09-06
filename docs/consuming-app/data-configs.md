@@ -39,6 +39,9 @@ return [
     'moreActions'     => [ /* ... */ ],                              // Optional: custom row actions
     'reports'         => [ /* ... */ ],                              // Optional: report definitions
     'permissions'     => [ /* ... */ ],                              // Optional: permission overrides
+    'crudType'        => 'modal',                                    // Optional: 'modal' (default), 'drawers', or 'pages'
+    'simpleActions'   => ['show', 'edit', 'delete'],                 // Optional: row action buttons to display
+    'view'            => [ /* ... */ ],                              // Optional: view configuration (route, card/list config)
 ];
 ```
 
@@ -155,6 +158,101 @@ Controls field visibility per context:
     'onDetail'   => [],    // Fields hidden from detail view
 ],
 ```
+
+### 2.7 crudType
+
+Controls how create, read, update, and delete operations are rendered. Three modes are supported:
+
+```php
+'crudType' => 'modal',   // Default: opens forms/details in Bootstrap modals
+'crudType' => 'drawers', // Opens forms/details in slide-over drawers
+'crudType' => 'pages',   // Navigates to dedicated pages (e.g., /resource/create, /resource/{id}/edit)
+```
+
+| crudType | Show (Detail) | Edit | Create | Row Click (List/Card View) |
+|----------|--------------|------|--------|---------------------------|
+| `modal` (default) | `wire:click="show()"` → Bootstrap modal | `wire:click="edit()"` → modal | `wire:click="create()"` → modal | `wire:click="show()"` |
+| `drawers` | `openDrawer` event → slide-over drawer | `openDrawer` event → drawer | `openDrawer` event → drawer | `openDrawer` event → drawer |
+| `pages` | `<a href>` → dedicated show page | `<a href>` → dedicated edit page | `<a href>` → dedicated create page | `window.location` → show page |
+
+The `crudType` can be overridden per-instance via the `:crud-type` mount prop on `qf.data-table`:
+
+```blade
+@livewire('qf.data-table', ['configKey' => 'hr.employee', 'crudType' => 'drawers'])
+```
+
+### 2.8 simpleActions
+
+Controls which action buttons appear on each table row. Defaults to `['show', 'edit', 'delete']`:
+
+```php
+'simpleActions' => ['show', 'edit', 'delete'],  // All three actions
+'simpleActions' => ['show'],                     // View-only (no edit/delete)
+'simpleActions' => ['show', 'edit'],             // No delete
+'simpleActions' => [],                           // No row actions at all
+```
+
+Additional actions supported: `'restore'`, `'forceDelete'` (for soft-deleted records), and `'expand'` (for inline expandable detail panels).
+
+Can be overridden per-instance via `:simple-actions` mount prop:
+
+```blade
+@livewire('qf.data-table', ['configKey' => 'hr.employee', 'simpleActions' => ['show']])
+```
+
+### 2.9 view (Route Configuration)
+
+When `crudType` is `'pages'`, the `view` key configures the route prefix used for create/edit/show page navigation:
+
+```php
+'view' => [
+    'route' => 'employees',  // Route name prefix (e.g., employees.show, employees.edit, employees.create)
+],
+```
+
+This generates URLs like:
+- Show: `route('employees.show', ['id' => $record->id])`
+- Edit: `route('employees.edit', ['id' => $record->id])`
+- Create: `route('employees.create')`
+
+### 2.10 switchViews
+
+Alternative view modes for the data table. Users can switch between views from a dropdown in the table header:
+
+```php
+'switchViews' => [
+    'table'   => true,       // Default table view (always available)
+    'list'    => [           // List view (compact rows)
+        'titleFields'    => ['name', 'email'],
+        'subtitleFields' => ['department', 'position'],
+        'badgeField'     => 'status',
+        'badgeColors'    => ['active' => 'success', 'inactive' => 'secondary'],
+    ],
+    'cards'   => [           // Card/grid view
+        'titleFields'    => ['name'],
+        'subtitleFields' => ['department', 'position'],
+        'contentFields'  => ['email', 'phone'],
+        'badgeField'     => 'status',
+        'badgeColors'    => ['active' => 'success', 'inactive' => 'secondary'],
+        'iconField'      => 'avatar',
+        'defaultIconClass' => 'fas fa-user',
+    ],
+    'monthly' => [           // Monthly timeline view (for date-based records like leave)
+        'dateField'      => 'start_date',
+        'endDateField'   => 'end_date',
+        'titleFields'    => ['employee.name', 'leaveType.name'],
+        'subtitleFields' => ['start_date', 'end_date'],
+        'badgeField'     => 'status',
+        'badgeColors'    => ['Approved' => 'success', 'Pending' => 'warning', 'Draft' => 'secondary', 'Denied' => 'danger', 'Cancelled' => 'dark'],
+    ],
+],
+```
+
+Each view mode renders via its own Blade partial:
+- [`table`](src/Resources/views/livewire/data-tables/data-table.blade.php:1) — standard paginated table
+- [`list`](src/Resources/views/livewire/data-tables/partials/list-view.blade.php:1) — compact list rows with avatar, title, subtitle, badge
+- [`cards`](src/Resources/views/livewire/data-tables/partials/card-view.blade.php:1) — card grid with image/icon header, body, footer actions
+- [`monthly`](src/Resources/views/livewire/data-tables/partials/monthly-view.blade.php:1) — groups records by month with timeline cards
 
 ---
 

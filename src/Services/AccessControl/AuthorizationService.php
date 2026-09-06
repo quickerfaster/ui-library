@@ -8,6 +8,25 @@ use Illuminate\Contracts\Auth\Authenticatable;
 class AuthorizationService
 {
     /**
+     * Callback that resolves the employee ID for a given user.
+     *
+     * Set by the consuming application in a service provider to enable
+     * record-ownership bypass in {@see authorizeView()}. When set, users
+     * who own a record (i.e. the record's `employee_id` matches their
+     * resolved employee ID) are allowed to view it without needing the
+     * `view_{resource}` Spatie permission.
+     *
+     * Example (in AppServiceProvider::boot):
+     *   \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::\$resolveUserEmployeeId =
+     *       function (\Illuminate\Contracts\Auth\Authenticatable \$user): ?int {
+     *           return \App\Modules\Hr\Models\Employee::where('user_id', \$user->id)->value('id');
+     *       };
+     *
+     * @var callable|null
+     */
+    public static $resolveUserEmployeeId = null;
+
+    /**
      * Pipe-separated string of admin role names for use with
      * Spatie's @hasanyrole Blade directive.
      *
@@ -126,6 +145,19 @@ class AuthorizationService
             return;
         }
 
+        // Ownership bypass: users can always view records they own.
+        // This covers ESS (Employee Self-Service) pages where an employee
+        // views their own leave requests, payslips, attendance records, etc.
+        // The consuming app registers a callback via $resolveUserEmployeeId
+        // that maps a User to their Employee ID.
+        if (static::$resolveUserEmployeeId !== null) {
+            $employeeId = call_user_func(static::$resolveUserEmployeeId, $user);
+
+            if ($employeeId !== null && $this->recordBelongsToEmployee($record, $employeeId)) {
+                return;
+            }
+        }
+
         $resource = $this->resolveResourceName($modelClass);
 
         if (method_exists($user, 'can') && $user->can('view_' . $resource)) {
@@ -209,6 +241,50 @@ class AuthorizationService
         }
 
         throw new AuthorizationException('You are not authorized to update this record.');
+    }
+
+    /**
+     * Check whether a record belongs to a given employee.
+     *
+     * Supports two patterns:
+     *  1. Direct `employee_id` property/column on the record.
+     *  2. `employee()` relationship that returns an Employee model with an `id`.
+     *
+     * @param object $record      The resolved model instance
+     * @param int    $employeeId  The employee's primary key
+     * @return bool
+     */
+    protected function recordBelongsToEmployee(object $record, int $employeeId): bool
+    {
+        // Pattern 1: Direct employee_id column (most HR records)
+        if (method_exists($record, 'getAttribute') || property_exists($record, 'employee_id')) {
+            try {
+                $recordEmployeeId = $record->getAttribute('employee_id')
+                    ?? $record->employee_id
+                    ?? null;
+
+                if ($recordEmployeeId !== null && (int) $recordEmployeeId === $employeeId) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // Attribute access failed — fall through to relationship check
+            }
+        }
+
+        // Pattern 2: employee() relationship
+        if (method_exists($record, 'employee')) {
+            try {
+                $employee = $record->employee()->first();
+
+                if ($employee && method_exists($employee, 'getKey') && (int) $employee->getKey() === $employeeId) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // Relationship access failed
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -73,6 +73,7 @@
   | Blade views | `app/Modules/{Module}/Resources/views/` |
   | Livewire components | `app/Modules/{Module}/Http/Livewire/` |
   | Livewire views | `app/Modules/{Module}/Resources/views/livewire/` |
+  | Factories | `app/Modules/{Module}/Database/Factories/` |
   | Migrations | `app/Modules/{Module}/Database/Migrations/` |
   | Seeders | `app/Modules/{Module}/Database/Seeders/` |
   | Services | `app/Modules/{Module}/Services/` |

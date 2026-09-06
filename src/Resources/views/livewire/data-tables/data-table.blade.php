@@ -472,6 +472,8 @@
             'controls' => $controls,
             'bulkSelection' => $bulkSelection,
             'configKey' => $configKey,
+            'crudType' => $crudType,
+            'modelName' => $modelName,
         ])
 
         {{-- Card View --}}
@@ -484,6 +486,8 @@
             'controls' => $controls,
             'bulkSelection' => $bulkSelection,
             'configKey' => $configKey,
+            'crudType' => $crudType,
+            'modelName' => $modelName,
         ])
 
         {{-- Monthly View --}}

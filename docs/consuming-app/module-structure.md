@@ -25,6 +25,7 @@ app/Modules/{ModuleName}/
 │   └── reports/                          # Report definitions
 │       └── {ReportName}.php
 ├── Database/
+│   ├── Factories/                        # Eloquent model factories for test data
 │   ├── Migrations/                       # Module-specific migrations (auto-loaded)
 │   └── Seeders/                          # Module-specific seeders
 ├── Http/
@@ -59,6 +60,7 @@ At minimum, every module must include:
 | Directory | Purpose | When to use |
 |-----------|---------|-------------|
 | `Config/` | `navigation.php`, `workflows.php`, `permissions.php` | When the module contributes to navigation, workflows, or permissions |
+| `Database/Factories/` | Eloquent model factories for test data generation | `EmployeeFactory`, `CompanyFactory` |
 | `Database/Migrations/` | Module-specific migrations | When the module owns its own tables |
 | `Database/Seeders/` | Module-specific seeders | When the module needs seed data |
 | `Http/Controllers/` | Custom controllers | When the module needs custom route handlers |

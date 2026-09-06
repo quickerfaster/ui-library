@@ -149,8 +149,26 @@ During the UX implementation, a library independence audit revealed **14 archite
 2 | `app/Modules/Leave/Models/LeaveRequest.php` | Removed `'attachments'` from `$fillable` and `'attachments' => 'array'` from `$casts` |
 3 | `app/Modules/Leave/Database/Migrations/2026_09_04_000000_drop_attachments_from_leave_requests.php` | Migration to drop `attachments` JSON column from `leave_requests` table |
 
-### 5.3 Verification
+### 5.3 New Files Created
+
+| File | Location | Purpose |
+|------|----------|---------|
+| [`LeaveDocumentUpload.php`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) | Consuming app | Livewire component providing upload, preview, download, and delete UI for leave request documents. Uses [`DocumentEngine`](src/Services/Documents/DocumentEngine.php:1) for all operations. |
+| `2026_09_04_000000_drop_attachments_from_leave_requests.php` | Consuming app | Migration to drop `attachments` JSON column from `leave_requests` table |
+
+### 5.4 HasDocuments Trait
+
+The library provides a [`HasDocuments`](src/Traits/Documents/HasDocuments.php:1) trait that models can use to implement the [`Documentable`](src/Contracts/Documents/Documentable.php:1) contract with sensible defaults. `LeaveRequest` uses this trait (or implements `Documentable` directly) to provide:
+
+- `documents()` — morphMany relationship to [`Document`](src/Models/Document.php:1)
+- `getDocumentableId()` — returns the model's primary key
+- `getDocumentType()` — returns the model's class basename
+- `getDocumentStoragePath()` — returns a storage path based on the model type and ID
+- `getDocumentTemplateData()` — returns template variables for document generation
+
+### 5.5 Verification
 
 - `LeaveRequest` implements [`Documentable`](src/Contracts/Documents/Documentable.php:1) with `getDocumentableId()`, `getDocumentType()`, `getDocumentStoragePath()`, `getDocumentTemplateData()`
 - `documents()` morphMany relationship targets [`Document`](src/Models/Document.php:1) model
 - Migration ran successfully: `2026_09_04_000000_drop_attachments_from_leave_requests ........ 71.26ms DONE`
+- [`LeaveDocumentUpload`](hr-consuming-app/app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1) component renders on the leave request detail page, providing full CRUD for documents via the polymorphic document system

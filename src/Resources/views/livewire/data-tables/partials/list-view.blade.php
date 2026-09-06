@@ -1,9 +1,26 @@
 <div class="list-view bg-white rounded-3 shadow-sm border overflow-hidden">
+    @php
+        $crudType = $crudType ?? 'modal';
+        $modelName = $modelName ?? '';
+    @endphp
+
     @forelse($records as $record)
 
         <div class="list-group-item list-group-item-action border-0 border-bottom p-3 transition-all hover-bg-light position-relative"
             wire:key="list-{{ $record->id }}" {{-- Giant SaaS Trick: The entire row navigates, but we stop propagation on buttons --}}
-            onclick="if(!event.target.closest('.stop-propagation')) { window.location='{{ $this->getShowUrl($record->id) }}' }"
+            @if ($crudType === 'drawers')
+                onclick="if(!event.target.closest('.stop-propagation')) {
+                    Livewire.dispatch('openDrawer', {
+                        component: 'qf.data-table-detail',
+                        params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}' },
+                        title: 'View {{ $modelName }}'
+                    })
+                }"
+            @elseif ($crudType === 'pages')
+                onclick="if(!event.target.closest('.stop-propagation')) { window.location='{{ $this->getShowUrl($record->id) }}' }"
+            @else
+                wire:click="show({{ $record->id }})"
+            @endif
             style="cursor: pointer;">
 
             <div class="d-flex align-items-center">

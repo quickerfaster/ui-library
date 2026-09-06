@@ -127,11 +127,17 @@ class Wizard extends Component
     public function handleStepFormSaved(int $recordId, int $stepIndex): void
     {
         $step = $this->steps[$stepIndex];
-        $modelClass = $step['model'];
+
+        // Store the record ID for this step (used by customComponent steps for document tracking)
         $this->stepData[$stepIndex] = $recordId;
-        $this->createdRecords[] = ['model' => $modelClass, 'id' => $recordId];
-        if ($modelClass === $this->models["primary"]) // Keep the ref to the primaryModelId
-            $this->primaryModelId = $recordId;
+
+        // Only track created records for model-backed steps
+        if (isset($step['model'])) {
+            $modelClass = $step['model'];
+            $this->createdRecords[] = ['model' => $modelClass, 'id' => $recordId];
+            if ($modelClass === $this->models["primary"]) // Keep the ref to the primaryModelId
+                $this->primaryModelId = $recordId;
+        }
 
         $this->saveToSession();
         $this->advance();
@@ -246,8 +252,8 @@ class Wizard extends Component
 
     protected function isFormStep(array $step): bool
     {
-        return isset($step['model']) && !isset($step['isReview']); // review step has no model
-    }
+        return (isset($step['model']) || isset($step['customComponent'])) && !isset($step['isReview']); // review step has no model
+   }
 
     protected function getChildComponentId(): string
     {
@@ -260,7 +266,7 @@ class Wizard extends Component
      * External preset data (from drawer/dashboard action cards) is merged in,
      * with internal wizard linking data taking precedence for the same keys.
      */
-    protected function getPresetDataForCurrentStep(): array
+    public function getPresetDataForCurrentStep(): array
     {
         $step = $this->steps[$this->currentStep] ?? [];
 
@@ -313,7 +319,7 @@ class Wizard extends Component
     public function render()
     {
         $currentStepConfig = $this->steps[$this->currentStep] ?? null;
-        $isReviewStep = $currentStepConfig && !isset($currentStepConfig['model']); // no model = review
+        $isReviewStep = $currentStepConfig && !isset($currentStepConfig['model']) && !isset($currentStepConfig['customComponent']);
 
         return view('qf::livewire.wizards.wizard', [
             'currentStepConfig' => $currentStepConfig,

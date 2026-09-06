@@ -74,6 +74,18 @@
                             'configKey' => $configKey,
                             'currentStepConfig' => $currentStepConfig,
                         ])
+                    @elseif (isset($steps[$currentStep]['customComponent']))
+                        @php
+                            $recordId = $stepData[$currentStep] ?? null;
+                            $presetData = $this->getPresetDataForCurrentStep();
+                        @endphp
+                        <livewire:{{ $steps[$currentStep]['customComponent'] }}
+                            :configKey="$configKey"
+                            :stepIndex="$currentStep"
+                            :recordId="$recordId"
+                            :presetData="$presetData"
+                            :wizardId="$wizardId"
+                            :wire:key="'custom-step-'.$currentStep" />
                     @else
                         @php
                             $step = $steps[$currentStep];
