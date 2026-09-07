@@ -98,10 +98,13 @@
                                                     :key="'extra_'.$permName"
                                                     :buttons="$resourceControlButtonGroup[$permName] ?? []"
                                                     :modelId="$permName"
-                                                    :resourceName="$permName"
                                                     :scopeType="$selectedScopeName"
                                                     :scopeId="$selectedScopeId"
                                                     :permissionType="'single'"
+                                                    :data="[
+                                                        'resourceName' => $permName,
+                                                        'controlsCSSClasses' => $controlsCSSClasses ?? '',
+                                                    ]"
                                                     wire:key="extra_toggle_{{ $permName }}" />
                                             </div>
                                         </div>
