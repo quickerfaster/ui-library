@@ -4,5 +4,5 @@
     moduleName="admin"
     :overrides="[]">
     
-    @livewire('user-company-assignment', ['user' => request('user')])
+    @livewire('qf.user-company-assignment', ['user' => request('user')])
 </x-qf::navigation-layout>
