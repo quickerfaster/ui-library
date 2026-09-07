@@ -536,6 +536,19 @@ return [
         'onboarding' => true,
         'tour' => true,
 
+        /*
+        |------------------------------------------------------------------
+        | Multi-Company Support
+        |------------------------------------------------------------------
+        |
+        | When enabled, the library exposes multi-company user assignment UI
+        | (navigation item, row actions, company switcher). Consuming apps
+        | that don't need multi-company support can disable this to keep the
+        | admin interface clean.
+        |
+        */
+        'multi_company' => false,
+
     ],
 
     /*

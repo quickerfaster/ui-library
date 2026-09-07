@@ -36,6 +36,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
+            $table->date('effective_date')->nullable();
             $table->timestamps();
             $table->unique(['user_id', 'company_id']);
         });
@@ -53,6 +54,7 @@ return new class extends Migration
 - The composite unique index on `[user_id, company_id]` prevents duplicate assignments.
 - `cascadeOnDelete()` ensures cleanup when a user or company is deleted.
 - The `companies` table is already created by the library's core migration.
+- The `effective_date` column tracks when a user's assignment to a company takes effect. It is exposed via `withPivot('effective_date')` on the [`HasUILibraryUser::companies()`](src/Traits/HasUILibraryUser.php:85) relationship. Set it to a future date for scheduled assignments, or leave `null` for immediate effect.
 
 ### 1.2 User Model Relationship
 
@@ -181,6 +183,8 @@ Alternatively, publish the library config and set the `company_provider` key:
 ---
 
 ## Phase 3 — Assignment UI
+
+> **UX Recommendation**: Use the library's [`Drawer`](src/Resources/views/livewire/drawer.blade.php) component (slide-over panel) for the assignment UI instead of a full-page navigation. The Drawer provides a slide-over UX that keeps the user on the current page while managing company assignments. This is the pattern used by SaaS platforms like Gusto and Rippling for inline administrative actions. The Drawer can be opened via `$this->dispatch('openDrawer', 'qf.user-company-assignment', ['userId' => $userId], 'Manage Companies')` from the "Manage Companies" row action.
 
 ### 3.1 Livewire Component
 
@@ -559,7 +563,27 @@ public function run(): void
 
 ## Phase 5 — Configuration
 
-### 5.1 Consuming App Config Override
+### 5.1 Enable the Multi-Company Feature Flag
+
+The library ships with multi-company support **disabled by default**. The consuming app must explicitly enable it in its published `config/ui-library.php`:
+
+```php
+'features' => [
+    // ... other feature flags
+    'multi_company' => true,
+],
+```
+
+When `multi_company` is `true`:
+- The **"Company Assignments"** sidebar navigation item (under Admin → Users) becomes visible
+- The **"Manage Companies"** row action appears on the Users DataTable
+- The company switcher dropdown in the top nav is available to all authenticated users (per `switcher_roles`)
+
+When `multi_company` is `false` (default):
+- The navigation item and row action are filtered out automatically by [`NavigationManager::loadModuleNavItems()`](src/Services/Navigation/NavigationManager.php:384) and [`DataTable::filterMoreActions()`](src/Http/Livewire/DataTables/DataTable.php:1825)
+- The admin interface remains clean for apps that don't need multi-company support
+
+### 5.2 Consuming App Config Override
 
 In the consuming app's published `config/ui-library.php`, verify or set the following keys:
 

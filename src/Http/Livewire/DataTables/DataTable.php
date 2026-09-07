@@ -1145,7 +1145,7 @@ class DataTable extends Component
         }
 
         if ($this->moreActions === null) {
-            $this->moreActions = $resolver->getMoreActions();
+            $this->moreActions = $this->filterMoreActions($resolver->getMoreActions());
         }
 
         $controls = $resolver->getControls();
@@ -1815,6 +1815,26 @@ class DataTable extends Component
     }
 
     // ==================== ROW ACTIONS ====================
+
+    /**
+     * Filter moreActions based on feature flags.
+     *
+     * Removes actions gated behind disabled features (e.g., "Manage Companies"
+     * when multi_company is off).
+     *
+     * @param  array $actions
+     * @return array
+     */
+    protected function filterMoreActions(array $actions): array
+    {
+        if (!config('ui-library.features.multi_company', false)) {
+            $actions = array_values(array_filter($actions, function ($action) {
+                return ($action['label'] ?? '') !== 'Manage Companies';
+            }));
+        }
+
+        return $actions;
+    }
 
     public function handleRowAction(int $actionIndex, int $recordId): void
     {
@@ -2534,7 +2554,7 @@ protected function checkConditions(array $action, $record): bool
         $controls = $resolver->getControls();
         $simpleActions = $this->simpleActions ?? ($resolver->getConfig()['simpleActions'] ?? []);
         $crudType = $this->crudType ?? ($resolver->getConfig()['crudType'] ?? false);
-        $moreActions = $this->moreActions ?? $resolver->getMoreActions();
+        $moreActions = $this->moreActions ?? $this->filterMoreActions($resolver->getMoreActions());
 
         $this->simpleActions = $simpleActions;
         $this->crudType = $crudType;

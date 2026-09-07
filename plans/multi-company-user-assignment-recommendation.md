@@ -1,9 +1,23 @@
 # Multi-Company User Assignment — Synthesis & Recommendation Report
 
-> **Status**: Library Changes Implemented / Consuming App Guide Available  
-> **Date**: 2026-09-07  
-> **Scope**: User-company assignment UX, default company seeding, company switcher behavior  
+> **Status**: Library Changes Implemented / Consuming App Guide Available
+> **Date**: 2026-09-07
+> **Scope**: User-company assignment UX, default company seeding, company switcher behavior
 > **Architecture Rule**: Library (`src/`) must remain fully decoupled from consuming app (`app/Modules/`)
+
+---
+
+## Gemini Analysis Findings
+
+An independent review of the multi-company implementation against SaaS best practices identified several gaps that have been addressed:
+
+| Finding | Severity | Resolution |
+|---------|:--------:|------------|
+| **No feature flag** — navigation items and row actions for multi-company assignment are always visible, even for apps that don't need the feature | 🟡 Medium | Added `features.multi_company` flag to [`ui-library.php`](src/Config/ui-library.php:531). Defaults to `false`. Navigation items and row actions are gated behind this flag in [`NavigationManager`](src/Services/Navigation/NavigationManager.php:384) and [`DataTable`](src/Http/Livewire/DataTables/DataTable.php:1825). |
+| **No effective-date tracking on pivot** — the `company_user` pivot had no way to track when an assignment takes effect (e.g., future-dated transfers) | 🟡 Medium | Added `effective_date` (nullable date) to the pivot migration and `withPivot('effective_date')` to [`HasUILibraryUser::companies()`](src/Traits/HasUILibraryUser.php:85). |
+| **Organization module relocation** — the assignment UI was documented under `app/Modules/Organization/` but the consuming app's existing company infrastructure lives in `app/Modules/Hr/` | 🟢 Low | Added guidance below on relocating the UI to the appropriate module. The library itself is module-agnostic. |
+
+These changes ensure the library follows SaaS multi-tenancy best practices: feature flags for optional capabilities, temporal pivot data for scheduled assignments, and module-agnostic architecture that lets consuming apps place the UI where it fits their domain model.
 
 ---
 
@@ -378,7 +392,21 @@ Full implementation details with code examples are documented in [`plans/consumi
 
 | # | File | Change |
 |---|------|--------|
-| C9 | `config/ui-library.php` | Verify `multitenancy.switcher_roles` is `['*']` (library default), register `organization` module if needed. |
+| C9 | `config/ui-library.php` | Set `features.multi_company` to `true` to enable the navigation item and row action. Verify `multitenancy.switcher_roles` is `['*']` (library default), register `organization` module if needed. |
+
+---
+
+### Organization Module Relocation Guidance
+
+The implementation guide in [`plans/consuming-app-multi-company-implementation.md`](plans/consuming-app-multi-company-implementation.md) places the assignment UI under `app/Modules/Organization/` as a convention. However, the consuming app's existing company infrastructure (CompanyProvider, employee records, etc.) lives in `app/Modules/Hr/`. The library is **module-agnostic** — consuming apps should place the UI files where they fit the domain model:
+
+| If your app has... | Place files under... |
+|--------------------|---------------------|
+| A dedicated `Organization` module | `app/Modules/Organization/` (as documented) |
+| Company logic in `Hr` module | `app/Modules/Hr/` — update namespaces accordingly |
+| No existing module structure | Create `app/Modules/Organization/` following the documented convention |
+
+The only requirement is that the Livewire component is registered and the route `/admin/user-company-assignments` resolves to a page containing the component. The library's navigation item and row action reference this route and are independent of the module namespace.
 
 ---
 

@@ -83,6 +83,7 @@ trait HasUILibraryUser
     public function companies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class, 'company_user')
+            ->withPivot('effective_date')
             ->withTimestamps();
     }
 

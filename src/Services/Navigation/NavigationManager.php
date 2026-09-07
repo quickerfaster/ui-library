@@ -380,6 +380,13 @@ class NavigationManager
         $workspaceFilter = new WorkspaceFilter($workspaceResolver->resolve());
         $allItems = array_values($workspaceFilter->filterContextItems($allItems));
 
+        // Gate multi-company items behind the feature flag
+        if (!config('ui-library.features.multi_company', false)) {
+            $allItems = array_values(array_filter($allItems, function ($item) {
+                return ($item['key'] ?? '') !== 'user_company_assignments';
+            }));
+        }
+
         return $allItems;
     }
 
