@@ -187,10 +187,17 @@ class AccessControlManager extends Component
                 $hasPermission = $this->selectedScope && $this->selectedScope->hasPermissionTo($permName);
                 $this->resourceControlButtonGroup[$permName] = [
                     [
-                        'label' => \Illuminate\Support\Str::title(str_replace('_', ' ', $permName)),
-                        'key' => $permName,
-                        'active' => $hasPermission,
-                        'color' => 'primary',
+                        'model' => Role::class,
+                        'stateSyncMethod' => 'method',
+                        'recordId' => $this->selectedScopeId,
+                        'componentId' => $permName,
+                        'onStateValue' => $permName,
+                        'offStateValue' => '',
+                        'state' => $hasPermission,
+                        'icon' => 'fas fa-lock',
+                        'iconBg' => 'light',
+                        'iconColor' => 'dark',
+                        'subtitle' => '<span><strong>' . ($this->selectedScope?->name ?? '') . '</strong> should have the <strong>' . \Illuminate\Support\Str::title(str_replace('_', ' ', $permName)) . '</strong> permission</span>',
                     ],
                 ];
             }
