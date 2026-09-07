@@ -553,7 +553,7 @@ return [
         | Roles that can see the company switcher dropdown in the top nav.
         | Use '*' to allow all authenticated users.
         */
-        'switcher_roles' => '*',
+        'switcher_roles' => ['*'],
 
         /*
         |------------------------------------------------------------------

@@ -500,7 +500,6 @@ class InstallCommand extends Command
             'SuperAdminSeeder' => 'QuickerFaster\UILibrary\Core\Admin\Database\Seeders\SuperAdminSeeder',
             'UserSeeder' => 'QuickerFaster\UILibrary\Core\Admin\Database\Seeders\UserSeeder',
             'SystemSettingsSeeder' => 'QuickerFaster\UILibrary\Core\System\Database\Seeders\SystemSettingsSeeder',
-            'OrganizationSeeder' => 'QuickerFaster\UILibrary\Core\Organization\Database\Seeders\OrganizationSeeder',
             'NotificationTemplateSeeder' => 'QuickerFaster\UILibrary\Core\Common\Database\Seeders\NotificationTemplateSeeder',
             'AccessControlPermissionSeeder' => 'QuickerFaster\UILibrary\Core\Admin\Database\Seeders\AccessControlPermissionSeeder',
         ];

@@ -3,6 +3,7 @@
 namespace QuickerFaster\UILibrary\Traits;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use QuickerFaster\UILibrary\Core\Organization\Models\Company;
 
 /**
@@ -73,6 +74,16 @@ trait HasUILibraryUser
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class, 'company_id');
+    }
+
+    /**
+     * Get all companies the user belongs to (multi-company support).
+     * Requires a 'company_user' pivot table in the consuming app.
+     */
+    public function companies(): BelongsToMany
+    {
+        return $this->belongsToMany(Company::class, 'company_user')
+            ->withTimestamps();
     }
 
     // Future traits to be composed here:

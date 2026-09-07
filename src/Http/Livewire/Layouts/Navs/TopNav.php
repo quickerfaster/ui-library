@@ -764,6 +764,12 @@ class TopNav extends Component
 
         $this->companies = $this->companyProvider->getCompanies($user);
 
+        // Hide switcher when user has 0 or 1 companies (no need to switch)
+        if ($this->companies->count() <= 1) {
+            $this->companies = collect();
+            return;
+        }
+
         // Determine current company from session
         $sessionCompanyId = Session::get('current_company_id');
         $providerCompanyId = $this->companyProvider->getCurrentCompanyId($user);
