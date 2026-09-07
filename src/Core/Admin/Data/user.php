@@ -203,7 +203,7 @@ return [
   ],
   'moreActions' => [
     [
-      'label'      => 'Manage Companies',
+      'title'      => 'Manage Companies',
       'icon'       => 'fa-solid fa-building',
       'route'      => 'admin.user-company-assignments',
       'routeParam' => 'user',
