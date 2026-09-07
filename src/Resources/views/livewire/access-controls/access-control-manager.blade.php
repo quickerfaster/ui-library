@@ -98,6 +98,7 @@
                                                     :key="'extra_'.$permName"
                                                     :buttons="$resourceControlButtonGroup[$permName] ?? []"
                                                     :modelId="$permName"
+                                                    :resourceName="$permName"
                                                     :scopeType="$selectedScopeName"
                                                     :scopeId="$selectedScopeId"
                                                     :permissionType="'single'"
