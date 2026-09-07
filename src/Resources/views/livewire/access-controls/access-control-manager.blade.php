@@ -101,7 +101,10 @@
                                                     :scopeType="$selectedScopeName"
                                                     :scopeId="$selectedScopeId"
                                                     :permissionType="'single'"
+                                                    stateSyncMethod="method"
                                                     :data="[
+                                                        'selectedScope' => $this->selectedScope,
+                                                        'selectedScopeId' => $this->selectedScopeId,
                                                         'resourceName' => $permName,
                                                         'controlsCSSClasses' => $controlsCSSClasses ?? '',
                                                     ]"
