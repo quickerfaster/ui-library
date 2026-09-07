@@ -82,6 +82,7 @@
                             </div>
                         @endforeach
                     </div>
+                @endif
 
                     {{-- Extra (Non-Model) Permissions --}}
                     @if(!empty($this->extraPermissions))
@@ -97,8 +98,8 @@
                                                     :key="'extra_'.$permName"
                                                     :buttons="$resourceControlButtonGroup[$permName] ?? []"
                                                     :modelId="$permName"
-                                                    :scopeType="$scopeType"
-                                                    :scopeId="$scopeId"
+                                                    :scopeType="$selectedScopeName"
+                                                    :scopeId="$selectedScopeId"
                                                     :permissionType="'single'"
                                                     wire:key="extra_toggle_{{ $permName }}" />
                                             </div>
@@ -108,7 +109,6 @@
                             </div>
                         </div>
                     @endif
-                @endif
             @else
                 <h4>Need Help?</h4>
                 <p>Select <strong class="text-primary">[Role],</strong>  then select <strong class="text-primary">[Module]</strong> and click <strong class="text-primary">[OK]</strong>    to set the permission of  <strong class="text-primary"> user that has that role can/cannot do.</strong> </p>
