@@ -462,6 +462,8 @@ Both bugs are in the same method and should be addressed together to avoid merge
 
 The following library files were modified to support multi-company user assignment:
 
+### 10.1 Multi-Company Core Changes
+
 | File | Change | Lines |
 |------|--------|-------|
 | [`src/Console/Commands/InstallCommand.php`](src/Console/Commands/InstallCommand.php:498) | Removed non-existent `OrganizationSeeder` from the `$seeders` array. The seeder class `QuickerFaster\UILibrary\Core\Organization\Database\Seeders\OrganizationSeeder` never existed, and the install command would fail silently when attempting to run it. | 498–505 |
@@ -472,6 +474,24 @@ The following library files were modified to support multi-company user assignme
 | [`src/Http/Livewire/Wizards/WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php:56) | Same `company_id` conditional visibility fix as DataTableForm — added missing `else` blocks in `loadConfiguration()` and `validateFields()` to hide `company_id` when a specific company is selected. | 56–78, validateFields |
 | [`src/Core/Admin/Config/navigation.php`](src/Core/Admin/Config/navigation.php:156) | Added `user_company_assignments` sidebar item to the `Users` context group, order 6 (after User Preferences at order 5). Route: `/admin/user-company-assignments`, permission: `manage_user_company_assignments`. This is the Option A recommendation — a dedicated sidebar link with hybrid enhancement. | 156–163 |
 | [`src/Core/Admin/Data/user.php`](src/Core/Admin/Data/user.php:204) | Added `moreActions` entry providing a "Manage Companies" row action on the Users DataTable. Links to `admin.user-company-assignments` route with `user` route parameter for direct per-user access. | 204–212 |
+
+### 10.2 Access Control Permission Panel Fixes
+
+During implementation, several bugs were discovered and fixed in the AccessControlManager component that prevented extra permissions (defined in `permissions.php` under the `extra` key) from rendering in the UI:
+
+| File | Change | Lines |
+|------|--------|-------|
+| [`src/Services/AccessControl/AccessControlManager.php`](src/Services/AccessControl/AccessControlManager.php) | Fixed `manageAccessControl()` to read `extra` permissions from `permissions.php` config files. Previously, the method only discovered model files via `ModelDiscovery` and never read the `extra` key, so any permissions defined outside of model files were silently ignored. Added logic to merge `extra` permissions into the `$models` array with a synthetic `_extra` key. | manageAccessControl() |
+| [`src/Services/AccessControl/resources/views/livewire/access-control-manager.blade.php`](src/Services/AccessControl/resources/views/livewire/access-control-manager.blade.php) | Fixed the extra permissions Blade section — it was nested inside a `@if (count($models) > 0)` conditional, meaning it only rendered when at least one model was discovered. Moved the extra permissions section **outside** the conditional so it renders independently. Also added the full button structure (icon, label, description) matching the model-based permission pattern. | extra permissions section |
+| [`src/Services/AccessControl/resources/views/livewire/access-control-manager.blade.php`](src/Services/AccessControl/resources/views/livewire/access-control-manager.blade.php) | Added missing `stateSyncMethod="method"` and `selectedScope` in `:data` attributes to the `ToggleButtonGroup` for extra permissions. The [`ToggleButtonListener`](src/Listeners/ToggleButtonListener.php) requires `stateSyncMethod="method"` to know how to sync state back to the server, and `selectedScope` in the `:data` JSON to identify which permission is being toggled. Without these attributes, toggling extra permissions would silently fail. | ToggleButtonGroup attributes |
+| `resources/views/vendor/qf/livewire/access-control-manager.blade.php` | Published override updated to match the fixed library source. This was critical because the consuming app had a published vendor override that was masking all library Blade fixes. The override was deleted and re-published from the corrected source. | full file |
+
+**Root cause summary**: Three compounding issues prevented extra permissions from working:
+1. **Backend**: `AccessControlManager::manageAccessControl()` never read the `extra` key from `permissions.php`
+2. **Template structure**: The extra permissions Blade block was inside a `@if (count($models) > 0)` guard
+3. **Component attributes**: `ToggleButtonGroup` was missing `stateSyncMethod` and `selectedScope`
+
+All three issues had to be fixed for extra permissions to render and function correctly.
 
 ### Navigation Placement Decision
 
@@ -485,6 +505,71 @@ The library provides **two entry points** for the assignment UI:
 This hybrid approach keeps the library decoupled from consuming-app page implementations while ensuring the assignment UI is discoverable through multiple access paths and properly permission-gated.
 
 **No consuming app files were created in this workspace** — all consuming app code is documented in [`plans/consuming-app-multi-company-implementation.md`](plans/consuming-app-multi-company-implementation.md) for reference by the consuming app team.
+
+---
+
+## 11. Lessons Learned
+
+The following lessons were learned during the implementation and debugging of the multi-company user assignment feature and the AccessControlManager permission panel:
+
+### 11.1 Published Vendor Overrides Take Priority Over Library Source
+
+Laravel's `loadViewsFrom` mechanism gives published views in `resources/views/vendor/qf/` **absolute priority** over the library's source views. This means:
+
+- If a consuming app has published a Blade view (e.g., `resources/views/vendor/qf/livewire/access-control-manager.blade.php`), **any changes to the library's source Blade file will be silently ignored**.
+- The published override is a static snapshot — it does not inherit future library updates.
+- This caused significant debugging confusion during the AccessControlManager fixes: the library source was correct, but the consuming app was rendering a stale published override.
+
+**Mitigation**: Always check for published overrides before debugging Blade rendering issues. Run `ls resources/views/vendor/qf/` to list all overrides. If an override exists for a view you're modifying, either delete it and re-publish, or manually merge the changes.
+
+### 11.2 Always Clear Caches After Library Blade Changes
+
+After modifying any Blade file in the library, run `php artisan optimize:clear` (or at minimum `php artisan view:clear`). Laravel compiles Blade templates into PHP files in `storage/framework/views/`, and these compiled files are not automatically invalidated when library source files change. Stale compiled views are the #1 cause of "I changed the Blade file but nothing happened."
+
+### 11.3 Extra Permissions Need Full Button Structure Matching Model-Based Pattern
+
+The `ToggleButtonGroup` component used in the AccessControlManager expects a specific data structure for each permission. Extra permissions (defined in `permissions.php` under the `extra` key) must provide the same structure as model-discovered permissions:
+
+```php
+'extra' => [
+    [
+        'id' => 'manage_user_company_assignments',
+        'label' => 'Manage User Company Assignments',
+        'description' => 'Assign users to multiple companies',
+        'icon' => 'fa-solid fa-building',
+    ],
+],
+```
+
+Each entry needs `id`, `label`, `description`, and `icon` — matching the structure that `ModelDiscovery` produces for model-based permissions. Missing fields will cause rendering issues or blank entries in the UI.
+
+### 11.4 ToggleButtonListener Requires `stateSyncMethod` and `selectedScope`
+
+The [`ToggleButtonListener`](src/Listeners/ToggleButtonListener.php) handles toggle events from the `ToggleButtonGroup` Blade component. It requires two critical attributes on the component:
+
+- **`stateSyncMethod="method"`** — Tells the listener which Livewire method to call to sync state back to the server. Without this, the listener cannot determine how to persist the toggle change.
+- **`selectedScope` in `:data`** — The `:data` JSON payload must include a `selectedScope` key identifying which permission/scope is being toggled. Without this, the listener receives the toggle event but doesn't know which permission to update.
+
+Example correct usage:
+```blade
+<x-qf::toggle-button-group
+    stateSyncMethod="method"
+    :data="json_encode(['selectedScope' => $permission['id'], 'role_id' => $role->id])"
+    ...
+/>
+```
+
+Omitting either attribute causes the toggle to silently fail — the UI updates but the change is never persisted to the server.
+
+### 11.5 Three Compounding Issues Can Mask Each Other
+
+The extra permissions bug was particularly difficult to diagnose because three independent issues compounded:
+
+1. **Backend** (`AccessControlManager`) didn't read `extra` from config
+2. **Template structure** (Blade conditional) hid the section when no models existed
+3. **Component attributes** (missing `stateSyncMethod`/`selectedScope`) prevented toggles from working
+
+Fixing only one or two of these would not have resolved the issue. When debugging complex UI components, verify the full data pipeline: backend data collection → template rendering → component interactivity. Test each layer independently.
 
 ---
 

@@ -761,6 +761,122 @@ The permission `manage_user_company_assignments` should be registered in the con
 
 ---
 
+## Phase 7 — Post-Implementation
+
+### 7.1 Vendor View Overrides
+
+The library uses Laravel's package view publishing system. When a consuming app publishes a library Blade view via `php artisan vendor:publish`, the published copy at `resources/views/vendor/qf/` takes **absolute priority** over the library's source views. This means:
+
+- **Any changes to library Blade files will NOT be reflected** in the consuming app if a published override exists at `resources/views/vendor/qf/`.
+- The override is a **full copy** of the view at the time of publishing — it does not inherit future library updates.
+- This is by design (Laravel's `loadViewsFrom` priority), but it creates a maintenance trap: library fixes to Blade templates are silently masked.
+
+**How to check for overrides:**
+
+```bash
+# List all published QF views
+ls -la resources/views/vendor/qf/
+
+# Check if a specific view has an override
+ls resources/views/vendor/qf/livewire/access-control-manager.blade.php
+```
+
+**When to update overrides:**
+
+| Scenario | Action |
+|----------|--------|
+| Library Blade file changed (bug fix, new feature) | Delete the override and re-publish, or manually merge changes |
+| Override was for a one-time customization | Consider using a different approach (component extension, slot) instead of a full view override |
+| Override is intentional and permanent | Document it; add a CI check that alerts when the source view changes |
+
+### 7.2 Cache Clearing
+
+After **any** library update (composer update, git pull of library changes), always clear all caches:
+
+```bash
+php artisan optimize:clear
+```
+
+This single command clears all Laravel caches:
+- **Compiled views** (`view:clear`) — Critical after Blade template changes. Stale compiled views are the #1 cause of "I changed the Blade file but nothing happened."
+- **Route cache** (`route:clear`) — Required after route file changes
+- **Config cache** (`config:clear`) — Required after config file changes
+- **Application cache** (`cache:clear`) — Clears the general cache store
+- **Compiled classes** (`clear-compiled`) — Clears the bootstrap/cache compiled.php
+- **Events cache** (`event:clear`) — Clears cached events
+
+**When to run specific cache clears:**
+
+| Command | When to Use |
+|---------|-------------|
+| `php artisan optimize:clear` | After any library update (recommended default) |
+| `php artisan view:clear` | After Blade template changes only (faster than full clear) |
+| `php artisan config:clear` | After config file changes only |
+| `php artisan route:clear` | After route file changes only |
+
+> **⚠️ Important**: In production, you typically want `php artisan optimize` (not `optimize:clear`) to pre-compile and cache for performance. However, during development and immediately after library updates, `optimize:clear` is the correct command.
+
+### 7.3 Troubleshooting Common Issues
+
+#### Issue 1: Component Not Found
+
+**Symptom**: Error `Unable to find component: [qf.user-company-assignment]` or similar.
+
+**Causes & Fixes**:
+1. **Component not registered** — Ensure the Livewire component is registered in a service provider:
+   ```php
+   Livewire::component('qf.user-company-assignment', UserCompanyAssignment::class);
+   ```
+2. **Module not loaded** — Verify the module is enabled in `config/ui-library.php` under `modules`.
+3. **Class not autoloaded** — Run `composer dump-autoload` after creating new component classes.
+
+#### Issue 2: Stale Views (Blade Changes Not Reflected)
+
+**Symptom**: You modified a Blade file but the old content still renders.
+
+**Causes & Fixes**:
+1. **Published override masking changes** — Check `resources/views/vendor/qf/` for an override of the view you modified. Delete or update it.
+2. **View cache not cleared** — Run `php artisan view:clear`.
+3. **Wrong file edited** — Verify you edited the correct file path. Library views are in `src/Resources/views/`; published overrides are in `resources/views/vendor/qf/`.
+
+#### Issue 3: Missing Permissions in UI
+
+**Symptom**: Navigation items or row actions don't appear even though the feature flag is enabled.
+
+**Causes & Fixes**:
+1. **Permission not seeded** — The `manage_user_company_assignments` permission must exist in the database. Run the permission seeder.
+2. **Role not assigned** — The current user's role must have the permission. Check the role-permission mapping.
+3. **Feature flag disabled** — Verify `features.multi_company` is `true` in `config/ui-library.php`.
+4. **Config cache** — Run `php artisan config:clear` after changing config values.
+
+#### Issue 4: AccessControlManager Extra Permissions Not Rendering
+
+**Symptom**: Extra permissions defined in `permissions.php` under the `extra` key don't appear in the AccessControlManager UI.
+
+**Causes & Fixes**:
+1. **`manageAccessControl()` only discovers model files** — The method scans model directories for permission definitions but never reads the `extra` key from `permissions.php`. This is a known library bug (see [`plans/library-relationship-bugs.md`](plans/library-relationship-bugs.md), Bug 4).
+2. **Extra permissions Blade section nested inside conditional** — The extra permissions section was only rendered when `count($models) > 0`. If no models were discovered, the entire extra permissions block was skipped (Bug 5).
+3. **ToggleButtonGroup missing required attributes** — Extra permission toggles need `stateSyncMethod="method"` and `selectedScope` in `:data` for the `ToggleButtonListener` to function (Bug 6).
+
+### 7.4 AccessControlPermissionSeeder
+
+The library's `AccessControlPermissionSeeder` should be registered in the consuming app's `DatabaseSeeder` to ensure all permissions (including `manage_user_company_assignments`) are seeded:
+
+```php
+// database/seeders/DatabaseSeeder.php
+public function run(): void
+{
+    $this->call([
+        \QuickerFaster\UILibrary\Services\AccessControl\AccessControlPermissionSeeder::class,
+        // ... other seeders
+    ]);
+}
+```
+
+This seeder reads permissions from all module `permissions.php` config files and creates them in the database. It is idempotent — re-running it will not duplicate existing permissions.
+
+---
+
 ## Implementation Checklist
 
 | # | Phase | File | Status |
@@ -782,6 +898,9 @@ The permission `manage_user_company_assignments` should be registered in the con
 | 15 | Phase 6 | (Optional) Register explicit route `/admin/user-company-assignments` with middleware if needed | ☐ |
 | 16 | Phase 6 | Register `manage_user_company_assignments` permission in seeder | ☐ |
 | 17 | Phase 6 | (Optional) Add Organization module nav entry in `app/Modules/Organization/Config/navigation.php` | ☐ |
+| 18 | Phase 7 | Register `AccessControlPermissionSeeder` in `DatabaseSeeder` | ☐ |
+| 19 | Phase 7 | Run `php artisan optimize:clear` after all library updates | ☐ |
+| 20 | Phase 7 | Check for published view overrides at `resources/views/vendor/qf/` | ☐ |
 
 ---
 
@@ -791,3 +910,4 @@ The permission `manage_user_company_assignments` should be registered in the con
 - **No changes to `app/` in this workspace**: All files described in this document are consuming-app files. They do not exist in the library workspace and should not be created there.
 - **Backward compatibility**: The `HrsCompanyProvider` implementation preserves the legacy `user->company_id` fallback path, allowing a gradual migration from single-company to multi-company.
 - **Pivot table simplicity**: The `company_user` pivot in this implementation is minimal (`user_id`, `company_id`, `timestamps`). If pivot extra data (e.g., `is_default`, `role`) is needed later, add columns to the migration and use `sync()` with pivot data arrays.
+- **AccessControlPermissionSeeder**: The library's [`AccessControlPermissionSeeder`](src/Services/AccessControl/AccessControlPermissionSeeder.php) should be registered in the consuming app's `DatabaseSeeder` to ensure all permissions are seeded. This is idempotent and safe to re-run.
