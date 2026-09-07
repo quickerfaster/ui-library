@@ -153,6 +153,14 @@ return [
                 'order' => 5,
                 'page_title' => NULL,
             ],
+            [
+                'key'        => 'user_company_assignments',
+                'label'      => 'Company Assignments',
+                'icon'       => 'fa-solid fa-building',
+                'route'      => '/admin/user-company-assignments',
+                'permission' => 'manage_user_company_assignments',
+                'order'      => 6,
+            ],
         ],
         'Access' => [
             [

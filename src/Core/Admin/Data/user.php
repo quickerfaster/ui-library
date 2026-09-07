@@ -201,7 +201,15 @@ return [
       ],
     ],
   ],
-  'moreActions' => [],
+  'moreActions' => [
+    [
+      'label'      => 'Manage Companies',
+      'icon'       => 'fa-solid fa-building',
+      'route'      => 'admin.user-company-assignments',
+      'routeParam' => 'user',
+      'permission' => 'manage_user_company_assignments',
+    ],
+  ],
   'switchViews' => [
     'default' => 'list',
     'list' => [

@@ -624,14 +624,18 @@ If the `Organization` module is not already registered in `config/ui-library.php
 
 ## Phase 6 — Navigation
 
-The library already provides the navigation entry point for the Company Assignments page. The `user_company_assignments` item is registered in [`src/Core/System/Config/navigation.php`](src/Core/System/Config/navigation.php) under the `accounts` context group, with:
+The library provides two entry points for the Company Assignments page:
 
-- **Key**: `user_company_assignments`
-- **Label**: `Company Assignments`
-- **Icon**: `fa-solid fa-building`
-- **Route**: `/system/user-company-assignments`
-- **Permission**: `manage_user_company_assignments`
-- **Order**: 45 (between Invitations and Account Activity)
+1. **Sidebar navigation link** — The `user_company_assignments` item is registered in [`src/Core/Admin/Config/navigation.php`](src/Core/Admin/Config/navigation.php) under the `Users` context group, with:
+
+   - **Key**: `user_company_assignments`
+   - **Label**: `Company Assignments`
+   - **Icon**: `fa-solid fa-building`
+   - **Route**: `/admin/user-company-assignments`
+   - **Permission**: `manage_user_company_assignments`
+   - **Order**: 6 (after User Preferences)
+
+2. **Row action on the Users DataTable** — A `moreActions` entry is registered in [`src/Core/Admin/Data/user.php`](src/Core/Admin/Data/user.php) providing a "Manage Companies" dropdown action on each user row. This links directly to the assignment page for that specific user via the `user` route parameter.
 
 ### 6.1 Create the Blade View
 
@@ -654,10 +658,10 @@ The consuming app needs to create a Blade view at `app/Modules/Admin/Resources/v
 
 ### 6.2 Route Resolution
 
-The navigation route `/system/user-company-assignments` must resolve to this view. In the consuming app's route file (e.g., `app/Modules/Admin/Routes/web.php`), register:
+The navigation route `/admin/user-company-assignments` must resolve to this view. In the consuming app's route file (e.g., `app/Modules/Admin/Routes/web.php`), register:
 
 ```php
-Route::get('/system/user-company-assignments', function () {
+Route::get('/admin/user-company-assignments', function () {
     return view('admin.user-company-assignments');
 })->middleware(['auth', 'can:manage_user_company_assignments']);
 ```
@@ -685,7 +689,7 @@ The permission `manage_user_company_assignments` should be registered in the con
 | 11 | Phase 5 | Verify/update `config/ui-library.php` multitenancy settings | ☐ |
 | 12 | Phase 5 | Register `organization` module if needed | ☐ |
 | 13 | Phase 6 | `app/Modules/Admin/Resources/views/user-company-assignments.blade.php` — page view | ☐ |
-| 14 | Phase 6 | Register route `/system/user-company-assignments` in admin routes | ☐ |
+| 14 | Phase 6 | Register route `/admin/user-company-assignments` in admin routes | ☐ |
 | 15 | Phase 6 | Register `manage_user_company_assignments` permission in seeder | ☐ |
 
 ---
