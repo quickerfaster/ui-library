@@ -718,7 +718,44 @@ Route::get('/admin/user-company-assignments', function () {
 })->middleware(['auth', 'can:manage_user_company_assignments']);
 ```
 
-### 6.3 Permission Registration
+### 6.3 Organization Module Entry (HR Apps)
+
+For consuming apps with an Organization module (e.g., HR platforms), add a second
+navigation entry in `app/Modules/Organization/Config/navigation.php` so HR
+administrators can access company assignments from the Organization context:
+
+```php
+// app/Modules/Organization/Config/navigation.php
+
+return [
+    'contexts' => [
+        'organization' => [
+            'label' => 'Organization',
+            'items' => [
+                // ... existing items (companies, locations, branches, etc.)
+                [
+                    'key'        => 'employee_allocations',
+                    'label'      => 'Employee Allocations',
+                    'icon'       => 'fa-solid fa-users-between-lines',
+                    'route'      => '/admin/user-company-assignments',
+                    'permission' => 'manage_user_company_assignments',
+                    'order'      => 50,
+                ],
+            ],
+        ],
+    ],
+];
+```
+
+This gives HR administrators two access points:
+- **Admin → Users → Company Assignments** (library default, global admin view)
+- **Organization → Employee Allocations** (consuming app, structural HR view)
+
+Both point to the same `/admin/user-company-assignments` page. The consuming app
+can also choose to build a separate Organization-specific UI and use a different
+route.
+
+### 6.4 Permission Registration
 
 The permission `manage_user_company_assignments` should be registered in the consuming app's permission seeder (or a dedicated seeder) to ensure it is available for role-based access control.
 
@@ -744,6 +781,7 @@ The permission `manage_user_company_assignments` should be registered in the con
 | 14 | Phase 6 | (Optional) Override view via `php artisan vendor:publish --tag=qf-core-views` or create `app/Modules/Admin/Resources/views/user-company-assignments.blade.php` | ☐ |
 | 15 | Phase 6 | (Optional) Register explicit route `/admin/user-company-assignments` with middleware if needed | ☐ |
 | 16 | Phase 6 | Register `manage_user_company_assignments` permission in seeder | ☐ |
+| 17 | Phase 6 | (Optional) Add Organization module nav entry in `app/Modules/Organization/Config/navigation.php` | ☐ |
 
 ---
 
