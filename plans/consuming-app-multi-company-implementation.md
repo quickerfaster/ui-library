@@ -637,9 +637,35 @@ The library provides two entry points for the Company Assignments page:
 
 2. **Row action on the Users DataTable** — A `moreActions` entry is registered in [`src/Core/Admin/Data/user.php`](src/Core/Admin/Data/user.php) providing a "Manage Companies" dropdown action on each user row. This links directly to the assignment page for that specific user via the `user` route parameter.
 
-### 6.1 Create the Blade View
+> **⚠️ Important: Route conventions differ between navigation configs and data configs**
+>
+> The library uses two different conventions for the `route` key depending on context:
+>
+> | Context | Key | Convention | Example | Rendered With |
+> |---|---|---|---|---|
+> | **Navigation config** (`navigation.php`) | `route` | URL path | `/admin/user-company-assignments` | `url()` helper |
+> | **Navigation config** (`navigation.php`) | `route` (no `/`) | Named route | `admin.dashboard` | `route()` helper |
+> | **Data config** (`user.php`) — `moreActions` | `route` | Named route | `admin.user-company-assignments` | `route()` helper |
+> | **Data config** (`user.php`) — `moreActions` | `url` | URL path | `/admin/user-company-assignments` | Appends `/$record->id` |
+>
+> **Key takeaways:**
+> - In **navigation configs**, `route` is treated as a URL path when it contains a `/` (rendered with `url()`), and as a named route otherwise (rendered with `route()`).
+> - In **`moreActions`** (data configs), `route` is **always** treated as a named route (rendered with `route()` helper). Use the `url` key instead when you need a URL path.
+> - The library uses `url` (not `route`) for the `moreActions` entry in [`user.php`](src/Core/Admin/Data/user.php:204) because the consuming app provides the route as a URL path, not a named route.
 
-The consuming app needs to create a Blade view at `app/Modules/Admin/Resources/views/user-company-assignments.blade.php` that embeds the assignment component:
+### 6.1 Library-Provided View (NEW)
+
+The library now ships a default Blade view at [`src/Core/Admin/Resources/views/admin/user-company-assignments.blade.php`](src/Core/Admin/Resources/views/admin/user-company-assignments.blade.php). This view is resolved by the library's catch-all route ([`src/System/Routes/web.php:63`](src/System/Routes/web.php:63)) which maps `/admin/user-company-assignments` → `qf-core::admin.user-company-assignments`.
+
+The default view uses the library's `navigation-layout` pattern and renders a placeholder card. This means the sidebar link works out of the box — no 404 when clicking "Company Assignments" in the navigation.
+
+**Consuming apps can override this view** by publishing it:
+
+```bash
+php artisan vendor:publish --tag=qf-core-views
+```
+
+Or by creating their own view at `app/Modules/Admin/Resources/views/user-company-assignments.blade.php` that embeds the assignment component:
 
 ```blade
 {{-- app/Modules/Admin/Resources/views/user-company-assignments.blade.php --}}
@@ -658,7 +684,9 @@ The consuming app needs to create a Blade view at `app/Modules/Admin/Resources/v
 
 ### 6.2 Route Resolution
 
-The navigation route `/admin/user-company-assignments` must resolve to this view. In the consuming app's route file (e.g., `app/Modules/Admin/Routes/web.php`), register:
+The library's catch-all route ([`src/System/Routes/web.php:63`](src/System/Routes/web.php:63)) already resolves `/admin/user-company-assignments` to the library's view. **No consuming-app route registration is required** for the page to load.
+
+If the consuming app wants to add middleware (e.g., permission checks) or use a named route, it can register its own route that takes precedence:
 
 ```php
 Route::get('/admin/user-company-assignments', function () {
@@ -688,9 +716,10 @@ The permission `manage_user_company_assignments` should be registered in the con
 | 10 | Phase 4 | Register seeder in `database/seeders/DatabaseSeeder.php` | ☐ |
 | 11 | Phase 5 | Verify/update `config/ui-library.php` multitenancy settings | ☐ |
 | 12 | Phase 5 | Register `organization` module if needed | ☐ |
-| 13 | Phase 6 | `app/Modules/Admin/Resources/views/user-company-assignments.blade.php` — page view | ☐ |
-| 14 | Phase 6 | Register route `/admin/user-company-assignments` in admin routes | ☐ |
-| 15 | Phase 6 | Register `manage_user_company_assignments` permission in seeder | ☐ |
+| 13 | Phase 6 | Library provides default view at `src/Core/Admin/Resources/views/admin/user-company-assignments.blade.php` — resolved by catch-all route | ✅ |
+| 14 | Phase 6 | (Optional) Override view via `php artisan vendor:publish --tag=qf-core-views` or create `app/Modules/Admin/Resources/views/user-company-assignments.blade.php` | ☐ |
+| 15 | Phase 6 | (Optional) Register explicit route `/admin/user-company-assignments` with middleware if needed | ☐ |
+| 16 | Phase 6 | Register `manage_user_company_assignments` permission in seeder | ☐ |
 
 ---
 
