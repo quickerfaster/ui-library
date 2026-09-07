@@ -55,6 +55,25 @@ The installer's `RoleSeeder` creates default roles and assigns permissions:
 
 The `SuperAdminSeeder` creates a super admin user with all permissions. Consuming apps can extend or replace these seeders by publishing and modifying them.
 
+### 1.5 Module Dashboard Access (`module_access`)
+
+The `module_access` configuration in `config/ui-library.php` controls which roles can access each module's dashboard. It maps URL prefixes to allowed roles:
+
+```php
+'module_access' => [
+    'hr'           => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'organization' => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'admin'        => ['admin', 'super_admin', 'company_admin'],
+    'leave'        => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'holiday'      => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'attendance'   => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'payroll'      => ['payroll_officer', 'hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'system'       => ['admin', 'super_admin', 'company_admin'],
+],
+```
+
+The `EnsureModuleDashboardAccess` middleware checks this config on every request. Users without the required role are redirected to their appropriate dashboard. `super_admin`, `admin`, and `company_admin` bypass all checks.
+
 ---
 
 ## 2. Notification Templates

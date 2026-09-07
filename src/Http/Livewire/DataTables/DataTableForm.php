@@ -163,11 +163,19 @@ class DataTableForm extends Component
         $this->fieldGroups = $resolver->getFieldGroups();
         $this->hiddenFields = $resolver->getHiddenFields();
 
-        // When 'All Companies' mode, show company_id on forms so super_admin can assign it
+        // Company field visibility: show when All Companies (0), hide when specific company selected
         if ($this->isAllCompaniesMode()) {
+            // Remove company_id from hidden so it appears on forms
             foreach (['onNewForm', 'onEditForm', 'onTable'] as $context) {
                 if (isset($this->hiddenFields[$context])) {
                     $this->hiddenFields[$context] = array_values(array_diff($this->hiddenFields[$context], ['company_id']));
+                }
+            }
+        } else {
+            // Add company_id to hidden so it's auto-injected from session (prevents user override)
+            foreach (['onNewForm', 'onEditForm', 'onTable'] as $context) {
+                if (isset($this->hiddenFields[$context]) && !in_array('company_id', $this->hiddenFields[$context])) {
+                    $this->hiddenFields[$context][] = 'company_id';
                 }
             }
         }
@@ -1030,14 +1038,16 @@ protected function hydrateMorphToSelectFields(): void
             }
         }
 
-        // When 'All Companies' mode, make company_id required on the form
+        // Company field validation: required in All Companies mode, nullable otherwise
         $fieldDefs = $this->fieldDefinitions;
-        if (
-            $this->isAllCompaniesMode()
-            && isset($fieldDefs['company_id'])
-            && !$this->isEditMode
-        ) {
-            $fieldDefs['company_id']['validation'] = 'required|integer|exists:companies,id';
+        if (isset($fieldDefs['company_id'])) {
+            if ($this->isAllCompaniesMode() && !$this->isEditMode) {
+                // Require company_id so super_admin can assign it
+                $fieldDefs['company_id']['validation'] = 'required|integer|exists:companies,id';
+            } else {
+                // Make nullable since company_id is auto-injected from session
+                $fieldDefs['company_id']['validation'] = 'nullable|integer|exists:companies,id';
+            }
         }
 
         // 🔍 DIAGNOSTIC: Log state before validation

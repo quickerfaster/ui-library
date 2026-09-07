@@ -68,6 +68,25 @@ The library-level `config('ui-library.navigation')` keys (`top_bar`, `sidebar.se
   - `can:update,App\Models\Post` — Laravel `Gate::allows()` check
 - Default nav items are provided by the [`HasNavItems`](../../src/Traits/HasNavItems.php:5) trait: dashboard, profile, account, help, settings.
 
+#### Context Group Permission Fallback
+
+Context groups in `navigation.php` support a dual-key permission model:
+
+1. **`permission`** — Checked first via `AuthorizationService::canAccessView()`. Admin users bypass this check.
+2. **`roles`** — Checked as fallback when the `permission` check fails. Supports `['*']` wildcard for all authenticated users.
+
+This fallback is implemented in [`top-nav-item.blade.php`](src/Resources/views/livewire/navs/partials/top-nav-item.blade.php) and the three inline blocks in [`top-nav.blade.php`](src/Resources/views/livewire/navs/top-nav.blade.php).
+
+Example context group with both keys:
+```php
+'Organization' => [
+    'label' => 'Organization',
+    'permission' => 'view_organization_overview',  // admin bypass
+    'roles' => ['*'],                               // fallback for all users
+    'url' => 'hr/dashboard-organization-overview',
+],
+```
+
 ---
 
 ## Sidebar State

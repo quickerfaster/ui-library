@@ -68,11 +68,45 @@ This would require a corresponding config schema extension in the relationship d
 
 ---
 
+## Bug 3: `company_id` field always visible on forms
+
+- **Location**: [`src/Http/Livewire/DataTables/DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php:63), `loadConfiguration()` method; and [`src/Http/Livewire/Wizards/WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php:56), `loadConfiguration()` method
+- **Root Cause**: The `loadConfiguration()` methods in both `DataTableForm` and `WizardForm` contained an `if` block that handled the "All Companies" case — when the session's `current_company_id` is `0` (meaning no company filter is active), the `company_id` field is shown so the user can choose which company the record belongs to. However, the corresponding `else` block was **missing**. When a specific company was selected (`current_company_id > 0`), the code should have added `company_id` to the `hiddenFields` array (with the selected company's ID as its value), but the `else` clause to do so did not exist. The same pattern was missing in both files' `validateFields()` methods.
+- **Reproduction Steps**:
+  1. Log in as a user with a specific company selected (not "All Companies")
+  2. Open any DataTable form or Wizard form that has a `company_id` field
+  3. The `company_id` field is visibly rendered as an editable field, even though the company is already determined by the session context
+  4. Users can see and potentially modify the company assignment when they should not be able to
+- **Impact**: Medium — the `company_id` field was always visible on all forms regardless of the current company context. When a specific company was selected in the switcher, the `company_id` field should have been hidden and auto-populated with that company's ID. Instead, it appeared as an editable field, creating confusion and a potential data integrity risk if users modified it.
+- **Recommended Fix** (already applied): Added `else` blocks in both `loadConfiguration()` and `validateFields()` in both files. When `current_company_id > 0`, the `company_id` field is added to the `hiddenFields` array with the selected company's ID as its value. This ensures the field is not rendered in the UI but is still submitted with the form data.
+
+### DataTableForm fix pattern:
+
+```php
+// loadConfiguration() — existing if block (kept):
+if (session('current_company_id', -1) == 0) {
+    $this->hiddenFields = array_diff($this->hiddenFields, ['company_id']);
+}
+
+// NEW else block (added):
+else {
+    $this->hiddenFields[] = 'company_id';
+    $this->fields['company_id'] = session('current_company_id');
+}
+```
+
+### WizardForm fix pattern:
+
+Same structural fix — added `else` block in `loadConfiguration()` to hide `company_id` and set its value from the session, and corresponding `else` blocks in `validateFields()` in both files to skip validation rules for hidden `company_id` fields.
+
+---
+
 ## Summary
 
 | Bug | Severity | Status | Affected Method |
 |-----|----------|--------|-----------------|
 | Bug 1: `hasMany` uses `sync()` | Critical | Open | `syncRelationships()` |
 | Bug 2: No pivot extra data support | High | Open | `syncRelationships()` |
+| Bug 3: `company_id` always visible on forms | Medium | Fixed | `loadConfiguration()`, `validateFields()` |
 
-Both bugs are in the same method and should be addressed together to avoid introducing merge conflicts. Bug 1 will cause a hard crash; Bug 2 causes silent data loss.
+Bugs 1 and 2 are in the same method and should be addressed together to avoid introducing merge conflicts. Bug 1 will cause a hard crash; Bug 2 causes silent data loss. Bug 3 has been resolved in both `DataTableForm` and `WizardForm`.

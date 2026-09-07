@@ -148,6 +148,14 @@ return [
                 'page_title' => NULL,
             ],
             [
+                'key'        => 'user_company_assignments',
+                'label'      => 'Company Assignments',
+                'icon'       => 'fa-solid fa-building',
+                'route'      => '/system/user-company-assignments',
+                'permission' => 'manage_user_company_assignments',
+                'order'      => 45,
+            ],
+            [
                 'key' => 'account_activity',
                 'label' => 'Account Activity',
                 'icon' => 'fas fa-history',

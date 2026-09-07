@@ -313,11 +313,34 @@ return [
 | `order` | Sort order (default `999`) |
 | `permission` | Optional Spatie permission name |
 | `gate` | Optional gate string (`role:`, `permission:`, `can:`) |
+| `roles` | `array` or `string` | `['*']` | Role(s) required. `'*'` = any authenticated user. Used as fallback when `permission` check fails. |
 | `workspace` | Optional workspace constraint map |
 
 ### 4.3 Context Groups
 
 Context groups organize related navigation items and control how they appear in the sidebar. When a user selects a top-nav tab, only that context group's items render in the sidebar.
+
+Context groups support a dual-key permission model:
+
+| Key | Type | Purpose |
+|-----|------|---------|
+| `permission` | `string` | Spatie permission name checked first via `AuthorizationService::canAccessView()`. Admin users bypass this check. |
+| `roles` | `array` or `string` | Role(s) required. Checked as fallback when the `permission` check fails. `['*']` = any authenticated user. |
+
+When both `permission` and `roles` are present, `permission` is checked first. If the `permission` check fails (user lacks the permission), `roles` is checked as a fallback. This allows context groups to be visible to users who may not have the specific permission but hold an allowed role.
+
+The `roles: ['*']` convention makes a context group visible to all authenticated users, regardless of their specific roles. This is useful for dashboards and overview pages that should be accessible to everyone.
+
+**Example — context group with both keys:**
+
+```php
+'Organization' => [
+    'label'      => 'Organization',
+    'permission' => 'view_organization_overview',  // admin bypass
+    'roles'      => ['*'],                           // fallback for all users
+    'url'        => 'hr/dashboard-organization-overview',
+],
+```
 
 ### 4.4 Sidebar Section Configuration
 
