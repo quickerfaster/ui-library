@@ -22,6 +22,8 @@ class AccessControlManager extends Component
     public $showResourceControlButtonGroup = false;
     public $resourceNames = [];
 
+    public $extraPermissions = [];
+
     public $selectedScopeName = 'Role';
     public $scopeNames;
     public $selectedScope = null;
@@ -150,6 +152,13 @@ class AccessControlManager extends Component
         $modelConfig = config('ui-library.access_control.models', []);
         $this->resourceNames = $this->getFilteredModels($modelConfig, $this->resourceNames);
 
+        // Load extra (non-model) permissions from the module's permissions.php config
+        $this->extraPermissions = [];
+        $permConfig = \QuickerFaster\UILibrary\Services\AccessControl\AccessControlPermissionService::getModulePermissionConfig($this->selectedModule);
+        if (!empty($permConfig['extra'])) {
+            $this->extraPermissions = (array) $permConfig['extra'];
+        }
+
         AccessControlPermissionService::checkPermissionsExistsOrCreate($this->resourceNames);
         $this->setupResourceControlButtonGroup();
 
@@ -170,6 +179,21 @@ class AccessControlManager extends Component
             $resourcePermissionNames = AccessControlPermissionService::getResourcePermissionNames($resourceName);
             if (empty($this->resourceControlButtonGroup[$resourceName]))
                 $this->resourceControlButtonGroup[$resourceName] = $this->getPermissionConfig($resourceName, $resourcePermissionNames);
+        }
+
+        // Build toggle config for extra (non-model) permissions
+        if (!empty($this->extraPermissions)) {
+            foreach ($this->extraPermissions as $permName) {
+                $hasPermission = $this->selectedScope && $this->selectedScope->hasPermissionTo($permName);
+                $this->resourceControlButtonGroup[$permName] = [
+                    [
+                        'label' => \Illuminate\Support\Str::title(str_replace('_', ' ', $permName)),
+                        'key' => $permName,
+                        'active' => $hasPermission,
+                        'color' => 'primary',
+                    ],
+                ];
+            }
         }
 
     }
