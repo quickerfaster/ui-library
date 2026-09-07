@@ -205,8 +205,7 @@ return [
     [
       'title'      => 'Manage Companies',
       'icon'       => 'fa-solid fa-building',
-      'route'      => 'admin.user-company-assignments',
-      'routeParam' => 'user',
+      'url'        => '/admin/user-company-assignments',
       'permission' => 'manage_user_company_assignments',
     ],
   ],
