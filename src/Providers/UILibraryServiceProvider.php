@@ -378,6 +378,9 @@ class UILibraryServiceProvider extends ServiceProvider
         // Notifications
         Livewire::component('qf.notifications-index', \QuickerFaster\UILibrary\Http\Livewire\Notifications\NotificationsIndex::class);
         Livewire::component('qf.notification-preferences', \QuickerFaster\UILibrary\Http\Livewire\Notifications\NotificationPreferences::class);
+
+        // Invitations
+        Livewire::component('qf.accept-invitation', \QuickerFaster\UILibrary\Http\Livewire\Invitations\AcceptInvitation::class);
     }
 
     private function registerCommands(): void
@@ -454,6 +457,11 @@ class UILibraryServiceProvider extends ServiceProvider
         Event::listen(
             \QuickerFaster\UILibrary\Events\ToggleButtonEvent::class,
             \QuickerFaster\UILibrary\Listeners\ToggleButtonListener::class
+        );
+
+        Event::listen(
+            \QuickerFaster\UILibrary\Events\DataTableRecordSaved::class,
+            \QuickerFaster\UILibrary\Core\Admin\Listeners\InvitationRecordListener::class
         );
 
         Event::subscribe(\QuickerFaster\UILibrary\Listeners\NotificationEventSubscriber::class);

@@ -13,11 +13,17 @@
 |   QuickerFaster\UILibrary\Console\Commands\GenerateScheduledReports
 |   (signature: reports:generate-scheduled)
 |
+| Invitation expiry is driven by:
+|
+|   QuickerFaster\UILibrary\Console\Commands\ExpireInvitations
+|   (signature: invitations:expire)
+|
 | Example registration:
 |
 |   protected function schedule(Schedule $schedule)
 |   {
 |       $schedule->command('reports:generate-scheduled')->hourly();
+|       $schedule->command('invitations:expire')->daily();
 |   }
 |
 | Optional config/qf.php retention knob (legacy note):

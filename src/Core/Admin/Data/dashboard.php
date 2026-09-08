@@ -218,10 +218,10 @@ return array (
             'component' => 'qf.data-table-form',
             'params' =>
             array (
-              'configKey' => 'admin.user',
+              'configKey' => 'admin.invitation',
               'recordId' => null,
             ),
-            'title' => 'Invite User',
+            'title' => 'Send Invitation',
           ),
           'style' => 'primary',
         ),

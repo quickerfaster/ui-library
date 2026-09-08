@@ -1432,7 +1432,23 @@ class DataTable extends Component
 
     public function getValueFromRecord($record, string $path)
     {
+        // If the path is a simple field name (no dot notation), check if it has a
+        // relationship definition. If so, resolve the relationship display value
+        // instead of returning the raw foreign key value.
+        if (!str_contains($path, '.')) {
+            $fieldDef = $this->allFieldDefinitions[$path] ?? null;
+            if ($fieldDef && isset($fieldDef['relationship'])) {
+                $relationMethod = $this->getRelationMethodFromField($path, $fieldDef);
+                $displayColumn = $this->getRelationDisplayColumn($fieldDef);
 
+                if ($relationMethod && $displayColumn) {
+                    $related = $record->{$relationMethod};
+                    if ($related) {
+                        return data_get($related, $displayColumn) ?? data_get($record, $path);
+                    }
+                }
+            }
+        }
 
         return data_get($record, $path);
     }

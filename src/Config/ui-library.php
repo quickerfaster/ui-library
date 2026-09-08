@@ -923,6 +923,12 @@ return [
             'decay_minutes' => 1,
         ],
     ],
+    'invitations' => [
+        'expiration_days' => 7,
+        'mail' => [
+            'template' => 'qf::mail.invitation',
+        ],
+    ],
     'quick_actions' => [
         'enabled' => true,
         'roles' => '*',

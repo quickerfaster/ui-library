@@ -56,6 +56,26 @@ return array (
     ),
     4 =>
     array (
+      'type' => 'stat',
+      'title' => 'Pending Invitations',
+      'size' => 'col-12',
+      'model' => 'QuickerFaster\\UILibrary\\Models\\Invitation',
+      'icon' => 'fas fa-envelope-open-text',
+      'aggregate' => 'count',
+      'conditions' =>
+      array (
+        0 =>
+        array (
+          0 => 'status',
+          1 => '=',
+          2 => 'pending',
+        ),
+      ),
+      'width' => 3,
+      'link' => '/admin/invitations?status=pending',
+    ),
+    5 =>
+    array (
       'type' => 'chart',
       'title' => 'Users by Status',
       'size' => 'col-12',
@@ -66,7 +86,7 @@ return array (
       'aggregate' => 'count',
       'width' => 4,
     ),
-    5 =>
+    6 =>
     array (
       'type' => 'chart',
       'title' => 'Roles by Guard',
@@ -78,7 +98,7 @@ return array (
       'aggregate' => 'count',
       'width' => 4,
     ),
-    6 =>
+    7 =>
     array (
       'type' => 'chart',
       'title' => 'Permissions by Guard',
@@ -90,7 +110,7 @@ return array (
       'aggregate' => 'count',
       'width' => 4,
     ),
-    7 =>
+    8 =>
     array (
       'type' => 'list',
       'title' => 'Recent Users',
@@ -127,7 +147,7 @@ return array (
       'show_view_all' => true,
       'view_all_link' => '/admin/users',
     ),
-    8 =>
+    9 =>
     array (
       'type' => 'list',
       'title' => 'Roles (A–Z)',
@@ -163,7 +183,7 @@ return array (
       'show_view_all' => true,
       'view_all_link' => '/admin/roles',
     ),
-    9 =>
+    10 =>
     array (
       'type' => 'action_card',
       'title' => 'Add New User',
@@ -191,7 +211,7 @@ return array (
       ),
       'width' => 3,
     ),
-    10 =>
+    11 =>
    array (
      'type' => 'action_card',
      'title' => 'Manage Roles',

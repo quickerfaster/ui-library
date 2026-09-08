@@ -1,11 +1,10 @@
 {{--
-    Invitations page for the Accounts context group.
+    Invitations audit page for the Accounts context group.
+
+    Read-only view showing all invitations across companies.
+    Uses the same admin.invitation DataTable config, but in a
+    system-level read-only context.
 --}}
-<x-qf::navigation-layout context="accounts" moduleName="system" :overrides="[]">
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Invitations</h5>
-            <p class="card-text">This page will be implemented in the future. It will provide management of user invitations and onboarding workflows.</p>
-        </div>
-    </div>
+<x-qf::navigation-layout configKey="admin.invitation" context="accounts" moduleName="system" :overrides="[]">
+    <livewire:qf.data-table configKey="admin.invitation" />
 </x-qf::navigation-layout>

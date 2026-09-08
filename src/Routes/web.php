@@ -140,5 +140,9 @@ Route::group(['middleware' => 'web'], function () {
         return view('testing');
     });
 
+    // Invitations — public accept route (token-based security)
+    Route::get('/invitations/accept/{token}', \QuickerFaster\UILibrary\Http\Livewire\Invitations\AcceptInvitation::class)
+        ->name('invitations.accept');
+
 
 });
