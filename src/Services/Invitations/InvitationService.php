@@ -3,6 +3,7 @@
 namespace QuickerFaster\UILibrary\Services\Invitations;
 
 use QuickerFaster\UILibrary\Models\Invitation;
+use QuickerFaster\UILibrary\Models\InvitationLog;
 use QuickerFaster\UILibrary\Mail\InvitationMail;
 use QuickerFaster\UILibrary\Events\Invitations\InvitationSent;
 use QuickerFaster\UILibrary\Events\Invitations\InvitationAccepted;
@@ -33,6 +34,8 @@ class InvitationService
         ]);
 
         $this->sendMail($invitation);
+
+        $this->log($invitation, 'sent', $createdBy);
 
         InvitationSent::dispatch($invitation);
 
@@ -85,6 +88,8 @@ class InvitationService
             'accepted_at' => now(),
         ]);
 
+        $this->log($invitation, 'accepted', $user->id);
+
         InvitationAccepted::dispatch($invitation);
 
         return $invitation;
@@ -100,6 +105,8 @@ class InvitationService
         ]);
 
         $this->sendMail($invitation);
+
+        $this->log($invitation, 'resend', auth()->id());
     }
 
     /**
@@ -111,6 +118,8 @@ class InvitationService
             'status' => Invitation::STATUS_REVOKED,
             'revoked_at' => now(),
         ]);
+
+        $this->log($invitation, 'revoked', auth()->id());
 
         InvitationRevoked::dispatch($invitation);
     }
@@ -127,10 +136,58 @@ class InvitationService
         foreach ($expired as $invitation) {
             $invitation->update(['status' => Invitation::STATUS_EXPIRED]);
 
+            $this->log($invitation, 'expired');
+
             InvitationExpired::dispatch($invitation);
         }
 
         return $expired->count();
+    }
+
+    /**
+     * Send a reminder for a pending invitation approaching expiration.
+     *
+     * Only sends if the invitation is pending, expires within 2 days,
+     * and has not already been reminded.
+     */
+    public function sendReminder(Invitation $invitation): bool
+    {
+        if (! $invitation->isPending()) {
+            return false;
+        }
+
+        if ($invitation->reminded_at) {
+            return false;
+        }
+
+        if (! $invitation->expires_at || $invitation->expires_at->diffInDays(now()) > 2) {
+            return false;
+        }
+
+        // Send reminder email with "Reminder:" prefix
+        Mail::to($invitation->email)->queue(
+            new InvitationMail($invitation, $this->generateAcceptUrl($invitation), 'Reminder: ')
+        );
+
+        $invitation->update(['reminded_at' => now()]);
+
+        $this->log($invitation, 'reminded');
+
+        return true;
+    }
+
+    /**
+     * Find all pending invitations that need reminders (expiring within 2 days, not yet reminded).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getPendingReminders()
+    {
+        return Invitation::where('status', Invitation::STATUS_PENDING)
+            ->whereNull('reminded_at')
+            ->where('expires_at', '<=', now()->addDays(2))
+            ->where('expires_at', '>', now())
+            ->get();
     }
 
     /**
@@ -171,5 +228,18 @@ class InvitationService
         Mail::to($invitation->email)->queue(
             new InvitationMail($invitation, $this->generateAcceptUrl($invitation))
         );
+    }
+
+    /**
+     * Log an action on an invitation for audit trail.
+     */
+    protected function log(Invitation $invitation, string $action, ?int $performedBy = null, array $metadata = []): InvitationLog
+    {
+        return InvitationLog::create([
+            'invitation_id' => $invitation->id,
+            'action' => $action,
+            'performed_by' => $performedBy,
+            'metadata' => $metadata,
+        ]);
     }
 }

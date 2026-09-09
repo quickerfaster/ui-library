@@ -18,12 +18,18 @@
 |   QuickerFaster\UILibrary\Console\Commands\ExpireInvitations
 |   (signature: invitations:expire)
 |
+| Invitation reminders are driven by:
+|
+|   QuickerFaster\UILibrary\Console\Commands\SendInvitationReminders
+|   (signature: invitations:send-reminders)
+|
 | Example registration:
 |
 |   protected function schedule(Schedule $schedule)
 |   {
 |       $schedule->command('reports:generate-scheduled')->hourly();
 |       $schedule->command('invitations:expire')->daily();
+|       $schedule->command('invitations:send-reminders')->dailyAt('09:00');
 |   }
 |
 | Optional config/qf.php retention knob (legacy note):

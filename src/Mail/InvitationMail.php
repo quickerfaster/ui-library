@@ -13,6 +13,7 @@ class InvitationMail extends Mailable
     public function __construct(
         public Invitation $invitation,
         public string $acceptUrl,
+        public string $subjectPrefix = '',
     ) {}
 
     public function build()
@@ -20,7 +21,7 @@ class InvitationMail extends Mailable
         $companyName = config('app.name', 'QuickerFaster');
 
         return $this
-            ->subject("You've been invited to join {$companyName}")
+            ->subject($this->subjectPrefix . "You've been invited to join {$companyName}")
             ->markdown('qf::mail.invitation', [
                 'invitation' => $this->invitation,
                 'acceptUrl' => $this->acceptUrl,

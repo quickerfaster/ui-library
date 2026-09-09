@@ -96,6 +96,87 @@
 
 ---
 
+---
+
+## F. Before Adding Custom Row Actions (`moreActions`)
+
+- [ ] **Use the `event` key pattern**: When defining custom row actions in a data config's `moreActions` array, use the `event` key to dispatch a Livewire event. The value is the event name that your DataTable subclass will listen for.
+
+  ```php
+  // Correct — flat 'event' key dispatches a Livewire event
+  'moreActions' => [
+      [
+          'title' => 'Resend Invitation',
+          'icon' => 'fas fa-paper-plane',
+          'event' => 'resendInvitation',          // ← dispatched as Livewire event
+          'permission' => 'view_invitation',
+          'condition' => ['status' => 'pending'],  // ← flat format
+      ],
+  ],
+  ```
+
+- [ ] **Use the flat `condition` format**: Conditions are specified as a simple key-value array (`['status' => 'pending']`), NOT the nested `{field, operator, value}` format. The flat format means "show this action only when the record's field equals this value."
+
+  ```php
+  // Correct — flat key-value condition
+  'condition' => ['status' => 'pending']
+
+  // Wrong — nested operator format (not supported by moreActions)
+  'condition' => ['field' => 'status', 'operator' => '=', 'value' => 'pending']
+  ```
+
+- [ ] **Extend `DataTable` with `executeRowAction()` override**: The base `DataTable` does not handle a plain `event` key in `moreActions` — it only handles `dispatchLivewireEvent` (with `eventName`/`params`). To support the `event` key, create a subclass that overrides `executeRowAction()`:
+
+  ```php
+  // In your custom DataTable subclass (e.g., InvitationDataTable)
+  public function executeRowAction($params): void
+  {
+      if (empty($params) || !is_array($params)) {
+          return;
+      }
+
+      if (!isset($params['actionIndex']) || !isset($params['recordId'])) {
+          return;
+      }
+
+      $action = $this->moreActions[$params['actionIndex']] ?? null;
+      if (!$action) {
+          return;
+      }
+
+      // If the action defines a plain 'event' key, dispatch it as a
+      // Livewire event and let the dedicated listener handle the rest.
+      if (!empty($action['event'])) {
+          $this->dispatch($action['event'], $params['recordId']);
+          return;
+      }
+
+      // Fall through to the parent implementation for all other action types.
+      parent::executeRowAction($params);
+  }
+  ```
+
+- [ ] **Register dedicated listeners**: Each `event` value must have a corresponding listener method in your DataTable subclass. Add the event name to the `$listeners` array and implement the handler method:
+
+  ```php
+  protected $listeners = [
+      // ... base listeners ...
+      'resendInvitation' => 'resendInvitation',
+      'revokeInvitation' => 'revokeInvitation',
+      'copyInvitationLink' => 'copyInvitationLink',
+  ];
+
+  public function resendInvitation($recordId): void
+  {
+      // Handle resend logic, then refresh the table
+      $this->dispatch('$refresh');
+  }
+  ```
+
+- [ ] **Reference canonical examples**: See [`InvitationDataTable`](src/Http/Livewire/DataTables/InvitationDataTable.php) for the complete `executeRowAction()` override and listener pattern, and [`invitation.php`](src/Core/Admin/Data/invitation.php) for the `moreActions` config definition with `event` keys and flat `condition` format.
+
+---
+
 ## Quick Reference: Common Violations & Fixes
 
 | Violation | Symptom | Fix |

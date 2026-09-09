@@ -22,6 +22,7 @@ class Invitation extends Model
         'expires_at',
         'accepted_at',
         'revoked_at',
+        'reminded_at',
         'created_by',
     ];
 
@@ -29,6 +30,7 @@ class Invitation extends Model
         'expires_at' => 'datetime',
         'accepted_at' => 'datetime',
         'revoked_at' => 'datetime',
+        'reminded_at' => 'datetime',
     ];
 
     /**
@@ -78,5 +80,13 @@ class Invitation extends Model
     public function hasExpired(): bool
     {
         return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    /**
+     * Audit log entries for this invitation.
+     */
+    public function logs()
+    {
+        return $this->hasMany(InvitationLog::class);
     }
 }

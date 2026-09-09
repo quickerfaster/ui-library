@@ -27,6 +27,11 @@
                         </div>
                         <h4 class="mb-3">Setup Complete!</h4>
                         <p class="text-muted">Your account has been created and you are now logged in.</p>
+                        <p class="text-muted small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            If your organization has configured onboarding steps, you will be guided through them now.
+                            Otherwise, you will be taken directly to the dashboard.
+                        </p>
                         <a href="{{ route(config('ui-library.home_route', 'admin.dashboard')) }}" class="btn btn-primary mt-2">
                             <i class="fas fa-arrow-right me-1"></i> Go to Dashboard
                         </a>

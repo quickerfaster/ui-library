@@ -1359,11 +1359,13 @@ The following planned features were deferred for a future release:
 
 | Item | Phase | Reason |
 |------|-------|--------|
-| Bulk CSV invite UI (BulkInvite component) | Phase 2 | Lower priority; single invitation flow provides core value |
+| Bulk CSV upload (CSV file import with column mapping) | Phase 2 | Lower priority; paste-emails bulk invite covers the common case |
 | Manual employee linking UI (InvitationDetail component) | Phase 3 | Lower priority; auto-linking covers the common case |
 | "Needs Linking" filter | Phase 3 | Depends on manual link UI |
 
-###8.5 What Works End-to-End
+**Note**: The `BulkInvite` component (paste-emails mode) has been implemented. It supports pasting multiple email addresses (one per line) with a default role assignment. The CSV upload mode (file import with column mapping for per-email role/employee assignment) remains deferred.
+
+### 8.5 What Works End-to-End
 
 The following flow is fully functional and tested:
 
@@ -1385,7 +1387,19 @@ Admin creates invitation (via dashboard quick action or admin/invitations DataTa
 
 **Expiration handling**: The `invitations:expire` scheduled command runs daily, expiring pending invitations past their `expires_at` date and dispatching `InvitationExpired` events.
 
-**Management UI**: The admin invitations page at `/admin/invitations` displays a DataTable with status, role, and employee columns. Row actions support resend and revoke. The system invitations page at `/system/invitations` provides a read-only audit view.
+**Management UI**: The admin invitations page at `/admin/invitations` displays a DataTable with status, role, and employee columns. The [`InvitationDataTable`](src/Http/Livewire/DataTables/InvitationDataTable.php) component extends the base `DataTable` and provides custom row actions via the `moreActions` `event` key pattern:
+
+| Row Action | Event | Condition | Description |
+|------------|-------|-----------|-------------|
+| Resend Invitation | `resendInvitation` | `status = pending` | Generates a new token and re-dispatches the invitation email |
+| Revoke Invitation | `revokeInvitation` | `status = pending` | Invalidates the invitation token and marks it as revoked |
+| Copy Invitation Link | `copyInvitationLink` | `status = pending` | Copies the signed accept URL to the clipboard via Alpine.js |
+
+These actions are defined in [`invitation.php`](src/Core/Admin/Data/invitation.php) under the `moreActions` key using the flat `condition` format (`['status' => 'pending']`). The `InvitationDataTable` overrides `executeRowAction()` to dispatch the `event` value as a Livewire event, with dedicated listener methods (`resendInvitation`, `revokeInvitation`, `copyInvitationLink`) handling the business logic.
+
+**Bulk Invite**: The [`BulkInvite`](src/Http/Livewire/Invitations/BulkInvite.php) component supports pasting multiple email addresses (one per line) with a default role assignment, dispatching invitations in bulk. CSV file upload with per-email column mapping remains deferred (see §8.4).
+
+The system invitations page at `/system/invitations` provides a read-only audit view.
 
 ###8.6 Library Independence
 

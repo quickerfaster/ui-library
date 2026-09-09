@@ -87,6 +87,23 @@ class AcceptInvitation extends Component
 
         if ($user) {
             Auth::login($user);
+
+            // Phase 7: Post-acceptance onboarding — redirect to first
+            // incomplete onboarding step if the consuming app has configured
+            // Spatie Onboard steps for the User model.
+            if (method_exists($user, 'hasIncompleteOnboardingSteps') && $user->hasIncompleteOnboardingSteps()) {
+                $firstIncomplete = $user->getFirstIncompleteOnboardingStep();
+                if ($firstIncomplete) {
+                    $this->redirect(route($firstIncomplete['route'] ?? 'onboarding.start'));
+
+                    return;
+                }
+            }
+
+            // No onboarding steps configured (or all complete) — go home.
+            $this->redirect(route(config('ui-library.home_route', 'admin.dashboard')));
+
+            return;
         }
     }
 
