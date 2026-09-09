@@ -381,6 +381,8 @@ class UILibraryServiceProvider extends ServiceProvider
 
         // Invitations
         Livewire::component('qf.accept-invitation', \QuickerFaster\UILibrary\Http\Livewire\Invitations\AcceptInvitation::class);
+        Livewire::component('qf.invitation-data-table', \QuickerFaster\UILibrary\Http\Livewire\DataTables\InvitationDataTable::class);
+        Livewire::component('qf.bulk-invite', \QuickerFaster\UILibrary\Http\Livewire\Invitations\BulkInvite::class);
     }
 
     private function registerCommands(): void

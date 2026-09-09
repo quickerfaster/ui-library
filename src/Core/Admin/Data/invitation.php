@@ -312,33 +312,21 @@ return [
             'icon' => 'fas fa-paper-plane',
             'event' => 'resendInvitation',
             'permission' => 'view_invitation',
-            'condition' => [
-                'field' => 'status',
-                'operator' => '=',
-                'value' => 'pending',
-            ],
+            'condition' => ['status' => 'pending'],
         ],
         [
             'title' => 'Revoke Invitation',
             'icon' => 'fas fa-ban',
             'event' => 'revokeInvitation',
             'permission' => 'view_invitation',
-            'condition' => [
-                'field' => 'status',
-                'operator' => '=',
-                'value' => 'pending',
-            ],
+            'condition' => ['status' => 'pending'],
         ],
         [
             'title' => 'Copy Invitation Link',
             'icon' => 'fas fa-copy',
             'event' => 'copyInvitationLink',
             'permission' => 'view_invitation',
-            'condition' => [
-                'field' => 'status',
-                'operator' => '=',
-                'value' => 'pending',
-            ],
+            'condition' => ['status' => 'pending'],
         ],
     ],
 ];
