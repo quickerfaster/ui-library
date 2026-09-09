@@ -20,6 +20,10 @@ class InvitationMail extends Mailable
     {
         $companyName = config('app.name', 'QuickerFaster');
 
+        // Resolve the role name from the Spatie Role relationship.
+        // The 'role' column stores the role ID; roleRelation gives us the name.
+        $roleName = $this->invitation->roleRelation?->name ?? $this->invitation->role ?? 'Member';
+
         return $this
             ->subject($this->subjectPrefix . "You've been invited to join {$companyName}")
             ->markdown('qf::mail.invitation', [
@@ -27,6 +31,7 @@ class InvitationMail extends Mailable
                 'acceptUrl' => $this->acceptUrl,
                 'companyName' => $companyName,
                 'expiresAt' => $this->invitation->expires_at,
+                'roleName' => $roleName,
             ]);
     }
 }

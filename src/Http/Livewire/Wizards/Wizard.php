@@ -114,8 +114,7 @@ class Wizard extends Component
     public function cancel(): void
     {
         session()->forget($this->wizardId);
-        // Redirect to a sensible default – you can make this configurable
-        redirect()->to('/');
+        $this->redirect($this->returnPath ?? '/');
     }
 
     public function finish(): void

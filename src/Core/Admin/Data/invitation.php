@@ -173,9 +173,8 @@ return [
         ],
         'onQuery' => [
             '0' => 'token',
-            '1' => 'message',
-            '2' => 'invitable_type',
-            '3' => 'invitable_id',
+            '1' => 'invitable_type',
+            '2' => 'invitable_id',
         ],
     ],
 

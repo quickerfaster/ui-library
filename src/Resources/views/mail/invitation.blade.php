@@ -7,7 +7,7 @@
 > {{ $invitation->message }}
 @endif
 
-**Role:** {{ $invitation->role ?? 'Member' }}
+**Role:** {{ $roleName }}
 
 @component('mail::button', ['url' => $acceptUrl])
 Accept Invitation

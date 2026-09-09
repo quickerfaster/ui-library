@@ -35,6 +35,7 @@ trait HasUILibraryUser
 {
     use HasSettings;
     use HasNotifications;
+    use \Spatie\Onboard\Concerns\GetsOnboarded;
 
     /**
      * Columns the library manages on the consuming app's User model that must

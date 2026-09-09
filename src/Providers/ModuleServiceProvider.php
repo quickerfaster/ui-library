@@ -222,14 +222,14 @@ class ModuleServiceProvider extends ServiceProvider
             Onboard::addStep($step['title'])
                 ->link($step['link'])
                 ->cta($step['cta'])
-                ->completeIf(function ($user) use ($step) {
+                ->completeIf(function ($model) use ($step) {
                     if (isset($step['model'])) {
                         return $step['model']::exists();
                     }
 
                     if (isset($step['condition'])) {
                         $condition = app($step['condition']);
-                        return $condition($user);
+                        return $condition($model);
                     }
 
                     return false;

@@ -88,15 +88,36 @@ class AcceptInvitation extends Component
         if ($user) {
             Auth::login($user);
 
-            // Phase 7: Post-acceptance onboarding — redirect to first
-            // incomplete onboarding step if the consuming app has configured
-            // Spatie Onboard steps for the User model.
-            if (method_exists($user, 'hasIncompleteOnboardingSteps') && $user->hasIncompleteOnboardingSteps()) {
-                $firstIncomplete = $user->getFirstIncompleteOnboardingStep();
-                if ($firstIncomplete) {
-                    $this->redirect(route($firstIncomplete['route'] ?? 'onboarding.start'));
+            // Phase 7: Post-acceptance onboarding — redirect to the
+            // consolidated onboarding wizard if the consuming app has
+            // registered HR onboarding steps via Spatie Onboard.
+            //
+            // The HR module now registers a single "Employee Onboarding"
+            // step pointing to the /onboarding wizard route. The wizard
+            // component manages its own internal sub-step state.
+            //
+            // Link resolution:
+            //   - HR onboarding: stored as "/onboarding" (raw URL path)
+            //     → falls through to url() after route() fails
+            //   - app_onboarding defaults: e.g. "/my-profile"
+            //     → same fallback behavior
+            if (method_exists($user, 'onboarding')) {
+                $onboarding = $user->onboarding();
 
-                    return;
+                if ($onboarding->inProgress()) {
+                    $nextStep = $onboarding->nextUnfinishedStep();
+
+                    if ($nextStep && $nextStep->link) {
+                        // Resolve as named route first (library defaults),
+                        // fall back to raw URL (HR wizard /onboarding).
+                        try {
+                            $this->redirect(route($nextStep->link));
+                        } catch (\Exception $e) {
+                            $this->redirect(url($nextStep->link));
+                        }
+
+                        return;
+                    }
                 }
             }
 

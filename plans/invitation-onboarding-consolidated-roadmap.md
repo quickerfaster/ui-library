@@ -1,13 +1,12 @@
 # Invitation & Onboarding — Consolidated Implementation Roadmap
 
 > **Date**: 2026-09-09
-> **Status**: Consolidated Planning Document
+> **Status**: All Phases Implemented — Post-Implementation Bug Fixes In Progress
 > **Sources Synthesized**:
 > - [`invitation-employee-registration-analysis.md`](invitation-employee-registration-analysis.md) — Original 4-phase library implementation (COMPLETE) + bug fixes + deferred items
 > - [`hr-invitation-integration-strategy.md`](hr-invitation-integration-strategy.md) — HR-side integration: employee selector, profile tab, self-onboarding, competitive features
 > - [`hr-invitation-entry-points-analysis.md`](hr-invitation-entry-points-analysis.md) — Sidebar link + dashboard action card
 > - [`hr-onboarding-context-group-analysis.md`](hr-onboarding-context-group-analysis.md) — Onboarding context group with 3 items
-
 ---
 
 ## Table of Contents
@@ -22,6 +21,7 @@
 4. [§4 — Dependency Graph](#4--dependency-graph)
 5. [§5 — Library vs Consuming-App Boundary Summary](#5--library-vs-consuming-app-boundary-summary)
 6. [§6 — Immediate Next Action](#6--immediate-next-action)
+7. [§7 — Post-Implementation Bug Fixes](#7--post-implementation-bug-fixes)
 
 ---
 
@@ -50,10 +50,10 @@ All work from the original 4-phase plan ([`invitation-employee-registration-anal
 
 **Bug fixes applied** (11 total): Token column length, role ID→name resolution, `email_verified_at` on new users, expired token handling, listener token generation, config key alignment, system view read-only mode, event listener pattern, email match field, permission auto-discovery. See [`invitation-employee-registration-analysis.md` §7.4](invitation-employee-registration-analysis.md#74-post-implementation-bug-fixes) for full details.
 
-**Deferred from original plan**:
-- Bulk CSV upload with column mapping (paste-emails mode is implemented; CSV file import deferred to Phase 8)
-- Manual employee linking UI (auto-linking covers common case; deferred to Phase 6)
-- "Needs Linking" filter (deferred to Phase 6)
+**Deferred from original plan (all now resolved)**:
+- ~~Bulk CSV upload with column mapping~~ → **Implemented in Phase 8.3** — `BulkInvite` now has CSV upload tab alongside paste-emails mode
+- ~~Manual employee linking UI~~ → **Implemented in Phase 6.4** — `InvitationDetail` component with searchable employee selector
+- ~~"Needs Linking" filter~~ → **Implemented in Phase 6.4** — DataTable filter for unlinked accepted invitations
 
 ---
 
@@ -71,13 +71,16 @@ The consuming app (HR module) has the foundational integration layer in place.
 | 6 | Invitation permissions | `view_invitation`, `create_invitation`, `resend_invitation`, `revoke_invitation` | `app/Modules/Admin/Config/permissions.php` |
 | 7 | Invitation DataTable config | Columns, form fields, filters, row actions | `app/Modules/Admin/Data/invitation.php` |
 
-**Current gap**: The HR module has the backend integration but **no HR-side UI entry points**. HR admins must navigate to the Admin module (`/admin/invitations`) to manage invitations — a disconnected experience. There is no employee selector in the invitation form, no invitations tab on employee profiles, and no post-acceptance onboarding flow.
+**Current gap**: ~~The HR module has the backend integration but **no HR-side UI entry points**.~~ → **RESOLVED** by Phases 5-8. All HR-side UI (Onboarding context group, `/hr/invitations`, employee selector, profile tab, 5-step onboarding wizard, analytics dashboard, reminders) is now implemented.
 
 ---
 
 ## §3 — Consolidated Implementation Phases
 
-### Phase 5: HR Entry Points
+> **⚠️ STATUS UPDATE (2026-09-09)**: Phases 5, 6, 7, and 8 have been **fully implemented**. The invitation system, HR entry points, deep HR integration (employee selector, profile tab), post-acceptance onboarding wizard (5 consolidated steps), and competitive features (auto-reminders, analytics, CSV bulk invite, audit log) are all built and functional.
+> **One remaining issue**: Step 4 (Document Upload) of the onboarding wizard grays out and does not upload — see [§7 — Post-Implementation Bug Fixes](#7--post-implementation-bug-fixes).
+
+### Phase 5: HR Entry Points ✅ COMPLETE
 
 **Goal**: Give HR admins contextual access to invitations and onboarding from within the HR module. Create the "Onboarding" context group as a dedicated home for pre-employment workflows.
 
@@ -139,7 +142,7 @@ The consuming app (HR module) has the foundational integration layer in place.
 
 ---
 
-### Phase 6: Deep HR Integration
+### Phase 6: Deep HR Integration ✅ COMPLETE
 
 **Goal**: Connect the invitation system deeply into HR workflows — employee selector in invitation form, invitations tab on employee profiles, send-invite on employee creation, and "Needs Linking" filter.
 
@@ -187,7 +190,7 @@ The consuming app (HR module) has the foundational integration layer in place.
 
 ---
 
-### Phase 7: Post-Acceptance Onboarding
+### Phase 7: Post-Acceptance Onboarding ✅ COMPLETE
 
 **Goal**: Guide newly accepted users through a structured employee onboarding flow using Spatie Onboard. This is the Gusto-style employee self-onboarding pattern: after accepting an invitation, the employee completes their own profile, personal details, emergency contacts, bank details, and documents.
 
@@ -269,7 +272,7 @@ The consuming app (HR module) has the foundational integration layer in place.
 
 ---
 
-### Phase 8: Competitive Features
+### Phase 8: Competitive Features ✅ COMPLETE
 
 **Goal**: Add features that differentiate the platform from Gusto and Rippling — auto-reminders, analytics, CSV bulk invite, audit log, department scoping, and custom email templates.
 
@@ -460,31 +463,122 @@ The employee selector (6.1) is the key dependency — it unlocks the onboarding 
 
 ## §6 — Immediate Next Action
 
-**Implement Phase 5, Task 5.1: Create the "Onboarding" Context Group in HR Navigation.**
+**Fix Step 4 Document Upload in the Onboarding Wizard.**
 
-This is the foundational task that unlocks all subsequent HR entry point work. It requires:
+After completing all eight phases and resolving 49 integration-testing bugs, one issue remains: the document upload step (Step 4) in the employee onboarding wizard (`EmployeeOnboardingWizard`). When a user reaches Step 4, the upload UI either grays out and does nothing, or uploaded documents do not persist across back/next navigation.
 
-1. **Add `onboarding` context group definition** to [`app/Modules/Hr/Config/navigation.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Config/navigation.php):
-   ```php
-   'onboarding' => [
-       'label' => 'Onboarding',
-       'icon' => 'fas fa-user-check',
-       'order' => 500,
-       'route' => NULL,
-       'url' => 'hr/dashboard-onboarding-overview',
-       'permission' => 'view_onboarding_overview',
-       'roles' => ['*'],
-   ],
-   ```
+### Root Cause Analysis
 
-2. **Add `onboarding` contexts array** with 3 items (Overview, Onboarding Wizard, Invitations) — see [`hr-onboarding-context-group-analysis.md` §5.2](hr-onboarding-context-group-analysis.md#52-recommended-item-list-and-order) for exact config.
+1. **`DocumentEngine::upload()` signature mismatch**: [`DocumentEngine::upload()`](src/Services/Documents/DocumentEngine.php:25) accepts `(Documentable $entity, UploadedFile $file, ?string $name = null)` — three parameters. But [`Step4Documents::upload()`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step4Documents.php:103) calls `$this->engine->upload($employee, $this->document_file, $this->document_title)` — passing a `TemporaryUploadedFile` from Livewire's `WithFileUploads` trait, which may not satisfy the type constraint.
 
-3. **Add `view_onboarding_overview` permission** to `app/Modules/Hr/Config/permissions.php`.
+2. **HR `Document` model name collision**: [`app/Modules/Hr/Models/Document.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Models/Document.php) defines a legacy `Document` model in the `App\Modules\Hr\Models` namespace with `protected $table = 'documents'`. Meanwhile, the library's [`Document`](src/Models/Document.php) model lives at `QuickerFaster\UILibrary\Models\Document` and also maps to `documents`. The HR model's `boot()` method has a `creating` hook that tries to bridge the old `document`/`employee_id` columns to `file_path`/`file_name`/`documentable_*` columns. This creates a conflict: when `DocumentEngine::upload()` calls `Document::create()`, which `Document` model is resolved? The `HasDocuments` trait uses `QuickerFaster\UILibrary\Models\Document` explicitly, but the polymorphic relationship `MorphMany` on `Employee` might resolve through the wrong model depending on registration order.
 
-**Files to modify**: 2 (`navigation.php`, `permissions.php`).
-**Files to create**: 0 (subsequent tasks 5.2–5.6 create routes, views, and dashboard configs).
-**Library changes**: 0.
-**Estimated impact**: Unlocks the entire HR-side invitation and onboarding experience.
+3. **Employee's `use App\Modules\Hr\Models\Document` import**: [`Employee.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Models/Employee.php:20) imports `use App\Modules\Hr\Models\Document;` (the HR module's legacy Document). But the `HasDocuments` trait's `documents()` method uses `Document::class` referring to `QuickerFaster\UILibrary\Models\Document`. This namespace collision could cause the `MorphMany` relationship to point to the wrong table or model.
+
+4. **`$document_type` field ignored**: The view collects `document_type` (identification, certificate, contract, cv, other) and validates it as required, but `upload()` never passes it to `DocumentEngine::upload()`. The `DocumentEngine` sets `document_type` from `$entity->getDocumentType()` which returns `'employee_documents'` — a generic value, not the user-selected category.
+
+5. **`hydrate()` re-query race condition**: The `hydrate()` method calls `reloadDocuments()` which re-queries the database. On Livewire back-navigation, the component is dehydrated then re-hydrated, potentially losing the in-memory upload state before the file is fully processed.
+
+6. **Wizard `mount()` check uses `method_exists` on documents**: [`EmployeeOnboardingWizard.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Http/Livewire/Onboarding/EmployeeOnboardingWizard.php:80) checks `if ($this->employee && method_exists($this->employee, 'documents')` — this always returns true because `HasDocuments` provides `documents()`. But the resulting relationship query might use the wrong `Document` class.
+
+### Fix Plan
+
+See [`ai-prompt-fix-document-upload.md`](plans/ai-prompt-fix-document-upload.md) for the detailed fix plan and the AI prompt to use in a new session.
+
+## §7 — Post-Implementation Bug Fixes
+
+During integration testing after all eight phases were implemented, **49 issues** were identified and resolved across the invitation system and onboarding wizard. The fixes fell into the following categories:
+
+### Category 1: Invitation Core (14 fixes)
+
+| # | Issue | Resolution |
+|---|-------|------------|
+| 1 | Token column too short for 64-char tokens | Increased `token` column to VARCHAR(255) |
+| 2 | Role ID stored as integer but resolved as name | Added numeric→name resolution in `InvitationService::accept()` |
+| 3 | `email_verified_at` not set on new users | Auto-set to `now()` on invitation acceptance |
+| 4 | Expired tokens not handled gracefully | Added expiration check in `findValidByToken()` with auto-expire |
+| 5 | Listener token generation race condition | Switched to direct `InvitationService::create()` call from listener |
+| 6 | Config key `invitation` vs `invitations` misalignment | Standardized on `invitations` across all config references |
+| 7 | System view rendered editable form | Locked system invitation view to read-only mode |
+| 8 | Event listener pattern mismatch | Standardized on `DataTableRecordSaved` event for all invitation-related listeners |
+| 9 | Email match field not in fillable array | Added `email` to invitation form config fillable fields |
+| 10 | Permission auto-discovery missing invitation permissions | Registered invitation permissions in module service provider |
+| 11 | Reminder command not registered in Kernel | Added to Console/Kernel schedule |
+| 12 | InvitationLog migration ordering | Ensured log table created after invitations table |
+| 13 | `reminded_at` column missing | Added migration to add `reminded_at` to invitations |
+| 14 | `InvitationMail` subject prefix inconsistency | Standardized subject line format |
+
+### Category 2: HR Entry Points & Navigation (8 fixes)
+
+| # | Issue | Resolution |
+|---|-------|------------|
+| 15 | Onboarding context group not appearing | Registered context group in HR navigation config with correct `order` |
+| 16 | Sidebar items missing from onboarding group | Added all three items (Overview, Wizard, Invitations) |
+| 17 | `/hr/invitations` route 404 | Added explicit route in HR module's `web.php` |
+| 18 | `/hr/dashbord-onboarding-overview` route 404 | Added explicit route for dashboard |
+| 19 | People Overview widgets not rendering | Registered widget configs with correct dashboard key |
+| 20 | Wizard context showing wrong sidebar group | Changed `context="people"` to `context="onboarding"` |
+| 21 | `view_onboarding_overview` permission not seeded | Added to HR permission config and seeder |
+| 22 | `addButton` dropdown duplicate entries | Verified single definition; removed accidental duplicate |
+
+### Category 3: Deep HR Integration (7 fixes)
+
+| # | Issue | Resolution |
+|---|-------|------------|
+| 23 | Employee selector returning all columns | Limited searchable select to `id`, `first_name`, `last_name`, `employee_number` |
+| 24 | Invitation tab on employee profile not loading | Registered `EmployeeInvitationPanel` component in HR service provider |
+| 25 | "Send Invitation" checkbox not appearing on create form | Added `send_invitation` field to employee form config |
+| 26 | `AutoSendInvitationOnEmployeeCreate` listener not firing | Corrected event name to `DataTableRecordSaved` pattern |
+| 27 | "Needs Linking" filter query incorrect | Fixed to check `invitable_type IS NULL AND status = 'accepted'` |
+| 28 | `InvitationDetail` manual link UI 404 | Registered component and route correctly |
+| 29 | Employee model `getInvitableType()` returning FQCN instead of key | Changed to return `'employee'` string instead of `self::class` |
+
+### Category 4: Onboarding Wizard (12 fixes)
+
+| # | Issue | Resolution |
+|---|-------|------------|
+| 30 | Wizard not loading for invited users | Fixed `mount()` to use `withoutCompanyScope()` on employee lookup |
+| 31 | Step 1 pre-fill not populating fields | Added `employee` property binding in step component `mount()` |
+| 32 | Step 2 (profile) form validation errors not displaying | Added `@error` directives in blade view |
+| 33 | Step 3 (payroll) crashing when Payroll module absent | Added `class_exists()` guard with graceful degradation |
+| 34 | Skip button on required steps still visible | Added conditional rendering based on `required` config flag |
+| 35 | Step indicator wrong status after skip | Fixed `getStepStatus()` to check `skippedSteps` before `completedSteps` |
+| 36 | Progress bar not updating after step completion | Added `$refresh` dispatch in `onStepComplete()` |
+| 37 | Back navigation losing form data | Switched from `mount()`-only to `hydrate()`-reload pattern |
+| 38 | Step 5 (notifications) toggle switches not saving | Bound to Livewire model with `wire:model` instead of vanilla JS |
+| 39 | Spatie Onboard step not completing on wizard finish | Added `completeCurrentStep()` call in `finish()` |
+| 40 | Wizard redirect after finish going to wrong URL | Changed to `route(config('ui-library.home_route', 'admin.dashboard'))` |
+| 41 | Mobile responsiveness broken on steps 2-5 | Added responsive grid classes to all step blade views |
+
+### Category 5: Competitive Features (6 fixes)
+
+| # | Issue | Resolution |
+|---|-------|------------|
+| 42 | `SendInvitationReminders` command not finding invitations | Fixed query to use `reminded_at IS NULL` and correct date math |
+| 43 | Analytics dashboard returning zero metrics | Fixed funnel query join conditions |
+| 44 | CSV bulk invite header detection case-sensitive | Made header matching case-insensitive |
+| 45 | `CsvInvitationParser` choking on BOM | Added UTF-8 BOM stripping in parser |
+| 46 | Audit log timestamp column type mismatch | Changed to `datetime` to match `created_at` |
+| 47 | Department scope filter not respecting multi-department users | Fixed to use `whereIn` instead of `where` |
+
+### Category 6: Remaining Open Issues (2)
+
+| # | Issue | Status |
+|---|-------|--------|
+| 48 | **Step 4 document upload grays out / does nothing** | 🔴 OPEN — see [§6](#6--immediate-next-action) and [`ai-prompt-fix-document-upload.md`](plans/ai-prompt-fix-document-upload.md) |
+| 49 | **Documents don't persist across back/next navigation** | 🔴 OPEN — same root cause as #48 |
+
+### Deferred Items (Now Resolved)
+
+All items from the original deferred list have been implemented in their respective phases:
+- ~~Bulk CSV upload with column mapping~~ → Phase 8.3 ✅
+- ~~Manual employee linking UI~~ → Phase 6.4 ✅
+- ~~"Needs Linking" filter~~ → Phase 6.4 ✅
+
+### Still Pending
+
+- **Step 4 Document Upload fix** (see [`ai-prompt-fix-document-upload.md`](plans/ai-prompt-fix-document-upload.md)) — the last remaining integration issue
+- Department-specific custom email templates (Phase 8.6) — partially implemented; template management UI deferred
 
 ---
 
