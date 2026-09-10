@@ -100,7 +100,19 @@
                                     @foreach ($group['fields'] as $field)
                                         @if (!$this->isFieldHidden($field, $isEditMode ? 'onEditForm' : 'onNewForm'))
                                             <div class="col-12  @if($crudType != "drawers") col-lg-8 @endif"> {{-- Centered-feel width --}}
-                                                {!! $this->getField($field)->renderForm($this->fields[$field] ?? null) !!}
+                                                @if(method_exists($this, 'isPresetField') && $this->isPresetField($field))
+                                                    {{-- Preset field: render as read-only badge with hidden input --}}
+                                                    <input type="hidden" wire:model="fields.{{ $field }}">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">{{ $this->getField($field)->getLabel() }}</label>
+                                                        <div class="form-control bg-light text-muted" style="cursor: not-allowed;">
+                                                            {{ !empty($this->selectedLabels[$field]) ? reset($this->selectedLabels[$field]) : ($this->fields[$field] ?? '—') }}
+                                                        </div>
+                                                    </div>
+                                                @else
+                                                    {{-- Normal field: render via renderForm() --}}
+                                                    {!! $this->getField($field)->renderForm($this->fields[$field] ?? null) !!}
+                                                @endif
                                             </div>
                                         @endif
                                     @endforeach

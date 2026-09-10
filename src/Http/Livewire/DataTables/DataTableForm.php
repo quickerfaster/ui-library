@@ -105,7 +105,6 @@ class DataTableForm extends Component
         $this->loadConfiguration();
         $this->initializeFields();
         $this->sessionCompanyId = session('current_company_id', 0);
-    \Log::info('DataTableForm mount - sessionCompanyId set to ' . $this->sessionCompanyId);
 
 
         if ($this->recordId) {
@@ -307,8 +306,7 @@ public function hydrate()
 protected function isAllCompaniesMode(): bool
 {
     $companyId = \Illuminate\Support\Facades\Session::get('current_company_id');
-
-    return empty($companyId) || (int) $companyId === 0;
+    return $companyId !== null && (int) $companyId === 0;
 }
 
 
@@ -355,8 +353,8 @@ protected function isAllCompaniesMode(): bool
 
             $this->fields[$field] = $value;
 
-            // Special handling for livewire-searchable-select: pre-populate selected labels
-            if ($fieldType === 'livewire-searchable-select') {
+            // Special handling for livewire-searchable-select and select: pre-populate selected labels
+            if (in_array($fieldType, ['livewire-searchable-select', 'select'])) {
                 $fieldObj = $this->getField($field);
                 if (method_exists($fieldObj, 'getInitialOptions')) {
                     $this->selectedLabels[$field] = $fieldObj->getInitialOptions($value);
@@ -365,12 +363,24 @@ protected function isAllCompaniesMode(): bool
         }
     }
 
+    /**
+     * Check if a field is preset (prefilled and should render as read-only).
+     * Used by livewire-searchable-select.blade.php to render a badge
+     * instead of an interactive search input.
+     * Computed from $this->prefilledData which is set once in mount() and
+     * never changes, so Livewire hydration cannot overwrite it.
+     */
+    public function isPresetField(string $fieldName): bool
+    {
+        return !empty($this->prefilledData[$fieldName]);
+    }
 
 
 
 
 
-protected function hydrateMorphToSelectFields(): void
+
+ protected function hydrateMorphToSelectFields(): void
 {
     foreach ($this->fieldDefinitions as $field => $def) {
         if (($def['field_type'] ?? '') !== 'morph_to_select') {
@@ -668,17 +678,15 @@ protected function hydrateMorphToSelectFields(): void
         }
 
 
-        // After fields are populated, refresh selectedLabels for searchable selects
+        // After fields are populated, refresh selectedLabels for searchable selects and selects
         foreach ($this->fieldDefinitions as $field => $definition) {
-            if (($definition['field_type'] ?? '') === 'livewire-searchable-select') {
+            if (in_array(($definition['field_type'] ?? ''), ['livewire-searchable-select', 'select'])) {
                 $fieldObj = $this->getField($field);
-                $this->selectedLabels[$field] = $fieldObj->getInitialOptions($this->fields[$field] ?? null);
+                if (method_exists($fieldObj, 'getInitialOptions')) {
+                    $this->selectedLabels[$field] = $fieldObj->getInitialOptions($this->fields[$field] ?? null);
+                }
             }
         }
-
-
-
-
 
     }
 

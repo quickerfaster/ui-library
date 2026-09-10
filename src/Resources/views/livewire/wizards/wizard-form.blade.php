@@ -20,7 +20,19 @@
                             $fieldType = $this->fieldDefinitions[$fieldName]['field_type'] ?? 'string';
                         @endphp
                         <div class="col-md-6">
-                            {!! $field->renderForm($this->fields[$fieldName] ?? null) !!}
+                            @if(method_exists($this, 'isPresetField') && $this->isPresetField($fieldName))
+                                {{-- Preset field: render as read-only badge with hidden input --}}
+                                <input type="hidden" wire:model="fields.{{ $fieldName }}">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ $field->getLabel() }}</label>
+                                    <div class="form-control bg-light text-muted" style="cursor: not-allowed;">
+                                        {{ !empty($this->selectedLabels[$fieldName]) ? reset($this->selectedLabels[$fieldName]) : ($this->fields[$fieldName] ?? '') }}
+                                    </div>
+                                </div>
+                            @else
+                                {{-- Normal field: render via renderForm() --}}
+                                {!! $field->renderForm($this->fields[$fieldName] ?? null) !!}
+                            @endif
 
                             {{-- Generic field hints system --}}
                             @php $hints = $this->fieldDefinitions[$fieldName]['hints'] ?? []; @endphp

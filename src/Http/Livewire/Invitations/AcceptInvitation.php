@@ -88,6 +88,10 @@ class AcceptInvitation extends Component
         if ($user) {
             Auth::login($user);
 
+            // Clear any stale company selection from a previous session
+            // (e.g., super admin's "All Companies" mode)
+            session()->forget('current_company_id');
+
             // Phase 7: Post-acceptance onboarding — redirect to the
             // consolidated onboarding wizard if the consuming app has
             // registered HR onboarding steps via Spatie Onboard.

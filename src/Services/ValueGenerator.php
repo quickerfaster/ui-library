@@ -43,7 +43,7 @@ class ValueGenerator
         $sequenceModel = $generatorDef['sequenceModel'] ?? $modelClass;
         $sequenceField = $generatorDef['sequenceField'] ?? $fieldName;
 
-        $max = $sequenceModel::max($sequenceField);
+        $max = $sequenceModel::withoutCompanyScope()->max($sequenceField);
         if ($max) {
             preg_match('/(\d+)$/', $max, $matches);
             return isset($matches[1]) ? (int)$matches[1] + 1 : 1;

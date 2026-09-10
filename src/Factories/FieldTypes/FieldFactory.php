@@ -26,6 +26,7 @@ class FieldFactory
         'string'       => TextField::class,
         'text'         => TextareaField::class,   // maybe textarea
         'select'       => SelectField::class,
+        'date'         => DatepickerField::class,
         'datepicker'   => DatepickerField::class,
         'timepicker'   => TimepickerField::class,
         'datetimepicker'   => DatetimepickerField::class,

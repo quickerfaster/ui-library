@@ -1,7 +1,7 @@
 # Invitation & Onboarding — Consolidated Implementation Roadmap
 
 > **Date**: 2026-09-09
-> **Status**: All Phases Implemented — Post-Implementation Bug Fixes In Progress
+> **Status**: All Phases Implemented — All Known Bugs Resolved (2026-09-10 Session)
 > **Sources Synthesized**:
 > - [`invitation-employee-registration-analysis.md`](invitation-employee-registration-analysis.md) — Original 4-phase library implementation (COMPLETE) + bug fixes + deferred items
 > - [`hr-invitation-integration-strategy.md`](hr-invitation-integration-strategy.md) — HR-side integration: employee selector, profile tab, self-onboarding, competitive features
@@ -20,8 +20,9 @@
    - [Phase 8: Competitive Features](#phase-8-competitive-features)
 4. [§4 — Dependency Graph](#4--dependency-graph)
 5. [§5 — Library vs Consuming-App Boundary Summary](#5--library-vs-consuming-app-boundary-summary)
-6. [§6 — Immediate Next Action](#6--immediate-next-action)
+6. [§6 — Document Upload Fix → Step 4 Removal](#6--document-upload-fix--step-4-removal-updated-2026-09-10)
 7. [§7 — Post-Implementation Bug Fixes](#7--post-implementation-bug-fixes)
+8. [§8 — All Fixes Applied (2026-09-10 Session)](#8--all-fixes-applied-2026-09-10-session)
 
 ---
 
@@ -71,14 +72,14 @@ The consuming app (HR module) has the foundational integration layer in place.
 | 6 | Invitation permissions | `view_invitation`, `create_invitation`, `resend_invitation`, `revoke_invitation` | `app/Modules/Admin/Config/permissions.php` |
 | 7 | Invitation DataTable config | Columns, form fields, filters, row actions | `app/Modules/Admin/Data/invitation.php` |
 
-**Current gap**: ~~The HR module has the backend integration but **no HR-side UI entry points**.~~ → **RESOLVED** by Phases 5-8. All HR-side UI (Onboarding context group, `/hr/invitations`, employee selector, profile tab, 5-step onboarding wizard, analytics dashboard, reminders) is now implemented.
+**Current gap**: ~~The HR module has the backend integration but **no HR-side UI entry points**.~~ → **RESOLVED** by Phases 5-8. All HR-side UI (Onboarding context group, `/hr/invitations`, employee selector, profile tab, 4-step onboarding wizard, analytics dashboard, reminders) is now implemented.
 
 ---
 
 ## §3 — Consolidated Implementation Phases
 
-> **⚠️ STATUS UPDATE (2026-09-09)**: Phases 5, 6, 7, and 8 have been **fully implemented**. The invitation system, HR entry points, deep HR integration (employee selector, profile tab), post-acceptance onboarding wizard (5 consolidated steps), and competitive features (auto-reminders, analytics, CSV bulk invite, audit log) are all built and functional.
-> **One remaining issue**: Step 4 (Document Upload) of the onboarding wizard grays out and does not upload — see [§7 — Post-Implementation Bug Fixes](#7--post-implementation-bug-fixes).
+> **⚠️ STATUS UPDATE (2026-09-10)**: Phases 5, 6, 7, and 8 have been **fully implemented**. The invitation system, HR entry points, deep HR integration (employee selector, profile tab), post-acceptance onboarding wizard (4 consolidated steps — Step 4 Documents removed), and competitive features (auto-reminders, analytics, CSV bulk invite, audit log) are all built and functional.
+> **Step 4 (Documents) removed**: After 8 rounds of debugging, the root cause was confirmed as a Livewire 3 `wire:model` auto-upload incompatibility with nested Livewire components. Documents can be uploaded later on the employee profile page via the standalone DataTableForm pattern. See [§6 — Document Upload Fix](#6--document-upload-fix-applied-2026-09-09) for details.
 
 ### Phase 5: HR Entry Points ✅ COMPLETE
 
@@ -214,14 +215,14 @@ The consuming app (HR module) has the foundational integration layer in place.
 | 7.2b | `PersonalDetailsComplete` condition | `app/Modules/Hr/Conditions/Onboarding/PersonalDetailsComplete.php` | Implements `OnboardingCondition`. `__invoke($user)`: returns `true` if `$user->phone` and `$user->address` are filled. |
 | 7.2c | `EmergencyContactsComplete` condition | `app/Modules/Hr/Conditions/Onboarding/EmergencyContactsComplete.php` | Implements `OnboardingCondition`. `__invoke($user)`: returns `true` if the employee has at least one emergency contact. |
 | 7.2d | `BankDetailsComplete` condition | `app/Modules/Hr/Conditions/Onboarding/BankDetailsComplete.php` | Implements `OnboardingCondition`. `__invoke($user)`: returns `true` if the employee has bank details. |
-| 7.2e | `DocumentsUploaded` condition | `app/Modules/Hr/Conditions/Onboarding/DocumentsUploaded.php` | Implements `OnboardingCondition`. `__invoke($user)`: returns `true` if the employee has uploaded required documents. |
+| ~~7.2e~~ | ~~`DocumentsUploaded` condition~~ | ~~`app/Modules/Hr/Conditions/Onboarding/DocumentsUploaded.php`~~ | 🚫 **REMOVED FROM WIZARD** — Document upload moved to employee profile page via standalone DataTableForm. Condition class retained for future use. |
 | 7.2f | `NotificationPreferencesSet` condition | `app/Modules/Hr/Conditions/Onboarding/NotificationPreferencesSet.php` | Implements `OnboardingCondition`. `__invoke($user)`: returns `true` if the user has notification preferences configured. |
 
 #### Task 7.3 — Publish HR Onboarding Steps Config
 
 | # | Task | File | Description |
 |---|---|---|---|
-| 7.3a | Create HR onboarding steps config | `app/Modules/Hr/Config/onboarding.php` | Returns `['steps' => [...]]` array with 6 steps (see step design below). Each step has `title`, `link`, `cta`, `condition` (FQCN of condition class). |
+| 7.3a | Create HR onboarding steps config | `app/Modules/Hr/Config/onboarding.php` | Returns `['steps' => [...]]` array with 5 steps (see step design below). Each step has `title`, `link`, `cta`, `condition` (FQCN of condition class). |
 
 **Step Design**:
 
@@ -232,8 +233,8 @@ The consuming app (HR module) has the foundational integration layer in place.
 | 2 | "Add Your Personal Details" | `/my-portal/personal-details` | "Add Details" | `PersonalDetailsComplete` | Phone, home address, date of birth, gender (optional). |
 | 3 | "Add Emergency Contacts" | `/my-portal/emergency-contacts` | "Add Contacts" | `EmergencyContactsComplete` | Name, relationship, phone, email (at least one required). |
 | 4 | "Set Up Payment Details" | `/my-portal/bank-details` | "Add Bank Account" | `BankDetailsComplete` | Bank name, account number, sort code/routing number, account type. |
-| 5 | "Upload Required Documents" | `/my-portal/documents` | "Upload Documents" | `DocumentsUploaded` | ID document, certificates, visa/work permit (configurable per company). |
-| 6 | "Set Your Notification Preferences" | `/my-portal/notifications` | "Configure" | `NotificationPreferencesSet` | Email, push, in-app toggles per notification type. |
+| ~~5~~ | ~~"Upload Required Documents"~~ | ~~`/my-portal/documents`~~ | ~~"Upload Documents"~~ | ~~`DocumentsUploaded`~~ | 🚫 **REMOVED** — Document upload available on employee profile page via standalone DataTableForm. |
+| 5 | "Set Your Notification Preferences" | `/my-portal/notifications` | "Configure" | `NotificationPreferencesSet` | Email, push, in-app toggles per notification type. |
 
 **Note**: Step 1a and 1b are mutually exclusive — 1a shows if no employee record exists (self-registration scenario), 1b shows if a pre-linked employee record exists (pre-hire scenario).
 
@@ -246,8 +247,8 @@ The consuming app (HR module) has the foundational integration layer in place.
 | 7.4c | `PersonalDetailsForm` | `app/Modules/Hr/Http/Livewire/Onboarding/PersonalDetailsForm.php` | Form for Step 2: updates user phone, address, date of birth. |
 | 7.4d | `EmergencyContactsForm` | `app/Modules/Hr/Http/Livewire/Onboarding/EmergencyContactsForm.php` | Form for Step 3: CRUD for emergency contacts. |
 | 7.4e | `BankDetailsForm` | `app/Modules/Hr/Http/Livewire/Onboarding/BankDetailsForm.php` | Form for Step 4: bank account details entry. |
-| 7.4f | `DocumentUploadForm` | `app/Modules/Hr/Http/Livewire/Onboarding/DocumentUploadForm.php` | Form for Step 5: document upload with required document types. |
-| 7.4g | `NotificationPreferencesForm` | `app/Modules/Hr/Http/Livewire/Onboarding/NotificationPreferencesForm.php` | Form for Step 6: notification channel toggles. |
+| ~~7.4f~~ | ~~`DocumentUploadForm`~~ | ~~`app/Modules/Hr/Http/Livewire/Onboarding/DocumentUploadForm.php`~~ | 🚫 **REMOVED** — Form for Step 5 (Documents) removed from wizard. |
+| 7.4g | `NotificationPreferencesForm` | `app/Modules/Hr/Http/Livewire/Onboarding/NotificationPreferencesForm.php` | Form for Step 5: notification channel toggles. |
 
 #### Task 7.5 — Create Employee Self-Onboarding Blade Views
 
@@ -268,7 +269,7 @@ The consuming app (HR module) has the foundational integration layer in place.
 |---|---|---|---|
 | 7.7a | Auto-create employee record if not pre-linked | `app/Modules/Hr/Services/HrInvitationService.php` | Extend `linkOnAccept()`: if no employee record exists after pre-link and email-match attempts, create a new Employee record with `work_email = invitation.email` and `user_id = user.id`. This handles the self-registration scenario where the invitation creates the employee record. |
 
-**Phase 7 Deliverables**: 1 library change (redirect logic), 6 condition classes, 1 onboarding config, 7 Livewire forms, 7+ blade views, 1 service provider update, 1 service method extension.
+**Phase 7 Deliverables**: 1 library change (redirect logic), 5 condition classes (DocumentsUploaded retained but removed from wizard), 1 onboarding config, 6 Livewire forms (DocumentUploadForm removed), 6+ blade views, 1 service provider update, 1 service method extension.
 
 ---
 
@@ -461,29 +462,36 @@ The employee selector (6.1) is the key dependency — it unlocks the onboarding 
 
 ---
 
-## §6 — Immediate Next Action
+## §6 — Document Upload Fix → Step 4 Removal (Updated 2026-09-10)
 
-**Fix Step 4 Document Upload in the Onboarding Wizard.**
+### Initial Fix Attempt (2026-09-09)
 
-After completing all eight phases and resolving 49 integration-testing bugs, one issue remains: the document upload step (Step 4) in the employee onboarding wizard (`EmployeeOnboardingWizard`). When a user reaches Step 4, the upload UI either grays out and does nothing, or uploaded documents do not persist across back/next navigation.
+**Root Cause**: HR migration made `employee_id` NOT NULL on the `documents` table, but the library's [`DocumentEngine::upload()`](src/Services/Documents/DocumentEngine.php:25) never set it. MySQL rejected inserts with a constraint violation that Livewire swallowed silently.
 
-### Root Cause Analysis
+**Files Changed** (8 fixes across 8 files, 1 new migration):
 
-1. **`DocumentEngine::upload()` signature mismatch**: [`DocumentEngine::upload()`](src/Services/Documents/DocumentEngine.php:25) accepts `(Documentable $entity, UploadedFile $file, ?string $name = null)` — three parameters. But [`Step4Documents::upload()`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step4Documents.php:103) calls `$this->engine->upload($employee, $this->document_file, $this->document_title)` — passing a `TemporaryUploadedFile` from Livewire's `WithFileUploads` trait, which may not satisfy the type constraint.
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/Modules/Hr/Database/Migrations/2026_09_10_000001_make_employee_id_nullable_in_documents_table.php` | **NEW** — makes `employee_id` nullable |
+| 2 | [`app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step4Documents.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step4Documents.php) | `forceFill` employee_id, persist `document_type`, add try/catch with error feedback |
+| 3 | [`app/Modules/Hr/Models/Employee.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Models/Employee.php) | Removed unused HR `Document` import to eliminate model collision risk |
+| 4 | [`app/Modules/Hr/Config/onboarding.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Config/onboarding.php) | Reference library `Document` model explicitly |
+| 5 | [`app/Modules/Hr/Data/employee.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Data/employee.php) | Changed `documents` relationship from `hasMany` to `morphMany` |
+| 6 | [`app/Modules/Hr/Conditions/DocumentsUploaded.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Conditions/DocumentsUploaded.php) | Added `withoutCompanyScope()` to document count query |
+| 7 | [`app/Modules/Hr/Http/Livewire/Onboarding/EmployeeOnboardingWizard.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Http/Livewire/Onboarding/EmployeeOnboardingWizard.php) | Added try/catch around document count check |
+| 8 | [`app/Modules/Hr/Models/Document.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Models/Document.php) | Added docblock explaining coexistence with library `Document` model |
 
-2. **HR `Document` model name collision**: [`app/Modules/Hr/Models/Document.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Models/Document.php) defines a legacy `Document` model in the `App\Modules\Hr\Models` namespace with `protected $table = 'documents'`. Meanwhile, the library's [`Document`](src/Models/Document.php) model lives at `QuickerFaster\UILibrary\Models\Document` and also maps to `documents`. The HR model's `boot()` method has a `creating` hook that tries to bridge the old `document`/`employee_id` columns to `file_path`/`file_name`/`documentable_*` columns. This creates a conflict: when `DocumentEngine::upload()` calls `Document::create()`, which `Document` model is resolved? The `HasDocuments` trait uses `QuickerFaster\UILibrary\Models\Document` explicitly, but the polymorphic relationship `MorphMany` on `Employee` might resolve through the wrong model depending on registration order.
+### Step 4 Removal (2026-09-10)
 
-3. **Employee's `use App\Modules\Hr\Models\Document` import**: [`Employee.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Models/Employee.php:20) imports `use App\Modules\Hr\Models\Document;` (the HR module's legacy Document). But the `HasDocuments` trait's `documents()` method uses `Document::class` referring to `QuickerFaster\UILibrary\Models\Document`. This namespace collision could cause the `MorphMany` relationship to point to the wrong table or model.
+After 8 rounds of debugging, the true root cause was confirmed: **Livewire 3's `wire:model` auto-upload on file inputs is fundamentally incompatible with nested Livewire components**. `Step4Documents` was rendered as a child of `EmployeeOnboardingWizard` via `@livewire()`, and the parent's snapshot checksum invalidated the child's upload request. `DataTableForm` works because it's standalone.
 
-4. **`$document_type` field ignored**: The view collects `document_type` (identification, certificate, contract, cv, other) and validates it as required, but `upload()` never passes it to `DocumentEngine::upload()`. The `DocumentEngine` sets `document_type` from `$entity->getDocumentType()` which returns `'employee_documents'` — a generic value, not the user-selected category.
+**Decision**: Step 4 (Documents) has been **removed** from the onboarding wizard. The wizard is now **4 steps** (was 5). Documents can be uploaded later on the employee profile page using the proven standalone `DataTableForm` pattern.
 
-5. **`hydrate()` re-query race condition**: The `hydrate()` method calls `reloadDocuments()` which re-queries the database. On Livewire back-navigation, the component is dehydrated then re-hydrated, potentially losing the in-memory upload state before the file is fully processed.
+**Architecture Compliance**: Zero library modifications. All changes in consuming app. Library retains sole ownership of `documents` table.
 
-6. **Wizard `mount()` check uses `method_exists` on documents**: [`EmployeeOnboardingWizard.php`](/Users/mac/Projects/LaravelProjects/hr-consuming-app/app/Modules/Hr/Http/Livewire/Onboarding/EmployeeOnboardingWizard.php:80) checks `if ($this->employee && method_exists($this->employee, 'documents')` — this always returns true because `HasDocuments` provides `documents()`. But the resulting relationship query might use the wrong `Document` class.
+### Retained Fixes
 
-### Fix Plan
-
-See [`ai-prompt-fix-document-upload.md`](plans/ai-prompt-fix-document-upload.md) for the detailed fix plan and the AI prompt to use in a new session.
+The `employee_id` nullable migration and all other fixes from the initial 2026-09-09 session remain applied, as they are still beneficial for the standalone document upload flow on the employee profile page.
 
 ## §7 — Post-Implementation Bug Fixes
 
@@ -545,7 +553,7 @@ During integration testing after all eight phases were implemented, **49 issues*
 | 35 | Step indicator wrong status after skip | Fixed `getStepStatus()` to check `skippedSteps` before `completedSteps` |
 | 36 | Progress bar not updating after step completion | Added `$refresh` dispatch in `onStepComplete()` |
 | 37 | Back navigation losing form data | Switched from `mount()`-only to `hydrate()`-reload pattern |
-| 38 | Step 5 (notifications) toggle switches not saving | Bound to Livewire model with `wire:model` instead of vanilla JS |
+| 38 | Step 4 (notifications, was Step 5) toggle switches not saving | Bound to Livewire model with `wire:model` instead of vanilla JS |
 | 39 | Spatie Onboard step not completing on wizard finish | Added `completeCurrentStep()` call in `finish()` |
 | 40 | Wizard redirect after finish going to wrong URL | Changed to `route(config('ui-library.home_route', 'admin.dashboard'))` |
 | 41 | Mobile responsiveness broken on steps 2-5 | Added responsive grid classes to all step blade views |
@@ -561,12 +569,16 @@ During integration testing after all eight phases were implemented, **49 issues*
 | 46 | Audit log timestamp column type mismatch | Changed to `datetime` to match `created_at` |
 | 47 | Department scope filter not respecting multi-department users | Fixed to use `whereIn` instead of `where` |
 
-### Category 6: Remaining Open Issues (2)
+### Category 6: Step 4 Documents — REMOVED
 
 | # | Issue | Status |
 |---|-------|--------|
-| 48 | **Step 4 document upload grays out / does nothing** | 🔴 OPEN — see [§6](#6--immediate-next-action) and [`ai-prompt-fix-document-upload.md`](plans/ai-prompt-fix-document-upload.md) |
-| 49 | **Documents don't persist across back/next navigation** | 🔴 OPEN — same root cause as #48 |
+| 48 | **Step 4 document upload grays out / does nothing** | 🚫 **WON'T FIX — REMOVED** — see [§6 — Document Upload Fix → Step 4 Removal](#6--document-upload-fix--step-4-removal-updated-2026-09-10) |
+| 49 | **Documents don't persist across back/next navigation** | 🚫 **WON'T FIX — REMOVED** — same root cause as #48 |
+
+**Root Cause**: Livewire 3 `wire:model` auto-upload on file inputs is fundamentally incompatible with nested Livewire components. `Step4Documents` rendered as a child of `EmployeeOnboardingWizard` via `@livewire()` — the parent's snapshot checksum invalidates the child's upload request. `DataTableForm` works because it's standalone.
+
+**Resolution**: Step 4 (Documents) removed from onboarding wizard. Wizard is now **4 steps** (was 5). Document upload available on employee profile page via standalone `DataTableForm`.
 
 ### Deferred Items (Now Resolved)
 
@@ -577,8 +589,41 @@ All items from the original deferred list have been implemented in their respect
 
 ### Still Pending
 
-- **Step 4 Document Upload fix** (see [`ai-prompt-fix-document-upload.md`](plans/ai-prompt-fix-document-upload.md)) — the last remaining integration issue
 - Department-specific custom email templates (Phase 8.6) — partially implemented; template management UI deferred
+
+---
+
+## §8 — All Fixes Applied (2026-09-10 Session)
+
+This session resolved many issues beyond the original Step 4 document upload. Below is the complete list of all fixes applied.
+
+### Onboarding Wizard
+
+- **Step 1**: Fixed `employee_number` UNIQUE constraint violation (CompanyScope mismatch in ValueGenerator + retry loop)
+- **Step 4 (Documents)**: REMOVED from wizard — Livewire 3 nested component incompatibility with file uploads. Wizard now 4 steps.
+- **Finish button**: Fixed `completeCurrentStep()` → removed broken Spatie Onboard block, redirects to dashboard
+- **Employee-User linking**: Added `#[On('stepSaved')]` listener to capture employeeId after Step 1
+
+### Employee Detail / My-Portal
+
+- **403 on tabs**: Created `EmployeeDataTableAuthorizationProvider` with employee ownership bypass for all 15 authorization methods
+- **Library bug fix**: [`row-actions.blade.php`](src/Core/Admin/Resources/views/components/row-actions.blade.php) now resolves `DataTableAuthorizationProvider` contract instead of hardcoded `DefaultAuthorizationProvider`
+- **AuthorizationService**: Added employee ownership bypass to `authorizeCreate()` and `authorizeUpdate()`
+- **Document upload button**: Added `'create'` to `simpleActions` in document.php data config
+- **Modal → Drawer**: Fixed `DataTable::add()` to respect `crudType` config; fixed `openDrawer` dispatch format (named arguments)
+- **Self-service Edit buttons**: Added `|| $this->isSelfServiceMode` to all Edit/Upload buttons on Personal, Contact, Employment, Payroll, Documents tabs
+- **Preset field locking**: Added `isPresetField()` mechanism to DataTableForm; `employee_id` and `employee_number` render as read-only badges for self-service users
+- **Date fields fix**: Added `'date' => DatepickerField::class` to FieldFactory map
+- **Select field labels**: Added `getInitialOptions()` to SelectField; expanded `selectedLabels` population to `'select'` type
+
+### Company Switching / Session
+
+- **"All Companies" leak**: Fixed `isAllCompaniesMode()` strict null check; cleared stale session on invitation accept; role-gated "All Companies" in TopNav, title suffix, and middleware
+
+### Library Infrastructure
+
+- **Published views**: Deleted stale `resources/views/vendor/qf/` — library symlink now authoritative
+- **Multiple root elements**: Fixed `step4-documents.blade.php` single-root requirement
 
 ---
 

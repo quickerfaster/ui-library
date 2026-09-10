@@ -774,7 +774,7 @@ class TopNav extends Component
         $sessionCompanyId = Session::get('current_company_id');
         $providerCompanyId = $this->companyProvider->getCurrentCompanyId($user);
 
-        if ($sessionCompanyId === 0) {
+        if ($sessionCompanyId === 0 && $this->userCanAccessAllCompanies($user)) {
             $this->currentCompanyId = 0;
         } elseif ($sessionCompanyId && $this->companies->pluck('id')->contains($sessionCompanyId)) {
             $this->currentCompanyId = $sessionCompanyId;
@@ -808,6 +808,15 @@ class TopNav extends Component
 
         // Redirect to dashboard to refresh the page context
         $this->redirect(url('/' . strtolower($this->moduleName) . '/dashboard'));
+    }
+
+    /**
+     * Check whether the given user is allowed to access "All Companies" mode.
+     */
+    public function userCanAccessAllCompanies($user): bool
+    {
+        $allCompaniesRoles = config('ui-library.all_companies_roles', ['super_admin', 'admin', 'company_admin']);
+        return $user && $user->hasAnyRole($allCompaniesRoles);
     }
 
     /**

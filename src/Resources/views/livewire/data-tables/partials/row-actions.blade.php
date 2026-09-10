@@ -5,7 +5,7 @@
     $queryParams = $queryParams ?? [];
     $isPage = $crudType === 'pages';
     $user = auth()->user();
-    $authService = app(\QuickerFaster\UILibrary\Services\DataTables\DefaultAuthorizationProvider::class);
+    $authService = app(\QuickerFaster\UILibrary\Contracts\DataTables\DataTableAuthorizationProvider::class);
 
     // Pre‑filter moreActions to only those the user can perform
     $visibleMoreActions = [];

@@ -293,7 +293,8 @@
                                     Switch Company
                                 </h6>
                             </li>
-                            {{-- All Companies option --}}
+                            {{-- All Companies option (admin roles only) --}}
+                            @if ($this->userCanAccessAllCompanies(auth()->user()))
                             <li wire:key="company-all">
                                 <a class="dropdown-item border-radius-md d-flex align-items-center {{ $isAllCompanies ? 'bg-info-light text-info fw-bold' : '' }}"
                                     href="#"
@@ -305,6 +306,7 @@
                                     @endif
                                 </a>
                             </li>
+                            @endif
                             <li><hr class="dropdown-divider my-1"></li>
                             @foreach ($companies as $company)
                                 <li wire:key="company-{{ $company->id }}">

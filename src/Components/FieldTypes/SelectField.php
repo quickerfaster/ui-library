@@ -174,4 +174,16 @@ class SelectField implements FieldType
     {
         return $this->name;
     }
+
+    public function getInitialOptions($value): array
+    {
+        if (empty($value)) {
+            return [];
+        }
+        $options = $this->getOptions();
+        if (is_array($value)) {
+            return array_intersect_key($options, array_flip($value));
+        }
+        return isset($options[$value]) ? [$value => $options[$value]] : [];
+    }
 }

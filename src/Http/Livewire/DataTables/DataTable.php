@@ -91,6 +91,8 @@ class DataTable extends Component
 
     protected DataTableAuthorizationProvider $authService;
 
+    public array $prefilledData = [];
+
 
 
 
@@ -117,7 +119,8 @@ class DataTable extends Component
         ?string $pageTitle = null,
         ?string $crudType = null,
         ?array $simpleActions = null,
-        ?array $moreActions = null
+        ?array $moreActions = null,
+        array $prefilledData = []
     ) {
 
         $this->configKey = $configKey;
@@ -141,6 +144,7 @@ class DataTable extends Component
         $this->crudType = $crudType;
         $this->simpleActions = $simpleActions;
         $this->moreActions = $moreActions;
+        $this->prefilledData = $prefilledData;
 
         $this->initializeFromConfig();
         $this->initializeComponent();
@@ -2340,6 +2344,9 @@ protected function checkConditions(array $action, $record): bool
     // Replace the existing add() method
     public function add($prefilledData = []): void
     {
+        // Merge mount-time prefilledData with any passed data (passed data takes precedence)
+        $prefilledData = array_merge($this->prefilledData, $prefilledData);
+
         $modelClass = $this->getConfigResolver()->getModel();
 
         if (!$this->authService->canCreate(auth()->user(), $modelClass)) {
@@ -2351,7 +2358,23 @@ protected function checkConditions(array $action, $record): bool
             return;
         }
 
-        $this->dispatch('openAddModal', $this->configKey, $prefilledData);
+        if ($this->crudType === 'drawers') {
+            $modelName = $this->getConfigResolver()->getModelName();
+            $this->dispatch('openDrawer',
+                component: 'qf.data-table-form',
+                params: [
+                    'configKey' => $this->configKey,
+                    'inline' => true,
+                    'prefilledData' => $prefilledData,
+                ],
+                title: 'New ' . $modelName,
+            );
+        } elseif ($this->crudType === 'pages') {
+            $modelPlural = \Str::plural(\Str::kebab($this->getConfigResolver()->getModelName()));
+            $this->redirect(url('/' . $modelPlural . '/create'));
+        } else {
+            $this->dispatch('openAddModal', $this->configKey, $prefilledData);
+        }
     }
 
 

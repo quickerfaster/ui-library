@@ -33,6 +33,18 @@ class ResolveCompanyContext
             }
         }
 
+        // If "All Companies" (0) is set but user lacks permission, re-resolve
+        if (session($sessionKey) === 0) {
+            $allCompaniesRoles = config('ui-library.all_companies_roles', ['super_admin', 'admin', 'company_admin']);
+            if ($user && !$user->hasAnyRole($allCompaniesRoles)) {
+                session()->forget($sessionKey);
+                $companyId = $this->companyProvider->getCurrentCompanyId($user);
+                if ($companyId !== null) {
+                    session()->put($sessionKey, (int) $companyId);
+                }
+            }
+        }
+
         return $next($request);
     }
 }

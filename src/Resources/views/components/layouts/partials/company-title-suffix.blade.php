@@ -1,6 +1,7 @@
 @php
     $companyId = \Illuminate\Support\Facades\Session::get('current_company_id');
-    $isAllCompanies = ($companyId === 0);
+    $allCompaniesRoles = config('ui-library.all_companies_roles', ['super_admin', 'admin', 'company_admin']);
+    $isAllCompanies = ($companyId === 0 && auth()->user()?->hasAnyRole($allCompaniesRoles));
     $currentCompanyName = null;
 
     if ($isAllCompanies) {

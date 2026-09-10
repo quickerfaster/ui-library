@@ -190,6 +190,15 @@ class AuthorizationService
             return;
         }
 
+        // Employee ownership bypass: employees can create records
+        // scoped to their own employee_id
+        if (static::$resolveUserEmployeeId !== null) {
+            $employeeId = call_user_func(static::$resolveUserEmployeeId, $user);
+            if ($employeeId !== null) {
+                return;
+            }
+        }
+
         $resource = $this->resolveResourceName($modelClass);
 
         if (method_exists($user, 'can') && $user->can('create_' . $resource)) {
@@ -221,6 +230,14 @@ class AuthorizationService
         // Bypass for super admin / admin
         if (static::isBypassAllowed($user)) {
             return;
+        }
+
+        // Employee ownership bypass
+        if (static::$resolveUserEmployeeId !== null) {
+            $employeeId = call_user_func(static::$resolveUserEmployeeId, $user);
+            if ($employeeId !== null) {
+                return;
+            }
         }
 
         // Self-edit bypass: users can always update their own record.
