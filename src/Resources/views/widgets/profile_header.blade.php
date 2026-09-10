@@ -31,7 +31,7 @@
                 @if(!empty($data['actions']))
                     <div class="mt-3 d-flex justify-content-start gap-2">
                         @foreach($data['actions'] as $action)
-                            <button wire:click="{{ $action['event'] }}({{ json_encode($action['params'] ?? []) }})" class="btn btn-sm btn-outline-light">
+                            <button onclick="Livewire.dispatch('{{ $action['event'] }}', {{ json_encode($action['params'] ?? []) }})" class="btn btn-sm btn-outline-light">
                                 <i class="{{ $action['icon'] ?? 'fas fa-edit' }} me-1"></i> {{ $action['label'] }}
                             </button>
                         @endforeach

@@ -625,6 +625,20 @@ This session resolved many issues beyond the original Step 4 document upload. Be
 - **Published views**: Deleted stale `resources/views/vendor/qf/` — library symlink now authoritative
 - **Multiple root elements**: Fixed `step4-documents.blade.php` single-root requirement
 
+### UI/UX Fixes
+
+- **Flatpickr datepicker**: Added `'date' => DatepickerField::class` to [`FieldFactory`](src/Factories/FieldTypes/FieldFactory.php); added `MutationObserver` in [`Drawer`](src/Http/Livewire/Drawer.php) to initialize flatpickr on dynamically loaded drawer content; added `flatpickr.min.js` script tag to all 4 layout blades; re-published assets via `php artisan vendor:publish`
+- **Page scroll lock**: Removed `scroll: false` from Offcanvas config; added `data-bs-scroll="true"` to drawer markup; added defensive `document.body` style cleanup in `hidden.bs.offcanvas` event listener
+- **Profile card layout**: Moved profile card above tabs (full-width horizontal layout); fixed Edit button dispatch to use `Livewire.dispatch()` instead of `wire:click`
+- **Tab state persistence**: Added `#[Url(as: 'tab')]` to `$activeTab` property for URL-based tab persistence across page refreshes; removed misplaced `wire:navigate` from tab buttons
+
+### Self-Service Authorization
+
+- **Sensitive fields locked**: Added `hire_date`, `employee_group_id`, `user_id`, `tag_ids` to `prefilledData` (conditional on `isSelfServiceMode`) so self-service users cannot modify these fields
+- **`isPresetField()` fix**: Changed from `!empty()` to `array_key_exists()` check so that `null`/empty values (e.g., `employee_group_id = null`) are still recognized as preset and rendered as read-only badges
+- **Array display fix**: Added `is_array()` check with `implode()` for `tag_ids` in preset badges to prevent "Array to string conversion" errors
+- **Document edit drawer**: Added `prefilledData` to the Edit button dispatch in [`row-actions.blade.php`](src/Core/Admin/Resources/views/components/row-actions.blade.php) so document edit drawers receive preset field data
+
 ---
 
 ## Appendix: Competitive Positioning (Post-Roadmap)

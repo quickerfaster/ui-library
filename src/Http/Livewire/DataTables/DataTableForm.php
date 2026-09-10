@@ -372,7 +372,7 @@ protected function isAllCompaniesMode(): bool
      */
     public function isPresetField(string $fieldName): bool
     {
-        return !empty($this->prefilledData[$fieldName]);
+        return array_key_exists($fieldName, $this->prefilledData);
     }
 
 

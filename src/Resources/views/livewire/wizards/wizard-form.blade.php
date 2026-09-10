@@ -26,7 +26,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">{{ $field->getLabel() }}</label>
                                     <div class="form-control bg-light text-muted" style="cursor: not-allowed;">
-                                        {{ !empty($this->selectedLabels[$fieldName]) ? reset($this->selectedLabels[$fieldName]) : ($this->fields[$fieldName] ?? '') }}
+                                        {{ !empty($this->selectedLabels[$fieldName]) ? reset($this->selectedLabels[$fieldName]) : (is_array($this->fields[$fieldName] ?? null) ? implode(', ', $this->fields[$fieldName]) : ($this->fields[$fieldName] ?? '')) }}
                                     </div>
                                 </div>
                             @else

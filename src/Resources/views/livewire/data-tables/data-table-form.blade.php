@@ -106,7 +106,7 @@
                                                     <div class="mb-3">
                                                         <label class="form-label">{{ $this->getField($field)->getLabel() }}</label>
                                                         <div class="form-control bg-light text-muted" style="cursor: not-allowed;">
-                                                            {{ !empty($this->selectedLabels[$field]) ? reset($this->selectedLabels[$field]) : ($this->fields[$field] ?? '—') }}
+                                                            {{ !empty($this->selectedLabels[$field]) ? reset($this->selectedLabels[$field]) : (is_array($this->fields[$field] ?? null) ? implode(', ', $this->fields[$field]) : ($this->fields[$field] ?? '—')) }}
                                                         </div>
                                                     </div>
                                                 @else

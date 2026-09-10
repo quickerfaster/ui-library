@@ -228,6 +228,7 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
         </script>
+        <script src="{{ asset('vendor/ui-library/bootstrap/assets/js/plugins/flatpickr.min.js') }}"></script>
         <script src="{{ asset('vendor/ui-library/assets/js/quicker-faster.js') }}"></script>
         <script src="{{ asset('vendor/ui-library/assets/js/quick-actions.js') }}"></script>
 
@@ -299,13 +300,15 @@
                 // Create a single Offcanvas instance and keep it
                 let bsDrawer = new bootstrap.Offcanvas(drawerElement, {
                     backdrop: true,
-                    keyboard: true,
-                    scroll: false
+                    keyboard: true
                 });
 
                 // When the offcanvas is fully hidden (after close animation)
                 drawerElement.addEventListener('hidden.bs.offcanvas', function() {
-                    // Tell Livewire to clear drawer content now that animation is complete
+                    // Defensive cleanup: remove any lingering backdrop and restore body scroll
+                    document.querySelectorAll('.offcanvas-backdrop').forEach(el => el.remove());
+                    document.body.style.overflow = '';
+                    document.body.classList.remove('modal-open');
                     Livewire.dispatch('drawerHidden');
                 });
 

@@ -595,6 +595,20 @@
         });
     }
 
+    // Initialize a single element with flatpickr (idempotent).
+    // Used by the MutationObserver below to auto-initialize datepickers
+    // on dynamically inserted DOM elements (e.g., inside drawers, modals).
+    function initFlatpickrOnElement(el) {
+        if (typeof flatpickr === 'undefined') return;
+        if (el._flatpickr) return;
+        var config = {};
+        var calendarConfig = el.getAttribute('data-calendar-config');
+        if (calendarConfig) {
+            try { config = JSON.parse(calendarConfig); } catch (e) {}
+        }
+        flatpickr(el, config);
+    }
+
     // ------------------------------------------------------------------
     // Livewire bootstrap
     //
@@ -635,6 +649,42 @@
         initSidebarFilter();
         initSidebarTabIntegration();
         initFlatpickr();
+
+        // MutationObserver: auto-initialize flatpickr on any new [data-datepicker]
+        // elements added to the DOM (e.g., inside drawers, modals, dynamically
+        // loaded content). This is more reliable than event-based initialization
+        // because it fires exactly when the element is inserted, regardless of timing.
+        if (typeof flatpickr !== 'undefined') {
+            var fpObserver = new MutationObserver(function (mutations) {
+                mutations.forEach(function (mutation) {
+                    mutation.addedNodes.forEach(function (node) {
+                        if (node.nodeType === 1) {
+                            // Check the added node itself
+                            if (node.matches && node.matches('[data-datepicker]')) {
+                                initFlatpickrOnElement(node);
+                            }
+                            // Check descendants
+                            if (node.querySelectorAll) {
+                                node.querySelectorAll('[data-datepicker]').forEach(initFlatpickrOnElement);
+                            }
+                        }
+                    });
+                });
+            });
+            fpObserver.observe(document.body, { childList: true, subtree: true });
+        }
+
+        // Re-initialize flatpickr whenever a new Livewire component mounts.
+        // This covers drawer content (which mounts as a separate chained request
+        // after the parent drawer component updates).
+        Livewire.hook('component.initialized', () => {
+            setTimeout(initFlatpickr, 150);
+        });
+
+        // Re-init flatpickr inside drawer after it is shown
+        document.addEventListener('shown.bs.offcanvas', function (e) {
+            setTimeout(initFlatpickr, 300);
+        });
     });
 
     // After a wire:navigate SPA navigation the sidebar DOM is swapped, so

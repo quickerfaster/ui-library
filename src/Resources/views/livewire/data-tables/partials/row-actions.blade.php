@@ -57,9 +57,9 @@
                 </a>
             @elseif ($crudType === 'drawers')
                 <button type="button"
-                    wire:click="$dispatch('openDrawer', { 
+                    wire:click="$dispatch('openDrawer', {
                         component: 'qf.data-table-form',
-                        params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}' },
+                        params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}', prefilledData: {{ json_encode($this->prefilledData) }} },
                         title: 'Edit {{ $modelName }}'
                     })"
                     class="{{ $btnClass }} text-primary-hover" title="Edit">
