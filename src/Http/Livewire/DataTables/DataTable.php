@@ -1998,7 +1998,7 @@ class DataTable extends Component
             $wizardUrl = $action['wizardUrl'] ?? '/';
             $separator = str_contains($wizardUrl, '?') ? '&' : '?';
             $url = $wizardUrl . $separator . 'resumeRecordId=' . $recordId;
-            $this->dispatch('open-url-new-tab', $url);
+            $this->redirect($url);
             return;
         }
 
