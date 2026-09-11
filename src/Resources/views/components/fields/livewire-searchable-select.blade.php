@@ -7,7 +7,7 @@
     $results = $results ?? [];
 @endphp
 
-<div class="mb-3">
+<div class="mb-3" x-data="{ search: '' }">
     <label class="form-label">{{ $label }}</label>
 
     {{-- Selected badges --}}
@@ -24,7 +24,8 @@
 
     {{-- Search input --}}
     <input type="text" class="form-control @error($fieldName) is-invalid @enderror" placeholder="{{ $placeholder }}"
-        wire:model.live.debounce.300ms="searches.{{ $fieldName }}" />
+        x-model="search"
+        x-on:input.debounce.300ms="$wire.set('searches.{{ $fieldName }}', search)" />
 
     {{-- Dropdown results --}}
     @if (!empty($searchQuery) && !empty($results))
