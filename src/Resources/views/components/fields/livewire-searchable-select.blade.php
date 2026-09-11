@@ -7,7 +7,7 @@
     $results = $results ?? [];
 @endphp
 
-<div wire:ignore.self class="mb-3">
+<div class="mb-3">
     <label class="form-label">{{ $label }}</label>
 
     {{-- Selected badges --}}
@@ -28,7 +28,8 @@
 
     {{-- Dropdown results --}}
     @if (!empty($searchQuery) && !empty($results))
-        <ul class="list-group mt-1" style="max-height: 200px; overflow-y: auto;">
+        <ul wire:key="search-results-{{ $fieldName }}" class="list-group mt-1"
+            style="max-height: 200px; overflow-y: auto;">
             @foreach ($results as $id => $resultLabel)
                 <li class="list-group-item list-group-item-action"
                     wire:click="selectOption('{{ $fieldName }}', '{{ $id }}', '{{ $resultLabel }}')"
