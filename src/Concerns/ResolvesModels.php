@@ -224,7 +224,7 @@ trait ResolvesModels
      * @param  array  $params Route parameters
      * @return \Illuminate\Http\RedirectResponse
      */
-    protected function resolveRedirect(string $route, array $params = []): \Illuminate\Http\RedirectResponse
+    protected function resolveRedirect(string $route, array $params = [])
     {
         // If the route looks like a URL (starts with / or http), redirect directly
         if (str_starts_with($route, '/') || str_starts_with($route, 'http')) {
