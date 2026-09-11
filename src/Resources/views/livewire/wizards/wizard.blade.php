@@ -140,10 +140,6 @@
                                 <i class="fas fa-paper-plane me-1"></i> Submit Request
                             </button>
                         @else
-                            <button type="button" class="btn btn-outline-secondary btn-lg px-4 shadow-sm fw-bold me-2"
-                                wire:click="$dispatch('saveDraftForm', {stepIndex: {{ $currentStep }}})">
-                                <i class="fas fa-save me-1"></i> Save Draft
-                            </button>
                             <button type="button" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold" wire:click="next">
                                 Save & Continue <i class="fas fa-chevron-right ms-2"></i>
                             </button>
