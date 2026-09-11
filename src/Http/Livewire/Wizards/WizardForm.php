@@ -123,8 +123,10 @@ class WizardForm extends Component
             $this->isEditMode = false;
             $this->recordId = null;
             $this->loadConfiguration();
-            $this->applyPresetData();
             $this->initializeFields();
+            $this->applyPresetData();
+            $this->loadDynamicOptions();
+
             return;
         }
 
