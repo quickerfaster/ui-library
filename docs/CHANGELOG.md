@@ -25,6 +25,9 @@
 - `app/Modules/Leave/Data/leave_type.php` — Three boolean fields (`is_active`, `deducts_from_balance`, `requires_approval`) changed from inverted `boolradio` to `checkbox` with `nullable|boolean` validation, matching the proven HR module pattern.
 - `app/Modules/Hr/Resources/views/livewire/leave-hub.blade.php` — `key()` stabilized from `now()` to `$employeeId` to prevent per-second component remounts.
 
+### Consuming App — Leave Accrual Service Fixes
+- `app/Modules/Leave/Services/LeaveAccrualService.php` — Fixed two bugs: (1) "None" accrual frequency now correctly skips accrual instead of ignoring the setting; (2) `accrual_rate` and `max_balance` now read from the `LeaveBalance` row instead of the non-existent `LeaveType` columns.
+
 ## ApprovalPanel Combined Component & Approval UX Polish — 2026-08-31
 
 ### Library — ApprovalPanel Combined Component
