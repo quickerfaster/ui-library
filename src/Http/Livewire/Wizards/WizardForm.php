@@ -475,11 +475,6 @@ class WizardForm extends Component
                 }
             }
 
-            // When submitting a draft, transition status from Draft to Pending
-            if ($this->isEditMode && ($record->status ?? '') === 'Draft') {
-                $data['status'] = 'Pending';
-            }
-
             if ($this->isEditMode) {
                 $original = $record->getOriginal();
                 $record->update($data);
