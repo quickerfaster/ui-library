@@ -59,7 +59,7 @@
     @if (!empty($results))
         <ul wire:key="search-results-{{ $fieldName }}"
             class="list-group mt-1 position-absolute w-100 searchable-select-results"
-            style="max-height: 200px; overflow-y: auto; z-index: 1000;">
+            style="max-height: 200px; overflow-y: auto; z-index: 1000; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
             @foreach ($results as $value => $resultLabel)
                 <li class="list-group-item list-group-item-action" tabindex="0"
                     style="cursor: pointer;"
