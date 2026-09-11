@@ -199,13 +199,59 @@ trait ResolvesModels
             ]);
         }
 
+        $redirect = $this->resolveRedirect($route, $params);
+
         if (method_exists($this, 'redirectRoute')) {
-            // Livewire redirect
-            return $this->redirectRoute($route, $params);
+            // Livewire redirect — resolveRedirect returns a RedirectResponse,
+            // but Livewire's redirectRoute expects a route name. Try route name
+            // first, then fall back to the URL from the resolved redirect.
+            try {
+                return $this->redirectRoute($route, $params);
+            } catch (\Symfony\Component\Routing\Exception\RouteNotFoundException $e) {
+                return redirect($redirect->getTargetUrl());
+            }
         }
 
         // Controller redirect
-        return redirect()->route($route, $params)->with($type, $message);
+        return $redirect->with($type, $message);
+    }
+
+    /**
+     * Resolve a redirect, falling back to url('/') if the named route
+     * does not exist in the consuming application.
+     *
+     * @param  string $route  Route name or URL path
+     * @param  array  $params Route parameters
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    protected function resolveRedirect(string $route, array $params = []): \Illuminate\Http\RedirectResponse
+    {
+        // If the route looks like a URL (starts with / or http), redirect directly
+        if (str_starts_with($route, '/') || str_starts_with($route, 'http')) {
+            return redirect($route);
+        }
+
+        try {
+            return redirect()->route($route, $params);
+        } catch (\Symfony\Component\Routing\Exception\RouteNotFoundException $e) {
+            Log::warning('ResolvesModels: route not found, falling back to home', [
+                'route'  => $route,
+                'params' => $params,
+            ]);
+
+            $fallback = config('ui-library.home_route', '/');
+
+            // If the fallback is also a route name, try it; otherwise use as URL
+            if (!str_starts_with($fallback, '/') && !str_starts_with($fallback, 'http')) {
+                try {
+                    return redirect()->route($fallback);
+                } catch (\Symfony\Component\Routing\Exception\RouteNotFoundException $e) {
+                    return redirect('/');
+                }
+            }
+
+            return redirect($fallback);
+        }
     }
 
     /**

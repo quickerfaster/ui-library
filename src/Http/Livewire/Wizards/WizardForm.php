@@ -120,7 +120,7 @@ class WizardForm extends Component
             $this->flashAndRedirect(
                 'error',
                 'The record you are trying to edit no longer exists or is not accessible.',
-                'dashboard'
+                config('ui-library.home_route', '/')
             );
             return;
         }
