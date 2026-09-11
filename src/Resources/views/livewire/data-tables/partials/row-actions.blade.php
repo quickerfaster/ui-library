@@ -12,6 +12,12 @@
     foreach ($moreActions as $index => $action) {
         $permission = is_array($action) ? ($action['action'] ?? $action['permission'] ?? '') : $action;
         if ($authService->canPerformAction($user, $permission, $record)) {
+            // Check business conditions for visibility
+            if (!empty($action['condition']) && is_array($action['condition'])) {
+                if (!$authService->evaluateConditions($record, $action['condition'])) {
+                    continue;
+                }
+            }
             $visibleMoreActions[] = ['index' => $index, 'action' => $action];
         }
     }
