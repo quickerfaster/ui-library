@@ -119,20 +119,30 @@
                     <div class="row">
                         @if (in_array($initiatorMode, ['users', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('initiator_users')->renderForm($fields['initiator_users'] ?? [], [
+                                @include('qf::components.fields.livewire-searchable-select', [
+                                    'fieldName' => 'initiator_users',
+                                    'label' => $this->getField('initiator_users')->getLabel(),
+                                    'placeholder' => 'Search users...',
+                                    'multiple' => true,
                                     'selectedLabels' => $this->selectedLabels['initiator_users'] ?? [],
                                     'searchQuery' => $this->searches['initiator_users'] ?? '',
                                     'results' => $this->searchResults['initiator_users'] ?? [],
-                                ]) !!}
+                                    'canInlineAdd' => false,
+                                ])
                             </div>
                         @endif
                         @if (in_array($initiatorMode, ['roles', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('initiator_roles')->renderForm($fields['initiator_roles'] ?? [], [
+                                @include('qf::components.fields.livewire-searchable-select', [
+                                    'fieldName' => 'initiator_roles',
+                                    'label' => $this->getField('initiator_roles')->getLabel(),
+                                    'placeholder' => 'Search roles...',
+                                    'multiple' => true,
                                     'selectedLabels' => $this->selectedLabels['initiator_roles'] ?? [],
                                     'searchQuery' => $this->searches['initiator_roles'] ?? '',
                                     'results' => $this->searchResults['initiator_roles'] ?? [],
-                                ]) !!}
+                                    'canInlineAdd' => false,
+                                ])
                             </div>
                         @endif
                     </div>
@@ -166,20 +176,30 @@
                     <div class="row">
                         @if (in_array($authorizerMode, ['users', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('authorizer_users')->renderForm($fields['authorizer_users'] ?? [], [
+                                @include('qf::components.fields.livewire-searchable-select', [
+                                    'fieldName' => 'authorizer_users',
+                                    'label' => $this->getField('authorizer_users')->getLabel(),
+                                    'placeholder' => 'Search users...',
+                                    'multiple' => true,
                                     'selectedLabels' => $this->selectedLabels['authorizer_users'] ?? [],
                                     'searchQuery' => $this->searches['authorizer_users'] ?? '',
                                     'results' => $this->searchResults['authorizer_users'] ?? [],
-                                ]) !!}
+                                    'canInlineAdd' => false,
+                                ])
                             </div>
                         @endif
                         @if (in_array($authorizerMode, ['roles', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('authorizer_roles')->renderForm($fields['authorizer_roles'] ?? [], [
+                                @include('qf::components.fields.livewire-searchable-select', [
+                                    'fieldName' => 'authorizer_roles',
+                                    'label' => $this->getField('authorizer_roles')->getLabel(),
+                                    'placeholder' => 'Search roles...',
+                                    'multiple' => true,
                                     'selectedLabels' => $this->selectedLabels['authorizer_roles'] ?? [],
                                     'searchQuery' => $this->searches['authorizer_roles'] ?? '',
                                     'results' => $this->searchResults['authorizer_roles'] ?? [],
-                                ]) !!}
+                                    'canInlineAdd' => false,
+                                ])
                             </div>
                         @endif
                     </div>

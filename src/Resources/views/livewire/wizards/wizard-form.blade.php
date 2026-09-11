@@ -29,6 +29,17 @@
                                         {{ !empty($this->selectedLabels[$fieldName]) ? reset($this->selectedLabels[$fieldName]) : (is_array($this->fields[$fieldName] ?? null) ? implode(', ', $this->fields[$fieldName]) : ($this->fields[$fieldName] ?? '')) }}
                                     </div>
                                 </div>
+                            @elseif($fieldType === 'livewire-searchable-select')
+                                @include('qf::components.fields.livewire-searchable-select', [
+                                    'fieldName' => $fieldName,
+                                    'label' => $this->fieldDefinitions[$fieldName]['label'] ?? $field->getLabel(),
+                                    'placeholder' => $this->fieldDefinitions[$fieldName]['placeholder'] ?? 'Search...',
+                                    'multiple' => $this->fieldDefinitions[$fieldName]['multiSelect'] ?? false,
+                                    'selectedLabels' => $this->selectedLabels[$fieldName] ?? [],
+                                    'searchQuery' => $this->searches[$fieldName] ?? '',
+                                    'results' => $this->searchResults[$fieldName] ?? [],
+                                    'canInlineAdd' => false,
+                                ])
                             @else
                                 {{-- Normal field: render via renderForm() --}}
                                 {!! $field->renderForm($this->fields[$fieldName] ?? null, [

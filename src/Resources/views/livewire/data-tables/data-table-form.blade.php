@@ -110,12 +110,26 @@
                                                         </div>
                                                     </div>
                                                 @else
-                                                    {{-- Normal field: render via renderForm() --}}
-                                                    {!! $this->getField($field)->renderForm($this->fields[$field] ?? null, [
-                                                        'selectedLabels' => $this->selectedLabels[$field] ?? [],
-                                                        'searchQuery' => $this->searches[$field] ?? '',
-                                                        'results' => $this->searchResults[$field] ?? [],
-                                                    ]) !!}
+                                                    {{-- Normal field: render via renderForm() or @include for searchable selects --}}
+                                                    @php $def = $this->fieldDefinitions[$field] ?? []; @endphp
+                                                    @if(($def['field_type'] ?? '') === 'livewire-searchable-select')
+                                                        @include('qf::components.fields.livewire-searchable-select', [
+                                                            'fieldName' => $field,
+                                                            'label' => $def['label'] ?? ucfirst($field),
+                                                            'placeholder' => $def['placeholder'] ?? 'Search...',
+                                                            'multiple' => $def['multiSelect'] ?? false,
+                                                            'selectedLabels' => $this->selectedLabels[$field] ?? [],
+                                                            'searchQuery' => $this->searches[$field] ?? '',
+                                                            'results' => $this->searchResults[$field] ?? [],
+                                                            'canInlineAdd' => $def['relationship']['inlineAdd'] ?? false,
+                                                        ])
+                                                    @else
+                                                        {!! $this->getField($field)->renderForm($this->fields[$field] ?? null, [
+                                                            'selectedLabels' => $this->selectedLabels[$field] ?? [],
+                                                            'searchQuery' => $this->searches[$field] ?? '',
+                                                            'results' => $this->searchResults[$field] ?? [],
+                                                        ]) !!}
+                                                    @endif
                                                 @endif
                                             </div>
                                         @endif

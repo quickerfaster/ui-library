@@ -1,66 +1,80 @@
-@props(['field', 'value' => null, 'name', 'label', 'multiple' => false, 'placeholder' => 'Search...'])
+{{--
+    Searchable select field.
 
+    This partial is rendered with @include() from the parent Livewire component
+    blade so that every wire:model / wire:click directive below is compiled as
+    part of the component's own render cycle. Rendering it through
+    View::make()->render() (i.e. renderForm()) produces raw HTML after Blade
+    compilation, which Livewire cannot attach directives to.
+
+    Supported variables:
+        $fieldName       (string)  field key, e.g. "initiator_users"
+        $label           (string)  human label
+        $placeholder     (string)  input placeholder
+        $multiple        (bool)
+        $selectedLabels  (array)   [id => label]
+        $searchQuery     (string)
+        $results         (array)   [value => label]
+        $canInlineAdd    (bool)    render "+ Create ..." button
+
+    Backwards compatibility: when rendered by renderForm(), $field / $name are
+    available instead of $fieldName.
+--}}
 @php
-    $fieldName = $field->getName();
+    $fieldName = $fieldName ?? ($name ?? (isset($field) ? $field->getName() : ''));
+    $label = $label ?? (isset($field) ? $field->getLabel() : ucfirst(str_replace('_', ' ', $fieldName)));
+    $placeholder = $placeholder ?? 'Search...';
+    $multiple = $multiple ?? false;
     $selectedLabels = $selectedLabels ?? [];
     $searchQuery = $searchQuery ?? '';
     $results = $results ?? [];
+    $canInlineAdd = $canInlineAdd ?? (isset($field) && method_exists($field, 'canInlineAdd') ? $field->canInlineAdd() : false);
 @endphp
 
-<div class="mb-3">
+<div class="mb-3 searchable-select-wrapper position-relative">
     <label class="form-label">{{ $label }}</label>
 
     {{-- Selected badges --}}
-    <div class="selected-items mb-2">
-        @foreach ($selectedLabels as $id => $labelText)
-            <span class="badge bg-primary me-1">
-                {{ $labelText }}
-                <button type="button" class="btn-close btn-close-white ms-1"
-                    data-remove-value="{{ $id }}"
-                    data-remove-field="{{ $fieldName }}"
-                    style="font-size: 0.5rem;"></button>
-            </span>
-        @endforeach
-    </div>
+    @if (!empty($selectedLabels))
+        <div class="selected-items mb-2 d-flex flex-wrap gap-1">
+            @foreach ($selectedLabels as $id => $labelText)
+                <span class="badge bg-primary">
+                    {{ $labelText }}
+                    <button type="button" class="btn-close btn-close-white ms-1"
+                        style="font-size: 0.5rem;"
+                        wire:click="removeSelected(@js($fieldName), @js($id))"></button>
+                </span>
+            @endforeach
+        </div>
+    @endif
 
-    {{-- Search input --}}
-    <div class="position-relative">
-        <input type="text"
-            class="form-control @error($fieldName) is-invalid @enderror"
-            id="search-input-{{ $fieldName }}"
-            placeholder="{{ $placeholder }}"
-            data-search-field="{{ $fieldName }}"
-            value="{{ $searchQuery }}"
-        />
+    {{-- Search input: bound straight to the Livewire component --}}
+    <input type="text"
+        class="form-control @error($fieldName) is-invalid @enderror"
+        placeholder="{{ $placeholder }}"
+        autocomplete="off"
+        wire:model.live.debounce.300ms="searches.{{ $fieldName }}" />
 
-        {{-- Dropdown results --}}
-        <ul id="search-results-{{ $fieldName }}"
-            class="list-group mt-1 position-absolute w-100"
-            style="max-height: 200px; overflow-y: auto; z-index: 1000; display: none;">
-            @if (!empty($searchQuery) && !empty($results))
-                @foreach ($results as $id => $resultLabel)
-                    <li class="list-group-item list-group-item-action"
-                        data-select-value="{{ $id }}"
-                        data-select-label="{{ $resultLabel }}"
-                        data-select-field="{{ $fieldName }}"
-                        style="cursor: pointer;">
-                        {{ $resultLabel }}
-                    </li>
-                @endforeach
-            @endif
+    {{-- Results dropdown: only rendered when the server returned matches --}}
+    @if (!empty($results))
+        <ul wire:key="search-results-{{ $fieldName }}"
+            class="list-group mt-1 position-absolute w-100 searchable-select-results"
+            style="max-height: 200px; overflow-y: auto; z-index: 1000;">
+            @foreach ($results as $value => $resultLabel)
+                <li class="list-group-item list-group-item-action" tabindex="0"
+                    style="cursor: pointer;"
+                    wire:click="selectOption(@js($fieldName), @js($value), @js($resultLabel))">
+                    {{ $resultLabel }}
+                </li>
+            @endforeach
         </ul>
-    </div>
+    @endif
 
-    {{-- CREATE NEW OPTION BUTTON --}}
-    @if (
-        $field->canInlineAdd() &&
-            !empty($searchQuery) &&
-            empty($results) &&
-            strlen($searchQuery) >= 2)
+    {{-- Inline create option (only when the host component supports it) --}}
+    @if ($canInlineAdd && !empty($searchQuery) && empty($results) && strlen($searchQuery) >= 2)
         <div class="mt-1">
             <button type="button" class="btn btn-sm btn-link text-primary p-0"
-                data-create-value="{{ $searchQuery }}"
-                data-create-field="{{ $fieldName }}">
+                wire:click="createAndSelectOption(@js($fieldName), @js($searchQuery))">
                 + Create "{{ $searchQuery }}"
             </button>
         </div>
@@ -72,94 +86,17 @@
     @enderror
 </div>
 
-<script>
-(function() {
-    var input = document.getElementById('search-input-{{ $fieldName }}');
-    if (!input || input.dataset.searchInitialized === '1') return;
-    input.dataset.searchInitialized = '1';
+@once
+    <style>
+        /* CSS-only dropdown toggle: shown while focus is anywhere inside the
+           wrapper (input or a result item), hidden otherwise. */
+        .searchable-select-wrapper .searchable-select-results {
+            display: none;
+        }
 
-    var fieldName = input.dataset.searchField;
-    var dropdown = document.getElementById('search-results-{{ $fieldName }}');
-    var timeout;
-
-    // Helper: find parent Livewire component
-    function getComponent() {
-        var componentEl = input.closest('[wire\\:id]');
-        if (!componentEl) return null;
-        var componentId = componentEl.getAttribute('wire:id');
-        if (!componentId) return null;
-        return window.Livewire.find(componentId);
-    }
-
-    // Search input handler with 300ms debounce
-    input.addEventListener('input', function() {
-        clearTimeout(timeout);
-        var value = input.value;
-        timeout = setTimeout(function() {
-            var component = getComponent();
-            if (component) {
-                component.set('searches.' + fieldName, value);
-            }
-        }, 300);
-    });
-
-    // Show dropdown on focus
-    input.addEventListener('focus', function() {
-        if (dropdown) dropdown.style.display = 'block';
-    });
-
-    // Hide dropdown on blur (with delay to allow click)
-    input.addEventListener('blur', function() {
-        setTimeout(function() {
-            if (dropdown) dropdown.style.display = 'none';
-        }, 200);
-    });
-
-    // Result click handler (event delegation on dropdown)
-    if (dropdown && !dropdown.dataset.clickInitialized) {
-        dropdown.dataset.clickInitialized = '1';
-        dropdown.addEventListener('click', function(e) {
-            var item = e.target.closest('[data-select-value]');
-            if (!item) return;
-            e.preventDefault();
-            var value = item.dataset.selectValue;
-            var label = item.dataset.selectLabel;
-            var component = getComponent();
-            if (component) {
-                component.call('selectOption', fieldName, value, label);
-            }
-        });
-    }
-
-    // Remove badge click handler (event delegation on parent div)
-    var container = input.closest('.mb-3');
-    if (container && !container.dataset.removeInitialized) {
-        container.dataset.removeInitialized = '1';
-        container.addEventListener('click', function(e) {
-            var btn = e.target.closest('[data-remove-value]');
-            if (!btn) return;
-            e.preventDefault();
-            var value = btn.dataset.removeValue;
-            var component = getComponent();
-            if (component) {
-                component.call('removeSelected', fieldName, value);
-            }
-        });
-    }
-
-    // Create new option click handler
-    if (container && !container.dataset.createInitialized) {
-        container.dataset.createInitialized = '1';
-        container.addEventListener('click', function(e) {
-            var btn = e.target.closest('[data-create-value]');
-            if (!btn) return;
-            e.preventDefault();
-            var value = btn.dataset.createValue;
-            var component = getComponent();
-            if (component) {
-                component.call('createAndSelectOption', fieldName, value);
-            }
-        });
-    }
-})();
-</script>
+        .searchable-select-wrapper:focus-within .searchable-select-results,
+        .searchable-select-wrapper .searchable-select-results:hover {
+            display: block;
+        }
+    </style>
+@endonce
