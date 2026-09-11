@@ -119,8 +119,60 @@ class Wizard extends Component
 
     public function finish(): void
     {
+        $step = $this->steps[$this->currentStep] ?? null;
+
+        // If the current (review) step is backed by a model and its record has
+        // not been persisted yet, ask the step's form component to save first.
+        // The form emits `stepFormSaved`, which advances and re-enters finish()
+        // once the record exists. This keeps the review step's model in Draft
+        // until completion is actually requested.
+        if ($step && isset($step['model']) && !isset($this->stepData[$this->currentStep])) {
+            $this->dispatch('saveStepForm', stepIndex: $this->currentStep);
+            return;
+        }
+
+        // Trigger the Draft → Pending transition on the primary record and start
+        // its workflow. The review step renders no WizardForm child component, so
+        // the transition is performed here rather than delegated to a form.
+        $this->completeWizard();
+
         session()->forget($this->wizardId);
         $this->currentStep = count($this->steps); // special index for completion
+    }
+
+    /**
+     * Transition the wizard's primary record from Draft to Pending and start its
+     * workflow. Mirrors WizardForm::completeWizard(), which cannot be used here
+     * because the review step has no mounted form component to dispatch to.
+     */
+    protected function completeWizard(): void
+    {
+        $primary = $this->getPrimaryModelData();
+
+        $primaryModelClass = $primary['class'] ?? ($this->models['primary'] ?? null);
+        $recordId = $primary['id'] ?? (isset($this->primaryModelId) ? $this->primaryModelId : null);
+
+        if (!$primaryModelClass || !$recordId) {
+            return;
+        }
+
+        $record = $primaryModelClass::find($recordId);
+
+        if (!$record || ($record->status ?? null) !== 'Draft') {
+            return;
+        }
+
+        $record->update(['status' => 'Pending']);
+
+        if ($record instanceof \QuickerFaster\UILibrary\Contracts\Workflow\Workflowable) {
+            try {
+                app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class)->start($record);
+            } catch (\Throwable $e) {
+                \Log::warning('Wizard: workflow start failed on complete', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     public function handleStepFormSaved(int $recordId, int $stepIndex): void
