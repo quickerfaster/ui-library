@@ -56,11 +56,12 @@ class WizardForm extends Component
         'saveDraftForm' => 'saveDraft',
     ];
 
-    public function mount(string $configKey, array $presetData = [], int $stepIndex = 0, ?int $recordId = null, array $customValidation = [], array $dynamicFields = [], ?string $draftSuccessMessage = null): void
+    public function mount(string $configKey, array $presetData = [], int $stepIndex = 0, ?int $recordId = null, array $customValidation = [], array $dynamicFields = [], ?string $draftSuccessMessage = null, array $stepGroups = []): void
     {
         $this->configKey = $configKey;
         $this->presetData = $presetData;
         $this->stepIndex = $stepIndex;
+        $this->stepGroups = $stepGroups;
         $this->recordId = $recordId;
         $this->customValidation = $customValidation;
         $this->dynamicFields = $dynamicFields;
@@ -429,6 +430,19 @@ class WizardForm extends Component
             $data = array_intersect_key($this->fields, array_flip($allowedFields));
 
             $data = $this->handleFileUploads($record, $data);
+
+            // Automatically cast all checkbox/boolean fields to true/false
+            foreach ($this->fieldDefinitions as $fieldName => $definition) {
+                if (isset($definition['field_type']) && in_array($definition['field_type'], ['checkbox', 'boolcheckbox', 'boolradio'], true)) {
+                    if (array_key_exists($fieldName, $data)) {
+                        $data[$fieldName] = (bool) $data[$fieldName];
+                    } else {
+                        if (in_array($fieldName, $allowedFields)) {
+                            $data[$fieldName] = false;
+                        }
+                    }
+                }
+            }
 
             foreach ($this->fieldDefinitions as $field => $def) {
                 if (isset($def['multiSelect']) && !isset($def['relationship']) && isset($data[$field]) && is_array($data[$field])) {
@@ -881,6 +895,13 @@ class WizardForm extends Component
                 if (isset($this->fieldGroups[$groupKey])) {
                     $displayGroups[$groupKey] = $this->fieldGroups[$groupKey];
                 }
+            }
+
+            // Defensive fallback: if stepGroups filtering produced no matches but
+            // fieldGroups is non-empty (e.g. cache returned stale/empty config),
+            // fall back to showing all groups rather than an empty card.
+            if (empty($displayGroups) && !empty($this->fieldGroups)) {
+                $displayGroups = $this->fieldGroups;
             }
         } else {
             // Fallback: show all groups

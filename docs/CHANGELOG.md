@@ -1,12 +1,29 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-08-30
-> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23) + Module Auto-Discovery + Tenancy Foundation + DataTable Record Events + HasWorkflow Trait + Resolver Config Bindings + DataTable Runtime Bridges + Drawer Decoupled Pattern + Cross-Module Cleanup + WorkspaceScopedApproverResolver Default + Approval UI Constructor→Boot Refactor + Payroll Approval Integration
+> **Date**: 2026-09-11
+> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23) + Module Auto-Discovery + Tenancy Foundation + DataTable Record Events + HasWorkflow Trait + Resolver Config Bindings + DataTable Runtime Bridges + Drawer Decoupled Pattern + Cross-Module Cleanup + WorkspaceScopedApproverResolver Default + Approval UI Constructor→Boot Refactor + Payroll Approval Integration + Leave Wizard Rendering Fix + Boolean Field Casting
 
 ---
 
 > ⚠️ **Testing status (2026-08-16)**: The workflow/approval foundation has been implemented and unit-verified (`php -l`, config validation), but has **NOT** yet been tested end-to-end in a consuming app. Further adjustments may be needed once integrated into a real consuming app (e.g., Spatie role/permission seeding, notification template registration, workspace-scoped approver resolution, and runtime workflow execution against real entities).
+
+## Leave Wizard Rendering Fix + Boolean Field Casting — 2026-09-11
+
+### Library — Livewire v3 Wizard Compatibility
+- [`wizard.blade.php`](src/Resources/views/livewire/wizards/wizard.blade.php:82) — Replaced `<livewire:{{ $formComponent }}>` and custom-step rendering with `<livewire:dynamic-component :component="...">`. Livewire v3 requires `dynamic-component` for variable component names; the v2 `<livewire:{{ $var }}>` syntax silently renders nothing.
+- [`WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php:59) — Added `$stepGroups` to `mount()` signature; [`render()`](src/Http/Livewire/Wizards/WizardForm.php:889) filters `fieldGroups` by step and adds a defensive fallback to all groups when filtering yields an empty card (guards against stale/empty cached config).
+
+### Library — Config Cache TTL
+- [`ModelConfigRepository.php`](src/Services/Config/ModelConfigRepository.php:16) — `Cache::rememberForever()` → `Cache::remember($key, 86400, ...)` with `$cacheTtl = 86400`. Config edits now self-heal within 24h instead of persisting stale data indefinitely.
+
+### Library — Boolean Field Casting
+- [`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php:776) — Save-time boolean coercion expanded from `'checkbox'` only to `['checkbox', 'boolcheckbox', 'boolradio']`.
+- [`WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php:436) — Added boolean casting loop (previously absent; all three boolean types now cast consistently in both save paths).
+
+### Consuming App — Leave Module
+- `app/Modules/Leave/Data/leave_type.php` — Three boolean fields (`is_active`, `deducts_from_balance`, `requires_approval`) changed from inverted `boolradio` to `checkbox` with `nullable|boolean` validation, matching the proven HR module pattern.
+- `app/Modules/Hr/Resources/views/livewire/leave-hub.blade.php` — `key()` stabilized from `now()` to `$employeeId` to prevent per-second component remounts.
 
 ## ApprovalPanel Combined Component & Approval UX Polish — 2026-08-31
 

@@ -136,7 +136,7 @@
         @endif
 
         {{-- Desktop context area --}}
-        <div class="d-none d-md-block mt-5">
+        <div class="mt-5">
             @php
                 $currentMenuType = session('context_menu_type', $contextMenuType);
                 $showContextMenu = $layoutConfig['context_menu']['enabled'] ?? true;

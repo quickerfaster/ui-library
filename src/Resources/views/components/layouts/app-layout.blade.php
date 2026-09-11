@@ -41,7 +41,7 @@
 {{-- Desktop context area --}}
 {{-- Desktop context area --}}
 {{-- Desktop context area --}}
-<div class="d-none d-md-block">
+<div>
     @php
         $currentMenuType = session('context_menu_type', $contextMenuType);
     @endphp

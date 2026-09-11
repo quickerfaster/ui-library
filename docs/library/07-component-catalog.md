@@ -65,6 +65,8 @@ All components are registered in [`UILibraryServiceProvider::registerLivewireCom
 | SetupChecklist | `qf.setup-checklist` | `SetupChecklist` | Setup onboarding checklist |
 | WizardForm | `qf.wizard-form` | `WizardForm` | Wizard with embedded forms |
 
+> **Note:** Wizard step configs may specify `customComponent` or `formComponent` keys. These are rendered through Livewire's `<livewire:dynamic-component :component="...">` syntax. Livewire v3 requires `dynamic-component` for variable component names — the v2 `<livewire:{{ $var }}>` form silently renders nothing. See [`wizard.blade.php`](src/Resources/views/livewire/wizards/wizard.blade.php:104).
+
 #### Layout & Navigation
 
 | Component | Alias | Class | Purpose |
@@ -249,6 +251,18 @@ public function make(string $name, array $definition): FieldType
     return new $class($name, $definition);
 }
 ```
+
+### Boolean Field Types
+
+All three boolean field types (`checkbox`, `boolcheckbox`, `boolradio`) are auto-cast to `(bool)` at save time in both [`DataTableForm`](src/Http/Livewire/DataTables/DataTableForm.php:776) and [`WizardForm`](src/Http/Livewire/Wizards/WizardForm.php:436). Unchecked/absent fields are written as `false`.
+
+| `field_type` | Field class | Renders | Save behavior |
+|---|---|---|---|
+| `checkbox` | `CheckboxField` | Single checkbox | `(bool)`; unchecked → `false` |
+| `boolcheckbox` | `CheckboxField` | Single checkbox | Same as `checkbox` |
+| `boolradio` | `RadioField` | Yes/No radios (default `[1=>'Yes', 0=>'No']`) | `(bool)`; missing → `false` |
+
+> ⚠️ **Do not use inverted `boolradio` options.** The save pipeline casts with `(bool)`, which discards option labels. If options are inverted (e.g. `[0 => 'Yes', 1 => 'No']`), selecting "Yes" stores `false` — silently reversing the meaning. Use `checkbox` for plain on/off flags.
 
 ### 4.6 WidgetProcessor Mapping
 

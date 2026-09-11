@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\File;
 class ModelConfigRepository
 {
     /**
+     * Cache TTL in seconds. Defaults to 86400 (24 hours).
+     * Override via subclass or set at runtime to control staleness window.
+     *
+     * @var int
+     */
+    protected int $cacheTtl = 86400;
+
+    /**
      * Base paths where module configs are stored, in resolution order.
      * First match wins — business modules (app/Modules) take priority over core modules (src/Core).
      *
@@ -38,7 +46,7 @@ class ModelConfigRepository
     public function get(string $configKey): array
     {
         $cacheKey = $this->getCacheKey($configKey);
-        return Cache::rememberForever($cacheKey, function () use ($configKey) {
+        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($configKey) {
             return $this->loadFromFile($configKey);
         });
     }

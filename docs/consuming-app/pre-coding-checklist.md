@@ -177,6 +177,15 @@
 
 ---
 
+## G. Before Adding Boolean Fields to a Data Config
+
+- [ ] Use `checkbox` for a plain true/false flag — it is the safe default.
+- [ ] Use `boolradio` only when `1 = Yes` / `0 = No` genuinely matches the stored semantics.
+- [ ] **Never** define inverted `boolradio` options (e.g. `0 => 'Yes'`) — save casts to `(bool)` and the inversion is silently lost.
+- [ ] All three boolean types (`checkbox`, `boolcheckbox`, `boolradio`) are auto-cast on save; unchecked/absent → `false`.
+
+---
+
 ## Quick Reference: Common Violations & Fixes
 
 | Violation | Symptom | Fix |
@@ -187,3 +196,4 @@
 | Module files outside module dir | Can't copy module to new project | Move files into `app/Modules/{Module}/` |
 | Nav item missing permission | All users see the link | Add `permission` key |
 | Blade not using navigation-layout | No sidebar/topbar on page | Wrap in `<x-qf::navigation-layout>` |
+| Inverted `boolradio` for a boolean flag | Value saved opposite of what the user selected | Use `field_type => 'checkbox'` |

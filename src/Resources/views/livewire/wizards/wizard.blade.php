@@ -79,13 +79,14 @@
                             $recordId = $stepData[$currentStep] ?? null;
                             $presetData = $this->getPresetDataForCurrentStep();
                         @endphp
-                        <livewire:{{ $steps[$currentStep]['customComponent'] }}
+                        <livewire:dynamic-component
+                            :component="$steps[$currentStep]['customComponent']"
                             :configKey="$configKey"
                             :stepIndex="$currentStep"
                             :recordId="$recordId"
                             :presetData="$presetData"
                             :wizardId="$wizardId"
-                            :wire:key="'custom-step-'.$currentStep" />
+                            :key="'custom-step-'.$currentStep" />
                     @else
                         @php
                             $step = $steps[$currentStep];
@@ -100,8 +101,17 @@
                             $formComponent = $step['formComponent'] ?? 'qf.wizard-form';
                             $draftSuccessMessage = $step['draftSuccessMessage'] ?? null;
                         @endphp
-                        <livewire:{{ $formComponent }} :configKey="$modelConfigKey" :presetData="$presetData" :stepIndex="$currentStep" :stepGroups="$stepGroups"
-                            :recordId="$recordId" :customValidation="$customValidation" :dynamicFields="$dynamicFields" :draftSuccessMessage="$draftSuccessMessage" :wire:key="'step-form-'.$currentStep" />
+                        <livewire:dynamic-component
+                            :component="$formComponent"
+                            :configKey="$modelConfigKey"
+                            :presetData="$presetData"
+                            :stepIndex="$currentStep"
+                            :stepGroups="$stepGroups"
+                            :recordId="$recordId"
+                            :customValidation="$customValidation"
+                            :dynamicFields="$dynamicFields"
+                            :draftSuccessMessage="$draftSuccessMessage"
+                            :key="'step-form-'.$currentStep" />
                     @endif
                 </div>
             </div>

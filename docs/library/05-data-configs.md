@@ -48,7 +48,7 @@ Key behaviors:
 
 - **Dot-notation keys**: `'hr.employee'` → `app/Modules/Hr/Data/employee.php`
 - **Nested paths**: `'hr.dashboards.overview'` → `app/Modules/Hr/Data/dashboards/overview.php`
-- **Forever caching**: Configs are cached indefinitely using `Cache::rememberForever()`
+- **TTL caching** — Configs are cached for 24 hours (`$cacheTtl = 86400`) via `Cache::remember()`; `forget($key)` / `flush()` still apply for immediate invalidation.
 - **Flush support**: `forget($key)` for single key, `flush()` for all keys via index tracking
 - **Singleton binding**: Registered as singleton in [`UILibraryServiceProvider`](../../src/Providers/UILibraryServiceProvider.php:91)
 

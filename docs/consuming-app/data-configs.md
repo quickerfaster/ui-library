@@ -88,6 +88,18 @@ Each field drives form rendering, table column display, detail view display, inl
 ],
 ```
 
+### 2.2a Boolean Field Types
+
+| `field_type` | Field class | Renders | Init default | Save behavior |
+|---|---|---|---|---|
+| `checkbox` | `CheckboxField` | Single checkbox | `default` | `(bool)`; unchecked/missing → `false` |
+| `boolcheckbox` | `CheckboxField` | Single checkbox | `default ?? false` | Same as `checkbox` |
+| `boolradio` | `RadioField` | Yes/No radios, default options `[1 => 'Yes', 0 => 'No']` | `default ?? null` | `(bool)` when present; missing → `false` |
+
+> ⚠️ **Do not use `boolradio` for inverted-semantics booleans.** The save pipeline casts the submitted value with `(bool)` ([`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php:776), [`WizardForm.php`](src/Http/Livewire/Wizards/WizardForm.php:436)), which discards the option label. If options are inverted (e.g. `[0 => 'Yes', 1 => 'No']`), selecting "Yes" stores `false` and the meaning is silently reversed — displaying "Yes" on a `0` that is falsy. Use `checkbox` for a plain on/off flag; reserve `boolradio` for fields whose values truly are `1 = Yes`, `0 = No`.
+
+All three boolean types are auto-cast on save; unchecked/absent fields are written as `false`. See also the FieldFactory mapping in [`07-component-catalog.md`](docs/library/07-component-catalog.md).
+
 ### 2.3 fieldGroups
 
 Organizes form fields into tabs/sections:

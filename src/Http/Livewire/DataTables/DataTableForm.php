@@ -772,8 +772,8 @@ protected function isAllCompaniesMode(): bool
                     continue;
 
                 if (isset($definition['field_type'])) {
-                    // Prepare boolen values
-                    if ($definition['field_type'] === 'checkbox') {
+                    // Prepare boolean values
+                    if (in_array($definition['field_type'], ['checkbox', 'boolcheckbox', 'boolradio'], true)) {
                         // If the key exists in $data, cast it; if it's missing (unchecked), set to false
                         if (array_key_exists($fieldName, $data)) {
                             $data[$fieldName] = (bool) $data[$fieldName];

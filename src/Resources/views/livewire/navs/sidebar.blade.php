@@ -1,5 +1,5 @@
 <div
-    class="sidebar-container bg-light border-end d-flex flex-column align-items-stretch
+    class="sidebar-container bg-light border-end d-none d-md-flex flex-column align-items-stretch
             @if ($state === 'full') sidebar-full
             @else sidebar-icon @endif"
     x-data="{

@@ -81,8 +81,6 @@ class SelectField implements FieldType
 
     public function getOptions(): array
     {
-
-
         // If relationship is defined, load options from related model.
         if (isset($this->definition['relationship'])) {
             $rel = $this->definition['relationship'];
