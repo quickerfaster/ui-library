@@ -1993,12 +1993,9 @@ class DataTable extends Component
             return;
         }
 
-        // Resume action: redirect to wizard with draft record ID
+        // Resume action: open edit drawer for the record
         if ($act === 'resume') {
-            $wizardUrl = $action['wizardUrl'] ?? '/';
-            $separator = str_contains($wizardUrl, '?') ? '&' : '?';
-            $url = $wizardUrl . $separator . 'resumeRecordId=' . $recordId;
-            $this->redirect($url);
+            $this->edit($recordId);
             return;
         }
 
