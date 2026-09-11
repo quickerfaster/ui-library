@@ -117,11 +117,14 @@ class WizardForm extends Component
         $record = $this->resolveModel($this->modelClass, $this->recordId);
 
         if (!$record) {
-            $this->flashAndRedirect(
-                'error',
-                'The record you are trying to edit no longer exists or is not accessible.',
-                config('ui-library.home_route', '/')
-            );
+            // Record no longer exists — gracefully reset to create mode
+            // instead of redirecting away (avoids errors on stale sessions)
+            session()->flash('warning', 'The record you were trying to edit no longer exists or is not accessible. You are now in create mode.');
+            $this->isEditMode = false;
+            $this->recordId = null;
+            $this->loadConfiguration();
+            $this->applyPresetData();
+            $this->initializeFields();
             return;
         }
 
