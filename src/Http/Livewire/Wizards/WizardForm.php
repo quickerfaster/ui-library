@@ -75,8 +75,14 @@ class WizardForm extends Component
         $this->listeners['saveDraftForm'] = 'handleSaveDraftForm';
 
         $this->loadConfiguration();
-        $this->applyPresetData();
         $this->initializeFields();
+        $this->applyPresetData();
+
+        // Dynamic options (loadOptionsFrom) are resolved inside initializeFields(),
+        // but some of them depend on preset values (e.g. leave balances keyed by
+        // employee_id). Re-resolve them now that presets have been applied so the
+        // option labels reflect the preset context (e.g. correct leave balances).
+        $this->loadDynamicOptions();
 
         if ($this->recordId) {
             $this->isEditMode = true;
@@ -467,6 +473,7 @@ class WizardForm extends Component
             if ($this->isEditMode) {
                 $record->update($data);
             } else {
+                $data['status'] = 'Draft';
                 $record = $record->create($data);
                 $this->recordId = $record->id;
                 $this->isEditMode = true;
@@ -496,10 +503,9 @@ class WizardForm extends Component
             $this->syncRelationships($record);
 
             // Auto-start workflow for records that implement Workflowable
-            // Skip if status is Draft (drafts are saved without workflow)
+            // Only start if status is explicitly 'Pending' (not 'Draft')
             if ($record instanceof \QuickerFaster\UILibrary\Contracts\Workflow\Workflowable) {
-                $status = $record->status ?? ($data['status'] ?? null);
-                if ($status !== 'Draft') {
+                if (($data['status'] ?? '') === 'Pending') {
                     try {
                         $definitionKey = $record->getWorkflowDefinitionKey();
                         $engine = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class);
@@ -883,6 +889,30 @@ class WizardForm extends Component
     public function getFieldConflicts(string $fieldName): array
     {
         return [];
+    }
+
+    /**
+     * Transition a Draft record to Pending and start its workflow.
+     * Called by the wizard when the user completes setup.
+     */
+    public function completeWizard(): void
+    {
+        if ($this->recordId && $this->isEditMode) {
+            $record = $this->modelClass::find($this->recordId);
+            if ($record && $record->status === 'Draft') {
+                $record->update(['status' => 'Pending']);
+
+                if ($record instanceof \QuickerFaster\UILibrary\Contracts\Workflow\Workflowable) {
+                    try {
+                        app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class)->start($record);
+                    } catch (\Throwable $e) {
+                        \Log::warning('WizardForm: workflow start failed on complete', [
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+        }
     }
 
     // ---------- Render ----------

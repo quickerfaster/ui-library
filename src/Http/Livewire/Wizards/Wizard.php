@@ -226,6 +226,22 @@ class Wizard extends Component
                 $instance = $modelClass::withTrashed()->find($record['id']);
 
                 if ($instance) {
+                    // Cancel any active workflows before force-deleting the record
+                    if ($instance instanceof \QuickerFaster\UILibrary\Contracts\Workflow\Workflowable) {
+                        try {
+                            $workflow = $instance->workflows()
+                                ->where('status', 'pending')
+                                ->first();
+                            if ($workflow) {
+                                $workflow->update(['status' => 'cancelled']);
+                            }
+                        } catch (\Throwable $e) {
+                            \Log::warning('Wizard: failed to cancel workflow', [
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+
                     $instance->forceDelete();
                 }
             }

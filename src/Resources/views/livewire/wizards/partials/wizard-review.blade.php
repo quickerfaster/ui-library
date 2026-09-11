@@ -109,7 +109,7 @@
                 $workingDays = 0;
                 $remainingAfter = null;
 
-                if ($employeeId && $leaveTypeId && $startDate && $balanceCallback) {
+                if ($employeeId && $leaveTypeId && $startDate && $endDate && $balanceCallback) {
                     $year = $startDate instanceof \Carbon\Carbon ? $startDate->year : date('Y', strtotime($startDate));
 
                     $balanceRecord = app()->call($balanceCallback, [
