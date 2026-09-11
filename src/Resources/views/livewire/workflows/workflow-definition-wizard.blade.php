@@ -119,12 +119,20 @@
                     <div class="row">
                         @if (in_array($initiatorMode, ['users', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('initiator_users')->renderForm($fields['initiator_users'] ?? []) !!}
+                                {!! $this->getField('initiator_users')->renderForm($fields['initiator_users'] ?? [], [
+                                    'selectedLabels' => $this->selectedLabels['initiator_users'] ?? [],
+                                    'searchQuery' => $this->searches['initiator_users'] ?? '',
+                                    'results' => $this->searchResults['initiator_users'] ?? [],
+                                ]) !!}
                             </div>
                         @endif
                         @if (in_array($initiatorMode, ['roles', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('initiator_roles')->renderForm($fields['initiator_roles'] ?? []) !!}
+                                {!! $this->getField('initiator_roles')->renderForm($fields['initiator_roles'] ?? [], [
+                                    'selectedLabels' => $this->selectedLabels['initiator_roles'] ?? [],
+                                    'searchQuery' => $this->searches['initiator_roles'] ?? '',
+                                    'results' => $this->searchResults['initiator_roles'] ?? [],
+                                ]) !!}
                             </div>
                         @endif
                     </div>
@@ -158,12 +166,20 @@
                     <div class="row">
                         @if (in_array($authorizerMode, ['users', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('authorizer_users')->renderForm($fields['authorizer_users'] ?? []) !!}
+                                {!! $this->getField('authorizer_users')->renderForm($fields['authorizer_users'] ?? [], [
+                                    'selectedLabels' => $this->selectedLabels['authorizer_users'] ?? [],
+                                    'searchQuery' => $this->searches['authorizer_users'] ?? '',
+                                    'results' => $this->searchResults['authorizer_users'] ?? [],
+                                ]) !!}
                             </div>
                         @endif
                         @if (in_array($authorizerMode, ['roles', 'mixed']))
                             <div class="col-md-6">
-                                {!! $this->getField('authorizer_roles')->renderForm($fields['authorizer_roles'] ?? []) !!}
+                                {!! $this->getField('authorizer_roles')->renderForm($fields['authorizer_roles'] ?? [], [
+                                    'selectedLabels' => $this->selectedLabels['authorizer_roles'] ?? [],
+                                    'searchQuery' => $this->searches['authorizer_roles'] ?? '',
+                                    'results' => $this->searchResults['authorizer_roles'] ?? [],
+                                ]) !!}
                             </div>
                         @endif
                     </div>

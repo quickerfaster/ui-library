@@ -111,7 +111,11 @@
                                                     </div>
                                                 @else
                                                     {{-- Normal field: render via renderForm() --}}
-                                                    {!! $this->getField($field)->renderForm($this->fields[$field] ?? null) !!}
+                                                    {!! $this->getField($field)->renderForm($this->fields[$field] ?? null, [
+                                                        'selectedLabels' => $this->selectedLabels[$field] ?? [],
+                                                        'searchQuery' => $this->searches[$field] ?? '',
+                                                        'results' => $this->searchResults[$field] ?? [],
+                                                    ]) !!}
                                                 @endif
                                             </div>
                                         @endif

@@ -20,7 +20,7 @@ class LivewireSearchableSelectField implements FieldType
         $this->definition = $definition;
     }
 
-    public function renderForm($value = null): string
+    public function renderForm($value = null, array $searchState = []): string
     {
         return $this->renderBlade('qf::components.fields.livewire-searchable-select', [
             'field' => $this,
@@ -29,6 +29,9 @@ class LivewireSearchableSelectField implements FieldType
             'label' => $this->definition['label'] ?? ucfirst($this->name),
             'multiple' => $this->definition['multiSelect'] ?? false,
             'placeholder' => $this->definition['placeholder'] ?? 'Search...',
+            'selectedLabels' => $searchState['selectedLabels'] ?? [],
+            'searchQuery' => $searchState['searchQuery'] ?? '',
+            'results' => $searchState['results'] ?? [],
         ]);
     }
 

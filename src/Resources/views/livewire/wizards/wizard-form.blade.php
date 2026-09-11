@@ -31,7 +31,11 @@
                                 </div>
                             @else
                                 {{-- Normal field: render via renderForm() --}}
-                                {!! $field->renderForm($this->fields[$fieldName] ?? null) !!}
+                                {!! $field->renderForm($this->fields[$fieldName] ?? null, [
+                                    'selectedLabels' => $this->selectedLabels[$fieldName] ?? [],
+                                    'searchQuery' => $this->searches[$fieldName] ?? '',
+                                    'results' => $this->searchResults[$fieldName] ?? [],
+                                ]) !!}
                             @endif
 
                             {{-- Generic field hints system --}}
