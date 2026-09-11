@@ -208,6 +208,23 @@ class DefaultAuthorizationProvider implements DataTableAuthorizationProvider
 
         // Support 'field' => 'value' equality checks and 'field' => ['value1', 'value2'] array checks
         foreach ($condition as $field => $expected) {
+            // Special-case SoftDeletes: 'trashed' is a method, not a property/relationship.
+            // Accessing $record->trashed as a property triggers Laravel's __get which attempts
+            // to resolve a 'trashed' relationship and throws LogicException.
+            if ($field === 'trashed') {
+                $actual = method_exists($record, 'trashed') ? $record->trashed() : false;
+
+                $conditionMet = is_array($expected)
+                    ? in_array($actual, $expected, true)
+                    : $actual == $expected;
+
+                if (!$conditionMet) {
+                    return false;
+                }
+
+                continue;
+            }
+
             if (!isset($record->$field)) {
                 return false;
             }
