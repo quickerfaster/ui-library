@@ -55,7 +55,8 @@
                     <div class="d-flex justify-content-between align-items-center mb-0">
                         <h6 class="fw-bold mb-0 text-dark text-truncate">
                             @foreach ($viewConfig['titleFields'] as $field)
-                                <span>{{ $this->getValueFromRecord($record, $field) }}</span>
+                                @php $titleDef = $this->columns[$field] ?? $this->allFieldDefinitions[$field] ?? null; @endphp
+                                <span>{!! $titleDef ? $this->getField($field, $titleDef)->renderTable($this->getValueFromRecord($record, $field), $record) : $this->getValueFromRecord($record, $field) !!}</span>
                                 @if (!$loop->last)
                                     <span class="text-muted mx-1">·</span>
                                 @endif
@@ -91,7 +92,8 @@
                     <div class="d-flex align-items-center text-muted small mt-1">
                         @if (!empty($viewConfig['subtitleFields']))
                             @foreach ($viewConfig['subtitleFields'] as $field)
-                                <span class="text-truncate">{{ $this->getValueFromRecord($record, $field) }}</span>
+                                @php $subtitleDef = $this->columns[$field] ?? $this->allFieldDefinitions[$field] ?? null; @endphp
+                                <span class="text-truncate">{!! $subtitleDef ? $this->getField($field, $subtitleDef)->renderTable($this->getValueFromRecord($record, $field), $record) : $this->getValueFromRecord($record, $field) !!}</span>
                                 @if (!$loop->last)
                                     <span class="mx-2">•</span>
                                 @endif

@@ -92,8 +92,13 @@ class CheckboxField implements FieldType
 
 
         // Green badge for truthy values, Red for falsy
+        $options = $this->getOptions();
+        if (!empty($options)) {
+            $label = $options[$value] ?? ($value ? 'Yes' : 'No');
+        } else {
+            $label = $value ? 'Yes' : 'No';
+        }
         $class = $value ? 'bg-success' : 'bg-danger';
-        $label = $value ? 'Yes' : 'No';
 
         return "<span class=\"badge {$class}\">{$label}</span>";
 

@@ -106,7 +106,7 @@
                     @if (!empty($viewConfig['contentFields']))
                         <div class="card-text border-top pt-3 mt-auto">
                             @foreach ($viewConfig['contentFields'] as $field)
-                                @php $def = $this->columns[$field] ?? null; @endphp
+                                @php $def = $this->columns[$field] ?? $this->allFieldDefinitions[$field] ?? null; @endphp
                                 <div class="d-flex justify-content-between mb-1 small">
                                     <span
                                         class="text-muted fw-semibold small text-uppercase">{{ $field }}:</span>
