@@ -62,6 +62,9 @@
 
                             // Map the value to the configured color
                             $color = ($viewConfig['badgeColors'] ?? [])[$val] ?? 'secondary';
+
+                            // Resolve field definition for proper rendering (e.g. boolean → Yes/No)
+                            $badgeDef = $this->columns[$viewConfig['badgeField']] ?? $this->allFieldDefinitions[$viewConfig['badgeField']] ?? null;
                         @endphp
 
                         @if ($val)
@@ -69,7 +72,7 @@
                                 <span
                                     class="badge rounded-pill bg-white text-{{ $color }} shadow-sm border border-{{ $color }} px-2 py-1"
                                     style="font-size: 0.65rem; text-transform: uppercase;">
-                                    {{ $val }}
+                                    {!! $badgeDef ? $this->getField($viewConfig['badgeField'], $badgeDef)->renderTable($val, $record) : $val !!}
                                 </span>
                             </div>
                         @endif
