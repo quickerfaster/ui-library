@@ -75,8 +75,8 @@ class WizardForm extends Component
         $this->listeners['saveDraftForm'] = 'handleSaveDraftForm';
 
         $this->loadConfiguration();
-        $this->initializeFields();
         $this->applyPresetData();
+        $this->initializeFields();
 
         if ($this->recordId) {
             $this->isEditMode = true;
