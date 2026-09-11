@@ -28,6 +28,10 @@
 ### Consuming App — Leave Accrual Service Fixes
 - `app/Modules/Leave/Services/LeaveAccrualService.php` — Fixed two bugs: (1) "None" accrual frequency now correctly skips accrual instead of ignoring the setting; (2) `accrual_rate` and `max_balance` now read from the `LeaveBalance` row instead of the non-existent `LeaveType` columns.
 
+### Consuming App — Leave Accrual Full Balance Grant
+- `config/leave.php` — New config file with `annual_allowances` (default: 20 days, overridable per leave type code).
+- `app/Modules/Leave/Services/LeaveAccrualService.php` — "None" frequency leave types now grant the full annual balance upfront on first run instead of starting at 0.
+
 ## ApprovalPanel Combined Component & Approval UX Polish — 2026-08-31
 
 ### Library — ApprovalPanel Combined Component
