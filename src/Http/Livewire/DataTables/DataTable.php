@@ -1996,7 +1996,8 @@ class DataTable extends Component
         // Resume action: redirect to wizard with draft record ID
         if ($act === 'resume') {
             $wizardUrl = $action['wizardUrl'] ?? '/';
-            $url = $wizardUrl . '?resumeRecordId=' . $recordId;
+            $separator = str_contains($wizardUrl, '?') ? '&' : '?';
+            $url = $wizardUrl . $separator . 'resumeRecordId=' . $recordId;
             $this->dispatch('open-url-new-tab', $url);
             return;
         }
