@@ -114,7 +114,7 @@ class Wizard extends Component
     public function cancel(): void
     {
         session()->forget($this->wizardId);
-        $this->redirect($this->returnPath ?? '/');
+        $this->redirect($this->returnPath ?: '/');
     }
 
     public function finish(): void
@@ -266,7 +266,7 @@ class Wizard extends Component
 
     public function cancelKeep(): void
     {
-        $this->redirect($this->returnPath ?? '/');
+        $this->redirect($this->returnPath ?: '/');
     }
 
     public function cancelDelete(): void
@@ -300,7 +300,7 @@ class Wizard extends Component
 
         });
         session()->forget($this->wizardId);
-        $this->redirect($this->returnPath ?? '/');
+        $this->redirect($this->returnPath ?: '/');
     }
 
 

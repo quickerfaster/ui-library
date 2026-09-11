@@ -415,7 +415,12 @@ class WizardForm extends Component
 
         DB::transaction(function () use ($wasEdit) {
             if ($this->isEditMode) {
-                $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
+                try {
+                    $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
+                } catch (\QuickerFaster\UILibrary\Exceptions\RecordNotAccessibleException $e) {
+                    $this->dispatch('showAlert', 'Error', 'The record no longer exists. Please start over.', 'error');
+                    return;
+                }
             } else {
                 $record = new $this->modelClass();
             }
@@ -471,19 +476,6 @@ class WizardForm extends Component
             }
 
             if ($this->isEditMode) {
-                $record->update($data);
-            } else {
-                $data['status'] = 'Draft';
-                $record = $record->create($data);
-                $this->recordId = $record->id;
-                $this->isEditMode = true;
-            }
-
-
-
-            // Add audit trait to ActivityLogger
-            if ($this->isEditMode) {
-                // Capture old values before update
                 $original = $record->getOriginal();
                 $record->update($data);
                 $changed = $record->getChanges();
@@ -491,6 +483,7 @@ class WizardForm extends Component
                 $new = array_intersect_key($data, $changed);
                 ActivityLogger::updated($this->configKey, $record, $old, $new);
             } else {
+                $data['status'] = 'Draft';
                 $record = $record->create($data);
                 $this->recordId = $record->id;
                 $this->isEditMode = true;
@@ -570,7 +563,12 @@ class WizardForm extends Component
 
         DB::transaction(function () {
             if ($this->isEditMode) {
-                $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
+                try {
+                    $record = $this->resolveModelOrFail($this->modelClass, $this->recordId);
+                } catch (\QuickerFaster\UILibrary\Exceptions\RecordNotAccessibleException $e) {
+                    $this->dispatch('showAlert', 'Error', 'The record no longer exists. Please start over.', 'error');
+                    return;
+                }
             } else {
                 $record = new $this->modelClass();
             }
