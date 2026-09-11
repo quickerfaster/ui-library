@@ -38,7 +38,7 @@ class Wizard extends Component
 
     public string $isResumingDraft = 'false';
 
-    public function mount(string $configKey, array $presetData = []): void
+    public function mount(string $configKey, array $presetData = [], ?string $returnPath = null): void
     {
         $this->presetData = $presetData;
 
@@ -51,7 +51,7 @@ class Wizard extends Component
         $this->completion = $resolver->getCompletion();
         $this->title = $resolver->getTitle();
         $this->description = $resolver->getDescription();
-        $this->returnPath = $resolver->getReturnPath();
+        $this->returnPath = $returnPath ?: $resolver->getReturnPath();
 
         // Check for resume draft query parameter
         $resumeRecordId = request()->query('resumeRecordId');
