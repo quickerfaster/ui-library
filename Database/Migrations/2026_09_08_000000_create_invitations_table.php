@@ -20,7 +20,7 @@ return new class extends Migration
             $table->dateTime('expires_at')->nullable();
             $table->dateTime('accepted_at')->nullable();
             $table->dateTime('revoked_at')->nullable();
-            $table->timestamp('reminded_at')->nullable()->after('revoked_at');
+            $table->dateTime('reminded_at')->nullable()->after('revoked_at');
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
 
