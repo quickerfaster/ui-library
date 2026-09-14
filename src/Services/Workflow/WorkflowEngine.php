@@ -453,6 +453,9 @@ class WorkflowEngine
     }
 
     /**
+     * Get a workflow definition by key.
+     *
+     * Looks up the definition from the database first, falling back to
      * existing config-based workflows.
      *
      * Rows with `is_active = false` are skipped in the DB-first lookup, causing

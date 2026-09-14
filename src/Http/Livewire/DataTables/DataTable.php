@@ -15,8 +15,7 @@ use QuickerFaster\UILibrary\Services\Search\SearchEngine;
 use QuickerFaster\UILibrary\Contracts\DataTables\DataTableAuthorizationProvider;
 use QuickerFaster\UILibrary\Traits\Filters\AppliesFilters;
 use QuickerFaster\UILibrary\Events\DataTableRecordSaved;
-
-
+use Illuminate\Support\Facades\Schema;
 
 
 class DataTable extends Component
@@ -1546,12 +1545,17 @@ class DataTable extends Component
         // ✅ 1b. ENSURE FOREIGN KEYS FOR VIEW CONFIG RELATIONS ARE SELECTED
         // Without the FK in the SELECT, eager-loading fails because Laravel
         // can't resolve the relationship (e.g. record_id for record.first_name).
+        // Only add FKs that are actual columns on the model's table — skip
+        // FKs that belong to related tables (e.g. employee_id on employees
+        // is a FK on employee_positions, not on employees itself).
         $viewRelations = $this->getViewConfigRelations();
         if (!empty($viewRelations)) {
             $configRelations = $resolver->getRelations();
+            $modelInstance = new $modelClass();
+            $tableColumns = Schema::getColumnListing($modelInstance->getTable());
             foreach ($viewRelations as $relationName) {
                 $fk = $configRelations[$relationName]['foreignKey'] ?? null;
-                if ($fk && !in_array($fk, $columnsToSelect)) {
+                if ($fk && !in_array($fk, $columnsToSelect) && in_array($fk, $tableColumns)) {
                     $columnsToSelect[] = $fk;
                 }
             }
