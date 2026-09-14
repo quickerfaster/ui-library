@@ -15,6 +15,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('entity_type');
             $table->boolean('is_active')->default(true);
+            $table->json('notifications')->nullable()->after('is_active');
             $table->timestamps();
         });
 
