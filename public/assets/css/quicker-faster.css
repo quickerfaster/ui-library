@@ -62,8 +62,8 @@
 
 
 
-/* Modal content */
-.modal-content {
+/* Modal content (scoped to custom modal-wrapper, not Bootstrap modals) */
+.modal-wrapper .modal-content {
     position: relative;
     top: -100%;
     transform: translateY(0);
@@ -92,7 +92,7 @@
     opacity: 1;
 }
 
-/* Modal content animation - Slide down */
+/* Modal content animation - Slide down (already scoped to modal-wrapper) */
 .modal-wrapper.is-open .modal-content {
     top: 1vh;
     /* Small gap from top of viewport */

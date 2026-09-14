@@ -41,6 +41,7 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
             <div class="d-flex align-items-center">
                 {{-- Search + Filter group --}}
+                @if ($controls['search'] ?? true)
                 <div class="input-group input-group-sm" style="min-width: 250px;">
                     <input type="text" wire:model.live.debounce.300ms="search" class="form-control"
                         placeholder="Search..." />
@@ -48,6 +49,7 @@
                         title="Advanced search">
                         <i class="fas fa-sliders-h"></i>
                     </button>
+                    @if ($controls['filterColumns'] ?? true)
                     <button class="btn btn-outline-secondary" type="button" wire:click="openFilterDrawer"
                         title="Filter">
                         <i class="fas fa-filter"></i>
@@ -55,7 +57,9 @@
                             <span class="badge bg-primary ms-1">{{ count($activeFilters) }}</span>
                         @endif
                     </button>
+                    @endif
                 </div>
+                @endif
 
                 {{-- View Menu --}}
 
@@ -169,6 +173,7 @@
                                 <i class="fas fa-columns me-2"></i> Columns...
                             </a>
                         </li>
+                        @if ($controls['editable'] ?? true)
                         <li>
                             <a class="dropdown-item d-flex align-items-center justify-content-between" href="#"
                                 wire:click.prevent="toggleInlineEditing">
@@ -178,6 +183,7 @@
                                 <i class="fas fa-check {{ $editable ? 'text-primary' : 'invisible' }}"></i>
                             </a>
                         </li>
+                        @endif
                     </ul>
                 </div>
 
@@ -189,16 +195,26 @@
                         <i class="fas fa-tools"></i> Tools
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('csv')">
-                                <i class="fas fa-file-csv me-2"></i> Export as CSV
-                            </a></li>
-                        <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('xls')">
-                                <i class="fas fa-file-excel me-2"></i> Export as XLS
-                            </a></li>
-                        <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('pdf')">
-                                <i class="fas fa-file-pdf me-2"></i> Export as PDF
-                            </a></li>
+                        @php $files = $controls['files'] ?? ['export' => ['csv', 'xls', 'pdf'], 'import' => ['csv', 'xls'], 'print' => true]; @endphp
+                        @if (!empty($files['export']))
+                            @if (in_array('csv', $files['export']))
+                            <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('csv')">
+                                    <i class="fas fa-file-csv me-2"></i> Export as CSV
+                                </a></li>
+                            @endif
+                            @if (in_array('xls', $files['export']))
+                            <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('xls')">
+                                    <i class="fas fa-file-excel me-2"></i> Export as XLS
+                                </a></li>
+                            @endif
+                            @if (in_array('pdf', $files['export']))
+                            <li><a class="dropdown-item" href="#" wire:click.prevent="exportAll('pdf')">
+                                    <i class="fas fa-file-pdf me-2"></i> Export as PDF
+                                </a></li>
+                            @endif
+                        @endif
 
+                        @if (!empty($files['import']))
                         <li>
                             <hr class="dropdown-divider">
                         </li>
@@ -208,18 +224,19 @@
                                 <i class="fas fa-download me-2"></i> Export Template (for import)
                             </a>
                         </li>
-
                         <li><a class="dropdown-item" href="#" wire:click.prevent="import">
                                 <i class="fas fa-upload me-2"></i> Import
                             </a></li>
+                        @endif
 
+                        @if ($files['print'] ?? true)
                         <li>
                             <hr class="dropdown-divider">
                         </li>
-
                         <li><a class="dropdown-item" href="#" wire:click.prevent="print">
                                 <i class="fas fa-print me-2"></i> Print
                             </a></li>
+                        @endif
                         <li>
                             <hr class="dropdown-divider">
                         </li>
@@ -433,7 +450,9 @@
 
                             {{-- Add Row Actions --}}
                             <td class="text-end pe-3">
-                                @include('qf::livewire.data-tables.partials.row-actions')
+                                @include('qf::livewire.data-tables.partials.row-actions', [
+                                    'detailComponent' => $detailComponent ?? '',
+                                ])
                             </td>
                         </tr>
 

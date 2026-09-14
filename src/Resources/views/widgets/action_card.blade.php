@@ -21,13 +21,25 @@
         @foreach($data['actions'] as $action)
             @php
                 $buttonClass = $action['style'] ?? 'primary';
+                $hasEvent = !empty($action['event']);
+                $url = $action['url'] ?? ($action['params']['url'] ?? null);
             @endphp
-            <button
-                wire:click="$dispatch('{{ $action['event'] }}', {{ json_encode($action['params'] ?? []) }})"
-                class="btn btn-{{ $buttonClass }} btn-sm"
-            >
-                {{ $action['label'] }}
-            </button>
+            @if ($hasEvent)
+                <button
+                    wire:click="$dispatch('{{ $action['event'] }}', {{ json_encode($action['params'] ?? []) }})"
+                    class="btn btn-{{ $buttonClass }} btn-sm"
+                >
+                    {{ $action['label'] }}
+                </button>
+            @elseif ($url)
+                <a href="{{ $url }}" class="btn btn-{{ $buttonClass }} btn-sm">
+                    {{ $action['label'] }}
+                </a>
+            @else
+                <button class="btn btn-{{ $buttonClass }} btn-sm" disabled>
+                    {{ $action['label'] }}
+                </button>
+            @endif
         @endforeach
     </div>
 @endif

@@ -74,6 +74,23 @@ The `module_access` configuration in `config/ui-library.php` controls which role
 
 The `EnsureModuleDashboardAccess` middleware checks this config on every request. Users without the required role are redirected to their appropriate dashboard. `super_admin`, `admin`, and `company_admin` bypass all checks.
 
+The middleware must be registered in the consuming app's `bootstrap/app.php`:
+
+```php
+// bootstrap/app.php
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->web(append: [
+        \QuickerFaster\UILibrary\Http\Middleware\ResolveCompanyContext::class,
+    ]);
+    
+    $middleware->alias([
+        'qf.resolve-company-context' => \QuickerFaster\UILibrary\Http\Middleware\ResolveCompanyContext::class,
+    ]);
+})
+```
+
+[`ResolveCompanyContext`](../../src/Http/Middleware/ResolveCompanyContext.php) (alias `qf.resolve-company-context`) reads the `current_company_id` from the session and binds it into the service container. This middleware is **required** for multi-tenant scoping — without it, [`CompanyScope`](../../src/Scopes/CompanyScope.php) cannot resolve the current tenant.
+
 ---
 
 ## 2. Notification Templates
@@ -266,9 +283,91 @@ See [19-notification-consuming-app-guide.md](19-notification-consuming-app-guide
 
 ---
 
-## 5. Testing
+## 5. Workflow Notification Type Mapping
 
-### 5.1 Asserting Permissions Are Seeded
+### 5.1 The `notifications.types` Config in `workflows.php`
+
+Every workflow definition that enables notifications MUST include a `notifications.types` map. This map tells [`WorkflowEngine::notifyTransition()`](../../src/Services/Workflow/WorkflowEngine.php:651) which template type to use for each event:
+
+```php
+// app/Modules/Hr/Config/workflows.php
+'leave_request_approval' => [
+    'label' => 'Leave Request Approval',
+    'steps' => [
+        // ...
+    ],
+    'notifications' => [
+        'enabled' => true,
+        'types' => [
+            'submitted'           => 'workflow_submitted',
+            'submitted_initiator' => 'workflow_submitted_initiator',
+            'approved'            => 'workflow_approved',
+            'stage_advanced'      => 'workflow_stage_advanced',
+            'workflow_completed'  => 'workflow_completed',
+            'rejected'            => 'workflow_rejected',
+            'recalled'            => 'workflow_recalled',
+        ],
+    ],
+],
+```
+
+**All seven events must be mapped.** Missing an event causes a logged warning and the notification falls back to `workflow_{event}` — which may not match any seeded template.
+
+### 5.2 Template Naming Convention
+
+All workflow notification template types use the `workflow_` prefix:
+
+| Template Type | Purpose | Recipient |
+|---------------|---------|-----------|
+| `workflow_submitted` | Workflow submitted for approval | Approvers |
+| `workflow_submitted_initiator` | Submission confirmation | Submitter |
+| `workflow_approved` | Step approved, next step ready | Next approvers |
+| `workflow_stage_advanced` | Workflow advanced to next stage | Submitter |
+| `workflow_completed` | Workflow fully approved | Submitter |
+| `workflow_rejected` | Workflow rejected | Submitter |
+| `workflow_recalled` | Workflow recalled | Pending approvers |
+
+**Rule:** Template type values in `notifications.types` must always use the `workflow_` prefix. Never use bare event names (e.g., `'submitted' => 'submitted'`) — they won't match the seeded templates.
+
+### 5.3 `NotificationTemplateIntegrityTest`
+
+The consuming app should include a test that verifies every event in every workflow definition's `notifications.types` has a corresponding template in the `notification_templates` table:
+
+```php
+// tests/Feature/Notifications/NotificationTemplateIntegrityTest.php
+public function test_all_workflow_notification_types_have_templates(): void
+{
+    $definitions = config('ui-library.workflows.definitions', []);
+    
+    foreach ($definitions as $key => $definition) {
+        $types = $definition['notifications']['types'] ?? [];
+        
+        foreach ($types as $event => $templateType) {
+            $this->assertDatabaseHas('notification_templates', [
+                'type' => $templateType,
+            ], "Template '{$templateType}' missing for workflow '{$key}' event '{$event}'");
+        }
+    }
+}
+```
+
+This test catches the "added an event to the engine but forgot to map it in config" bug before it reaches production.
+
+### 5.4 Seeding Workflow Templates
+
+The library's [`NotificationTemplateSeeder`](../../src/Core/Common/Database/Seeders/NotificationTemplateSeeder.php) seeds the four basic workflow templates (`workflow_submitted`, `workflow_approved`, `workflow_rejected`, `workflow_recalled`). The consuming app must seed the three additional initiator-feedback templates:
+
+- `workflow_submitted_initiator`
+- `workflow_stage_advanced`
+- `workflow_completed`
+
+These should be added to the consuming app's workflow-specific seeders (e.g., `LeaveWorkflowNotificationTemplateSeeder`, `WorkflowNotificationTemplateSeeder`).
+
+---
+
+## 6. Testing
+
+### 6.1 Asserting Permissions Are Seeded
 
 ```php
 public function test_permissions_are_seeded(): void
@@ -284,7 +383,7 @@ public function test_permissions_are_seeded(): void
 }
 ```
 
-### 5.2 Testing Notification Dispatch
+### 6.2 Testing Notification Dispatch
 
 ```php
 use QuickerFaster\UILibrary\Services\Notifications\NotificationService;

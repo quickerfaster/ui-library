@@ -79,6 +79,8 @@ class ApprovalPanel extends Component
             $this->reject($this->comments);
         } elseif ($this->actionType === 'recall') {
             $this->recall();
+        } elseif ($this->actionType === 'cancel') {
+            $this->cancel();
         }
     }
 
@@ -191,6 +193,7 @@ class ApprovalPanel extends Component
         $canApprove = false;
         $canReject = false;
         $canRecall = false;
+        $canCancel = false;
 
         if ($workflow && $workflow->isPending()) {
             $user = Auth::user();
@@ -213,7 +216,21 @@ class ApprovalPanel extends Component
             }
         }
 
-        return compact('canApprove', 'canReject', 'canRecall');
+        if ($workflow && $workflow->isApproved()) {
+            $user = Auth::user();
+
+            if ($user) {
+                // HR managers and super admins can cancel approved leave requests
+                $workspaceId = $this->resolveWorkspaceId($workflow);
+                $canCancel = $this->guard->canApprove(
+                    $user,
+                    ['hr_manager', 'super_admin'],
+                    $workspaceId
+                );
+            }
+        }
+
+        return compact('canApprove', 'canReject', 'canRecall', 'canCancel');
     }
 
     // -----------------------------------------------------------------------
@@ -289,6 +306,7 @@ class ApprovalPanel extends Component
             'rejected' => 'Rejected',
             'completed' => 'Completed',
             'recalled' => 'Recalled',
+            'cancelled' => 'Cancelled',
             default => ucfirst($action),
         };
     }
@@ -301,6 +319,7 @@ class ApprovalPanel extends Component
             'rejected' => 'rejected',
             'completed' => 'approved',
             'recalled' => 'cancelled',
+            'cancelled' => 'cancelled',
             default => 'pending',
         };
     }

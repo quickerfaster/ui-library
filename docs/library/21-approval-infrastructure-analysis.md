@@ -197,4 +197,103 @@ Because `WorkflowEngine` is already the documented successor and is the only *co
 
 ---
 
-**Related files**: [`00-index.md`](../README.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`09-engines-and-services.md`](./09-engines-and-services.md) · [`10-settings-and-config.md`](./10-settings-and-config.md)
+## 6. WorkflowEngine Notification Events (Post-Analysis Implementation)
+
+Since the original analysis, the [`WorkflowEngine`](../../src/Services/Workflow/WorkflowEngine.php) notification system has been fully implemented. This section documents the event types, routing, and patterns discovered during implementation.
+
+### 6.1 Event Type Catalog
+
+The engine dispatches **seven** distinct notification events via [`notifyTransition()`](src/Services/Workflow/WorkflowEngine.php:627):
+
+| Event | Trigger | Recipient | Template Type Convention |
+|-------|---------|-----------|--------------------------|
+| `submitted` | [`start()`](src/Services/Workflow/WorkflowEngine.php:124) | Current step approvers | `workflow_submitted` |
+| `submitted_initiator` | [`start()`](src/Services/Workflow/WorkflowEngine.php:134) | Submitter (confirmation) | `workflow_submitted_initiator` |
+| `approved` | [`approve()`](src/Services/Workflow/WorkflowEngine.php:215) | Next step approvers | `workflow_approved` |
+| `stage_advanced` | [`approve()`](src/Services/Workflow/WorkflowEngine.php:216) — when `$nextStep !== null` | Submitter (progress) | `workflow_stage_advanced` |
+| `workflow_completed` | [`approve()`](src/Services/Workflow/WorkflowEngine.php:216) — when `$nextStep === null` | Submitter (final) | `workflow_completed` |
+| `rejected` | [`reject()`](src/Services/Workflow/WorkflowEngine.php:331) | Submitter | `workflow_rejected` |
+| `recalled` | [`recall()`](src/Services/Workflow/WorkflowEngine.php:289) | All pending approvers | `workflow_recalled` |
+
+### 6.2 Initiator Feedback Flow
+
+A key pattern discovered during implementation: the **initiator (submitter) receives notifications at every stage**, not just on final approval/rejection. This is implemented via two dedicated event types:
+
+1. **`submitted_initiator`** — dispatched immediately after `submitted` in [`start()`](src/Services/Workflow/WorkflowEngine.php:134). Gives the submitter confirmation that their workflow was successfully submitted and is now pending.
+
+2. **`stage_advanced`** — dispatched in [`approve()`](src/Services/Workflow/WorkflowEngine.php:216) when the workflow advances to a next step (not yet complete). Keeps the initiator informed of progress through multi-step workflows.
+
+3. **`workflow_completed`** — dispatched in [`approve()`](src/Services/Workflow/WorkflowEngine.php:216) when `$nextStep === null` (final approval). Replaces `stage_advanced` for the terminal transition.
+
+This means the initiator receives a notification for **every transition** in their workflow, not just the final outcome. The approver and initiator receive **different** template types for the same underlying action (e.g., an approval sends `workflow_approved` to the next approver but `workflow_stage_advanced` to the initiator).
+
+### 6.3 `workflow_completed` Routing for Final Approval
+
+When the last step is approved, the engine routes to `workflow_completed` instead of `stage_advanced`:
+
+```php
+// WorkflowEngine::approve() — lines 215-216
+$completed = $nextStep === null;
+$initiatorEvent = $completed ? 'workflow_completed' : 'stage_advanced';
+```
+
+This distinction allows the consuming app to use different templates for "your request moved to the next stage" vs. "your request was fully approved."
+
+### 6.4 Approver Bypass in `authorizeView()`
+
+[`AuthorizationService::authorizeView()`](src/Services/AccessControl/AuthorizationService.php:167) includes a **workflow approver bypass**: users who are the current-step approver for a record's pending workflow can view that record even if they lack the `view_{resource}` Spatie permission. This is critical for approval workflows where approvers may not have general view access to the module.
+
+The bypass checks:
+1. The record implements [`Workflowable`](../../src/Contracts/Workflow/Workflowable.php)
+2. The record has a pending [`Workflow`](../../src/Models/Workflow.php)
+3. The current step is pending
+4. The user is an authorized approver for that step (via [`ApprovalGuard::canApprove()`](../../src/Services/Approvals/ApprovalGuard.php))
+
+This sits alongside the existing super-admin bypass and the ownership bypass (ESS pattern).
+
+### 6.5 Permission Naming Convention: `Str::snake()` not `Str::kebab()`
+
+Two different naming conventions coexist in the codebase and must not be confused:
+
+| Context | Convention | Example | Source |
+|---------|-----------|---------|--------|
+| **Permission names** | `Str::snake()` | `view_leave_request` | [`AccessControlPermissionService`](src/Services/AccessControl/AccessControlPermissionService.php:28) |
+| **URL/model slugs** | `Str::kebab()` | `leave-requests` | [`WorkflowEngine::resolveWorkflowableUrl()`](src/Services/Workflow/WorkflowEngine.php:716) |
+
+[`AccessControlPermissionService::generatePermissionName()`](src/Services/AccessControl/AccessControlPermissionService.php:28) uses:
+```php
+$permissionName = $action . "_" . Str::snake($modelName);
+```
+
+While [`WorkflowEngine::resolveWorkflowableUrl()`](src/Services/Workflow/WorkflowEngine.php:716) uses:
+```php
+$modelPlural = Str::plural(Str::kebab($modelName));
+```
+
+**Rule:** Permissions always use `snake_case`. URLs always use `kebab-case`. Never use `Str::kebab()` for permission names — it produces `view-leave-request` which won't match any Spatie permission.
+
+### 6.6 Template Variable Payload Enrichment
+
+[`notifyTransition()`](src/Services/Workflow/WorkflowEngine.php:684) enriches every notification payload with contextual variables beyond what the caller provides:
+
+```php
+$payload = array_merge($data, [
+    'workflow_id'     => $workflow->id,
+    'workflow_key'    => $workflow->definition_key,
+    'workflow_status' => $workflow->status,
+    'url'             => $url,                              // Link to workflowable entity
+    'title'           => $workflowable?->title ?? $workflowable?->name ?? null,
+]);
+```
+
+Callers add event-specific variables:
+- **`approve()`** adds: `step_name`, `next_step_name`, `approver_name`, `completed` (bool)
+- **`reject()`** adds: `step_name`, `approver_name`, `comments`
+- **`recall()`** adds: `step_name`, `approver_name`
+- **`start()`** adds: `workflowable_type`
+
+These variables are available as `{placeholder}` substitutions in notification templates. Template authors can use `{approver_name}`, `{next_step_name}`, `{completed}`, `{step_name}`, `{url}`, and `{title}` in their notification bodies.
+
+---
+
+**Related files**: [`00-index.md`](../README.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`09-engines-and-services.md`](./09-engines-and-services.md) · [`10-settings-and-config.md`](./10-settings-and-config.md) · [`sidebar-active-state-pitfalls.md`](./sidebar-active-state-pitfalls.md)

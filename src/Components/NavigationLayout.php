@@ -213,6 +213,8 @@ class NavigationLayout extends Component
         $currentPath = request()->path();
         $currentRouteName = Route::currentRouteName();
 
+        $bestMatch = null;
+        $bestMatchLength = 0;
 
         foreach ($this->contextItems as $ctx => $items) {
             foreach ($items as $item) {
@@ -220,16 +222,32 @@ class NavigationLayout extends Component
                 if (!$route)
                     continue;
 
+                // Named route match (no slashes) — exact equality only.
                 if (!str_contains($route, '/') && $route === $currentRouteName) {
                     $this->activeContext = $ctx;
                     return;
                 }
-                $pathToMatch = ltrim($route, '/');
+
+                // Strip query string from route definition before comparison,
+                // because request()->path() never includes query parameters.
+                $pathToMatch = ltrim(parse_url($route, PHP_URL_PATH) ?? '', '/');
+
+                if ($pathToMatch === '')
+                    continue;
+
                 if ($pathToMatch === $currentPath || str_starts_with($currentPath, $pathToMatch)) {
-                    $this->activeContext = $ctx;
-                    return;
+                    $matchLength = strlen($pathToMatch);
+                    if ($matchLength > $bestMatchLength) {
+                        $bestMatch = $ctx;
+                        $bestMatchLength = $matchLength;
+                    }
                 }
             }
+        }
+
+        if ($bestMatch !== null) {
+            $this->activeContext = $bestMatch;
+            return;
         }
 
         $keys = array_keys($this->contextGroups);

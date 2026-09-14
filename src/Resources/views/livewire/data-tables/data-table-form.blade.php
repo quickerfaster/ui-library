@@ -60,6 +60,14 @@
             <div class="container-xl" style="max-width: 900px; margin: 0 auto;">
 
 
+                {{-- Success Message --}}
+                @if ($successMessage)
+                    <div class="alert alert-success border-start border-success border-4 shadow-sm mb-4 d-flex align-items-center">
+                        <i class="fas fa-check-circle text-success me-2 fs-5"></i>
+                        <span class="fw-medium">{{ $successMessage }}</span>
+                    </div>
+                @endif
+
                 {{-- Error Handling: Clean & Focused --}}
                 @if ($errors->any())
                     <div class="alert alert-light border-start border-danger border-4 shadow-sm mb-4">

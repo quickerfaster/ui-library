@@ -14,7 +14,7 @@
             <h5>{{ $group['title'] ?? ucfirst($groupKey) }}</h5>
             <div class="row">
                 @foreach($group['fields'] as $fieldName)
-                    @if(!$this->isFieldHidden($fieldName, 'onNewForm'))
+                    @if(!$this->isFieldHidden($fieldName, $this->isEditMode ? 'onEditForm' : 'onNewForm'))
                         @php
                             $field = $this->getField($fieldName);
                             $fieldType = $this->fieldDefinitions[$fieldName]['field_type'] ?? 'string';

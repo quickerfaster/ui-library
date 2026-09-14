@@ -63,6 +63,11 @@ class DataTableForm extends Component
     public array $prefilledData = [];
     public array $croppedImages = [];
 
+    /**
+     * Success message shown as an inline alert banner on the form after save.
+     */
+    public ?string $successMessage = null;
+
 
     public array $morphSelectedType = [];   // keyed by field name
     public array $morphSelectedId = [];     // keyed by field name
@@ -887,12 +892,15 @@ protected function isAllCompaniesMode(): bool
             $this->dispatch('formSaved', $this->recordId, $this->isEditMode);
             $this->dispatch('refreshDataTable');
 
-            // Show success feedback to user (skip when inline — the drawer's parent
-            // page listens for 'formSaved' and shows its own confirmation)
-            if (!$this->inline) {
+            // Set inline success message for display on the form
+            $this->successMessage = $this->isEditMode ? 'Record updated successfully.' : 'Record created successfully.';
+
+            // Also dispatch a toast for drawer/inline forms
+            if ($this->inline) {
                 $this->dispatch('showAlert', [
                     'type' => 'success',
-                    'message' => $this->isEditMode ? 'Record updated successfully.' : 'Record created successfully.',
+                    'message' => $this->successMessage,
+                    'autoClose' => true,
                 ]);
             }
 

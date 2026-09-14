@@ -159,7 +159,7 @@ This ensures consuming apps can override library defaults.
 
 [`Sidebar`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php) receives an `$activeContext` (plus `contextGroupLabel`, `contextGroupIcon`, `contextGroupConfig`) from `NavigationLayout`. When context-specific items are present and `$activeContext` is set, [`Sidebar::buildModuleSections()`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php:156) renders **only that context group's items** — selecting a top-nav tab shows that context's items in the sidebar. Otherwise it falls back to `NavigationManager`, then to the Phase 4.3 legacy build.
 
-> **⚠️ Context Group Matching**: The `context` prop in every blade view's `<x-qf::navigation-layout>` MUST match the context group key in the module's `Config/navigation.php`. A mismatch causes the wrong sidebar links to appear. Example: blade has `context="my-portal"` → nav config must define a `'my-portal'` context group. See [Pre-Coding Checklist](../consuming-app/pre-coding-checklist.md) §E.
+> **⚠️ Context Group Matching**: The `context` prop in every blade view's `<x-qf::navigation-layout>` MUST match the context group key in the module's `Config/navigation.php`. A mismatch causes the wrong sidebar links to appear. Example: blade has `context="my-portal"` → nav config must define a `'my-portal'` context group. See [Pre-Coding Checklist](../consuming-app/pre-coding-checklist.md) §E and [Sidebar Active State Pitfalls](./sidebar-active-state-pitfalls.md) §5 for the full diagnosis and fix pattern.
 
 ---
 

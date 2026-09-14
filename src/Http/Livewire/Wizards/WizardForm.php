@@ -41,7 +41,7 @@ class WizardForm extends Component
     public array $conflictWarnings = [];
 
     // Configurable draft success message (override in wizard step config)
-    public string $draftSuccessMessage = 'Record saved as draft.';
+    public ?string $draftSuccessMessage = 'Record saved as draft.';
 
     // For searchable selects
     public array $searches = [];

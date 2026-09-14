@@ -4,9 +4,15 @@ namespace QuickerFaster\UILibrary\Services\AccessControl;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
+use QuickerFaster\UILibrary\Contracts\Workflow\Workflowable;
+use QuickerFaster\UILibrary\Services\Approvals\ApprovalGuard;
 
 class AuthorizationService
 {
+    public function __construct(
+        protected ApprovalGuard $approvalGuard,
+    ) {}
+
     /**
      * Callback that resolves the employee ID for a given user.
      *
@@ -158,6 +164,29 @@ class AuthorizationService
             }
         }
 
+        // Workflow approver bypass: users who are the current-step approver
+        // for a record's pending workflow are allowed to view it, even if they
+        // lack the `view_{resource}` Spatie permission.
+        if ($record instanceof Workflowable) {
+            $workflow = $record->workflow()->first();
+
+            if ($workflow && $workflow->isPending()) {
+                $currentStep = $workflow->currentStep;
+
+                if ($currentStep && $currentStep->isPending()) {
+                    $workspaceId = $workflow->context['workspace_id'] ?? null;
+
+                    if ($this->approvalGuard->canApprove(
+                        $user,
+                        $currentStep->roles ?? [],
+                        $workspaceId !== null ? (string) $workspaceId : null
+                    )) {
+                        return;
+                    }
+                }
+            }
+        }
+
         $resource = $this->resolveResourceName($modelClass);
 
         if (method_exists($user, 'can') && $user->can('view_' . $resource)) {
@@ -305,7 +334,7 @@ class AuthorizationService
     }
 
     /**
-     * Resolve a kebab-case resource name from a model class or instance.
+     * Resolve a snake_case resource name from a model class or instance.
      *
      * @param string|object $model  FQCN string or model instance
      * @return string
@@ -314,6 +343,6 @@ class AuthorizationService
     {
         $class = is_object($model) ? get_class($model) : $model;
 
-        return \Str::kebab(class_basename($class));
+        return \Str::snake(class_basename($class));
     }
 }

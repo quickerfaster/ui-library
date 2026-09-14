@@ -547,7 +547,7 @@ class NavigationManager
             }
 
             // URL path match (prefix matching for nested pages)
-            $pathToMatch = ltrim($route, '/');
+            $pathToMatch = ltrim(parse_url($route, PHP_URL_PATH) ?? $route, '/');
             if ($pathToMatch === $currentPath || str_starts_with($currentPath, $pathToMatch . '/')) {
                 return true;
             }

@@ -102,6 +102,11 @@ Run these against a **real consuming-app entity** (a model that implements [`Wor
 
 - [ ] With `Event::fake()`, assert `WorkflowSubmitted`, `WorkflowApproved`, `WorkflowRejected`, and `WorkflowRecalled` are dispatched at the correct transitions.
 - [ ] With real listeners, confirm a notification record appears in `notification_logs` for a workflow whose `notifications` config is enabled (after seeding the templates per §2.2).
+- [ ] **Verify all `notifications.types` are mapped** in every workflow definition config. All seven events (`submitted`, `submitted_initiator`, `approved`, `stage_advanced`, `workflow_completed`, `rejected`, `recalled`) must have entries. Missing mappings produce `"Workflow notification type not mapped"` log warnings.
+- [ ] **Run `NotificationTemplateIntegrityTest`** — confirms every template type referenced in `notifications.types` has a corresponding row in the `notification_templates` table.
+- [ ] **Verify initiator receives correct template** (not the approver template). On approval, the initiator should receive `workflow_stage_advanced` (or `workflow_completed` for final step), NOT `workflow_approved`. Check the `notification_logs` table to confirm the correct `type` was dispatched to the submitter.
+- [ ] **Verify all workflow step roles exist in the DB.** Steps reference Spatie role names — if a role doesn't exist, [`ApproverResolver::resolve()`](../../src/Contracts/Approvals/ApproverResolver.php) returns an empty array and no approvers are notified.
+- [ ] **Verify approver has an Employee record in the submitter's company.** The [`WorkspaceScopedApproverResolver`](../../src/Services/Approvals/WorkspaceScopedApproverResolver.php) filters by `company_id` — an approver without an employee record in the same company won't be resolved.
 
 > **Notification-specific consuming-app guidance** (throttling/scheduling, audience segmentation, inline actions, template variables, and their tests) now lives in [`19-notification-consuming-app-guide.md`](./19-notification-consuming-app-guide.md). Use that guide for the four consuming-app notification concerns instead of this checklist.
 

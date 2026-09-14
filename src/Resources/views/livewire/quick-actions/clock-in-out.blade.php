@@ -25,9 +25,16 @@
         </h5>
 
         @if ($status === 'clocked_in' && $clockedInSince)
-            <p class="text-sm text-secondary mb-3">
-                Since {{ $clockedInSince }}
+            <p class="text-sm text-secondary mb-1">
+                Clocked in at {{ $clockedInSince }}
             </p>
+            @if ($lastEventAt)
+                <p class="text-xs text-muted mb-3">
+                    {{ \Carbon\Carbon::parse($lastEventAt)->format('M j, Y g:i A') }}
+                </p>
+            @else
+                <p class="text-xs text-muted mb-3">&nbsp;</p>
+            @endif
         @else
             <p class="text-sm text-secondary mb-3">
                 Tap the button below to clock in
@@ -44,7 +51,23 @@
 
         {{-- Toggle Button --}}
         <button
-            wire:click="toggle"
+            x-data
+            x-on:click="
+                if ('geolocation' in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            $wire.toggle(pos.coords.latitude, pos.coords.longitude);
+                        },
+                        (err) => {
+                            // Geolocation denied or unavailable — proceed without coordinates
+                            $wire.toggle();
+                        },
+                        { timeout: 5000, maximumAge: 60000 }
+                    );
+                } else {
+                    $wire.toggle();
+                }
+            "
             wire:loading.attr="disabled"
             wire:target="toggle"
             class="btn btn-lg w-100 rounded-3 fw-bold

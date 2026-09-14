@@ -137,8 +137,8 @@ class NotificationService
             $key = $matches[1];
             $value = data_get($data, $key);
 
-            if (is_scalar($value) || (is_object($value) && method_exists($value, '__toString'))) {
-                return (string) $value;
+            if (is_scalar($value) || is_null($value) || (is_object($value) && method_exists($value, '__toString'))) {
+                return (string) ($value ?? '');
             }
 
             // Leave the placeholder unchanged if the value is not renderable.

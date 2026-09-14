@@ -90,6 +90,7 @@ class ApprovalHistoryTimeline extends Component
             'rejected' => 'Rejected',
             'completed' => 'Completed',
             'recalled' => 'Recalled',
+            'cancelled' => 'Cancelled',
             default => ucfirst($action),
         };
     }
@@ -102,6 +103,7 @@ class ApprovalHistoryTimeline extends Component
             'rejected' => 'rejected',
             'completed' => 'approved',
             'recalled' => 'cancelled',
+            'cancelled' => 'cancelled',
             default => 'pending',
         };
     }

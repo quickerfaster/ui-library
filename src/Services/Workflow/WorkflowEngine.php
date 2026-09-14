@@ -11,6 +11,7 @@ use QuickerFaster\UILibrary\Contracts\Approvals\ApproverResolver;
 use QuickerFaster\UILibrary\Contracts\Notifications\Notifiable;
 use QuickerFaster\UILibrary\Contracts\Workflow\Workflowable;
 use QuickerFaster\UILibrary\Events\Workflows\WorkflowApproved;
+use QuickerFaster\UILibrary\Events\Workflows\WorkflowCancelled;
 use QuickerFaster\UILibrary\Events\Workflows\WorkflowRecalled;
 use QuickerFaster\UILibrary\Events\Workflows\WorkflowRejected;
 use QuickerFaster\UILibrary\Events\Workflows\WorkflowSubmitted;
@@ -131,7 +132,7 @@ class WorkflowEngine
         // Notify the initiator that their workflow was submitted.
         $initiatorId = $workflow->submitted_by ?? Auth::id();
         if ($initiatorId) {
-            $this->notifyTransition($workflow, 'submitted', [$initiatorId], [
+            $this->notifyTransition($workflow, 'submitted_initiator', [$initiatorId], [
                 'workflowable_type' => $workflow->workflowable_type,
             ]);
         }
@@ -203,8 +204,26 @@ class WorkflowEngine
 
         $this->notifyTransition($workflow, 'approved', $recipientIds, [
             'step_name' => $currentStep->name,
+            'approver_name' => Auth::user()->name ?? 'An approver',
+            'next_step_name' => $nextStep->name ?? null,
+            'completed' => $nextStep === null,
             'comments' => $comments ?? '',
         ]);
+
+        // Notify the initiator that the request advanced
+        $initiatorId = $workflow->submitted_by;
+        if ($initiatorId) {
+            $completed = $nextStep === null;
+            $initiatorEvent = $completed ? 'workflow_completed' : 'stage_advanced';
+            $approverName = Auth::user()->name ?? 'An approver';
+            $this->notifyTransition($workflow, $initiatorEvent, [$initiatorId], [
+                'step_name' => $currentStep->name ?? '',
+                'approver_name' => $approverName,
+                'next_step_name' => $nextStep->name ?? null,
+                'completed' => $completed,
+                'comments' => $comments,
+            ]);
+        }
     }
 
     /**
@@ -257,10 +276,26 @@ class WorkflowEngine
 
             $this->notifyTransition($workflow, 'approved', $requiredIds, [
                 'step_name' => $currentStep->name,
+                'approver_name' => Auth::user()->name ?? 'An approver',
+                'next_step_name' => null,
+                'completed' => false,
                 'comments' => $comments ?? '',
                 'partial' => true,
                 'remaining' => $remaining,
             ]);
+
+            // Notify the initiator that the request advanced
+            $initiatorId = $workflow->submitted_by;
+            if ($initiatorId) {
+                $approverName = Auth::user()->name ?? 'An approver';
+                $this->notifyTransition($workflow, 'stage_advanced', [$initiatorId], [
+                    'step_name' => $currentStep->name ?? '',
+                    'approver_name' => $approverName,
+                    'next_step_name' => null,
+                    'completed' => false,
+                    'comments' => $comments,
+                ]);
+            }
 
             return;
         }
@@ -285,8 +320,26 @@ class WorkflowEngine
 
         $this->notifyTransition($workflow, 'approved', $recipientIds, [
             'step_name' => $currentStep->name,
+            'approver_name' => Auth::user()->name ?? 'An approver',
+            'next_step_name' => $nextStep->name ?? null,
+            'completed' => $nextStep === null,
             'comments' => $comments ?? '',
         ]);
+
+        // Notify the initiator that the request advanced
+        $initiatorId = $workflow->submitted_by;
+        if ($initiatorId) {
+            $completed = $nextStep === null;
+            $initiatorEvent = $completed ? 'workflow_completed' : 'stage_advanced';
+            $approverName = Auth::user()->name ?? 'An approver';
+            $this->notifyTransition($workflow, $initiatorEvent, [$initiatorId], [
+                'step_name' => $currentStep->name ?? '',
+                'approver_name' => $approverName,
+                'next_step_name' => $nextStep->name ?? null,
+                'completed' => $completed,
+                'comments' => $comments,
+            ]);
+        }
     }
 
     /**
@@ -366,12 +419,40 @@ class WorkflowEngine
     }
 
     /**
-     * Resolve a workflow definition, DB-first with config fallback.
-     *
-     * Active rows in the workflow_definitions table take priority so that
-     * definitions created through the workflow definition wizard are honoured
-     * by the engine. When no active DB row exists, the legacy config-driven
-     * definition is returned unchanged — preserving backward compatibility for
+     * Cancel an approved workflow (post-approval cancellation).
+     * Restores the workflowable to a cancelled state and notifies relevant parties.
+     */
+    public function cancel(Workflow $workflow, ?string $comments = null): void
+    {
+        if (!$workflow->isApproved()) {
+            throw new \RuntimeException('Only approved workflows can be cancelled.');
+        }
+
+        DB::transaction(function () use ($workflow, $comments) {
+            $workflow->update([
+                'status' => 'cancelled',
+                'completed_at' => now(),
+            ]);
+
+            WorkflowAction::create([
+                'workflow_id' => $workflow->id,
+                'user_id' => auth()->id(),
+                'action' => 'cancelled',
+                'comments' => $comments,
+            ]);
+
+            event(new \QuickerFaster\UILibrary\Events\Workflows\WorkflowCancelled($workflow, $comments));
+
+            $initiatorId = $workflow->submitted_by;
+            if ($initiatorId) {
+                $this->notifyTransition($workflow, 'cancelled', [$initiatorId], [
+                    'comments' => $comments,
+                ]);
+            }
+        });
+    }
+
+    /**
      * existing config-based workflows.
      *
      * Rows with `is_active = false` are skipped in the DB-first lookup, causing
@@ -598,16 +679,23 @@ class WorkflowEngine
 
         $types = $config['types'] ?? [];
 
-        $type = array_key_exists($event, $types)
-            ? $types[$event]
-            : "workflow_{$event}";
+        $typeName = $types[$event] ?? "workflow_{$event}";
+
+        // Warn when type mapping is missing
+        if (!isset($types[$event])) {
+            \Log::warning("Workflow notification type not mapped. Add '{$event}' to notifications.types config.", [
+                'workflow_key' => $workflow->definition_key ?? 'unknown',
+                'event' => $event,
+                'fallback' => $typeName,
+            ]);
+        }
 
         // A null/empty type means the event's notification toggle is off. Skip it.
-        if ($type === null || $type === '') {
+        if ($typeName === null || $typeName === '') {
             return;
         }
 
-        $type = (string) $type;
+        $typeName = (string) $typeName;
         $recipientIds = array_values(array_unique(array_filter($recipientIds)));
 
         $useAsync = (bool) config('ui-library.notifications.queue', false);
@@ -635,9 +723,9 @@ class WorkflowEngine
                 ]);
 
                 if ($useAsync) {
-                    $this->notifications->dispatchAsync($notifiable, $type, $payload);
+                    $this->notifications->dispatchAsync($notifiable, $typeName, $payload);
                 } else {
-                    $this->notifications->dispatch($notifiable, $type, $payload);
+                    $this->notifications->dispatch($notifiable, $typeName, $payload);
                 }
             }
         }
@@ -701,3 +789,4 @@ class WorkflowEngine
         return $user instanceof Notifiable ? $user : null;
     }
 }
+

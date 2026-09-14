@@ -9,9 +9,12 @@
         <div class="list-group-item list-group-item-action border-0 border-bottom p-3 transition-all hover-bg-light position-relative"
             wire:key="list-{{ $record->id }}" {{-- Giant SaaS Trick: The entire row navigates, but we stop propagation on buttons --}}
             @if ($crudType === 'drawers')
+                @php
+                    $detailComp = !empty($detailComponent) ? $detailComponent : 'qf.data-table-detail';
+                @endphp
                 onclick="if(!event.target.closest('.stop-propagation')) {
                     Livewire.dispatch('openDrawer', {
-                        component: 'qf.data-table-detail',
+                        component: '{{ $detailComp }}',
                         params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}' },
                         title: 'View {{ $modelName }}'
                     })
@@ -109,6 +112,7 @@
                 <div class="ms-3 stop-propagation op-0-hover">
                     @include('qf::livewire.data-tables.partials.row-actions', [
                         'record' => $record,
+                        'detailComponent' => $detailComponent ?? '',
                         'simpleActions' => $simpleActions,
                         'moreActions' => $moreActions,
                         'controls' => $controls,

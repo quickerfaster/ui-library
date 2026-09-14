@@ -93,6 +93,19 @@ class DataTable extends Component
 
     public array $prefilledData = [];
 
+    /**
+     * Optional wizard URL override for resume actions.
+     * When set, this overrides the wizardUrl from the data config.
+     */
+    public ?string $wizardUrl = null;
+
+    /**
+     * Optional controls override. When provided, these take precedence over
+     * the controls defined in the data config. Useful for scoping toolbar
+     * features in restricted contexts (e.g., employee-scoped views).
+     */
+    public ?array $controlsOverride = null;
+
 
 
 
@@ -120,11 +133,13 @@ class DataTable extends Component
         ?string $crudType = null,
         ?array $simpleActions = null,
         ?array $moreActions = null,
-        array $prefilledData = []
+        array $prefilledData = [],
+        ?array $controls = null,
     ) {
 
         $this->configKey = $configKey;
         $this->hiddenFields = $hiddenFields;
+        $this->controlsOverride = $controls;
 
         $hiddenFieldsParam = request()->query('hiddenFields', []);
         if (is_array($hiddenFieldsParam)) {
@@ -1993,9 +2008,48 @@ class DataTable extends Component
             return;
         }
 
-        // Resume action: open edit drawer for the record
+        // Resume action: redirect to wizard with draft record prefill
         if ($act === 'resume') {
-            $this->edit($recordId);
+            $wizardUrl = $this->wizardUrl ?? $action['wizardUrl'] ?? null;
+            if ($wizardUrl) {
+                $separator = str_contains($wizardUrl, '?') ? '&' : '?';
+                $this->redirect($wizardUrl . $separator . 'resumeRecordId=' . $recordId);
+            } else {
+                // Fallback to edit modal if no wizardUrl configured
+                $this->edit($recordId);
+            }
+            return;
+        }
+
+        // Recall action: withdraw a pending workflow request
+        if ($act === 'recall') {
+            $modelClass = $this->getConfigResolver()->getModel();
+            $record = $modelClass::find($recordId);
+            if ($record && method_exists($record, 'workflow')) {
+                $workflow = $record->workflow()->where('status', 'pending')->first();
+                if ($workflow) {
+                    app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class)->recall($workflow);
+                    $message = $action['successMessage'] ?? 'The request has been withdrawn.';
+                    $this->dispatch('showAlert', ['type' => 'success', 'message' => $message, 'autoClose' => true]);
+                    $this->dispatch('refreshDataTable');
+                }
+            }
+            return;
+        }
+
+        // Cancel action: cancel an approved workflow request
+        if ($act === 'cancel') {
+            $modelClass = $this->getConfigResolver()->getModel();
+            $record = $modelClass::find($recordId);
+            if ($record && method_exists($record, 'workflow')) {
+                $workflow = $record->workflow()->where('status', 'approved')->first();
+                if ($workflow) {
+                    app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEngine::class)->cancel($workflow);
+                    $message = $action['successMessage'] ?? 'Record cancelled.';
+                    $this->dispatch('showAlert', ['type' => 'success', 'message' => $message, 'autoClose' => true]);
+                    $this->dispatch('refreshDataTable');
+                }
+            }
             return;
         }
 
@@ -2588,10 +2642,11 @@ protected function checkConditions(array $action, $record): bool
         $this->viewConfig = $viewConfig;
 
 
-        $controls = $resolver->getControls();
+        $controls = $this->controlsOverride ?? $resolver->getControls();
         $simpleActions = $this->simpleActions ?? ($resolver->getConfig()['simpleActions'] ?? []);
         $crudType = $this->crudType ?? ($resolver->getConfig()['crudType'] ?? false);
         $moreActions = $this->moreActions ?? $this->filterMoreActions($resolver->getMoreActions());
+        $detailComponent = $resolver->getConfig()['detailComponent'] ?? '';
 
         $this->simpleActions = $simpleActions;
         $this->crudType = $crudType;
@@ -2610,6 +2665,7 @@ protected function checkConditions(array $action, $record): bool
             'moreActions' => $moreActions,
             'bulkActions' => $this->bulkActions,
             'filesActions' => $this->filesActions,
+            'detailComponent' => $detailComponent,
             'modelName' => $resolver->getModelName(),
         ]);
     }

@@ -1,12 +1,75 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-11
-> **Status**: Current — All 14 fix/audit categories + 19 new items + 4 home page & runtime polish items + 3 access control improvements + Phase 5 Navigation & UX Polish + App\Modules Resolution & ActivityLogs Contract completed + Architecture Blueprint Split + Access Control & Navigation UX Polish + Authorization, Seeding & Install Fixes (observations 17-23) + Module Auto-Discovery + Tenancy Foundation + DataTable Record Events + HasWorkflow Trait + Resolver Config Bindings + DataTable Runtime Bridges + Drawer Decoupled Pattern + Cross-Module Cleanup + WorkspaceScopedApproverResolver Default + Approval UI Constructor→Boot Refactor + Payroll Approval Integration + Leave Wizard Rendering Fix + Boolean Field Casting
+> **Date**: 2026-09-13
+> **Status**: Current — Leave Request Cancellation, Detail Drawer Approval UI, ESS Toolbar Restrictions, Form Success Feedback, AlertModal Polish, CSS Modal Fix
 
 ---
 
-> ⚠️ **Testing status (2026-08-16)**: The workflow/approval foundation has been implemented and unit-verified (`php -l`, config validation), but has **NOT** yet been tested end-to-end in a consuming app. Further adjustments may be needed once integrated into a real consuming app (e.g., Spatie role/permission seeding, notification template registration, workspace-scoped approver resolution, and runtime workflow execution against real entities).
+## Leave Request Cancellation & Detail Drawer Approval UI — 2026-09-13
+
+### Library — Domain Leak Fix: Config-Driven Success Messages
+
+- [`DataTable.php:2023,2039`](src/Http/Livewire/DataTables/DataTable.php:2023) — `recall` and `cancel` row actions now read `successMessage` from the `moreActions` config entry instead of using hardcoded strings. The hardcoded `'Leave request cancelled.'` was a domain leak violating the library independence principle. Fallback: `'The request has been withdrawn.'` / `'Record cancelled.'`.
+
+### Library — `detailComponent` Support in Row Actions
+
+- [`DataTable.php:2640`](src/Http/Livewire/DataTables/DataTable.php:2640) — `render()` now reads `detailComponent` from config and passes it to the view.
+- [`row-actions.blade.php:40-43`](src/Resources/views/livewire/data-tables/partials/row-actions.blade.php:40) — View button in drawer mode now uses `$detailComponent` from config instead of hardcoded `'qf.data-table-detail'`. Falls back to `'qf.data-table-detail'` when not configured.
+- [`list-view.blade.php:11-18`](src/Resources/views/livewire/data-tables/partials/list-view.blade.php:11) — Row `onclick` handler in drawer mode also uses `$detailComponent` from config.
+- [`data-table.blade.php:436-438`](src/Resources/views/livewire/data-tables/data-table.blade.php:436) — Passes `detailComponent` to `row-actions` partial.
+- [`card-view.blade.php:132`](src/Resources/views/livewire/data-tables/partials/card-view.blade.php:132), [`monthly-view.blade.php:177`](src/Resources/views/livewire/data-tables/partials/monthly-view.blade.php:177) — Also pass `detailComponent`.
+
+### Library — `controls` Override Parameter on DataTable
+
+- [`DataTable.php:107,137,142,2643`](src/Http/Livewire/DataTables/DataTable.php:107) — Added `$controlsOverride` property and `?array $controls = null` mount parameter. When provided, these take precedence over the data config's `controls`. Enables context-specific toolbar restrictions without modifying shared configs.
+- [`data-table.blade.php:44-58`](src/Resources/views/livewire/data-tables/data-table.blade.php:44) — Search input and Filter button now gated by `$controls['search']` and `$controls['filterColumns']`.
+- [`data-table.blade.php:172-180`](src/Resources/views/livewire/data-tables/data-table.blade.php:172) — Inline Editing toggle gated by `$controls['editable']`.
+- [`data-table.blade.php:191-246`](src/Resources/views/livewire/data-tables/data-table.blade.php:191) — Tools menu (Export, Import, Print) now gated by `$controls['files']` with per-format granularity.
+
+### Library — Form Success Feedback: Inline Alert + Toast
+
+- [`DataTableForm.php:69`](src/Http/Livewire/DataTables/DataTableForm.php:69) — Added `$successMessage` property for inline alert banner on the form.
+- [`DataTableForm.php:895-904`](src/Http/Livewire/DataTables/DataTableForm.php:895) — `save()` now sets `$this->successMessage` for full-page forms AND dispatches `showAlert` toast with `autoClose: true` for drawer/inline forms. Previously: full-page forms got an intrusive modal; drawer forms got no feedback at all.
+- [`data-table-form.blade.php:63-69`](src/Resources/views/livewire/data-tables/data-table-form.blade.php:63) — Added success alert banner (green, with check icon) above the form fields, shown when `$successMessage` is set.
+
+### Library — AlertModal: `success` Type + Smart Sizing
+
+- [`AlertModal.php:161-217`](src/Http/Livewire/Modals/AlertModal.php:161) — Added `'success'` case to `getDefaultTitle()` ("Success"), `getDefaultIcon()` (`fa-check-circle`), and `getDefaultConfirmText()`. Previously fell through to `default` showing "Alert" with a bell icon.
+- [`AlertModal.php:95`](src/Http/Livewire/Modals/AlertModal.php:95) — `show()` now uses `$this->getDefaultSize()` for type-based modal sizing.
+- [`AlertModal.php:210-217`](src/Http/Livewire/Modals/AlertModal.php:210) — New `getDefaultSize()` method: returns `'sm'` for `success`/`info`/`error`/`warning` (compact 300px), `null` for `confirm`/`prompt` (default 500px).
+- [`alert-modal.blade.php:2-5`](src/Resources/views/livewire/modals/alert-modal.blade.php:2) — Added scoped CSS to reduce Bootstrap's default modal padding for the alert modal.
+
+### Library — CSS Fix: Modal min-height Leak
+
+- [`quicker-faster.css:66`](public/assets/css/quicker-faster.css:66) — Scoped `.modal-content { min-height: 500px; }` to `.modal-wrapper .modal-content`. The unscoped rule was leaking into Bootstrap modals (alert, confirm, prompt), forcing all of them to be at least 500px tall regardless of content.
+
+### Consuming App — Leave Module: Cancel Leave Date Gate
+
+- [`LeaveRequest.php:278-282`](hr-consuming-app:app/Modules/Leave/Models/LeaveRequest.php:278) — Added `getHasNotStartedAttribute()` accessor returning `true` when `start_date` is in the future.
+- [`leave_request.php:434`](hr-consuming-app:app/Modules/Leave/Data/leave_request.php:434) — "Cancel Leave" condition updated from `['status' => ['Approved']]` to `['status' => ['Approved'], 'has_not_started' => [true]]`. Cancel is now only available for approved leaves that haven't started yet.
+- [`leave_request.php:426,434`](hr-consuming-app:app/Modules/Leave/Data/leave_request.php:426) — Added `successMessage` keys to `recall` ("Leave request withdrawn.") and `cancel` ("Leave request cancelled.") moreActions.
+
+### Consuming App — Leave Module: Detail Drawer with Approval UI
+
+- [`LeaveRequestDetail.php`](hr-consuming-app:app/Modules/Leave/Http/Livewire/LeaveRequestDetail.php) — **New** Livewire component (42 lines). Accepts `recordId`, `configKey`, `returnParams`. Resolves `LeaveRequest` with `employee`, `leaveType`, `workflow` eager-loaded. Listens to `refreshDetail` for approval panel integration. Follows the same pattern as [`PayrollRunDetail`](hr-consuming-app:app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunDetail.php).
+- [`leave-request-detail.blade.php`](hr-consuming-app:app/Modules/Leave/Resources/views/livewire/leave-request-detail.blade.php) — **New** Blade view composing `qf.approval-panel` (banner mode, when workflow exists) + `qf.data-table-detail` (field groups) + `leave-document-upload` (documents).
+- [`LeaveServiceProvider.php:53`](hr-consuming-app:app/Modules/Leave/Providers/LeaveServiceProvider.php:53) — Registered `qf.leave-request-detail` component.
+- [`leave_request.php:250`](hr-consuming-app:app/Modules/Leave/Data/leave_request.php:250) — Set `'detailComponent' => 'qf.leave-request-detail'`.
+- [`leave-requests/show.blade.php`](hr-consuming-app:app/Modules/Leave/Resources/views/leave-requests/show.blade.php) — Simplified from 31 lines to 17 lines. No longer manually resolves `LeaveRequest`, checks workflow, or embeds approval-panel/document-upload — the `LeaveRequestDetail` component handles all of that.
+
+### Consuming App — ESS Toolbar Restrictions (5 Data Tables)
+
+- [`leave-hub.blade.php:42-48`](hr-consuming-app:app/Modules/Hr/Resources/views/livewire/leave-hub.blade.php:42) — My Leaves tab: added `controls` override hiding Filter, Add, Inline Editing, Import, Export Template, XLS export.
+- [`employee-detail.blade.php:628-634,703-709,733-739,749-755`](hr-consuming-app:app/Modules/Hr/Resources/views/livewire/employee-detail.blade.php:628) — Payslips, Attendance, Documents, Clock Events tabs: same `controls` restrictions applied.
+- [`employee-detail.blade.php:721-734`](hr-consuming-app:app/Modules/Hr/Resources/views/livewire/employee-detail.blade.php:721) — Documents tab: removed standalone "Upload" button (wasted horizontal space), enabled toolbar "Add" button with `'simpleActions' => ['show', 'create']`.
+
+### Published Files Updated
+
+All library blade changes also applied to consuming app's `resources/views/vendor/qf/` published copies:
+- `data-table.blade.php`, `row-actions.blade.php`, `list-view.blade.php`, `card-view.blade.php`, `monthly-view.blade.php`
+- `data-table-form.blade.php`, `alert-modal.blade.php`
+- `public/vendor/ui-library/assets/css/quicker-faster.css`
 
 ## Leave Wizard Rendering Fix + Boolean Field Casting — 2026-09-11
 

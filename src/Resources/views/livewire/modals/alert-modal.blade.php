@@ -1,4 +1,9 @@
 <div wire:ignore.self>
+    <style>
+        #{{ $modalId }} .modal-header { padding: 0.75rem 1rem; }
+        #{{ $modalId }} .modal-body { padding: 0.75rem 1rem; }
+        #{{ $modalId }} .modal-footer { padding: 0.5rem 1rem; }
+    </style>
     <div class="modal fade" id="{{ $modalId }}" tabindex="-1" aria-hidden="true"
          wire:ignore.self>
         <div class="modal-dialog {{ $size ? 'modal-' . $size : '' }} modal-dialog-centered">

@@ -91,8 +91,8 @@ class AlertModal extends Component
         $this->autoClose       = $params['autoClose']       ?? false;
         $this->autoCloseDelay  = $params['autoCloseDelay']  ?? 3;
 
-        // Size
-        $this->size            = $params['size']            ?? null;
+        // Size — use type-based default, allow explicit override
+        $this->size            = $params['size']            ?? $this->getDefaultSize();
 
         $this->showModal = true;
         $this->dispatch('open-bs-modal', [
@@ -162,6 +162,7 @@ public function confirm(): void
     {
         return match($this->type) {
             'confirm' => 'Confirm',
+            'success' => 'Success',
             'info'    => 'Information',
             'error'   => 'Error',
             'warning' => 'Warning',
@@ -174,6 +175,7 @@ public function confirm(): void
     {
         return match($this->type) {
             'confirm' => 'fas fa-question-circle',
+            'success' => 'fas fa-check-circle',
             'info'    => 'fas fa-info-circle',
             'error'   => 'fas fa-exclamation-circle',
             'warning' => 'fas fa-exclamation-triangle',
@@ -186,7 +188,7 @@ public function confirm(): void
     {
         return match($this->type) {
             'confirm' => 'Confirm',
-            'info', 'error', 'warning' => 'OK',
+            'success', 'info', 'error', 'warning' => 'OK',
             'prompt'  => 'Submit',
             default   => 'OK',
         };
@@ -197,6 +199,19 @@ public function confirm(): void
         return match($this->type) {
             'confirm', 'prompt' => 'Cancel',
             default => '',
+        };
+    }
+
+    /**
+     * Get the default modal size based on the alert type.
+     * Simple messages (success/info/error/warning) use a compact 'sm' modal.
+     * Confirm and prompt dialogs use the default size for their content.
+     */
+    protected function getDefaultSize(): ?string
+    {
+        return match($this->type) {
+            'success', 'info', 'error', 'warning' => 'sm',
+            default => null,
         };
     }
 

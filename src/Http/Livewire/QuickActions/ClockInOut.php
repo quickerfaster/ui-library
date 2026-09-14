@@ -36,8 +36,17 @@ class ClockInOut extends Component
     /** @var string|null Error message to display */
     public ?string $error = null;
 
+    /** @var float|null Browser geolocation latitude */
+    public ?float $latitude = null;
+
+    /** @var float|null Browser geolocation longitude */
+    public ?float $longitude = null;
+
     protected $listeners = [
-        'clockEventRecorded' => 'refreshStatus',
+        // 'clockEventRecorded' listener removed — the component already
+        // sets its own status in toggle(). Listening to its own event
+        // caused a redundant refreshStatus() call that re-queried the DB
+        // and briefly flickered the UI back to the previous state.
     ];
 
     public function mount($employeeId = null): void
@@ -79,7 +88,7 @@ class ClockInOut extends Component
     /**
      * Toggle clock in / clock out.
      */
-    public function toggle(): void
+    public function toggle(?float $latitude = null, ?float $longitude = null): void
     {
         if (!$this->employeeId) {
             $this->error = 'No employee record found.';
@@ -92,13 +101,20 @@ class ClockInOut extends Component
         try {
             $recorder = app(ClockEventRecorder::class);
 
+            // Build meta array with optional geolocation data
+            $meta = [];
+            if ($latitude !== null && $longitude !== null) {
+                $meta['latitude'] = $latitude;
+                $meta['longitude'] = $longitude;
+            }
+
             if ($this->status === 'clocked_out') {
-                $result = $recorder->record($this->employeeId, 'clock_in');
+                $result = $recorder->record($this->employeeId, 'clock_in', $meta);
                 $this->status = 'clocked_in';
                 $this->clockedInSince = $this->formatTime($result['timestamp']);
                 $this->lastEventAt = $result['timestamp'];
             } else {
-                $result = $recorder->record($this->employeeId, 'clock_out');
+                $result = $recorder->record($this->employeeId, 'clock_out', $meta);
                 $this->status = 'clocked_out';
                 $this->clockedInSince = null;
                 $this->lastEventAt = $result['timestamp'];
@@ -109,8 +125,15 @@ class ClockInOut extends Component
                 'event_type' => $result['event_type'],
                 'timestamp' => $result['timestamp'],
             ]);
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => $this->status === 'clocked_in'
+                    ? 'Clocked in successfully!'
+                    : 'Clocked out successfully!',
+            ]);
         } catch (\Throwable $e) {
-            $this->error = 'Unable to record clock event. Please try again.';
+            $this->error = $e->getMessage();
         } finally {
             $this->recording = false;
         }

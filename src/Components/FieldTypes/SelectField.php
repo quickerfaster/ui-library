@@ -61,14 +61,24 @@ class SelectField implements FieldType
     public function renderTable($value, $record): string
     {
         // For a select, we usually want to show the label, not the raw value.
+        // Guard against non-scalar values (e.g., Carbon instances from datetime casts
+        // that were incorrectly routed to a select field).
+        if (!is_scalar($value)) {
+            return e((string) $value);
+        }
+
         $options = $this->getOptions();
-        return $options[$value] ?? e($value);
+        return $options[$value] ?? e((string) $value);
     }
 
     public function renderDetail($value, $record): string
     {
+        if (!is_scalar($value)) {
+            return e((string) $value);
+        }
+
         $options = $this->getOptions();
-        return $options[$value] ?? e($value);
+        return $options[$value] ?? e((string) $value);
     }
 
     public function getValidationRules(): array

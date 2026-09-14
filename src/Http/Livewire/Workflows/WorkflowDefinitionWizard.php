@@ -97,7 +97,7 @@ class WorkflowDefinitionWizard extends Wizard
     public array $searchResults = [];
     public array $selectedLabels = [];
 
-    public function mount(?string $configKey = null, ?int $definitionId = null): void
+    public function mount(string $configKey = '', array $presetData = [], ?string $returnPath = null, ?int $definitionId = null): void
     {
         // The admin wrapper blade embeds this component with no mount params,
         // so a query-string `definitionId` (e.g.

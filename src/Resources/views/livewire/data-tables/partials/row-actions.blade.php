@@ -37,9 +37,12 @@
                     <i class="fas fa-eye"></i>
                 </a>
             @elseif ($crudType === 'drawers')
+                @php
+                    $detailComp = !empty($detailComponent) ? $detailComponent : 'qf.data-table-detail';
+                @endphp
                 <button type="button"
-                    wire:click="$dispatch('openDrawer', { 
-                        component: 'qf.data-table-detail',
+                    wire:click="$dispatch('openDrawer', {
+                        component: '{{ $detailComp }}',
                         params: { configKey: '{{ $configKey }}', recordId: {{ $record->id }}, inline: true, crudType: '{{ $crudType }}' },
                         title: 'View {{ $modelName }}'
                     })"
@@ -150,12 +153,23 @@
                         $routeParam = $action['routeParam'] ?? 'id';
                         $url = $action['url'] ?? null;
                         $isDirectLink = !empty($routeName) || !empty($url);
+
+                        // Build route parameters from the action's 'params' config,
+                        // replacing {id} placeholders with the actual record ID.
+                        $routeParams = [];
+                        if ($routeName && !empty($action['params'])) {
+                            foreach ($action['params'] as $key => $value) {
+                                $routeParams[$key] = str_replace('{id}', $record->id, $value);
+                            }
+                        } elseif ($routeName) {
+                            $routeParams = [$routeParam => $record->id];
+                        }
                     @endphp
                     <li>
                         @if ($isDirectLink)
                             @php
                                 $href = $routeName
-                                    ? route($routeName, [$routeParam => $record->id])
+                                    ? route($routeName, $routeParams)
                                     : ($url . '/' . $record->id);
                             @endphp
                             <a class="dropdown-item d-flex align-items-center py-2" href="{{ $href }}"

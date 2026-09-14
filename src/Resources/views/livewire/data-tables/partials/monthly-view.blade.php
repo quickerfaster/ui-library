@@ -174,6 +174,7 @@
                                             <div class="op-2-hover">
                                                 @include('qf::livewire.data-tables.partials.row-actions', [
                                                     'record' => $record,
+                                                    'detailComponent' => $detailComponent ?? '',
                                                     'simpleActions' => $simpleActions,
                                                     'moreActions' => $moreActions,
                                                     'controls' => $controls,

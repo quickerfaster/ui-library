@@ -23,7 +23,8 @@
             $isActive = request()->routeIs($item['route']);
         } else {
             // Direct URL comparison
-            $isActive = request()->url() === url($item['route']);
+            $routePath = parse_url($item['route'], PHP_URL_PATH) ?? $item['route'];
+            $isActive = request()->url() === url($routePath);
         }
     } elseif (isset($item['url'])) {
         $isActive = request()->url() === url($item['url']);

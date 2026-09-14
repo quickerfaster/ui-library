@@ -88,13 +88,13 @@
 
 - [ ] **Context group match**: The `context` prop in the blade view MUST match the context group key in `Config/navigation.php`.
   - Example: Blade has `context="my-portal"` → Nav config must have `'my-portal' => ['items' => [...]]`
+  - A mismatch causes silent fallback to buggy URL-based resolution. See [Sidebar Active State Pitfalls](../library/sidebar-active-state-pitfalls.md) §5 for the full diagnosis.
 - [ ] **Route coverage**: Is the route covered by the catch-all `/{module}/{view}` pattern, or does it need an explicit `Route::get()`?
   - Catch-all covers: `/{module}/{view}` → `app/Modules/{Module}/Resources/views/{view}.blade.php`
   - Explicit route needed for: custom URLs, route parameters beyond `{id}`, named routes
+- [ ] **No query strings in route definitions.** Route URLs in navigation configs must not include query strings (e.g., `/leave/leave-hub?tab=all-requests`). Use [`parse_url($route, PHP_URL_PATH)`](../library/sidebar-active-state-pitfalls.md) to strip them before comparison. Query parameters belong in the controller/view, not in route definitions.
 - [ ] **Permission**: Every nav item should have a `permission` key for access control.
 - [ ] **Icon**: Use Font Awesome 5 free icons (`fas fa-*`).
-
----
 
 ---
 
@@ -183,6 +183,15 @@
 - [ ] Use `boolradio` only when `1 = Yes` / `0 = No` genuinely matches the stored semantics.
 - [ ] **Never** define inverted `boolradio` options (e.g. `0 => 'Yes'`) — save casts to `(bool)` and the inversion is silently lost.
 - [ ] All three boolean types (`checkbox`, `boolcheckbox`, `boolradio`) are auto-cast on save; unchecked/absent → `false`.
+
+---
+
+## H. Before Adding Workflow Notification Config
+
+- [ ] **Every workflow notification event must have a `types` mapping.** When defining `notifications.types` in a workflow config (`Config/workflows.php` or DB definition), all seven events must be mapped: `submitted`, `submitted_initiator`, `approved`, `stage_advanced`, `workflow_completed`, `rejected`, `recalled`. Missing mappings produce `"Workflow notification type not mapped"` log warnings and silent notification failures.
+- [ ] **Template types must use `workflow_` prefix convention.** Values in `notifications.types` must be `workflow_submitted`, `workflow_approved`, etc. — never bare event names like `submitted` or `approved`. The `notification_templates` table uses the `workflow_` prefix convention.
+- [ ] **Run `NotificationTemplateIntegrityTest`** after adding or modifying workflow notification config. This test verifies every template type referenced in config has a corresponding row in the database.
+- [ ] **Seed all seven template types.** The library seeds only four (`workflow_submitted`, `workflow_approved`, `workflow_rejected`, `workflow_recalled`). The consuming app must seed the three initiator-feedback types (`workflow_submitted_initiator`, `workflow_stage_advanced`, `workflow_completed`) in its own seeders.
 
 ---
 

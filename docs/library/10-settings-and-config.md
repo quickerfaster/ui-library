@@ -213,6 +213,78 @@ Hardening for the centralized `/{module}/{view}/{id?}` route pattern (see [`15-g
 - **`authorization_callback`** — optional callable `($user, $module, $view, $id)` returning `true`/`false`. Takes precedence over `gate` when both are set.
 - **`rate_limiting`** — applies the `qf-catch-all` named limiter (registered in [`UILibraryServiceProvider`](../../src/Providers/UILibraryServiceProvider.php)) keyed by user id or IP.
 
+### Notifications
+
+```php
+'notifications' => [
+    'enabled'          => true,
+    'default_channels' => ['database', 'mail'],
+    'queue_connection' => env('UI_LIBRARY_NOTIFICATION_QUEUE', 'sync'),
+    'roles'            => ['*'],          // Spatie roles allowed to see the notification bell
+    'icon'             => 'fas fa-bell',  // TopNav bell icon
+    'title'            => 'Notifications', // TopNav bell tooltip
+],
+```
+
+- **`enabled`** — master toggle for the notification bell in [`TopNav`](../../src/Http/Livewire/Layouts/Navs/TopNav.php). When `false`, the bell is hidden for all users.
+- **`default_channels`** — channels used when a template doesn't specify its own channel.
+- **`queue_connection`** — queue connection for async notification dispatch. Set to `sync` for synchronous delivery during development.
+- **`roles`** — Spatie role names allowed to see and interact with the notification bell. Supports `'*'` (string) or `['*']` (array) wildcard for all authenticated users. Mirrors the pattern used by `background_jobs`, `module_access`, and context group role filtering. When a user lacks all listed roles, the bell is hidden entirely.
+- **`icon`** / **`title`** — customize the TopNav bell appearance.
+
+The role check is implemented in [`TopNav::loadNotificationsConfig()`](../../src/Http/Livewire/Layouts/Navs/TopNav.php:275):
+
+```php
+$roles = $config['roles'] ?? '*';
+$isWildcard = ($roles === '*' || $roles === ['*']);
+if (!$isWildcard && !auth()->user()->hasAnyRole((array) $roles)) {
+    $this->notificationsEnabled = false;
+    return;
+}
+```
+
+### Module Dashboard Access (`module_access`)
+
+```php
+'module_access' => [
+    'hr'           => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'organization' => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'admin'        => ['admin', 'super_admin', 'company_admin'],
+    'leave'        => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'payroll'      => ['payroll_officer', 'hr_manager', 'admin', 'super_admin', 'company_admin'],
+    'system'       => ['admin', 'super_admin', 'company_admin'],
+],
+```
+
+Maps URL prefix (module slug) to allowed Spatie roles. The [`EnsureModuleDashboardAccess`](../../src/Http/Middleware/EnsureModuleDashboardAccess.php) middleware checks this config on every request. Users without a required role are redirected to their appropriate dashboard.
+
+- **`super_admin`**, **`admin`**, and **`company_admin`** bypass all checks — they can access any module dashboard.
+- The middleware is registered in the consuming app's `bootstrap/app.php` as part of the web middleware group.
+- This config must be published and customized per consuming app — the library ships sensible defaults but every app has different module/role mappings.
+
+> **Cross-link**: Full middleware setup and role mapping details are in [permissions-and-notifications.md](../consuming-app/permissions-and-notifications.md) §1.5.
+
+### Middleware Registration
+
+The library registers two critical middleware aliases in [`UILibraryServiceProvider`](../../src/Providers/UILibraryServiceProvider.php):
+
+| Alias | Class | Purpose |
+|-------|-------|---------|
+| `qf.resolve-company-context` | [`ResolveCompanyContext`](../../src/Http/Middleware/ResolveCompanyContext.php) | Resolves `company_id` from session into the service container for tenant scoping |
+| `qf.ensure-module-dashboard-access` | `EnsureModuleDashboardAccess` | Checks `module_access` config; redirects unauthorized users |
+
+The consuming app must register these in `bootstrap/app.php`:
+
+```php
+// bootstrap/app.php
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->web(append: [
+        \QuickerFaster\UILibrary\Http\Middleware\ResolveCompanyContext::class,
+        // EnsureModuleDashboardAccess is typically applied per-route group
+    ]);
+})
+```
+
 ---
 
 ## 8.5 Settings Architecture

@@ -64,6 +64,12 @@ trait ResolvesDateStrings
             return $carbon->toDateString();
         }
 
+        // Handle '{day} this week' (e.g., 'sunday this week', 'monday this week')
+        if (preg_match('/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday) this week$/i', $value, $matches)) {
+            $day = ucfirst(strtolower($matches[1]));
+            return $now->copy()->startOfWeek(Carbon::SUNDAY)->next($day)->toDateString();
+        }
+
         // Handle 'next monday', 'last friday', etc. (simple)
         if (preg_match('/^(next|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i', $value, $matches)) {
             $direction = strtolower($matches[1]);
