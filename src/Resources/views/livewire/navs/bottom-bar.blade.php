@@ -1,11 +1,6 @@
 <nav class="navbar navbar-light bg-white shadow-sm d-md-none fixed-bottom"
      style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);"
-     x-data="bottomBar({
-         activeContext: '{{ $activeContext }}',
-         contextGroups: {{ json_encode($this->contextGroups) }},
-         visibleGroups: {{ json_encode($this->visibleGroups) }},
-         hasOverflow: {{ $this->hasOverflow ? 'true' : 'false' }}
-     })">
+     x-data="{ overflowOpen: false }">
 
     <div class="d-flex justify-content-around w-100 px-1 py-1">
 
@@ -16,22 +11,42 @@
                 $url = $this->resolveUrl($group);
                 $hasItems = !empty($group['items']);
             @endphp
-            <button
-               @click="handleTabTap('{{ $key }}', '{{ $url }}', {{ $hasItems ? 'true' : 'false' }})"
-               class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0
-                      {{ $isActive ? 'text-primary fw-bold' : 'text-muted' }}"
-               style="min-width: 56px; max-width: 80px; gap: 2px;"
-               wire:key="bb-tab-{{ $key }}">
-                @if (!empty($group['icon']))
-                    <i class="{{ $group['icon'] }} fs-5 {{ $isActive ? 'opacity-100' : 'opacity-50' }}"></i>
-                @endif
-                <span class="text-truncate" style="font-size: 0.65rem; max-width: 100%; line-height: 1.1;">
-                    {{ \Illuminate\Support\Str::limit($group['label'] ?? $key, 10) }}
-                </span>
+            <div class="d-flex flex-column align-items-center position-relative"
+                 style="min-width: 56px; max-width: 80px;"
+                 wire:key="bb-tab-{{ $key }}">
+
+                {{-- Main tab button — navigates --}}
+                <a href="{{ $url }}"
+                   wire:navigate
+                   class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0 w-100
+                          {{ $isActive ? 'text-primary fw-bold' : 'text-muted' }}"
+                   style="gap: 2px; padding-bottom: 0;">
+                    @if (!empty($group['icon']))
+                        <i class="{{ $group['icon'] }} fs-5 {{ $isActive ? 'opacity-100' : 'opacity-50' }}"></i>
+                    @endif
+                    <span class="text-truncate" style="font-size: 0.65rem; max-width: 100%; line-height: 1.1;">
+                        {{ \Illuminate\Support\Str::limit($group['label'] ?? $key, 10) }}
+                    </span>
+                </a>
+
+                {{-- Chevron button — opens context sheet (only on active tab with items) --}}
                 @if ($isActive && $hasItems)
-                    <i class="fas fa-chevron-up opacity-50" style="font-size: 0.5rem;"></i>
+                    <button class="btn btn-sm border-0 p-0 text-primary opacity-75"
+                            style="font-size: 0.5rem; line-height: 1; margin-top: -2px;"
+                            wire:click="$dispatch('openContextSheet', {
+                                key: '{{ $key }}',
+                                label: '{{ addslashes($group['label'] ?? $key) }}',
+                                icon: '{{ addslashes($group['icon'] ?? '') }}',
+                                items: {{ json_encode($group['items'] ?? []) }}
+                            })"
+                            title="Show {{ $group['label'] ?? $key }} menu">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                @else
+                    {{-- Spacer to maintain alignment --}}
+                    <div style="height: 14px;"></div>
                 @endif
-            </button>
+            </div>
         @endforeach
 
         {{-- "More" overflow tab --}}
@@ -114,40 +129,3 @@
     @endif
 
 </nav>
-
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('bottomBar', (config) => ({
-        overflowOpen: false,
-        lastTap: { key: null, time: 0 },
-        doubleTapWindow: 400, // ms
-
-        handleTabTap(key, url, hasItems) {
-            const now = Date.now();
-            const isSameKey = this.lastTap.key === key;
-            const isDoubleTap = isSameKey && (now - this.lastTap.time) < this.doubleTapWindow;
-
-            this.lastTap = { key, time: now };
-
-            if (isDoubleTap && hasItems) {
-                // Double-tap on active tab with sub-items → open context sheet
-                const group = config.contextGroups[key];
-                if (group) {
-                    Livewire.dispatch('openContextSheet', {
-                        key: key,
-                        label: group.label || key,
-                        icon: group.icon || '',
-                        items: group.items || []
-                    });
-                }
-                return; // Don't navigate
-            }
-
-            if (!isDoubleTap) {
-                // Single tap → navigate
-                Livewire.navigate(url);
-            }
-        }
-    }));
-});
-</script>
