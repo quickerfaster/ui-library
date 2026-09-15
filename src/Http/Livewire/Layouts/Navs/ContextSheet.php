@@ -48,13 +48,19 @@ class ContextSheet extends Component
 
     /**
      * Open the sheet with the given context group data.
+     *
+     * Accepts either an associative array or individual parameters
+     * from Livewire's $dispatch('openContextSheet', {...}).
      */
-    public function open(array $payload): void
+    public function open(array $payload = []): void
     {
-        $this->contextKey = $payload['key'] ?? null;
-        $this->contextLabel = $payload['label'] ?? '';
-        $this->contextIcon = $payload['icon'] ?? '';
-        $this->items = $payload['items'] ?? [];
+        // Support both array payload and flat parameters from Livewire events
+        if (!empty($payload)) {
+            $this->contextKey = $payload['key'] ?? null;
+            $this->contextLabel = $payload['label'] ?? '';
+            $this->contextIcon = $payload['icon'] ?? '';
+            $this->items = $payload['items'] ?? [];
+        }
         $this->isOpen = true;
     }
 
