@@ -9,6 +9,7 @@ class Export extends Model
 {
     protected $fillable = [
         'user_id',
+        'company_id',
         'config_key',
         'filters',
         'columns',
@@ -22,8 +23,8 @@ class Export extends Model
         'completed_at',
 
         'file_size',
-        'total_rows',	
-        'chunk_size',	
+        'total_rows',
+        'chunk_size',
         'total_chunks',
     ];
 

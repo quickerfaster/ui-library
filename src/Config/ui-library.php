@@ -538,6 +538,24 @@ return [
 
         /*
         |------------------------------------------------------------------
+        | Export / Import Queue Connection
+        |------------------------------------------------------------------
+        |
+        | The queue connection used by GenerateExport, ExportChunk,
+        | FinalizeExportZip, ProcessImport, and ProcessImportChunk jobs.
+        |
+        | Defaults to the app's QUEUE_CONNECTION env value so that local
+        | development (sync) works out of the box. Set to 'database' (or
+        | any other connection) when running a dedicated queue worker.
+        |
+        | Also accepts an explicit queue name via 'queue_name'.
+        |
+        */
+        'queue_connection' => env('UI_LIBRARY_QUEUE_CONNECTION', env('QUEUE_CONNECTION', 'sync')),
+        'queue_name' => env('UI_LIBRARY_QUEUE_NAME', 'default'),
+
+        /*
+        |------------------------------------------------------------------
         | Multi-Company Support
         |------------------------------------------------------------------
         |

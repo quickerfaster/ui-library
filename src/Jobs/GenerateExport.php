@@ -51,19 +51,21 @@ class GenerateExport implements ShouldQueue
     public $maxExceptions = 1;
 
     /**
-     * Explicit queue and connection so these jobs always land on the
-     * same queue/connection as background jobs, allowing a single worker.sh
-     * to serve both.
+     * Queue and connection are driven by config so each consuming app
+     * can choose sync (local dev), database (single worker.sh), Redis,
+     * or any other queue driver without touching library source code.
+     *
+     * @see config('ui-library.features.queue_connection')
+     * @see config('ui-library.features.queue_name')
      */
-    public $queue = 'default';
-    public $connection = 'database';
-
-    protected int $exportId;
-
     public function __construct(int $exportId)
     {
         $this->exportId = $exportId;
+        $this->queue = config('ui-library.features.queue_name', 'default');
+        $this->connection = config('ui-library.features.queue_connection', 'sync');
     }
+
+    protected int $exportId;
 
     public function handle()
     {

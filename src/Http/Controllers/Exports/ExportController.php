@@ -203,6 +203,12 @@ class ExportController extends Controller
             'status' => 'pending',
         ]);
 
+        \Log::info('Export queued.', [
+            'export_id' => $export->id,
+            'connection' => config('ui-library.features.queue_connection', 'sync'),
+            'queue' => config('ui-library.features.queue_name', 'default'),
+        ]);
+
         GenerateExport::dispatch($export->id);
 
         return response()->json([

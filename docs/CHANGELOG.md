@@ -1,8 +1,31 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-13
-> **Status**: Current — Leave Request Cancellation, Detail Drawer Approval UI, ESS Toolbar Restrictions, Form Success Feedback, AlertModal Polish, CSS Modal Fix
+> **Date**: 2026-09-15
+> **Status**: Current — Config-Driven Queue Connection for Export/Import Jobs, Export Model Fillable Fix
+
+---
+
+## Config-Driven Queue Connection for Export/Import Jobs — 2026-09-15
+
+### Root Cause
+
+The six data-processing jobs ([`GenerateExport`](src/Jobs/GenerateExport.php), [`ExportChunk`](src/Jobs/ExportChunk.php), [`FinalizeExportZip`](src/Jobs/FinalizeExportZip.php), [`ProcessImport`](src/Jobs/ProcessImport.php), [`ProcessImportChunk`](src/Jobs/ProcessImportChunk.php), [`GenerateReportJob`](src/Jobs/GenerateReportJob.php)) hardcoded `$connection = 'database'` and `$queue = 'default'`, overriding the consuming app's `QUEUE_CONNECTION` env setting. On `QUEUE_CONNECTION=sync` (local dev), jobs were dispatched to the `database` queue driver but no worker was running → exports/imports stayed `pending` indefinitely → modal showed "Initializing export..." forever.
+
+### Fix
+
+- [`src/Config/ui-library.php`](src/Config/ui-library.php:554) — Added `features.queue_connection` (defaults to `QUEUE_CONNECTION` env → `sync`) and `features.queue_name` (defaults to `'default'`).
+- All six jobs now read `config('ui-library.features.queue_connection')` and `config('ui-library.features.queue_name')` in their constructors instead of using hardcoded properties.
+- [`SendNotification`](src/Jobs/SendNotification.php) intentionally uses its own `notifications.queue_connection` config (separate concern).
+
+### Also Fixed
+
+- [`src/Models/Export.php`](src/Models/Export.php:12) — Added missing `company_id` to `$fillable` (was causing silent `MassAssignmentException` risk).
+- [`src/Http/Controllers/Exports/ExportController.php`](src/Http/Controllers/Exports/ExportController.php:206) — Added diagnostic logging that records `export_id`, `connection`, and `queue` on each export.
+
+### Docs Updated
+
+- [`docs/library/10-settings-and-config.md`](docs/library/10-settings-and-config.md) — Added §Feature Flags & Queue Configuration documenting the new config keys.
 
 ---
 

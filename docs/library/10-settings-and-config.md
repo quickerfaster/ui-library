@@ -185,9 +185,39 @@ The [`DocumentEngine`](../../src/Services/Documents/DocumentEngine.php:13) reads
 ],
 ```
 
-The [`ReportEngine`](../../src/Services/Reports/ReportEngine.php) resolves report implementations from `config('ui-library.reports.report_types.{type}')`. The `notification_channels` key controls which channels are used for report delivery. The `queue_connection` key determines which queue connection [`GenerateReportJob`](../../src/Jobs/GenerateReportJob.php) dispatches to.
+The [`ReportEngine`](../../src/Services/Reports/ReportEngine.php) resolves report implementations from `config('ui-library.reports.report_types.{type}')`. The `notification_channels` key controls which channels are used for report delivery. The `queue_connection` key controls the queue for report notification delivery (not the job itself — see §Feature Flags below for the unified job queue config).
 
 > **Cross-link**: Report engine deep-dive is in [`09-engines-and-services.md`](./09-engines-and-services.md).
+
+### Feature Flags & Queue Configuration
+
+```php
+'features' => [
+    'exports'          => true,
+    'imports'          => true,
+    'reports'          => true,
+    'approvals'        => true,
+    'onboarding'       => true,
+    'tour'             => true,
+
+    /*
+    | Queue connection used by all library data-processing jobs:
+    | GenerateExport, ExportChunk, FinalizeExportZip,
+    | ProcessImport, ProcessImportChunk, GenerateReportJob.
+    |
+    | Defaults to the app's QUEUE_CONNECTION env value so local
+    | development (sync) works out of the box. Override via
+    | UI_LIBRARY_QUEUE_CONNECTION in .env for production.
+    */
+    'queue_connection' => env('UI_LIBRARY_QUEUE_CONNECTION', env('QUEUE_CONNECTION', 'sync')),
+    'queue_name'       => env('UI_LIBRARY_QUEUE_NAME', 'default'),
+],
+```
+
+- **`queue_connection`** — the queue driver used by all six library data-processing jobs. Falls back to `QUEUE_CONNECTION` from `.env`, then `sync`. Set `UI_LIBRARY_QUEUE_CONNECTION=database` in production when running `php artisan queue:work`.
+- **`queue_name`** — the queue name within that connection. Defaults to `'default'`. Override via `UI_LIBRARY_QUEUE_NAME` to isolate library jobs on a dedicated queue.
+
+> **Note**: [`SendNotification`](../../src/Jobs/SendNotification.php) uses its own `notifications.queue_connection` config (separate concern — notifications may need independent queue routing).
 
 ### Catch-All Route Security
 
