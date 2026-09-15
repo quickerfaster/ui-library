@@ -201,6 +201,16 @@ class NavigationLayout extends Component
         foreach ($this->contextItems as $groupKey => &$items) {
             usort($items, fn($a, $b) => ($a['order'] ?? 999) <=> ($b['order'] ?? 999));
         }
+
+        // Merge context items into context groups so each group carries its
+        // sub-navigation items. This enables the mobile BottomBar to show
+        // the chevron button and the Context Sheet to display sub-items.
+        // context_groups have labels/icons/URLs; contexts have the items.
+        foreach ($this->contextItems as $groupKey => $items) {
+            if (isset($this->contextGroups[$groupKey])) {
+                $this->contextGroups[$groupKey]['items'] = $items;
+            }
+        }
     }
 
     protected function setActiveContext(): void
