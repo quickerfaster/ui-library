@@ -53,6 +53,167 @@ Related service contracts (full signatures in [`08-contracts-and-interfaces.md`]
 
 ---
 
+## Per-Module `navigation.php` Config Schema
+
+Each business module defines its navigation structure in `app/Modules/{Module}/Config/navigation.php`. The file returns an array with two top-level keys:
+
+### `contexts` — Context Group Definitions
+
+Context groups appear as **tabs in the TopNav bar**. Selecting a tab filters the sidebar to show only that group's items. Each context group is keyed by a unique slug:
+
+```php
+return [
+    'contexts' => [
+        'my-portal' => [
+            'label'      => 'My Portal',           // Display label in TopNav tab
+            'icon'       => 'fas fa-home',          // Font Awesome icon class
+            'url'        => 'hr/my-portal',         // Default route when tab is clicked
+            'permission' => 'view_my_portal',       // Spatie permission (optional)
+            'roles'      => ['employee', 'manager'], // Spatie roles fallback (optional, '*' = all)
+            'feature'    => 'ess',                   // Workspace feature gate (optional)
+            'order'      => 10,                      // Sort order (lower = first)
+            'sidebar'    => [                        // Sidebar rendering options (optional)
+                'section_label'    => 'Self Service', // Custom header (null=use label, false=no header)
+                'collapsible'      => true,           // Enable expand/collapse toggle
+                'expanded_default' => true,           // Start expanded
+            ],
+            'items' => [                             // Sidebar navigation items
+                [
+                    'label'      => 'Dashboard',
+                    'icon'       => 'fas fa-tachometer-alt',
+                    'route'      => 'hr.dashboard-my-portal-overview',
+                    'permission' => 'view_my_portal',
+                ],
+                [
+                    'label'      => 'My Attendance',
+                    'icon'       => 'fas fa-user-clock',
+                    'url'        => '/hr/my-attendance',   // url takes precedence over route
+                    'permission' => 'view_attendance',
+                ],
+                [
+                    'label'      => 'External Link',
+                    'icon'       => 'fas fa-external-link-alt',
+                    'url'        => 'https://example.com',
+                    'target'     => '_blank',               // Open in new tab
+                ],
+            ],
+        ],
+        'hr' => [ /* ... another context group ... */ ],
+    ],
+
+    // Legacy flat items (pre-context-groups, still supported)
+    'items' => [
+        ['label' => 'Dashboard', 'icon' => 'fas fa-home', 'route' => 'hr.dashboard'],
+    ],
+];
+```
+
+#### Context Group Keys
+
+| Key | Type | Required | Purpose |
+|-----|------|----------|---------|
+| `label` | `string` | ✅ | Display text in the TopNav tab |
+| `icon` | `string` | — | Font Awesome icon class for the tab |
+| `url` | `string` | — | Default navigation target when tab is clicked |
+| `route` | `string` | — | Named route (alternative to `url`) |
+| `permission` | `string` | — | Spatie permission name; admin users bypass this check |
+| `roles` | `array` | — | Spatie role names as fallback; `['*']` = all authenticated users |
+| `feature` | `string` | — | Workspace feature flag — group hidden when feature not in workspace context |
+| `order` | `int` | — | Sort position (lower = further left in TopNav) |
+| `sidebar` | `array` | — | Sidebar rendering options (see table below) |
+| `items` | `array` | — | Sidebar navigation items for this context group |
+
+#### Sidebar Rendering Options (`sidebar` key)
+
+| Key | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `section_label` | `string\|null\|false` | `null` | Custom header label (`null` = use group label, `false` = no header) |
+| `collapsible` | `bool` | `true` | Enable expand/collapse toggle on the section header |
+| `expanded_default` | `bool` | `true` | Start in expanded state (only when `collapsible`) |
+
+#### Item Keys
+
+| Key | Type | Required | Purpose |
+|-----|------|----------|---------|
+| `label` | `string` | ✅ | Display text |
+| `icon` | `string` | — | Font Awesome icon class |
+| `route` | `string` | — | Named Laravel route |
+| `url` | `string` | — | Raw URL (takes precedence over `route`) |
+| `target` | `string` | — | Link target (`'_blank'` for external links) |
+| `permission` | `string` | — | Spatie permission gate |
+| `roles` | `array` | — | Spatie role gate |
+| `workspace` | `array` | — | Key-value constraints matched against workspace context |
+| `badge` | `array` | — | Badge config: `{ 'text' => 'New', 'color' => 'danger' }` |
+
+### `items` — Legacy Flat Items (Pre-Context-Groups)
+
+When a module predates the context group system, it may define a flat `items` array at the top level. These items appear in the sidebar regardless of which context group is active. New modules should use `contexts` instead.
+
+> **⚠️ Critical Contract**: The `context` prop in `<x-qf::navigation-layout context="my-portal">` MUST match a context group key in `navigation.php`. A mismatch causes the wrong sidebar links to appear or the sidebar to fall back to `NavigationManager`/legacy mode.
+
+---
+
+## TopNav Architecture
+
+[`TopNav`](../../src/Http/Livewire/Layouts/Navs/TopNav.php) (1072 lines) is the most complex navigation component. It renders the top bar with context group tabs, module/company switchers, and integrated subsystems.
+
+### Context Group Loading
+
+[`TopNav::loadContextGroups()`](../../src/Http/Livewire/Layouts/Navs/TopNav.php) resolves context groups from the active module's `navigation.php`:
+
+1. Reads the module's `Config/navigation.php` via the 4-tier resolution chain
+2. Extracts the `contexts` array (keyed by context slug)
+3. Applies [`WorkspaceFilter::filterContextGroups()`](../../src/Services/Navigation/WorkspaceFilter.php:34) — groups with a `feature` key are kept only when that feature is in the workspace's `features` array
+4. Applies permission/role filtering — groups with unmet `permission` or `roles` are excluded
+5. Sorts by `order` (lower = further left)
+6. Dispatches the [`NavigationBuilding`](../../src/Events/NavigationBuilding.php) event for last-mile customization
+
+### Overflow with Active-Item Promotion
+
+When context groups exceed `max_desktop` (default 5) or `max_mobile` (default 3), excess tabs move into a "More" dropdown. The algorithm in [`TopNav::getVisibleContextGroupsProperty()`](../../src/Http/Livewire/Layouts/Navs/TopNav.php) ensures the **active context group is always promoted** to the visible set, even if it would otherwise fall into overflow.
+
+### Integrated Subsystems
+
+TopNav hosts several subsystems that share its role-checking pattern (`$config['roles'] ?? '*'` with wildcard support):
+
+| Subsystem | Config Key | Purpose |
+|-----------|-----------|---------|
+| **Module Switcher** | `ui-library.module_switcher` | Dropdown to jump between business modules; reads `user_facing` modules, applies role filtering |
+| **Company Switcher** | `ui-library.navigation.show_company_switcher` | Multitenancy-aware company selector; gated by `features.multi_company` |
+| **Quick Actions** | `ui-library.quick_actions` | Cmd+K command palette, ⚡ dropdown with favorites ranking via [`RankingEngine`](../../src/Services/QuickActions/RankingEngine.php) |
+| **Notifications** | `ui-library.notifications` | Bell icon with unread count, real-time Echo broadcasting, role-gated visibility |
+| **Background Jobs** | `ui-library.background_jobs` | Status indicator for running queue jobs with configurable roles |
+
+Each subsystem follows the same pattern: read config → check `enabled` → check `roles` (with `'*'` wildcard) → render or hide.
+
+---
+
+## HorizontalContextMenu & MenuRenderer
+
+### HorizontalContextMenu
+
+[`HorizontalContextMenu`](../../src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php) (275 lines) renders context group items as a **horizontal button bar** instead of a vertical sidebar. It supports two modes:
+
+**Mode 1 — Single Context (default):** Renders items from the active context group as inline buttons. Uses the same overflow/promotion algorithm as TopNav: the first `maxVisibleItems` items are shown inline, and if the active item falls into overflow, it is promoted to the visible set.
+
+**Mode 2 — Cross-Context Dropdowns (`showAllContexts = true`):** Renders ALL context groups as dropdown triggers. Each dropdown contains that group's items. The active context's dropdown is highlighted. This mode is used when the sidebar is hidden and the user needs access to all context groups from the horizontal bar.
+
+Key properties:
+- `$maxVisibleItems` — resolved from `config('ui-library.navigation.context_menu.max_visible_items', 7)`. Set to `0` to disable overflow (show all items).
+- `$allowTypeSwitch` — when `true`, shows a toggle button to switch between sidebar and horizontal menu.
+- `$position` — `'left'` or `'right'` alignment within the content area.
+
+### MenuRenderer
+
+[`MenuRenderer`](../../src/Http/Livewire/Layouts/Navs/MenuRenderer.php) (72 lines) is a thin wrapper that delegates to either `Sidebar` or `HorizontalContextMenu` based on the `menuType` session value:
+
+- `menuType = 'sidebar'` → renders [`Sidebar`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php)
+- `menuType = 'horizontal'` → renders [`HorizontalContextMenu`](../../src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php)
+
+[`MenuRenderer::switchMenuType()`](../../src/Http/Livewire/Layouts/Navs/MenuRenderer.php:56) persists the choice to `session('context_menu_type')` and dispatches `saveMenuType` + `menu-type-changed` events. The `$counter` property forces child component re-mounting on switch.
+
+---
+
 ## Library-level navigation keys
 
 The library-level `config('ui-library.navigation')` keys (`top_bar`, `sidebar.sections`, `bottom_bar`, `company_provider`, `show_company_switcher`, `open_in_tabs`, workspace config) are documented canonically in [`10-settings-and-config.md`](./10-settings-and-config.md#navigation).
