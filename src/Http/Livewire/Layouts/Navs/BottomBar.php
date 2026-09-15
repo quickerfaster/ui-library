@@ -4,15 +4,93 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs;
 
 use Livewire\Component;
 
-
+/**
+ * Mobile bottom tab bar — renders context group tabs.
+ *
+ * Replaces the old sidebar-item-duplicating BottomBar with a proper
+ * mobile navigation surface. Context groups from navigation.php
+ * appear as labeled icon tabs. The active tab shows a chevron (▲)
+ * indicating sub-items are available via the ContextSheet.
+ *
+ * Overflow groups (beyond $maxVisible) are accessible via a "More"
+ * tab that opens the OverflowSheet.
+ */
 class BottomBar extends Component
 {
-    public array $items = [];
+    /** @var array Context group definitions keyed by group slug. */
+    public array $contextGroups = [];
+
+    /** @var string|null The currently active context group key. */
+    public ?string $activeContext = null;
+
+    /** @var int Maximum visible tabs before overflow. */
     public int $maxVisible = 4;
 
-    public function mount(array $items): void
+    /** @var string Current module name (for wire:key scoping). */
+    public string $moduleName = '';
+
+    public function mount(
+        array $contextGroups = [],
+        ?string $activeContext = null,
+        int $maxVisible = 4,
+        string $moduleName = ''
+    ): void {
+        $this->contextGroups = $contextGroups;
+        $this->activeContext = $activeContext;
+        $this->maxVisible = max(1, $maxVisible);
+        $this->moduleName = $moduleName;
+    }
+
+    /**
+     * Context groups that fit in the visible tab bar.
+     */
+    public function getVisibleGroupsProperty(): array
     {
-        $this->items = $items;
+        return array_slice($this->contextGroups, 0, $this->maxVisible, true);
+    }
+
+    /**
+     * Context groups that overflow into the "More" sheet.
+     */
+    public function getOverflowGroupsProperty(): array
+    {
+        if (count($this->contextGroups) <= $this->maxVisible) {
+            return [];
+        }
+        return array_slice($this->contextGroups, $this->maxVisible, null, true);
+    }
+
+    /**
+     * Whether the overflow "More" tab should be shown.
+     */
+    public function getHasOverflowProperty(): bool
+    {
+        return count($this->contextGroups) > $this->maxVisible;
+    }
+
+    /**
+     * Resolve a URL from a context group definition.
+     */
+    public function resolveUrl(array $group): string
+    {
+        if (!empty($group['route']) && !str_contains($group['route'], '/')) {
+            return route($group['route']);
+        }
+        if (!empty($group['route'])) {
+            return url($group['route']);
+        }
+        if (!empty($group['url'])) {
+            return url($group['url']);
+        }
+        return '#';
+    }
+
+    /**
+     * Open the overflow sheet via Alpine/Bootstrap offcanvas.
+     */
+    public function openOverflowSheet(): void
+    {
+        $this->dispatch('open-overflow-sheet');
     }
 
     public function render()

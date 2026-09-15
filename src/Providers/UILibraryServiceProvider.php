@@ -297,6 +297,8 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.top-nav', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\TopNav::class);
         Livewire::component('qf.sidebar', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\Sidebar::class);
         Livewire::component('qf.bottom-bar', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\BottomBar::class);
+        Livewire::component('qf.context-sheet', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\ContextSheet::class);
+        Livewire::component('qf.navigation-hub', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\NavigationHub::class);
         Livewire::component('qf.navigation-layout', \QuickerFaster\UILibrary\Http\Livewire\Layouts\NavigationLayout::class);
         Livewire::component('qf.horizontal-context-menu', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\HorizontalContextMenu::class);
         Livewire::component('qf.menu-renderer', \QuickerFaster\UILibrary\Http\Livewire\Layouts\Navs\MenuRenderer::class);

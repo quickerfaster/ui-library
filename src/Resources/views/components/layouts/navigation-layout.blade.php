@@ -195,10 +195,30 @@
         </div>
 
 
-        {{-- Bottom Bar (mobile) --}}
+        {{-- Bottom Bar (mobile) — context group tabs --}}
         @if ($layoutConfig['bottom_bar']['enabled'] ?? true)
-            <livewire:qf.bottom-bar :items="$contextItems[$activeContext] ?? []" :activeContext="$activeContext" wire:key="bottom-bar-{{ $moduleName }}" />
+            <livewire:qf.bottom-bar
+                :contextGroups="$contextGroups"
+                :activeContext="$activeContext"
+                :moduleName="$moduleName"
+                wire:key="bottom-bar-{{ $moduleName }}" />
         @endif
+
+        {{-- Context Sheet (mobile) — slide-up sub-items for active context --}}
+        <livewire:qf.context-sheet
+            wire:key="context-sheet-{{ $moduleName }}" />
+
+        {{-- Navigation Hub (mobile) — module + company switching --}}
+        <livewire:qf.navigation-hub
+            :currentModule="$moduleName"
+            :currentModuleLabel="$currentModuleLabel ?? $moduleName"
+            :modules="$modules ?? []"
+            :currentCompanyId="$currentCompanyId ?? null"
+            :currentCompanyName="$currentCompanyName ?? ''"
+            :companies="$companies ?? []"
+            :canAccessAllCompanies="$canAccessAllCompanies ?? false"
+            :multiCompanyEnabled="$multiCompanyEnabled ?? false"
+            wire:key="navigation-hub-{{ $moduleName }}" />
 
 
 

@@ -174,118 +174,19 @@
 
             </ul>
 
-            {{-- Right side: mobile scroll, locale switcher, profile --}}
+            {{-- Right side: company indicator (mobile), locale switcher, profile --}}
             <div class="d-flex align-items-center">
-                @if (!$hideTopnavContexts)
-                <div class="d-md-none mobile-scroll-wrapper me-2">
-                    <div class="d-flex overflow-auto" style="gap:.5rem;">
-                        @foreach ($this->visibleMobile as $key => $item)
-                            @php
-                                $isNamedRoute = isset($item['route']) && !Str::contains($item['route'], '/');
-                                $url = $isNamedRoute
-                                    ? route($item['route'])
-                                    : url($item['url'] ?? Str::kebab($key));
-
-                                // Permission check — same logic as top-nav-item.blade.php
-                                $hasPermission = true;
-                                if (!empty($item['permission'])) {
-                                    $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
-                                    // FALLBACK: if permission check fails but item has roles, try role-based access
-                                    if (!$hasPermission && !empty($item['roles'])) {
-                                        $roles = $item['roles'];
-                                        $isWildcard = ($roles === '*' || $roles === ['*']);
-                                        $hasPermission = $isWildcard
-                                            || \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed(auth()->user())
-                                            || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
-                                    }
-                                } elseif (!empty($item['roles'])) {
-                                    $roles = $item['roles'];
-                                    $isWildcard = ($roles === '*' || $roles === ['*']);
-                                    $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
-                                } elseif (!empty($url)) {
-                                    $segments = explode('/', $url);
-                                    $viewName = last($segments);
-                                    $viewName = str_replace('dashboard-', '', $viewName);
-                                    $permission = 'view_' . \Illuminate\Support\Str::singular(str_replace('-', '_', $viewName));
-                                    $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($permission);
-                                }
-                            @endphp
-                            @if ($hasPermission)
-                            <a href="{{ $url }}"
-                                class="btn btn-light btn-sm {{ $key === $activeContext ? 'active' : '' }}"
-                                wire:key="mobile-item-{{ $key }}">
-                                @if (!empty($item['icon']))
-                                    <i class="fa {{ $item['icon'] }} me-1"></i>
-                                @endif
-                                <span>{{ $item['label'] }}</span>
-                            </a>
-                            @endif
-                        @endforeach
-
-                        @if ($this->overflowMobile->isNotEmpty())
-                            <div class="btn-group position-static" wire:key="mobile-overflow">
-                                <button class="btn btn-light btn-sm dropdown-toggle" data-bs-toggle="dropdown"></button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    @foreach ($this->overflowMobile as $key => $item)
-                                        @php
-                                            $isNamedRoute =
-                                                isset($item['route']) && !Str::contains($item['route'], '/');
-                                            $url = $isNamedRoute
-                                                ? route($item['route'])
-                                                : url($item['url'] ?? Str::kebab($key));
-
-                                            // Permission check — same logic as top-nav-item.blade.php
-                                            $hasPermission = true;
-                                            if (!empty($item['permission'])) {
-                                                $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
-                                                // FALLBACK: if permission check fails but item has roles, try role-based access
-                                                if (!$hasPermission && !empty($item['roles'])) {
-                                                    $roles = $item['roles'];
-                                                    $isWildcard = ($roles === '*' || $roles === ['*']);
-                                                    $hasPermission = $isWildcard
-                                                        || \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed(auth()->user())
-                                                        || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
-                                                }
-                                            } elseif (!empty($item['roles'])) {
-                                                $roles = $item['roles'];
-                                                $isWildcard = ($roles === '*' || $roles === ['*']);
-                                                $hasPermission = $isWildcard || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
-                                            } elseif (!empty($url)) {
-                                                $segments = explode('/', $url);
-                                                $viewName = last($segments);
-                                                $viewName = str_replace('dashboard-', '', $viewName);
-                                                $permission = 'view_' . \Illuminate\Support\Str::singular(str_replace('-', '_', $viewName));
-                                                $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($permission);
-                                            }
-                                        @endphp
-                                        @if ($hasPermission)
-                                        <li wire:key="mobile-overflow-item-{{ $key }}">
-                                            <a href="{{ $url }}" class="dropdown-item d-flex align-items-center">
-                                                @if (!empty($item['icon']))
-                                                    <i class="fa {{ $item['icon'] }} me-2" style="width: 20px;"></i>
-                                                @endif
-                                                <span>{{ $item['label'] }}</span>
-                                            </a>
-                                        </li>
-                                        @endif
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-                @endif
-
-                {{-- Company Switcher --}}
+                {{-- Company indicator (mobile) — opens NavigationHub scrolled to company section --}}
                 @if ($companies && $companies->isNotEmpty())
                     @php
                         $isAllCompanies = $currentCompanyId === 0;
                     @endphp
-                    <div class="dropdown me-2" id="company-switcher" wire:key="company-switcher">
+                    {{-- Desktop: keep dropdown --}}
+                    <div class="dropdown me-2 d-none d-md-block" id="company-switcher" wire:key="company-switcher">
                         <button class="btn btn-sm {{ $isAllCompanies ? 'btn-outline-info' : 'btn-outline-primary' }} dropdown-toggle px-3 py-1 my-0 fw-medium" type="button"
                             data-bs-toggle="dropdown" aria-label="Switch Company">
                             <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
-                            <span class="d-none d-md-inline">{{ \Illuminate\Support\Str::limit($currentCompanyName, 12) }}</span>
+                            <span>{{ \Illuminate\Support\Str::limit($currentCompanyName, 12) }}</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="max-height: 300px; overflow-y: auto;">
                             <li>
@@ -293,7 +194,6 @@
                                     Switch Company
                                 </h6>
                             </li>
-                            {{-- All Companies option (admin roles only) --}}
                             @if ($this->userCanAccessAllCompanies(auth()->user()))
                             <li wire:key="company-all">
                                 <a class="dropdown-item border-radius-md d-flex align-items-center {{ $isAllCompanies ? 'bg-info-light text-info fw-bold' : '' }}"
@@ -323,6 +223,13 @@
                             @endforeach
                         </ul>
                     </div>
+                    {{-- Mobile: company indicator button → opens NavigationHub --}}
+                    <button class="btn btn-sm btn-outline-primary px-2 py-1 my-0 fw-medium d-md-none me-1"
+                            wire:click="$dispatch('openNavigationHub', { scrollTo: 'company' })"
+                            aria-label="Switch Company">
+                        <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
+                        <span>{{ \Illuminate\Support\Str::limit($currentCompanyName, 8) }}</span>
+                    </button>
                 @endif
 
                 {{-- Notifications --}}

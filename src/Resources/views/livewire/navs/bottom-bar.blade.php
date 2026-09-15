@@ -1,90 +1,115 @@
-<nav class="navbar navbar-light bg-white shadow-sm d-md-none fixed-bottom" style="z-index: 1030;">
-    <div class="d-flex px-2 py-1" style="gap:.5rem; overflow-x:auto; overflow-y:visible;">
+<nav class="navbar navbar-light bg-white shadow-sm d-md-none fixed-bottom"
+     style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);"
+     x-data="{ overflowOpen: false }"
+     @open-overflow-sheet.window="overflowOpen = true">
 
-        @php
-            $visibleItems = array_slice($items, 0, $maxVisible);
-            $overflowItems = array_slice($items, $maxVisible);
-        @endphp
+    <div class="d-flex justify-content-around w-100 px-1 py-1">
 
-        @foreach ($visibleItems as $item)
+        {{-- Visible context group tabs --}}
+        @foreach ($this->visibleGroups as $key => $group)
             @php
-                $isNamedRoute = isset($item['route']) && !str_contains($item['route'], '/');
-                $itemUrl = $isNamedRoute
-                    ? route($item['route'])
-                    : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
+                $isActive = $key === $activeContext;
+                $url = $this->resolveUrl($group);
+                $hasItems = !empty($group['items']);
             @endphp
-            <a href="{{ $itemUrl }}"
-               class="btn btn-light flex-shrink-0 text-center"
-               style="min-width:70px;"
-               wire:navigate>
-                @if(!empty($item['icon']))
-                    <i class="{{ $item['icon'] }} d-block mb-1"></i>
+            <a href="{{ $url }}"
+               wire:navigate
+               class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0
+                      {{ $isActive ? 'text-primary fw-bold' : 'text-muted' }}"
+               style="min-width: 56px; max-width: 80px; gap: 2px;"
+               wire:key="bb-tab-{{ $key }}">
+                @if (!empty($group['icon']))
+                    <i class="{{ $group['icon'] }} fs-5 {{ $isActive ? 'opacity-100' : 'opacity-50' }}"></i>
                 @endif
-                <small>{{ $item['label'] }}</small>
+                <span class="text-truncate" style="font-size: 0.65rem; max-width: 100%; line-height: 1.1;">
+                    {{ \Illuminate\Support\Str::limit($group['label'] ?? $key, 10) }}
+                </span>
+                @if ($isActive && $hasItems)
+                    <i class="fas fa-chevron-up opacity-50" style="font-size: 0.5rem;"></i>
+                @endif
             </a>
         @endforeach
 
-        @if (count($overflowItems) > 0)
-            <div class="btn-group dropup flex-shrink-0 d-md-block d-none">
-                <button class="btn btn-light dropdown-toggle"
-                        data-bs-toggle="dropdown"
-                        data-bs-display="static"
-                        data-bs-boundary="viewport">
-                    <i class="fa fa-ellipsis-h"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    @foreach ($overflowItems as $item)
-                        @php
-                            $isNamedRoute = isset($item['route']) && !str_contains($item['route'], '/');
-                            $itemUrl = $isNamedRoute
-                                ? route($item['route'])
-                                : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
-                        @endphp
-                        <li>
-                            <a href="{{ $itemUrl }}" class="dropdown-item d-flex align-items-center" wire:navigate>
-                                @if (!empty($item['icon']))
-                                    <i class="fa {{ $item['icon'] }} me-2"></i>
-                                @endif
-                                <span>{{ $item['label'] }}</span>
-                            </a>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-
-            {{-- Mobile bottom sheet --}}
-            <div class="d-md-none">
-                <button class="btn btn-light" data-bs-toggle="offcanvas" data-bs-target="#mobileMoreSheet">
-                    <i class="fa fa-ellipsis-h"></i>
-                </button>
-                <div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreSheet">
-                    <div class="offcanvas-header">
-                        <h5 class="offcanvas-title">More</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-                    </div>
-                    <div class="offcanvas-body p-0">
-                        <ul class="list-group list-group-flush">
-                            @foreach ($overflowItems as $item)
-                                @php
-                                    $isNamedRoute = isset($item['route']) && !str_contains($item['route'], '/');
-                                    $itemUrl = $isNamedRoute
-                                        ? route($item['route'])
-                                        : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
-                                @endphp
-                                <li class="list-group-item">
-                                    <a href="{{ $itemUrl }}" class="d-flex align-items-center" wire:navigate>
-                                        @if (!empty($item['icon']))
-                                            <i class="fa {{ $item['icon'] }} me-2"></i>
-                                        @endif
-                                        <span>{{ $item['label'] }}</span>
-                                    </a>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                </div>
-            </div>
+        {{-- "More" overflow tab --}}
+        @if ($this->hasOverflow)
+            <button class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0 text-muted"
+                    style="min-width: 56px; max-width: 80px; gap: 2px;"
+                    @click="overflowOpen = true"
+                    wire:key="bb-tab-more">
+                <i class="fas fa-ellipsis-h fs-5 opacity-50"></i>
+                <span class="text-truncate" style="font-size: 0.65rem; max-width: 100%; line-height: 1.1;">More</span>
+            </button>
         @endif
 
     </div>
+
+    {{-- Overflow Sheet (Bootstrap Offcanvas) --}}
+    @if ($this->hasOverflow)
+    <div class="offcanvas offcanvas-bottom h-auto"
+         tabindex="-1"
+         id="bottomBarOverflowSheet"
+         x-bind:class="{ 'show': overflowOpen }"
+         x-show="overflowOpen"
+         x-transition
+         style="max-height: 70vh; border-radius: 16px 16px 0 0;"
+         @hidden.bs.offcanvas="overflowOpen = false">
+        <div class="offcanvas-header border-bottom">
+            <h6 class="offcanvas-title fw-bold">More Contexts</h6>
+            <button type="button" class="btn-close" @click="overflowOpen = false"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            <div class="list-group list-group-flush">
+                @foreach ($this->overflowGroups as $key => $group)
+                    @php
+                        $isActive = $key === $activeContext;
+                        $url = $this->resolveUrl($group);
+                        $hasItems = !empty($group['items']);
+                    @endphp
+                    <div class="list-group-item border-0 px-3 py-2"
+                         x-data="{ expanded: {{ $isActive ? 'true' : 'false' }} }"
+                         wire:key="bb-overflow-{{ $key }}">
+                        {{-- Group header --}}
+                        <a href="{{ $url }}"
+                           wire:navigate
+                           @click="expanded = true"
+                           class="d-flex align-items-center text-decoration-none {{ $isActive ? 'text-primary fw-bold' : 'text-dark' }}">
+                            @if (!empty($group['icon']))
+                                <i class="{{ $group['icon'] }} me-2 {{ $isActive ? 'opacity-100' : 'opacity-50' }}" style="width: 20px;"></i>
+                            @endif
+                            <span class="flex-grow-1">{{ $group['label'] ?? $key }}</span>
+                            @if ($hasItems)
+                                <i class="fas fa-chevron-down opacity-50 ms-2"
+                                   :class="{ 'fa-chevron-down': !expanded, 'fa-chevron-up': expanded }"
+                                   @click.prevent="expanded = !expanded"></i>
+                            @endif
+                        </a>
+
+                        {{-- Sub-items (expandable) --}}
+                        @if ($hasItems)
+                        <div class="ms-4 mt-1 border-start ps-2" x-show="expanded" x-collapse>
+                            @foreach ($group['items'] as $item)
+                                @php
+                                    $itemUrl = !empty($item['route']) && !str_contains($item['route'], '/')
+                                        ? route($item['route'])
+                                        : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
+                                @endphp
+                                <a href="{{ $itemUrl }}"
+                                   wire:navigate
+                                   @click="overflowOpen = false"
+                                   class="d-flex align-items-center py-1 text-decoration-none text-muted small">
+                                    @if (!empty($item['icon']))
+                                        <i class="{{ $item['icon'] }} me-2 opacity-50" style="width: 16px;"></i>
+                                    @endif
+                                    <span>{{ $item['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
 </nav>
