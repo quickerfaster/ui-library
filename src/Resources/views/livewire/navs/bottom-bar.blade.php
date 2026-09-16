@@ -7,23 +7,30 @@
          hasOverflow: {{ $this->hasOverflow ? 'true' : 'false' }}
      })">
 
-    {{-- Handle Bar — sits above the tab bar, opens Context Sheet --}}
+    {{-- Handle Bar — context label + optional sub-menu trigger --}}
     @php
         $activeGroup = $this->contextGroups[$activeContext] ?? null;
         $activeHasItems = $activeGroup && !empty($activeGroup['items']);
+        $activeUrl = $activeGroup ? $this->resolveUrl($activeGroup) : '#';
     @endphp
-    @if ($activeHasItems)
+    @if ($activeGroup)
         <div class="w-100 py-1 border-top border-light"
              style="cursor: pointer; background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.04); display: block; text-align: center;"
-             @click="Livewire.dispatch('openContextSheet')">
+             @if ($activeHasItems)
+                 @click="Livewire.dispatch('openContextSheet')"
+             @else
+                 @click="Livewire.navigate('{{ $activeUrl }}')"
+             @endif>
             <span class="text-primary fw-medium" style="font-size: 0.75rem; pointer-events: none;">
-                {{ \Illuminate\Support\Str::limit($activeGroup['label'] ?? $activeContext, 20) }}
+                {{ $activeGroup['label'] ?? $activeContext }}
             </span>
-            <i class="fas fa-chevron-up text-primary ms-1" style="font-size: 0.65rem; pointer-events: none;"></i>
+            @if ($activeHasItems)
+                <i class="fas fa-chevron-up text-primary ms-1" style="font-size: 0.65rem; pointer-events: none;"></i>
+            @endif
         </div>
     @endif
 
-    {{-- Tab Bar --}}
+    {{-- Tab Bar — icons only --}}
     <div class="d-flex justify-content-around w-100 px-1 pb-1">
         @foreach ($this->visibleGroups as $key => $group)
             @php
@@ -32,33 +39,34 @@
             @endphp
             <a href="{{ $url }}"
                wire:navigate
-               class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0
-                      {{ $isActive ? 'text-primary fw-bold' : 'text-muted' }}"
-               style="min-width: 56px; max-width: 80px; gap: 2px;"
-               wire:key="bb-tab-{{ $key }}">
+               class="btn btn-sm d-flex align-items-center justify-content-center flex-shrink-0 border-0
+                      {{ $isActive ? 'text-primary' : 'text-muted' }}"
+               style="width: 56px; height: 44px;"
+               wire:key="bb-tab-{{ $key }}"
+               title="{{ $group['label'] ?? $key }}">
                 @if (!empty($group['icon']))
                     <i class="{{ $group['icon'] }} fs-5 {{ $isActive ? 'opacity-100' : 'opacity-50' }}"></i>
+                @else
+                    <span class="fw-bold {{ $isActive ? 'opacity-100' : 'opacity-50' }}" style="font-size: 0.7rem;">
+                        {{ \Illuminate\Support\Str::limit($group['label'] ?? $key, 3, '') }}
+                    </span>
                 @endif
-                <span class="text-truncate" style="font-size: 0.65rem; max-width: 100%; line-height: 1.1;">
-                    {{ \Illuminate\Support\Str::limit($group['label'] ?? $key, 10) }}
-                </span>
             </a>
         @endforeach
 
         @if ($this->hasOverflow)
             <button class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0 text-muted"
-                    style="min-width: 56px; max-width: 80px; gap: 2px;"
+                    style="width: 56px; height: 44px; gap: 1px;"
                     @click="overflowOpen = true"
                     wire:key="bb-tab-more">
-                <i class="fas fa-ellipsis-h fs-5 opacity-50"></i>
-                <span class="text-truncate" style="font-size: 0.65rem; max-width: 100%; line-height: 1.1;">More</span>
+                <i class="fas fa-ellipsis-h opacity-50" style="font-size: 0.9rem;"></i>
+                <span style="font-size: 0.55rem; line-height: 1;">More</span>
             </button>
         @endif
     </div>
 
     {{-- Overflow Sheet --}}
     @if ($this->hasOverflow)
-    {{-- Backdrop --}}
     <div x-show="overflowOpen"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
@@ -70,7 +78,6 @@
          style="z-index: 1040;"
          @click="overflowOpen = false"></div>
 
-    {{-- Sheet --}}
     <div x-show="overflowOpen"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="translate-y-full"
