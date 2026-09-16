@@ -8,42 +8,20 @@ use Illuminate\Support\Collection;
 /**
  * Mobile Navigation Hub — combined module and company switching sheet.
  *
- * Replaces the separate module switcher dropdown and company switcher
- * dropdown with a unified half-sheet. Both sections are role-gated:
- * the module section only appears when the user has access to multiple
- * modules; the company section only appears when multi-company is
- * enabled and the user has access to multiple companies.
+ * Self-sufficient: loads modules from config, companies from session/provider,
+ * and current context from session. No data dependencies on parent components.
  */
 class NavigationHub extends Component
 {
-    /** @var bool Whether the sheet is open. */
     public bool $isOpen = false;
-
-    /** @var string Current module name. */
     public string $currentModule = '';
-
-    /** @var string Current module label. */
     public string $currentModuleLabel = '';
-
-    /** @var array Available modules (from TopNav). */
     public array $modules = [];
-
-    /** @var int|null Current company ID. */
     public ?int $currentCompanyId = null;
-
-    /** @var string Current company name. */
     public string $currentCompanyName = '';
-
-    /** @var Collection|array Available companies. */
     public $companies = [];
-
-    /** @var bool Whether the user can access all companies. */
     public bool $canAccessAllCompanies = false;
-
-    /** @var bool Whether multi-company is enabled. */
     public bool $multiCompanyEnabled = false;
-
-    /** @var string Section to scroll to on open ('module' or 'company'). */
     public string $scrollTo = '';
 
     protected $listeners = [
@@ -51,46 +29,89 @@ class NavigationHub extends Component
         'closeNavigationHub' => 'close',
     ];
 
-    public function mount(
-        string $currentModule = '',
-        string $currentModuleLabel = '',
-        array $modules = [],
-        ?int $currentCompanyId = null,
-        string $currentCompanyName = '',
-        $companies = [],
-        bool $canAccessAllCompanies = false,
-        bool $multiCompanyEnabled = false
-    ): void {
-        $this->currentModule = $currentModule;
-        $this->currentModuleLabel = $currentModuleLabel;
-        $this->modules = $modules;
-        $this->currentCompanyId = $currentCompanyId;
-        $this->currentCompanyName = $currentCompanyName;
-        $this->companies = $companies instanceof Collection ? $companies : collect($companies);
-        $this->canAccessAllCompanies = $canAccessAllCompanies;
-        $this->multiCompanyEnabled = $multiCompanyEnabled;
+    public function mount(): void
+    {
+        $this->loadModules();
+        $this->loadCompanyContext();
     }
 
     /**
-     * Open the hub, optionally scrolling to a section.
+     * Load accessible modules from config, matching TopNav's logic.
      */
+    protected function loadModules(): void
+    {
+        $allModules = config('ui-library.modules', []);
+        $user = auth()->user();
+
+        $this->modules = collect($allModules)
+            ->filter(fn($cfg) => ($cfg['enabled'] ?? false) && ($cfg['user_facing'] ?? false))
+            ->filter(function ($cfg) use ($user) {
+                $roles = $cfg['roles'] ?? '*';
+                if ($roles === '*' || $roles === ['*']) {
+                    return true;
+                }
+                return $user && $user->hasAnyRole((array) $roles);
+            })
+            ->map(fn($cfg, $key) => [
+                'key'   => $key,
+                'label' => $cfg['label'] ?? $key,
+                'icon'  => $cfg['icon'] ?? 'fa-cube',
+                'route' => $cfg['route'] ?? null,
+                'url'   => $cfg['url'] ?? null,
+            ])
+            ->sortBy('label')
+            ->values()
+            ->toArray();
+
+        $this->currentModule = session('active_module', 'admin');
+        $activeCfg = $allModules[$this->currentModule] ?? null;
+        $this->currentModuleLabel = $activeCfg['label'] ?? $this->currentModule;
+    }
+
+    /**
+     * Load company context from session and config.
+     */
+    protected function loadCompanyContext(): void
+    {
+        $this->multiCompanyEnabled = (bool) config('ui-library.features.multi_company', false);
+
+        if (!$this->multiCompanyEnabled) {
+            return;
+        }
+
+        $sessionKey = config('ui-library.tenancy.session_key', 'current_company_id');
+        $this->currentCompanyId = session($sessionKey);
+
+        // Resolve companies via CompanyProvider contract
+        try {
+            $provider = app(\QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider::class);
+            $this->companies = $provider->getCompanies();
+            $this->currentCompanyName = $this->companies
+                ->firstWhere('id', $this->currentCompanyId)?->name ?? '';
+        } catch (\Exception $e) {
+            $this->companies = collect();
+        }
+
+        // Check all-companies access
+        $allCompaniesRoles = config('ui-library.all_companies_roles', ['super_admin', 'admin', 'company_admin']);
+        $user = auth()->user();
+        $this->canAccessAllCompanies = $user && $user->hasAnyRole($allCompaniesRoles);
+    }
+
     public function open(array $payload = []): void
     {
+        // Refresh data on open (module/company may have changed)
+        $this->loadModules();
+        $this->loadCompanyContext();
         $this->scrollTo = $payload['scrollTo'] ?? '';
         $this->isOpen = true;
     }
 
-    /**
-     * Close the hub.
-     */
     public function close(): void
     {
         $this->isOpen = false;
     }
 
-    /**
-     * Switch to a different module.
-     */
     public function switchModule(string $moduleKey): void
     {
         $module = collect($this->modules)->firstWhere('key', $moduleKey);
@@ -105,29 +126,20 @@ class NavigationHub extends Component
         $this->redirect($url, navigate: true);
     }
 
-    /**
-     * Switch to a different company.
-     */
     public function switchCompany(int $companyId): void
     {
-        session(['current_company_id' => $companyId]);
+        $sessionKey = config('ui-library.tenancy.session_key', 'current_company_id');
+        session([$sessionKey => $companyId]);
         $this->isOpen = false;
 
-        // Redirect to refresh the page with new company context
         $this->redirect(request()->url(), navigate: true);
     }
 
-    /**
-     * Whether to show the module section.
-     */
     public function getShowModuleSectionProperty(): bool
     {
         return count($this->modules) > 1;
     }
 
-    /**
-     * Whether to show the company section.
-     */
     public function getShowCompanySectionProperty(): bool
     {
         return $this->multiCompanyEnabled && $this->companies->isNotEmpty();

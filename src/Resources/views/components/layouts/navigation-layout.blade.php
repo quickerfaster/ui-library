@@ -215,16 +215,8 @@
             :items="$contextItems[$activeContext] ?? []"
             wire:key="context-sheet-{{ $moduleName }}" />
 
-        {{-- Navigation Hub (mobile) — module + company switching --}}
+        {{-- Navigation Hub (mobile) — self-sufficient module + company switching --}}
         <livewire:qf.navigation-hub
-            :currentModule="$moduleName"
-            :currentModuleLabel="$currentModuleLabel ?? $moduleName"
-            :modules="$modules ?? []"
-            :currentCompanyId="$currentCompanyId ?? null"
-            :currentCompanyName="$currentCompanyName ?? ''"
-            :companies="$companies ?? []"
-            :canAccessAllCompanies="$canAccessAllCompanies ?? false"
-            :multiCompanyEnabled="$multiCompanyEnabled ?? false"
             wire:key="navigation-hub-{{ $moduleName }}" />
 
 
