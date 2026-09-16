@@ -1,11 +1,9 @@
-<nav id="main-nav" class="navbar navbar-light bg-white shadow-sm fixed-top" style="z-index: 1030;">
+<nav id="main-nav" class="navbar navbar-expand-md navbar-light bg-white shadow-sm fixed-top" style="z-index: 1030;">
 
     <style>
-        /* Ensure Bootstrap dropdowns render above the fixed navbar */
         #main-nav .dropdown-menu {
             z-index: 1050 !important;
         }
-        /* Remove list bullets from context group tabs */
         #main-nav .context-tabs {
             list-style: none;
             padding: 0;
@@ -18,7 +16,7 @@
         {{-- Left: Module Switcher → NavigationHub --}}
         @if ($moduleSwitcherEnabled && !empty($this->modules))
         <button class="btn btn-sm btn-outline-primary px-3 py-1 my-0 fw-medium me-2 flex-shrink-0" type="button"
-            wire:click="$dispatch('openNavigationHub', { scrollTo: 'module' })"
+            @click="Livewire.dispatch('openNavigationHub', { scrollTo: 'module' })"
             aria-label="Switch Module">
             <i class="fas fa-th-large me-1"></i>
             <span class="d-none d-md-inline">{{ $this->currentModuleLabel }}</span>
@@ -65,7 +63,7 @@
                     @php $isOverflowActive = $this->overflowDesktop->has($activeContext); @endphp
                     <div class="dropdown" wire:key="overflow-dropdown">
                         <a class="btn btn-sm px-3 py-1 nav-link dropdown-toggle {{ $isOverflowActive ? 'active fw-bold text-primary' : '' }}"
-                            href="#" data-bs-toggle="dropdown">
+                            href="#" data-bs-toggle="dropdown" data-bs-display="static">
                             {{ __('qf::nav.more') }}
                         </a>
                         <ul class="dropdown-menu">
@@ -97,7 +95,7 @@
             @if ($companies && $companies->isNotEmpty())
                 @php $isAllCompanies = $currentCompanyId === 0; @endphp
                 <button class="btn btn-sm {{ $isAllCompanies ? 'btn-outline-info' : 'btn-outline-primary' }} px-2 py-1 my-0 fw-medium"
-                        wire:click="$dispatch('openNavigationHub', { scrollTo: 'company' })"
+                        @click="Livewire.dispatch('openNavigationHub', { scrollTo: 'company' })"
                         aria-label="Switch Company">
                     <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
                     <span class="d-none d-md-inline">{{ \Illuminate\Support\Str::limit($currentCompanyName, 12) }}</span>
