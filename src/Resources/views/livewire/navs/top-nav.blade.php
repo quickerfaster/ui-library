@@ -15,35 +15,14 @@
         $currentModule = strtolower($this->moduleName);
     @endphp
 
-    {{-- Module Switcher --}}
+    {{-- Module Switcher — opens NavigationHub --}}
     @if ($moduleSwitcherEnabled && !empty($this->modules))
-    <div class="dropdown me-2" id="module-switcher" wire:key="module-switcher">
-        <button class="btn btn-sm btn-outline-primary dropdown-toggle px-3 py-1 my-0 fw-medium" type="button"
-            data-bs-toggle="dropdown" aria-label="Switch Module" aria-expanded="false">
-            <i class="fas fa-th-large me-1"></i>
-            <span class="d-none d-md-inline">{{ $this->currentModuleLabel }}</span>
-        </button>
-        <ul class="dropdown-menu shadow border-0" style="max-height: 300px; overflow-y: auto;">
-            <li>
-                <h6 class="dropdown-header ps-2 text-uppercase text-xs font-weight-bolder opacity-6">
-                    Switch Module
-                </h6>
-            </li>
-            @foreach ($this->modules as $module)
-                <li wire:key="module-{{ $module['key'] }}">
-                    <a class="dropdown-item border-radius-md d-flex align-items-center {{ $module['key'] === $this->activeModuleKey ? 'bg-light text-primary fw-bold' : '' }}"
-                        href="#"
-                        wire:click.prevent="switchModule('{{ $module['key'] }}')">
-                        <i class="{{ $module['icon'] ?? 'fas fa-cube' }} me-2 {{ $module['key'] === $this->activeModuleKey ? 'text-primary' : 'opacity-6' }}"></i>
-                        <span>{{ $module['label'] }}</span>
-                        @if ($module['key'] === $this->activeModuleKey)
-                            <i class="fas fa-check ms-auto text-primary"></i>
-                        @endif
-                    </a>
-                </li>
-            @endforeach
-        </ul>
-    </div>
+    <button class="btn btn-sm btn-outline-primary px-3 py-1 my-0 fw-medium me-2" type="button"
+        wire:click="$dispatch('openNavigationHub', { scrollTo: 'module' })"
+        aria-label="Switch Module">
+        <i class="fas fa-th-large me-1"></i>
+        <span class="d-none d-md-inline">{{ $this->currentModuleLabel }}</span>
+    </button>
     @endif
 
 
