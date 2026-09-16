@@ -8,9 +8,9 @@ use Livewire\Component;
  * Mobile context sheet — slide-up panel showing sub-items for the active
  * context group.
  *
- * Triggered by double-tapping the active tab in the BottomBar or by
- * tapping the chevron indicator. Mirrors the desktop sidebar behavior:
- * selecting a context group reveals its sub-navigation items.
+ * Triggered by tapping the handle bar above the BottomBar. Mirrors the
+ * desktop sidebar behavior: selecting a context group reveals its
+ * sub-navigation items in a mobile-friendly slide-up sheet.
  */
 class ContextSheet extends Component
 {
@@ -34,28 +34,15 @@ class ContextSheet extends Component
         'closeContextSheet' => 'close',
     ];
 
-    public function mount(
-        ?string $contextKey = null,
-        string $contextLabel = '',
-        string $contextIcon = '',
-        array $items = []
-    ): void {
-        $this->contextKey = $contextKey;
-        $this->contextLabel = $contextLabel;
-        $this->contextIcon = $contextIcon;
-        $this->items = $items;
-    }
-
     /**
-     * Open the sheet with the given context group data.
+     * Open the sheet with context group data from a Livewire event.
      *
-     * Accepts either an associative array or individual parameters
-     * from Livewire's $dispatch('openContextSheet', {...}).
+     * Livewire 3 passes $dispatch('openContextSheet', {...}) data
+     * as the first argument to the listener method.
      */
-    public function open(array $payload = []): void
+    public function open($payload = null): void
     {
-        // Support both array payload and flat parameters from Livewire events
-        if (!empty($payload)) {
+        if (is_array($payload)) {
             $this->contextKey = $payload['key'] ?? null;
             $this->contextLabel = $payload['label'] ?? '';
             $this->contextIcon = $payload['icon'] ?? '';

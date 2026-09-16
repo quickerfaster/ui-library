@@ -119,9 +119,9 @@ User taps [People] in Bottom Tab Bar
   │
   ├─► Content navigates to People's default URL (e.g., /hr/dashboard-people-overview)
   │
-  └─► A "sub-items" indicator (chevron/arrow) appears on the active tab
+  └─► A handle bar appears above the tab bar: "People ▲"
        │
-       ├─► User taps the active tab AGAIN (or swipes up)
+       ├─► User taps the handle bar
        │     │
        │     └─► Slide-up sheet reveals People's sub-items:
        │          ┌──────────────────────────────────────┐
@@ -155,9 +155,9 @@ User taps [People] in Bottom Tab Bar
 
 | Element | Position | Behavior |
 |---------|----------|----------|
-| **Context Group Tabs** | Horizontal row, 4-5 visible | Each tab = one context group from `navigation.php`. Icon + short label. Active tab is highlighted with a chevron (▲) indicating sub-items are available. |
+| **Handle Bar** | Above the tab bar (only when active context has sub-items) | Full-width horizontal bar showing the active context label + ▲ chevron. Tapping it opens the **Context Sheet**. Follows the iOS/Material Design "pull-up handle" pattern. |
+| **Context Group Tabs** | Horizontal row, 4-5 visible | Each tab = one context group from `navigation.php`. Icon + short label. Active tab is highlighted. |
 | **"More" tab** (⋯) | Last position (if > 4-5 groups) | Opens the **Overflow Sheet** — an expandable accordion listing all context groups. See §3.6 for full behavior. |
-| **Active tab double-tap** | Any active tab | Opens the **Context Sheet** showing that group's sub-items |
 
 **Tab configuration** (from `navigation.php` context group):
 ```php
@@ -170,7 +170,7 @@ User taps [People] in Bottom Tab Bar
 ],
 ```
 
-#### Context Sheet (slide-up, triggered by active tab double-tap or swipe)
+#### Context Sheet (slide-up, triggered by Handle Bar tap)
 
 | Element | Behavior |
 |---------|----------|
@@ -198,7 +198,7 @@ User taps [People] in Bottom Tab Bar
 └──────────────────────────────────┘
 ```
 
-#### State B: "People" Tab Active (first tap)
+#### State B: "People" Tab Active (handle bar visible)
 
 ```
 ┌──────────────────────────────────┐
@@ -209,13 +209,11 @@ User taps [People] in Bottom Tab Bar
 │   (employee stats, org chart)     │
 │                                   │
 │                                   │
-│                                   │
+├──────────────────────────────────┤
+│         ▬▬ People ▲ ▬▬           │  ← Handle Bar (tap to open Context Sheet)
 ├──────────────────────────────────┤
 │  🏠        👤       👥       ⚙️    ⋯ │
 │ Dashboard  Portal [People] Manage More │  ← [People] highlighted
-│                          ▲          │
-│                     chevron indicates│
-│                     sub-items avail. │
 └──────────────────────────────────┘
 ```
 
