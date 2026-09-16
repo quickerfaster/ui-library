@@ -1,5 +1,18 @@
 <nav id="main-nav" class="navbar navbar-light bg-white shadow-sm fixed-top" style="z-index: 1030;">
 
+    <style>
+        /* Ensure Bootstrap dropdowns render above the fixed navbar */
+        #main-nav .dropdown-menu {
+            z-index: 1050 !important;
+        }
+        /* Remove list bullets from context group tabs */
+        #main-nav .context-tabs {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+
     <div class="d-flex align-items-center w-100 px-2">
 
         {{-- Left: Module Switcher → NavigationHub --}}
@@ -43,6 +56,7 @@
 
             {{-- Context group tabs --}}
             @if (!$hideTopnavContexts)
+                <ul class="navbar-nav context-tabs">
                 @foreach ($this->visibleDesktop as $key => $item)
                     @include('qf::livewire.navs.partials.top-nav-item', ['item' => $item, 'key' => $key])
                 @endforeach
@@ -72,6 +86,7 @@
                         </ul>
                     </div>
                 @endif
+                </ul>
             @endif
         </div>
 
