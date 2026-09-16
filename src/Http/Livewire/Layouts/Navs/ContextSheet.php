@@ -30,24 +30,22 @@ class ContextSheet extends Component
     public bool $isOpen = false;
 
     protected $listeners = [
-        'openContextSheet' => 'open',
         'closeContextSheet' => 'close',
     ];
 
     /**
-     * Open the sheet with context group data from a Livewire event.
+     * Open the sheet with context group data.
      *
-     * Livewire 3 passes $dispatch('openContextSheet', {...}) data
-     * as the first argument to the listener method.
+     * Called directly from Alpine via $wire.call('openSheet', ...).
+     * Accepts individual parameters to avoid Livewire container
+     * resolution issues with array type hints.
      */
-    public function open($payload = null): void
+    public function openSheet($key = null, $label = '', $icon = '', $items = []): void
     {
-        if (is_array($payload)) {
-            $this->contextKey = $payload['key'] ?? null;
-            $this->contextLabel = $payload['label'] ?? '';
-            $this->contextIcon = $payload['icon'] ?? '';
-            $this->items = $payload['items'] ?? [];
-        }
+        $this->contextKey = $key;
+        $this->contextLabel = $label;
+        $this->contextIcon = $icon;
+        $this->items = is_array($items) ? $items : [];
         $this->isOpen = true;
     }
 

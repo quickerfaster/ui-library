@@ -15,12 +15,7 @@
     @if ($activeHasItems)
         <div class="w-100 py-1 border-top border-light"
              style="cursor: pointer; background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.04); display: block; text-align: center;"
-             @click="$wire.dispatch('openContextSheet', {
-                 key: '{{ $activeContext }}',
-                 label: '{{ addslashes($activeGroup['label'] ?? $activeContext) }}',
-                 icon: '{{ addslashes($activeGroup['icon'] ?? '') }}',
-                 items: {{ json_encode($activeGroup['items']) }}
-             })">
+             @click="$wire.call('openSheet', '{{ $activeContext }}', '{{ addslashes($activeGroup['label'] ?? $activeContext) }}', '{{ addslashes($activeGroup['icon'] ?? '') }}', {{ json_encode($activeGroup['items']) }})">
             <span class="text-primary fw-medium" style="font-size: 0.75rem; pointer-events: none;">
                 {{ \Illuminate\Support\Str::limit($activeGroup['label'] ?? $activeContext, 20) }}
             </span>
