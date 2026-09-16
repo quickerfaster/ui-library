@@ -111,7 +111,7 @@
                             @if ($hasItems)
                                 <i class="fas fa-chevron-down opacity-50 ms-2"
                                    :class="{ 'fa-chevron-down': !expanded, 'fa-chevron-up': expanded }"
-                                   @click.prevent="expanded = !expanded"></i>
+                                   style="pointer-events: none;"></i>
                             @endif
                         </div>
                         @if ($hasItems)
