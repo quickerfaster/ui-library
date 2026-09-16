@@ -16,7 +16,7 @@ Three related bugs in navigation active-state detection:
 
 2. **BottomBar overflow "More" menu**: Sub-items had **no active detection at all** — all rendered as `text-muted small` with no conditional logic. The "More" button never highlighted even when the active context was in overflow. Active overflow group headers had no visual accent (background/border).
 
-3. **Onboarding context group showing wrong sidebar**: The [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php:1) `@props` directive declared `'activeContext' => null`, which **shadowed** the component's public `$activeContext` property (correctly set to `'onboarding'` by `setActiveContext()`). The `@props` default of `null` took precedence over the `render()` data, causing `$contextItems[null]` to return an empty array. The sidebar then fell back to URL-based matching, which resolved to `'manage'` on the onboarding overview page.
+3. **Onboarding context group showing wrong sidebar**: A **PHP reference bug** in [`NavigationLayout.php`](src/Components/NavigationLayout.php:201-213) caused `$this->contextItems['onboarding']` to be overwritten with Manage items. The `&$items` foreach loop (line 201) left `$items` as a reference to the last element (`'onboarding'`). The subsequent `foreach ($this->contextItems as $groupKey => $items)` (line 209, without `&`) overwrote the referenced value on each iteration — by the final iteration, `$this->contextItems['onboarding']` contained Manage items instead of Onboarding items.
 
 ### Fix — ContextSheet
 
@@ -35,13 +35,14 @@ Three related bugs in navigation active-state detection:
 - [`bottom-bar.blade.php:108-130`](src/Resources/views/livewire/navs/bottom-bar.blade.php:108) — Active overflow group header gets blue left border + tinted background + bold text + primary icon.
 - [`bottom-bar.blade.php:131-156`](src/Resources/views/livewire/navs/bottom-bar.blade.php:131) — Sub-items now use `isItemActive()` for detection. Active sub-item gets blue tinted background (`rgba(13,110,253,0.15)`), bold text, primary icon, and checkmark.
 
-### Fix — NavigationLayout `@props` Shadowing
+### Fix — NavigationLayout PHP Reference Bug
 
-- [`navigation-layout.blade.php:1`](src/Resources/views/components/layouts/navigation-layout.blade.php:1) — Removed `'activeContext' => null` from the `@props` directive. The `@props` default was shadowing the component's public `$activeContext` property (set correctly by `setActiveContext()`), causing `$activeContext` to be `null` in the blade template. Added `'context' => null` to allow the `context` attribute to be passed through.
+- [`NavigationLayout.php:204`](src/Components/NavigationLayout.php:204) — Added `unset($items)` after the `&$items` foreach sort loop to break the PHP reference. Without this, the subsequent `foreach ($this->contextItems as $groupKey => $items)` (without `&`) overwrites the last element because `$items` is still bound by reference from the previous loop.
+- [`navigation-layout.blade.php:1`](src/Resources/views/components/layouts/navigation-layout.blade.php:1) — Removed `'activeContext' => null` from `@props` (was shadowing component property). Added `'context' => null`.
 
 ### Design Principle
 
-All three fixes follow the same pattern: **align with the proven sidebar approach** (`request()->url() === url($routePath)`) rather than inventing new path-comparison logic. This ensures consistent active-state detection across all navigation surfaces (desktop sidebar, mobile ContextSheet, mobile overflow menu). Additionally, **class-based Blade component public properties must not be shadowed by `@props` defaults** — the `@props` directive should only list attributes that are passed via the component tag, not properties set internally by the component class.
+All three fixes follow the same pattern: **align with the proven sidebar approach** (`request()->url() === url($routePath)`) rather than inventing new path-comparison logic. This ensures consistent active-state detection across all navigation surfaces (desktop sidebar, mobile ContextSheet, mobile overflow menu). Additionally, **always `unset()` after `&$item` foreach loops** to prevent PHP reference leaks into subsequent non-reference loops — a classic PHP footgun.
 
 ---
 
