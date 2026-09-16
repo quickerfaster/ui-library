@@ -13,19 +13,18 @@
         $activeHasItems = $activeGroup && !empty($activeGroup['items']);
     @endphp
     @if ($activeHasItems)
-        <div class="d-flex justify-content-center py-1"
-             style="cursor: pointer;"
+        <div class="text-center py-1 border-top border-light"
+             style="cursor: pointer; background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.04);"
              @click="$wire.dispatch('openContextSheet', {
                  key: '{{ $activeContext }}',
                  label: '{{ addslashes($activeGroup['label'] ?? $activeContext) }}',
                  icon: '{{ addslashes($activeGroup['icon'] ?? '') }}',
                  items: {{ json_encode($activeGroup['items']) }}
              })">
-            <div class="d-flex align-items-center gap-1 text-primary opacity-75"
-                 style="font-size: 0.7rem;">
-                <span class="fw-medium">{{ \Illuminate\Support\Str::limit($activeGroup['label'] ?? $activeContext, 16) }}</span>
-                <i class="fas fa-chevron-up" style="font-size: 0.6rem;"></i>
-            </div>
+            <span class="text-primary fw-medium" style="font-size: 0.75rem;">
+                {{ \Illuminate\Support\Str::limit($activeGroup['label'] ?? $activeContext, 20) }}
+            </span>
+            <i class="fas fa-chevron-up text-primary ms-1" style="font-size: 0.65rem;"></i>
         </div>
     @endif
 
