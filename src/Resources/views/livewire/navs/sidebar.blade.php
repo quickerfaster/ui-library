@@ -1,5 +1,5 @@
 <div
-    class="sidebar-container bg-light border-end d-none d-md-flex flex-column align-items-stretch overflow-hidden
+    class="sidebar-container bg-light border-end d-none d-md-flex flex-column align-items-stretch
             @if ($state === 'full') sidebar-full
             @else sidebar-icon @endif"
     x-data="{
@@ -23,13 +23,14 @@
     ])
 
     {{-- Phase 5.3: Sidebar fuzzy filter --}}
-    <div class="sidebar-filter p-2" data-sidebar-filter-wrap style="overflow: hidden;">
+    <div class="sidebar-filter px-2 pt-2 pb-1" data-sidebar-filter-wrap>
         <div class="input-group input-group-sm flex-nowrap">
             <span class="input-group-text" data-sidebar-filter-icon>
                 <i class="fas fa-search"></i>
             </span>
             <input type="text"
                    class="form-control form-control-sm"
+                   style="min-width: 0;"
                    placeholder="{{ __('qf::nav.filter_modules') }}"
                    aria-label="{{ __('qf::nav.filter_modules') }}"
                    title="{{ __('qf::nav.filter_modules') }}"
