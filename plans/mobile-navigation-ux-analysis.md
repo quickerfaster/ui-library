@@ -1,8 +1,21 @@
 # Mobile Navigation UX/UI Analysis — QuickerFaster UI Library
 
-> **Date**: 2026-09-15
-> **Status**: Proposal — awaiting review
+> **Date**: 2026-09-16
+> **Status**: ✅ BottomBar implemented — TopNav pending
 > **Related**: [`docs/library/06-navigation-system.md`](../docs/library/06-navigation-system.md), [`src/Http/Livewire/Layouts/Navs/TopNav.php`](../src/Http/Livewire/Layouts/Navs/TopNav.php), [`src/Http/Livewire/Layouts/Navs/BottomBar.php`](../src/Http/Livewire/Layouts/Navs/BottomBar.php), [`src/Http/Livewire/Layouts/Navs/Sidebar.php`](../src/Http/Livewire/Layouts/Navs/Sidebar.php)
+
+### Implementation Status
+
+| Component | Status | Commits |
+|-----------|--------|---------|
+| **BottomBar** — context group tabs | ✅ Done | Icon-only tabs + handle bar label |
+| **ContextSheet** — slide-up sub-items | ✅ Done | Props from NavigationLayout, Alpine x-show |
+| **NavigationHub** — module + company switching | ✅ Done | Half-sheet with role-gated sections |
+| **TopNav** — mobile context pills removed | ✅ Done | Company indicator button → NavigationHub |
+| **Content padding** — bottom spacing | ✅ Done | 8rem (128px) on mobile |
+| **Overflow sheet** — "More" accordion | ✅ Done | Pure Alpine, expandable groups |
+| **TopNav** — NavigationHub integration | ⬜ Pending | Wire up module/company data to hub |
+| **TopNav** — mobile layout polish | ⬜ Pending | Module switcher button, action icons |
 
 ---
 
@@ -16,7 +29,7 @@
 │           [🔔] [⚡] [👤]                                       │  ← notifications, quick actions, profile
 ├──────────┬───────────────────────────────────────────────────┤
 │ Sidebar  │  Content Area                                      │
-│ (context │                                                    │
+│ (context │                                                    │ 
 │  items)  │                                                    │
 │          │                                                    │
 ├──────────┴───────────────────────────────────────────────────┤
@@ -151,13 +164,13 @@ User taps [People] in Bottom Tab Bar
 | **Quick Actions** (⚡) | Right | Same as desktop — command palette or dropdown |
 | **Profile** (👤) | Right | Same as desktop — dropdown with profile, settings, logout |
 
-#### Bottom Tab Bar (56px, always visible)
+#### Bottom Tab Bar (~48px, always visible)
 
 | Element | Position | Behavior |
 |---------|----------|----------|
-| **Handle Bar** | Above the tab bar (only when active context has sub-items) | Full-width horizontal bar showing the active context label + ▲ chevron. Tapping it opens the **Context Sheet**. Follows the iOS/Material Design "pull-up handle" pattern. |
-| **Context Group Tabs** | Horizontal row, 4-5 visible | Each tab = one context group from `navigation.php`. Icon + short label. Active tab is highlighted. |
-| **"More" tab** (⋯) | Last position (if > 4-5 groups) | Opens the **Overflow Sheet** — an expandable accordion listing all context groups. See §3.6 for full behavior. |
+| **Handle Bar** | Above the tab bar (always visible when a context is active) | Full-width bar showing the active context label. For groups WITH sub-items: shows "Label ▲" — tap opens **Context Sheet**. For groups WITHOUT sub-items: shows "Label" (no chevron) — tap navigates to that context. |
+| **Context Group Tabs** | Horizontal row, 4-5 visible | **Icon-only** — each tab shows the context group's icon. No text labels (handle bar serves as the label). Active tab is highlighted. `title` attribute for accessibility. |
+| **"More" tab** (⋯) | Last position (if > 4-5 groups) | Opens the **Overflow Sheet** — an expandable accordion listing all context groups with full labels and sub-items. |
 
 **Tab configuration** (from `navigation.php` context group):
 ```php
