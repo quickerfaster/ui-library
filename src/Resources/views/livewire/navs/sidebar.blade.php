@@ -36,8 +36,8 @@
                    aria-label="{{ __('qf::nav.filter_modules') }}"
                    title="{{ __('qf::nav.filter_modules') }}"
                    data-sidebar-filter>
-            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 d-flex align-items-center justify-content-center"
-                    data-sidebar-filter-clear style="display:none;">
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 d-flex align-items-center justify-content-center px-1"
+                    data-sidebar-filter-clear style="display:none; width: 26px;">
                 <i class="fas fa-times"></i>
             </button>
         </div>
