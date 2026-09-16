@@ -100,9 +100,8 @@
                     <div class="list-group-item border-0 px-3 py-2"
                          x-data="{ expanded: {{ $isActive ? 'true' : 'false' }} }"
                          wire:key="bb-overflow-{{ $key }}">
-                        <a href="{{ $url }}"
-                           wire:navigate
-                           @click="expanded = true"
+                        <a href="#"
+                           @click.prevent="expanded = !expanded"
                            class="d-flex align-items-center text-decoration-none {{ $isActive ? 'text-primary fw-bold' : 'text-dark' }}">
                             @if (!empty($group['icon']))
                                 <i class="{{ $group['icon'] }} me-2 {{ $isActive ? 'opacity-100' : 'opacity-50' }}" style="width: 20px;"></i>
