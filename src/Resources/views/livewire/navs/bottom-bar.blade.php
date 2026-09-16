@@ -58,19 +58,38 @@
 
     {{-- Overflow Sheet --}}
     @if ($this->hasOverflow)
-    <div class="offcanvas offcanvas-bottom h-auto"
-         tabindex="-1"
-         id="bottomBarOverflowSheet"
-         x-show="overflowOpen"
-         x-transition
-         style="max-height: 70vh; border-radius: 16px 16px 0 0; display: none;"
-         x-effect="if (overflowOpen) { bootstrap.Offcanvas.getOrCreateInstance($el).show() } else { bootstrap.Offcanvas.getInstance($el)?.hide() }"
-         @hidden.bs.offcanvas="overflowOpen = false">
-        <div class="offcanvas-header border-bottom">
-            <h6 class="offcanvas-title fw-bold">More Contexts</h6>
-            <button type="button" class="btn-close" @click="overflowOpen = false"></button>
+    {{-- Backdrop --}}
+    <div x-show="overflowOpen"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="position-fixed start-0 top-0 w-100 h-100 bg-dark opacity-50"
+         style="z-index: 1040;"
+         @click="overflowOpen = false"></div>
+
+    {{-- Sheet --}}
+    <div x-show="overflowOpen"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="translate-y-full"
+         x-transition:enter-end="translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="translate-y-0"
+         x-transition:leave-end="translate-y-full"
+         class="position-fixed bottom-0 start-0 end-0 bg-white shadow-lg"
+         style="z-index: 1045; max-height: 70vh; border-radius: 16px 16px 0 0; overflow-y: auto;">
+        <div class="d-flex justify-content-center pt-2 pb-1">
+            <div class="bg-secondary rounded-pill opacity-50" style="width: 36px; height: 4px;"></div>
         </div>
-        <div class="offcanvas-body p-0">
+        <div class="d-flex align-items-center px-3 py-2 border-bottom">
+            <h6 class="mb-0 fw-bold flex-grow-1">More Contexts</h6>
+            <button type="button" class="btn btn-sm btn-light rounded-circle" @click="overflowOpen = false" style="width: 32px; height: 32px;">
+                <i class="fas fa-times opacity-50"></i>
+            </button>
+        </div>
+        <div class="p-0">
             <div class="list-group list-group-flush">
                 @foreach ($this->overflowGroups as $key => $group)
                     @php
