@@ -25,12 +25,13 @@
     {{-- Phase 5.3: Sidebar fuzzy filter --}}
     <div class="sidebar-filter px-2 pt-2 pb-1" data-sidebar-filter-wrap>
         <div class="d-flex align-items-center" style="gap: 0;">
-            <span class="input-group-text" data-sidebar-filter-icon style="flex-shrink: 0;">
+            <span class="input-group-text" data-sidebar-filter-icon
+                  style="flex-shrink: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0;">
                 <i class="fas fa-search"></i>
             </span>
             <input type="text"
                    class="form-control form-control-sm"
-                   style="min-width: 0;"
+                   style="min-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0;"
                    placeholder="{{ __('qf::nav.filter_modules') }}"
                    aria-label="{{ __('qf::nav.filter_modules') }}"
                    title="{{ __('qf::nav.filter_modules') }}"
