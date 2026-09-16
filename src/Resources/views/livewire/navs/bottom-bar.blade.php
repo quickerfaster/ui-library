@@ -100,9 +100,10 @@
                     <div class="list-group-item border-0 px-3 py-2"
                          x-data="{ expanded: {{ $isActive ? 'true' : 'false' }} }"
                          wire:key="bb-overflow-{{ $key }}">
-                        <a href="#"
-                           @click.prevent="expanded = !expanded"
-                           class="d-flex align-items-center text-decoration-none {{ $isActive ? 'text-primary fw-bold' : 'text-dark' }}">
+                        <div role="button"
+                           @click="expanded = !expanded"
+                           class="d-flex align-items-center text-decoration-none {{ $isActive ? 'text-primary fw-bold' : 'text-dark' }}"
+                           style="cursor: pointer;">
                             @if (!empty($group['icon']))
                                 <i class="{{ $group['icon'] }} me-2 {{ $isActive ? 'opacity-100' : 'opacity-50' }}" style="width: 20px;"></i>
                             @endif
@@ -112,7 +113,7 @@
                                    :class="{ 'fa-chevron-down': !expanded, 'fa-chevron-up': expanded }"
                                    @click.prevent="expanded = !expanded"></i>
                             @endif
-                        </a>
+                        </div>
                         @if ($hasItems)
                         <div class="ms-4 mt-1 border-start ps-2" x-show="expanded" x-collapse>
                             @foreach ($group['items'] as $item)
