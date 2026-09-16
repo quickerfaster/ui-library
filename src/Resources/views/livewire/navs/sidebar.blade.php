@@ -23,19 +23,19 @@
     ])
 
     {{-- Phase 5.3: Sidebar fuzzy filter --}}
-    <div class="sidebar-filter px-2 pt-2 pb-1" data-sidebar-filter-wrap style="max-width: 100%;">
-        <div class="input-group input-group-sm flex-nowrap" style="width: 100%;">
+    <div class="sidebar-filter px-2 pt-2 pb-1" data-sidebar-filter-wrap>
+        <div class="d-flex align-items-center" style="gap: 0;">
             <span class="input-group-text" data-sidebar-filter-icon style="flex-shrink: 0;">
                 <i class="fas fa-search"></i>
             </span>
             <input type="text"
                    class="form-control form-control-sm"
-                   style="min-width: 0; width: 1%;"
+                   style="min-width: 0;"
                    placeholder="{{ __('qf::nav.filter_modules') }}"
                    aria-label="{{ __('qf::nav.filter_modules') }}"
                    title="{{ __('qf::nav.filter_modules') }}"
                    data-sidebar-filter>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0"
                     data-sidebar-filter-clear style="display:none;">
                 <i class="fas fa-times"></i>
             </button>
