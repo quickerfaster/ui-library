@@ -31,7 +31,7 @@
     @endif
 
     {{-- Tab Bar — icons only --}}
-    <div class="d-flex justify-content-around w-100 px-1 pb-1">
+    <div class="d-flex justify-content-around w-100 px-1 pt-1 pb-1" style="border-top: 1px solid rgba(0,0,0,0.04);">
         @foreach ($this->visibleGroups as $key => $group)
             @php
                 $isActive = $key === $activeContext;
