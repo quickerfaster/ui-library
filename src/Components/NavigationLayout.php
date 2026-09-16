@@ -201,6 +201,7 @@ class NavigationLayout extends Component
         foreach ($this->contextItems as $groupKey => &$items) {
             usort($items, fn($a, $b) => ($a['order'] ?? 999) <=> ($b['order'] ?? 999));
         }
+        unset($items); // Break reference to prevent overwriting last element in subsequent loops
 
         // Merge context items into context groups so each group carries its
         // sub-navigation items. This enables the mobile BottomBar to show
