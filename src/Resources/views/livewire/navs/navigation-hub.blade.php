@@ -1,5 +1,4 @@
-<div class="d-md-none"
-     x-data="{ open: @entangle('isOpen'), scrollTo: @entangle('scrollTo') }"
+<div x-data="{ open: @entangle('isOpen'), scrollTo: @entangle('scrollTo') }"
      x-show="open"
      x-transition:enter="transition ease-out duration-200"
      x-transition:enter-start="translate-y-full"
