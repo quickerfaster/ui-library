@@ -205,7 +205,14 @@
         @endif
 
         {{-- Context Sheet (mobile) — slide-up sub-items for active context --}}
+        @php
+            $activeCtxGroup = $contextGroups[$activeContext] ?? null;
+        @endphp
         <livewire:qf.context-sheet
+            :contextKey="$activeContext"
+            :contextLabel="$activeCtxGroup['label'] ?? $activeContext"
+            :contextIcon="$activeCtxGroup['icon'] ?? ''"
+            :items="$contextItems[$activeContext] ?? []"
             wire:key="context-sheet-{{ $moduleName }}" />
 
         {{-- Navigation Hub (mobile) — module + company switching --}}

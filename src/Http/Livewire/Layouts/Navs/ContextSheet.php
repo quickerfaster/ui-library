@@ -8,58 +8,53 @@ use Livewire\Component;
  * Mobile context sheet — slide-up panel showing sub-items for the active
  * context group.
  *
- * Triggered by tapping the handle bar above the BottomBar. Mirrors the
- * desktop sidebar behavior: selecting a context group reveals its
- * sub-navigation items in a mobile-friendly slide-up sheet.
+ * Items are received as props from NavigationLayout (same data source
+ * as the desktop sidebar). The sheet simply toggles open/close.
  */
 class ContextSheet extends Component
 {
-    /** @var string|null The active context group key. */
+    /** @var string|null */
     public ?string $contextKey = null;
 
-    /** @var string Context group display label. */
+    /** @var string */
     public string $contextLabel = '';
 
-    /** @var string Context group icon class. */
+    /** @var string */
     public string $contextIcon = '';
 
-    /** @var array Sub-navigation items for the active context group. */
+    /** @var array */
     public array $items = [];
 
-    /** @var bool Whether the sheet is currently open. */
+    /** @var bool */
     public bool $isOpen = false;
 
     protected $listeners = [
+        'openContextSheet' => 'open',
         'closeContextSheet' => 'close',
     ];
 
-    /**
-     * Open the sheet with context group data.
-     *
-     * Called directly from Alpine via $wire.call('openSheet', ...).
-     * Accepts individual parameters to avoid Livewire container
-     * resolution issues with array type hints.
-     */
-    public function openSheet($key = null, $label = '', $icon = '', $items = []): void
+    public function mount(
+        ?string $contextKey = null,
+        string $contextLabel = '',
+        string $contextIcon = '',
+        array $items = []
+    ): void {
+        $this->contextKey = $contextKey;
+        $this->contextLabel = $contextLabel;
+        $this->contextIcon = $contextIcon;
+        $this->items = $items;
+    }
+
+    public function open(): void
     {
-        $this->contextKey = $key;
-        $this->contextLabel = $label;
-        $this->contextIcon = $icon;
-        $this->items = is_array($items) ? $items : [];
         $this->isOpen = true;
     }
 
-    /**
-     * Close the sheet.
-     */
     public function close(): void
     {
         $this->isOpen = false;
     }
 
-    /**
-     * Resolve a URL from a navigation item.
-     */
     public function resolveItemUrl(array $item): string
     {
         if (!empty($item['route']) && !str_contains($item['route'], '/')) {
