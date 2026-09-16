@@ -24,7 +24,7 @@
 
     {{-- Phase 5.3: Sidebar fuzzy filter --}}
     <div class="sidebar-filter px-2 pt-2 pb-1" data-sidebar-filter-wrap>
-        <div class="d-flex align-items-stretch" style="gap: 0;">
+        <div class="d-flex align-items-center" style="gap: 0;">
             <span class="input-group-text" data-sidebar-filter-icon
                   style="flex-shrink: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0;">
                 <i class="fas fa-search"></i>
@@ -36,7 +36,7 @@
                    aria-label="{{ __('qf::nav.filter_modules') }}"
                    title="{{ __('qf::nav.filter_modules') }}"
                    data-sidebar-filter>
-            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0"
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 d-flex align-items-center justify-content-center"
                     data-sidebar-filter-clear style="display:none;">
                 <i class="fas fa-times"></i>
             </button>
