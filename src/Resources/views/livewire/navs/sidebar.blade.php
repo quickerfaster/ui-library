@@ -23,8 +23,8 @@
     ])
 
     {{-- Phase 5.3: Sidebar fuzzy filter --}}
-    <div class="sidebar-filter p-2" data-sidebar-filter-wrap>
-        <div class="input-group input-group-sm">
+    <div class="sidebar-filter p-2" data-sidebar-filter-wrap style="overflow: hidden;">
+        <div class="input-group input-group-sm flex-nowrap">
             <span class="input-group-text" data-sidebar-filter-icon>
                 <i class="fas fa-search"></i>
             </span>
