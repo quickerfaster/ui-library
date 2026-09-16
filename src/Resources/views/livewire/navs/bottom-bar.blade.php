@@ -55,11 +55,13 @@
         @endforeach
 
         @if ($this->hasOverflow)
-            <button class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0 text-muted"
+            @php $activeInOverflow = $this->isActiveInOverflow; @endphp
+            <button class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0
+                           {{ $activeInOverflow ? 'text-primary' : 'text-muted' }}"
                     style="width: 56px; height: 44px; gap: 1px;"
                     @click="overflowOpen = true"
                     wire:key="bb-tab-more">
-                <i class="fas fa-ellipsis-h opacity-50" style="font-size: 0.9rem;"></i>
+                <i class="fas fa-ellipsis-h {{ $activeInOverflow ? 'opacity-100' : 'opacity-50' }}" style="font-size: 0.9rem;"></i>
                 <span style="font-size: 0.55rem; line-height: 1;">More</span>
             </button>
         @endif
@@ -97,53 +99,64 @@
             </button>
         </div>
         <div class="p-0">
-            <div class="list-group list-group-flush">
-                @foreach ($this->overflowGroups as $key => $group)
-                    @php
-                        $isActive = $key === $activeContext;
-                        $url = $this->resolveUrl($group);
-                        $hasItems = !empty($group['items']);
-                    @endphp
-                    <div class="list-group-item border-0 px-3 py-2"
-                         x-data="{ expanded: {{ $isActive ? 'true' : 'false' }} }"
-                         wire:key="bb-overflow-{{ $key }}">
-                        <div role="button"
-                           @click="expanded = !expanded"
-                           class="d-flex align-items-center text-decoration-none {{ $isActive ? 'text-primary fw-bold' : 'text-dark' }}"
-                           style="cursor: pointer;">
-                            @if (!empty($group['icon']))
-                                <i class="{{ $group['icon'] }} me-2 {{ $isActive ? 'opacity-100' : 'opacity-50' }}" style="width: 20px;"></i>
-                            @endif
-                            <span class="flex-grow-1">{{ $group['label'] ?? $key }}</span>
-                            @if ($hasItems)
-                                <i class="fas fa-chevron-down opacity-50 ms-2"
-                                   :class="{ 'fa-chevron-down': !expanded, 'fa-chevron-up': expanded }"
-                                   style="pointer-events: none;"></i>
-                            @endif
-                        </div>
+            @foreach ($this->overflowGroups as $key => $group)
+                @php
+                    $isActive = $key === $activeContext;
+                    $url = $this->resolveUrl($group);
+                    $hasItems = !empty($group['items']);
+                @endphp
+                <div class="px-0 py-0"
+                     x-data="{ expanded: {{ $isActive ? 'true' : 'false' }} }"
+                     wire:key="bb-overflow-{{ $key }}">
+                    {{-- Group header --}}
+                    <div role="button"
+                       @click="expanded = !expanded"
+                       class="d-flex align-items-center text-decoration-none px-3 py-3
+                              {{ $isActive ? 'fw-bold' : 'text-dark' }}"
+                       @if ($isActive)
+                       style="background: rgba(13, 110, 253, 0.25); border-left: 3px solid #0d6efd; color: #212529; cursor: pointer;"
+                       @else
+                       style="border-left: 3px solid transparent; cursor: pointer;"
+                       @endif>
+                        @if (!empty($group['icon']))
+                            <i class="{{ $group['icon'] }} me-2 {{ $isActive ? 'text-primary opacity-100' : 'text-muted opacity-50' }}" style="width: 20px;"></i>
+                        @endif
+                        <span class="flex-grow-1">{{ $group['label'] ?? $key }}</span>
                         @if ($hasItems)
-                        <div class="ms-4 mt-1 border-start ps-2" x-show="expanded" x-collapse>
-                            @foreach ($group['items'] as $item)
-                                @php
-                                    $itemUrl = !empty($item['route']) && !str_contains($item['route'], '/')
-                                        ? route($item['route'])
-                                        : (isset($item['route']) ? url($item['route']) : (isset($item['url']) ? url($item['url']) : '#'));
-                                @endphp
-                                <a href="{{ $itemUrl }}"
-                                   wire:navigate
-                                   @click="overflowOpen = false"
-                                   class="d-flex align-items-center py-1 text-decoration-none text-muted small">
-                                    @if (!empty($item['icon']))
-                                        <i class="{{ $item['icon'] }} me-2 opacity-50" style="width: 16px;"></i>
-                                    @endif
-                                    <span>{{ $item['label'] }}</span>
-                                </a>
-                            @endforeach
-                        </div>
+                            <i class="fas fa-chevron-down ms-2 {{ $isActive ? 'text-primary' : 'text-muted' }} opacity-50"
+                               :class="{ 'fa-chevron-down': !expanded, 'fa-chevron-up': expanded }"
+                               style="pointer-events: none;"></i>
                         @endif
                     </div>
-                @endforeach
-            </div>
+                    {{-- Sub-items --}}
+                    @if ($hasItems)
+                    <div class="ms-4 border-start ps-2" x-show="expanded" x-collapse>
+                        @foreach ($group['items'] as $item)
+                            @php
+                                $itemUrl = $this->resolveItemUrl($item);
+                                $itemActive = $this->isItemActive($item);
+                            @endphp
+                            <a href="{{ $itemUrl }}"
+                               wire:navigate
+                               @click="overflowOpen = false"
+                               class="d-flex align-items-center py-2 pe-3 text-decoration-none
+                                      {{ $itemActive ? 'fw-bold' : 'text-muted' }}"
+                               @if ($itemActive)
+                               style="background: rgba(13, 110, 253, 0.15); border-radius: 6px; color: #212529;"
+                               @endif>
+                                @if (!empty($item['icon']))
+                                    <i class="{{ $item['icon'] }} me-2 {{ $itemActive ? 'text-primary opacity-100' : 'opacity-50' }}" style="width: 16px;"></i>
+                                @endif
+                                <span class="flex-grow-1">{{ $item['label'] }}</span>
+                                @if ($itemActive)
+                                    <i class="fas fa-check text-primary" style="font-size: 0.7rem;"></i>
+                                @endif
+                            </a>
+                        @endforeach
+                    </div>
+                    @endif
+                </div>
+            @endforeach
         </div>
     </div>
     @endif

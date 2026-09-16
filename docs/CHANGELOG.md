@@ -1,8 +1,47 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-15
-> **Status**: Current — Config-Driven Queue Connection for Export/Import Jobs, Export Model Fillable Fix
+> **Date**: 2026-09-16
+> **Status**: Current — ContextSheet & BottomBar Overflow Active State Highlighting Fix
+
+---
+
+## ContextSheet & BottomBar Overflow Active State Highlighting — 2026-09-16
+
+### Root Cause
+
+Three related bugs in navigation active-state detection:
+
+1. **ContextSheet**: [`isItemActive()`](src/Http/Livewire/Layouts/Navs/ContextSheet.php:66-85) used `trim(request()->path(), '/')` for path comparison, which returned `false` for all items during Livewire's render cycle. The proven [`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php:26-27) uses `request()->url() === url($routePath)` (full URL comparison).
+
+2. **BottomBar overflow "More" menu**: Sub-items had **no active detection at all** — all rendered as `text-muted small` with no conditional logic. The "More" button never highlighted even when the active context was in overflow. Active overflow group headers had no visual accent (background/border).
+
+3. **Onboarding context group showing wrong sidebar**: The [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php:1) `@props` directive declared `'activeContext' => null`, which **shadowed** the component's public `$activeContext` property (correctly set to `'onboarding'` by `setActiveContext()`). The `@props` default of `null` took precedence over the `render()` data, causing `$contextItems[null]` to return an empty array. The sidebar then fell back to URL-based matching, which resolved to `'manage'` on the onboarding overview page.
+
+### Fix — ContextSheet
+
+- [`ContextSheet.php:66-85`](src/Http/Livewire/Layouts/Navs/ContextSheet.php:66) — `isItemActive()` rewritten to use `request()->url() === url($routePath)`, matching the sidebar approach. Removed `trim()` + `str_starts_with` fallback.
+- [`ContextSheet.php:32`](src/Http/Livewire/Layouts/Navs/ContextSheet.php:32) — `renderVersion` bumped 2→3 to force Livewire snapshot regeneration.
+- [`context-sheet.blade.php:1-11`](src/Resources/views/livewire/navs/context-sheet.blade.php:1) — Added `.context-sheet-item` hover CSS (`background-color: #f8f9fa` on hover, chevron opacity boost).
+- [`context-sheet.blade.php:49-66`](src/Resources/views/livewire/navs/context-sheet.blade.php:49) — Removed `list-group-item`, `list-group-item-action`, `border-0` Bootstrap classes. Replaced with custom styling: active items get blue left border (3px `#0d6efd`) + tinted background (`rgba(13,110,253,0.25)`), inactive items get transparent border for consistent spacing. Removed all `!important` declarations.
+
+### Fix — BottomBar Overflow "More" Menu
+
+- [`BottomBar.php:88-130`](src/Http/Livewire/Layouts/Navs/BottomBar.php:88) — Added three methods:
+  - `isItemActive(array $item): bool` — same `request()->url() === url($routePath)` logic
+  - `resolveItemUrl(array $item): string` — resolves sub-item URLs
+  - `getIsActiveInOverflowProperty(): bool` — returns `true` when active context is in overflow
+- [`bottom-bar.blade.php:57-67`](src/Resources/views/livewire/navs/bottom-bar.blade.php:57) — "More" button now shows `text-primary` + full opacity when active context is in overflow.
+- [`bottom-bar.blade.php:108-130`](src/Resources/views/livewire/navs/bottom-bar.blade.php:108) — Active overflow group header gets blue left border + tinted background + bold text + primary icon.
+- [`bottom-bar.blade.php:131-156`](src/Resources/views/livewire/navs/bottom-bar.blade.php:131) — Sub-items now use `isItemActive()` for detection. Active sub-item gets blue tinted background (`rgba(13,110,253,0.15)`), bold text, primary icon, and checkmark.
+
+### Fix — NavigationLayout `@props` Shadowing
+
+- [`navigation-layout.blade.php:1`](src/Resources/views/components/layouts/navigation-layout.blade.php:1) — Removed `'activeContext' => null` from the `@props` directive. The `@props` default was shadowing the component's public `$activeContext` property (set correctly by `setActiveContext()`), causing `$activeContext` to be `null` in the blade template. Added `'context' => null` to allow the `context` attribute to be passed through.
+
+### Design Principle
+
+All three fixes follow the same pattern: **align with the proven sidebar approach** (`request()->url() === url($routePath)`) rather than inventing new path-comparison logic. This ensures consistent active-state detection across all navigation surfaces (desktop sidebar, mobile ContextSheet, mobile overflow menu). Additionally, **class-based Blade component public properties must not be shadowed by `@props` defaults** — the `@props` directive should only list attributes that are passed via the component tag, not properties set internally by the component class.
 
 ---
 

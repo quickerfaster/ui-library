@@ -1,3 +1,14 @@
+<style>
+    .context-sheet-item:hover {
+        background-color: #f8f9fa;
+    }
+    .context-sheet-item:hover .text-muted {
+        color: #6c757d !important;
+    }
+    .context-sheet-item:hover .opacity-25 {
+        opacity: 0.5 !important;
+    }
+</style>
 <div class="d-md-none"
      x-data="{ open: @entangle('isOpen') }"
      x-show="open"
@@ -37,20 +48,31 @@
         </div>
 
         {{-- Sub-items --}}
-        <div class="list-group list-group-flush pb-3">
+        <div class="pb-3">
             @forelse ($items as $item)
                 @php
                     $itemUrl = $this->resolveItemUrl($item);
+                    $isActive = $this->isItemActive($item);
                 @endphp
                 <a href="{{ $itemUrl }}"
                    wire:navigate
                    @click="open = false"
-                   class="list-group-item list-group-item-action border-0 d-flex align-items-center px-3 py-3">
+                   class="d-flex align-items-center px-3 py-3 text-decoration-none context-sheet-item
+                          {{ $isActive ? 'fw-bold' : 'text-dark' }}"
+                   @if ($isActive)
+                   style="background: rgba(13, 110, 253, 0.25); border-left: 3px solid #0d6efd; color: #212529;"
+                   @else
+                   style="border-left: 3px solid transparent;"
+                   @endif>
                     @if (!empty($item['icon']))
-                        <i class="{{ $item['icon'] }} me-3 text-muted" style="width: 20px; text-align: center;"></i>
+                        <i class="{{ $item['icon'] }} me-3 {{ $isActive ? 'text-primary' : 'text-muted' }}" style="width: 20px; text-align: center;"></i>
                     @endif
                     <span class="flex-grow-1">{{ $item['label'] }}</span>
-                    <i class="fas fa-chevron-right text-muted opacity-25"></i>
+                    @if ($isActive)
+                        <i class="fas fa-check text-primary"></i>
+                    @else
+                        <i class="fas fa-chevron-right text-muted opacity-25"></i>
+                    @endif
                 </a>
             @empty
                 <div class="text-center text-muted py-4">

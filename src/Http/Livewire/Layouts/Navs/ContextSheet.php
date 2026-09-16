@@ -28,6 +28,9 @@ class ContextSheet extends Component
     /** @var bool */
     public bool $isOpen = false;
 
+    /** @var int Bump to force Livewire snapshot regeneration. */
+    public int $renderVersion = 3;
+
     protected $listeners = [
         'openContextSheet' => 'open',
         'closeContextSheet' => 'close',
@@ -53,6 +56,32 @@ class ContextSheet extends Component
     public function close(): void
     {
         $this->isOpen = false;
+    }
+
+    /**
+     * Determine if a sub-item is the currently active page.
+     * Mirrors sidebar-item.blade.php logic — uses full URL comparison
+     * for robustness across Livewire re-renders and sub-requests.
+     */
+    public function isItemActive(array $item): bool
+    {
+        // 1. Try route/URL matching (same approach as sidebar-item.blade.php)
+        if (!empty($item['route'])) {
+            // Named route (no slashes, e.g. 'hr.dashboard')
+            if (!str_contains($item['route'], '/')) {
+                return request()->routeIs($item['route']);
+            }
+            // URL path — compare full URLs for robustness
+            $routePath = parse_url($item['route'], PHP_URL_PATH) ?? $item['route'];
+            return request()->url() === url($routePath);
+        }
+
+        if (!empty($item['url'])) {
+            $urlPath = parse_url($item['url'], PHP_URL_PATH) ?? $item['url'];
+            return request()->url() === url($urlPath);
+        }
+
+        return false;
     }
 
     public function resolveItemUrl(array $item): string

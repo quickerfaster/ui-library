@@ -13,18 +13,39 @@
 
     <div class="d-flex align-items-center w-100 px-2">
 
-        {{-- Left: Module Switcher → NavigationHub --}}
+        {{-- Module Switcher --}}
         @if ($moduleSwitcherEnabled && !empty($this->modules))
-        <button class="btn btn-sm btn-outline-primary px-3 py-1 my-0 fw-medium me-2 flex-shrink-0" type="button"
-            @click="Livewire.dispatch('openNavigationHub', { scrollTo: 'module' })"
-            aria-label="Switch Module">
-            <i class="fas fa-th-large me-1"></i>
-            <span class="d-none d-md-inline">{{ $this->currentModuleLabel }}</span>
-        </button>
+            {{-- Desktop: Bootstrap dropdown --}}
+            <div class="dropdown me-2 d-none d-md-block" id="module-switcher">
+                <button class="btn btn-sm btn-outline-primary dropdown-toggle px-3 py-1 my-0 fw-medium flex-shrink-0" type="button"
+                    data-bs-toggle="dropdown" aria-label="Switch Module">
+                    <i class="fas fa-th-large me-1"></i>
+                    <span>{{ $this->currentModuleLabel }}</span>
+                </button>
+                <ul class="dropdown-menu shadow border-0">
+                    @foreach ($this->modules as $module)
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center {{ ($module['key'] ?? '') === $this->activeModuleKey ? 'active fw-bold text-primary' : '' }}"
+                                href="#" wire:click.prevent="switchModule('{{ $module['key'] }}')">
+                                <i class="{{ $module['icon'] ?? 'fa-cube' }} me-2" style="width: 20px;"></i>
+                                {{ $module['label'] ?? $module['key'] }}
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+
+            {{-- Mobile: NavigationHub button --}}
+            <button class="btn btn-sm btn-outline-primary px-3 py-1 my-0 fw-medium me-2 flex-shrink-0 d-md-none" type="button"
+                @click="Livewire.dispatch('openNavigationHub')"
+                aria-label="Switch Module">
+                <i class="fas fa-th-large me-1"></i>
+                <span>{{ $this->currentModuleLabel }}</span>
+            </button>
         @endif
 
         {{-- Desktop: Context group tabs --}}
-        <div class="d-none d-md-flex align-items-center flex-grow-1 overflow-hidden" style="gap: 0.25rem;">
+        <div class="d-none d-md-flex align-items-center flex-grow-1" style="gap: 0.25rem;">
             @php
                 $currentModule = strtolower($this->moduleName);
                 use Illuminate\Support\Str;
@@ -63,10 +84,10 @@
                     @php $isOverflowActive = $this->overflowDesktop->has($activeContext); @endphp
                     <div class="dropdown" wire:key="overflow-dropdown">
                         <a class="btn btn-sm px-3 py-1 nav-link dropdown-toggle {{ $isOverflowActive ? 'active fw-bold text-primary' : '' }}"
-                            href="#" data-bs-toggle="dropdown" data-bs-display="static">
+                            href="#" data-bs-toggle="dropdown" data-bs-boundary="viewport">
                             {{ __('qf::nav.more') }}
                         </a>
-                        <ul class="dropdown-menu">
+                        <ul class="dropdown-menu shadow border-0">
                             @foreach ($this->overflowDesktop as $key => $item)
                                 @php
                                     $url = isset($item['route']) && !Str::contains($item['route'], '/')
@@ -91,15 +112,39 @@
         {{-- Right: Actions --}}
         <div class="d-flex align-items-center ms-auto flex-shrink-0" style="gap: 0.125rem;">
 
-            {{-- Company Switcher → NavigationHub (desktop + mobile unified) --}}
+            {{-- Company Switcher --}}
             @if ($companies && $companies->isNotEmpty())
                 @php $isAllCompanies = $currentCompanyId === 0; @endphp
-                <button class="btn btn-sm {{ $isAllCompanies ? 'btn-outline-info' : 'btn-outline-primary' }} px-2 py-1 my-0 fw-medium"
-                        @click="Livewire.dispatch('openNavigationHub', { scrollTo: 'company' })"
-                        aria-label="Switch Company">
-                    <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
-                    <span class="d-none d-md-inline">{{ \Illuminate\Support\Str::limit($currentCompanyName, 12) }}</span>
-                </button>
+
+                {{-- Desktop: Bootstrap dropdown --}}
+                <div class="dropdown d-none d-md-block" id="company-switcher">
+                    <button class="btn btn-sm {{ $isAllCompanies ? 'btn-outline-info' : 'btn-outline-primary' }} dropdown-toggle px-2 py-1 my-0 fw-medium" type="button"
+                        data-bs-toggle="dropdown" aria-label="Switch Company">
+                        <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
+                        <span>{{ \Illuminate\Support\Str::limit($currentCompanyName, 12) }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        @if ($this->userCanAccessAllCompanies(auth()->user()))
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center {{ $currentCompanyId === 0 ? 'active fw-bold text-info' : '' }}"
+                                    href="#" wire:click.prevent="switchCompany(0)">
+                                    <i class="fas fa-globe me-2" style="width: 20px;"></i> All Companies
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                        @endif
+                        @foreach ($companies as $company)
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center {{ $currentCompanyId === ($company->id ?? $company['id'] ?? null) ? 'active fw-bold text-primary' : '' }}"
+                                    href="#" wire:click.prevent="switchCompany({{ $company->id ?? $company['id'] }})">
+                                    <i class="fas fa-building me-2" style="width: 20px;"></i>
+                                    {{ $company->name ?? $company['name'] }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+
             @endif
 
             {{-- Notifications (always visible) --}}

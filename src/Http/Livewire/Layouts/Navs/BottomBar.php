@@ -86,6 +86,54 @@ class BottomBar extends Component
     }
 
     /**
+     * Determine if a sub-item is the currently active page.
+     * Uses full URL comparison for robustness (same approach as
+     * ContextSheet and sidebar-item.blade.php).
+     */
+    public function isItemActive(array $item): bool
+    {
+        if (!empty($item['route'])) {
+            if (!str_contains($item['route'], '/')) {
+                return request()->routeIs($item['route']);
+            }
+            $routePath = parse_url($item['route'], PHP_URL_PATH) ?? $item['route'];
+            return request()->url() === url($routePath);
+        }
+
+        if (!empty($item['url'])) {
+            $urlPath = parse_url($item['url'], PHP_URL_PATH) ?? $item['url'];
+            return request()->url() === url($urlPath);
+        }
+
+        return false;
+    }
+
+    /**
+     * Resolve a sub-item URL (for overflow sub-items).
+     */
+    public function resolveItemUrl(array $item): string
+    {
+        if (!empty($item['route']) && !str_contains($item['route'], '/')) {
+            return route($item['route']);
+        }
+        if (!empty($item['route'])) {
+            return url($item['route']);
+        }
+        if (!empty($item['url'])) {
+            return url($item['url']);
+        }
+        return '#';
+    }
+
+    /**
+     * Whether the active context is in the overflow group.
+     */
+    public function getIsActiveInOverflowProperty(): bool
+    {
+        return isset($this->overflowGroups[$this->activeContext]);
+    }
+
+    /**
      * Open the overflow sheet via Alpine/Bootstrap offcanvas.
      */
     public function openOverflowSheet(): void

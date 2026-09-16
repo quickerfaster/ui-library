@@ -1,5 +1,6 @@
 <div x-data="{ open: @entangle('isOpen'), scrollTo: @entangle('scrollTo') }"
      x-show="open"
+     class="d-md-none"
      x-transition:enter="transition ease-out duration-200"
      x-transition:enter-start="translate-y-full"
      x-transition:enter-end="translate-y-0"
@@ -44,7 +45,10 @@
                     @endphp
                     <button wire:click="switchModule('{{ $module['key'] }}')"
                             class="list-group-item list-group-item-action border-0 d-flex align-items-center px-3 py-3 rounded-2
-                                   {{ $isActive ? 'bg-primary bg-opacity-10 text-primary fw-bold' : '' }}">
+                                   {{ $isActive ? 'fw-bold' : '' }}"
+                            @if ($isActive)
+                            style="background: rgba(13, 110, 253, 0.15); border-left: 3px solid #0d6efd; color: #212529;"
+                            @endif>
                         @if (!empty($module['icon']))
                             <i class="{{ $module['icon'] }} me-3 {{ $isActive ? 'text-primary' : 'text-muted' }}" style="width: 20px; text-align: center;"></i>
                         @endif
@@ -68,20 +72,27 @@
                     @php $isAllCompanies = $currentCompanyId === 0; @endphp
                     <button wire:click="switchCompany(0)"
                             class="list-group-item list-group-item-action border-0 d-flex align-items-center px-3 py-3 rounded-2
-                                   {{ $isAllCompanies ? 'bg-info bg-opacity-10 text-info fw-bold' : '' }}">
+                                   {{ $isAllCompanies ? 'fw-bold' : '' }}"
+                            @if ($isAllCompanies)
+                            style="background: rgba(13, 202, 240, 0.15); border-left: 3px solid #0dcaf0; color: #212529;"
+                            @endif>
                         <i class="fas fa-globe me-3 {{ $isAllCompanies ? 'text-info' : 'text-muted' }}" style="width: 20px; text-align: center;"></i>
                         <span class="flex-grow-1">All Companies</span>
                         @if ($isAllCompanies)
                             <i class="fas fa-check text-info"></i>
                         @endif
                     </button>
+                    <hr class="my-2">
                 @endif
 
                 @foreach ($companies as $company)
                     @php $isActive = $currentCompanyId === ($company->id ?? $company['id'] ?? null); @endphp
                     <button wire:click="switchCompany({{ $company->id ?? $company['id'] }})"
                             class="list-group-item list-group-item-action border-0 d-flex align-items-center px-3 py-3 rounded-2
-                                   {{ $isActive ? 'bg-primary bg-opacity-10 text-primary fw-bold' : '' }}">
+                                   {{ $isActive ? 'fw-bold' : '' }}"
+                            @if ($isActive)
+                            style="background: rgba(13, 110, 253, 0.15); border-left: 3px solid #0d6efd; color: #212529;"
+                            @endif>
                         <i class="fas fa-building me-3 {{ $isActive ? 'text-primary' : 'text-muted' }}" style="width: 20px; text-align: center;"></i>
                         <span class="flex-grow-1">{{ $company->name ?? $company['name'] }}</span>
                         @if ($isActive)

@@ -73,11 +73,14 @@ class NavigationHub extends Component
      */
     protected function loadCompanyContext(): void
     {
-        $this->multiCompanyEnabled = (bool) config('ui-library.features.multi_company', false);
-
-        if (!$this->multiCompanyEnabled) {
+        // Match TopNav's config key for consistency — both components
+        // should gate the company section on the same condition.
+        if (!config('ui-library.navigation.show_company_switcher', true)) {
+            $this->multiCompanyEnabled = false;
             return;
         }
+
+        $this->multiCompanyEnabled = true;
 
         $sessionKey = config('ui-library.tenancy.session_key', 'current_company_id');
         $this->currentCompanyId = session($sessionKey);
@@ -85,7 +88,7 @@ class NavigationHub extends Component
         // Resolve companies via CompanyProvider contract
         try {
             $provider = app(\QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider::class);
-            $this->companies = $provider->getCompanies();
+            $this->companies = $provider->getCompanies(auth()->user());
             $this->currentCompanyName = $this->companies
                 ->firstWhere('id', $this->currentCompanyId)?->name ?? '';
         } catch (\Exception $e) {
@@ -122,7 +125,16 @@ class NavigationHub extends Component
         session(['active_module' => $moduleKey]);
         $this->isOpen = false;
 
-        $url = $module['route'] ?? $module['url'] ?? '/';
+        // Resolve named routes with route() helper (matching TopNav's pattern).
+        // Fall back to raw URL if no named route is configured.
+        if (!empty($module['route'])) {
+            $url = route($module['route']);
+        } elseif (!empty($module['url'])) {
+            $url = url($module['url']);
+        } else {
+            $url = '/';
+        }
+
         $this->redirect($url, navigate: true);
     }
 
@@ -132,7 +144,10 @@ class NavigationHub extends Component
         session([$sessionKey => $companyId]);
         $this->isOpen = false;
 
-        $this->redirect(request()->url(), navigate: true);
+        // Redirect to the current module's dashboard (matching TopNav's pattern).
+        // request()->url() can fail with SPA navigation; the module dashboard
+        // is the canonical landing page after a company switch.
+        $this->redirect(url('/' . strtolower($this->currentModule) . '/dashboard'), navigate: true);
     }
 
     public function getShowModuleSectionProperty(): bool

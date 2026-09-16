@@ -1,4 +1,4 @@
-@props(['moduleName', 'configKey' => null, 'activeContext' => null])
+@props(['moduleName', 'configKey' => null, 'context' => null])
 
 @php
     $contextMenuType = $contextMenuType ?? 'sidebar';

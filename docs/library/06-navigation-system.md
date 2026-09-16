@@ -12,9 +12,18 @@
 
 ## Overview
 
-Navigation is a **cross-cutting concern** owned by the library. Per **ADR-005** (see [`13-adr.md`](./13-adr.md)), a single [`NavigationLayout`](../../src/Components/NavigationLayout.php) component composes three nav sub-components — [`TopNav`](../../src/Http/Livewire/Layouts/Navs/TopNav.php), [`Sidebar`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php), and [`BottomBar`](../../src/Http/Livewire/Layouts/Navs/BottomBar.php) — providing a consistent navigation architecture across all modules.
+Navigation is a **cross-cutting concern** owned by the library. Per **ADR-005** (see [`13-adr.md`](./13-adr.md)), a single [`NavigationLayout`](../../src/Components/NavigationLayout.php) component composes all nav sub-components — [`TopNav`](../../src/Http/Livewire/Layouts/Navs/TopNav.php), [`Sidebar`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php), [`BottomBar`](../../src/Http/Livewire/Layouts/Navs/BottomBar.php), [`ContextSheet`](../../src/Http/Livewire/Layouts/Navs/ContextSheet.php), and [`NavigationHub`](../../src/Http/Livewire/Layouts/Navs/NavigationHub.php) — providing a consistent navigation architecture across all modules and viewport sizes.
 
 **ADR-005 rationale**: one shared layout shell avoids per-module duplication, creates a predictable navigation contract, and centralizes the integration point. The trade-off is that `NavigationLayout` must stay simple while remaining flexible for varying modules and contexts.
+
+### Desktop vs Mobile Architecture
+
+| Surface | Desktop (≥768px) | Mobile (<768px) |
+|---------|------------------|-----------------|
+| **Context tabs** | TopNav horizontal tabs | BottomBar icon-only tabs + Handle Bar |
+| **Sub-items** | Sidebar (left panel) | ContextSheet (slide-up, tap handle bar) |
+| **Module/Company switch** | TopNav dropdowns | NavigationHub (slide-up, tap ⌘ button) |
+| **Overflow contexts** | "More…" dropdown in TopNav | "More" tab → Overflow Sheet in BottomBar |
 
 ---
 
@@ -25,9 +34,11 @@ Navigation is a **cross-cutting concern** owned by the library. Per **ADR-005** 
 | Component | Alias | Class | Purpose |
 |-----------|-------|-------|---------|
 | NavigationLayout | `qf.navigation-layout` | `NavigationLayout` | Main app shell |
-| TopNav | `qf.top-nav` | `TopNav` | Top navigation bar |
-| Sidebar | `qf.sidebar` | `Sidebar` | Collapsible sidebar |
-| BottomBar | `qf.bottom-bar` | `BottomBar` | Mobile bottom navigation |
+| TopNav | `qf.top-nav` | `TopNav` | Top navigation bar (desktop + mobile) |
+| Sidebar | `qf.sidebar` | `Sidebar` | Collapsible desktop sidebar |
+| BottomBar | `qf.bottom-bar` | `BottomBar` | Mobile bottom tab bar + overflow sheet |
+| ContextSheet | `qf.context-sheet` | `ContextSheet` | Mobile slide-up sub-item sheet |
+| NavigationHub | `qf.navigation-hub` | `NavigationHub` | Mobile module + company switching sheet |
 | HorizontalContextMenu | `qf.horizontal-context-menu` | `HorizontalContextMenu` | Context-sensitive horizontal menu |
 | MenuRenderer | `qf.menu-renderer` | `MenuRenderer` | Dynamic menu renderer |
 
@@ -38,6 +49,8 @@ Navigation is a **cross-cutting concern** owned by the library. Per **ADR-005** 
 - [`src/Http/Livewire/Layouts/Navs/TopNav.php`](../../src/Http/Livewire/Layouts/Navs/TopNav.php)
 - [`src/Http/Livewire/Layouts/Navs/Sidebar.php`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php)
 - [`src/Http/Livewire/Layouts/Navs/BottomBar.php`](../../src/Http/Livewire/Layouts/Navs/BottomBar.php)
+- [`src/Http/Livewire/Layouts/Navs/ContextSheet.php`](../../src/Http/Livewire/Layouts/Navs/ContextSheet.php)
+- [`src/Http/Livewire/Layouts/Navs/NavigationHub.php`](../../src/Http/Livewire/Layouts/Navs/NavigationHub.php)
 - [`src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php`](../../src/Http/Livewire/Layouts/Navs/HorizontalContextMenu.php)
 - [`src/Http/Livewire/Layouts/Navs/MenuRenderer.php`](../../src/Http/Livewire/Layouts/Navs/MenuRenderer.php)
 
