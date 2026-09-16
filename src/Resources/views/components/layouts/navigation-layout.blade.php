@@ -185,7 +185,7 @@
                             wire:key="sidebar-menu-{{ $moduleName }}-{{ $activeContext }}" />
                     @endif
 
-                    <main class="flex-grow-1 px-4 pb-md-3" style="min-width: 0; padding-bottom: 6rem;">
+                    <main class="flex-grow-1 px-4 pb-md-3" style="min-width: 0; padding-bottom: 10rem; background: rgba(255,0,0,0.1);">
                         {{-- ========== HEADER SECTION ========== --}}
                         @include('qf::components.layouts.partials.page-header')
                         {{ $slot }}
