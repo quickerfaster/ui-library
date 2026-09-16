@@ -31,7 +31,7 @@
                 <i class="{{ $contextIcon }} me-2 text-primary fs-5"></i>
             @endif
             <h6 class="mb-0 fw-bold flex-grow-1">{{ $contextLabel }}</h6>
-            <button class="btn btn-sm btn-light rounded-circle" @click="open = false" style="width: 32px; height: 32px;">
+            <button class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center" @click="open = false" style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>

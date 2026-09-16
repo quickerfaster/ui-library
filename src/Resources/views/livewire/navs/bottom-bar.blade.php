@@ -85,7 +85,7 @@
         </div>
         <div class="d-flex align-items-center px-3 py-2 border-bottom">
             <h6 class="mb-0 fw-bold flex-grow-1">More Contexts</h6>
-            <button type="button" class="btn btn-sm btn-light rounded-circle" @click="overflowOpen = false" style="width: 32px; height: 32px;">
+            <button type="button" class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center" @click="overflowOpen = false" style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>
