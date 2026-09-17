@@ -1,15 +1,16 @@
-<style>
-    .sidebar-filter-clear-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 26px;
-        padding-left: 0.25rem !important;
-        padding-right: 0.25rem !important;
-    }
-</style>
-<div
-    class="sidebar-container bg-light border-end d-none d-md-flex flex-column align-items-stretch
+<div>
+    <style>
+        .sidebar-filter-clear-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            padding-left: 0.25rem !important;
+            padding-right: 0.25rem !important;
+        }
+    </style>
+    <div
+        class="sidebar-container bg-light border-end d-none d-md-flex flex-column align-items-stretch
             @if ($state === 'full') sidebar-full
             @else sidebar-icon @endif"
     x-data="{
@@ -327,4 +328,5 @@
             justify-content: center;
         }
     </style>
+</div>
 </div>
