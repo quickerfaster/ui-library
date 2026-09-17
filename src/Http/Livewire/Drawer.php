@@ -29,6 +29,7 @@ class Drawer extends Component
     
     public function open(string $component, array $params = [], string $title = ''): void
     {
+        \Log::info('[Drawer] open() CALLED', ['component' => $component]);
         if ($this->isOpen && $this->component === $component) {
             // Already open with same component – just refresh?
             return;

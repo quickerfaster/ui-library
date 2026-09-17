@@ -183,7 +183,7 @@
                 <li>
                     <a href="#" wire:click.prevent="openSettings"
                         class="nav-link d-flex align-items-center py-1 text-muted" data-bs-toggle="tooltip"
-                        wire:ignore.self title="{{ $settingsContext }} Settings">
+                        title="{{ $settingsContext }} Settings">
                         <i class="fas fa-cog opacity-6 me-2" aria-hidden="true"></i>
                         <span class="nav-link-text ms-1">{{ ucfirst($settingsContext) }} Settings</span>
                     </a>

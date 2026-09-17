@@ -359,6 +359,7 @@ public function switchToHorizontal(): void
 
 public function openSettings()
 {
+    \Log::info('[Sidebar] openSettings CALLED', ['settingsContext' => $this->settingsContext]);
     $contextKey = strtolower($this->settingsContext);
     $title = ($this->settingsContext ? $this->settingsContext . ' ' : '') . 'Settings';
     $this->dispatch('openDrawer', 'qf.settings-panel', [
