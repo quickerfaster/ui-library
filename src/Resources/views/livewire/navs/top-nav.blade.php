@@ -149,53 +149,14 @@
 
             {{-- Notifications (always visible) --}}
             @if ($notificationsEnabled)
-            <div class="dropdown" wire:key="notifications-dropdown">
-                <a href="#" class="px-2 py-1 my-0 position-relative dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" title="{{ $notificationsTitle }}">
-                    <i class="{{ $notificationsIcon }}"></i>
-                    @if ($this->unreadCount > 0)
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
-                        {{ $this->unreadCount > 99 ? '99+' : $this->unreadCount }}
-                    </span>
-                    @endif
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-0" style="min-width: 320px; max-width: 360px; max-height: 400px; overflow-y: auto;">
-                    <li><h6 class="dropdown-header pt-3 px-3 text-uppercase text-xs font-weight-bolder opacity-6">
-                        <i class="{{ $notificationsIcon }} me-1"></i>{{ $notificationsTitle }}
-                        @if ($this->unreadCount > 0)
-                            <span class="badge bg-danger ms-1">{{ $this->unreadCount }}</span>
-                        @endif
-                    </h6></li>
-                    @forelse ($this->unreadNotifications->take(10) as $notification)
-                        <li wire:key="notif-{{ $notification->id }}">
-                            <a href="#" class="dropdown-item d-flex align-items-start py-2 px-3 border-bottom"
-                               wire:click.prevent="navigateToNotification({{ $notification->id }})">
-                                <span class="flex-shrink-0 me-2 mt-1">
-                                    @if (!empty($notification->data['icon']))
-                                        <i class="{{ $notification->data['icon'] }} text-primary"></i>
-                                    @else
-                                        <i class="fas fa-bell text-muted"></i>
-                                    @endif
-                                </span>
-                                <span class="flex-grow-1 min-width-0">
-                                    <span class="d-block text-sm fw-medium text-dark text-truncate">{{ $notification->data['title'] ?? $notification->data['message'] ?? 'Notification' }}</span>
-                                    @if (!empty($notification->data['message']) && !empty($notification->data['title']))
-                                        <span class="d-block text-xs text-muted text-truncate">{{ $notification->data['message'] }}</span>
-                                    @endif
-                                    <span class="d-block text-xs text-muted mt-1">{{ $notification->created_at->diffForHumans() }}</span>
-                                </span>
-                                @if (!$notification->read_at)
-                                    <span class="flex-shrink-0 ms-2 mt-1"><span class="bg-primary rounded-circle d-inline-block" style="width: 8px; height: 8px;"></span></span>
-                                @endif
-                            </a>
-                        </li>
-                    @empty
-                        <li><span class="dropdown-item-text text-muted text-sm py-3 text-center">No notifications yet.</span></li>
-                    @endforelse
-                    <li><hr class="dropdown-divider my-0"></li>
-                    <li><a href="{{ url('/notifications') }}" class="dropdown-item text-sm text-primary fw-semibold py-2 text-center">
-                        View all notifications <i class="fas fa-arrow-right ms-1"></i></a></li>
-                </ul>
-            </div>
+            <a href="#" class="px-2 py-1 my-0 position-relative" wire:click.prevent="openNotificationsDrawer" title="{{ $notificationsTitle }}">
+                <i class="{{ $notificationsIcon }}"></i>
+                @if ($this->unreadCount > 0)
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
+                    {{ $this->unreadCount > 99 ? '99+' : $this->unreadCount }}
+                </span>
+                @endif
+            </a>
             @endif
 
             {{-- Quick Actions Cmd+K (always visible) --}}
@@ -333,5 +294,89 @@
 
         </div>
     </div>
+
+    {{-- Notifications Offcanvas Drawer --}}
+    @if ($notificationsEnabled && $showNotificationsDrawer)
+    <div class="offcanvas offcanvas-end show" tabindex="-1" id="notificationsDrawer"
+         style="visibility: visible; width: 380px; z-index: 1045;"
+         wire:key="notifications-drawer">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title fw-bold">
+                <i class="{{ $notificationsIcon }} me-2"></i>{{ $notificationsTitle }}
+                @if ($this->unreadCount > 0)
+                <span class="badge rounded-pill bg-danger ms-2">{{ $this->unreadCount }}</span>
+                @endif
+            </h5>
+            <button type="button" class="btn-close" wire:click="closeNotificationsDrawer" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            @php $unreadNotifications = $this->unreadNotifications; @endphp
+            @if ($unreadNotifications->isEmpty())
+                <div class="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
+                    <i class="fas fa-bell-slash fa-3x mb-3 opacity-50"></i>
+                    <p class="mb-0">No new notifications</p>
+                </div>
+            @else
+                <div class="list-group list-group-flush" style="max-height: calc(100vh - 120px); overflow-y: auto;">
+                    @foreach ($unreadNotifications as $notification)
+                        <div class="list-group-item list-group-item-action border-bottom py-3 px-3"
+                             wire:key="notification-{{ $notification->id }}"
+                             wire:click="navigateToNotification({{ $notification->id }})">
+                            <div class="d-flex w-100 justify-content-between align-items-start">
+                                <div class="me-2">
+                                    <i class="{{ \QuickerFaster\UILibrary\Services\Notifications\NotificationTypeRegistry::getIcon($notification->type) }} {{ \QuickerFaster\UILibrary\Services\Notifications\NotificationTypeRegistry::getColor($notification->type) }} fs-5"></i>
+                                </div>
+                                <div class="flex-grow-1 me-2">
+                                    <h6 class="mb-1 fw-semibold text-sm">{{ $notification->subject }}</h6>
+                                    <p class="mb-1 text-xs text-muted">{{ \Illuminate\Support\Str::limit($notification->body, 100) }}</p>
+                                    <small class="text-muted">{{ $notification->created_at->diffForHumans() }}</small>
+
+                                    {{-- Inline action buttons --}}
+                                    @if (!empty($notification->actions))
+                                        <div class="mt-2 d-flex gap-1 flex-wrap">
+                                            @foreach ($notification->actions as $action)
+                                                @php
+                                                    $style = $action['style'] ?? 'primary';
+                                                    $btnClass = match ($style) {
+                                                        'success' => 'btn-success',
+                                                        'danger' => 'btn-danger',
+                                                        'warning' => 'btn-warning',
+                                                        'info' => 'btn-info',
+                                                        'secondary' => 'btn-secondary',
+                                                        'dark' => 'btn-dark',
+                                                        'light' => 'btn-light',
+                                                        default => 'btn-primary',
+                                                    };
+                                                @endphp
+                                                <button class="btn btn-sm {{ $btnClass }}"
+                                                        wire:click="handleAction({{ $notification->id }}, '{{ $action['handler'] }}', {{ json_encode($action['data'] ?? []) }})">
+                                                    {{ $action['label'] }}
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                                <button class="btn btn-sm btn-link text-primary p-0 ms-2 flex-shrink-0"
+                                        wire:click="markAsRead({{ $notification->id }})"
+                                        title="Mark as read">
+                                    <i class="fas fa-check-circle"></i>
+                                </button>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            {{-- Drawer footer: view all notifications --}}
+            <div class="border-top p-2 text-center bg-light">
+                <a href="/notifications" class="text-primary fw-semibold text-sm text-decoration-none">
+                    View All Notifications <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {{-- Backdrop --}}
+    <div class="offcanvas-backdrop fade show" wire:click="closeNotificationsDrawer" style="z-index: 1040;"></div>
+    @endif
 
 </nav>
