@@ -16,11 +16,11 @@ class ContextSheet extends Component
     /** @var string|null */
     public ?string $contextKey = null;
 
-    /** @var string */
-    public string $contextLabel = '';
+    /** @var string|null */
+    public ?string $contextLabel = '';
 
-    /** @var string */
-    public string $contextIcon = '';
+    /** @var string|null */
+    public ?string $contextIcon = '';
 
     /** @var array */
     public array $items = [];
