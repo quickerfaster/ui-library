@@ -361,16 +361,12 @@ public function openSettings()
 {
     $contextKey = strtolower($this->settingsContext);
     $title = ($this->settingsContext ? $this->settingsContext . ' ' : '') . 'Settings';
-    $this->dispatch('openDrawer',
-        component: 'qf.settings-panel',
-        params: [
-            'mode' => 'company',
-            'context' => $contextKey,
-            'moduleName' => $this->moduleName ?? null,
-            'initialGroup' => 'auto_generation',
-        ],
-        title: $title
-    );
+    $this->dispatch('openDrawer', 'qf.settings-panel', [
+        'mode' => 'company',
+        'context' => $contextKey,
+        'moduleName' => $this->moduleName ?? null,
+        'initialGroup' => 'auto_generation',
+    ], $title);
 }
 
     public function render()
