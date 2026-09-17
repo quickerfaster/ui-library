@@ -208,5 +208,19 @@
                 </div>
             </div>
         </div>
+
+        {{-- Logout --}}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="text-center">
+                    <form method="POST" action="{{ route('logout') }}" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-danger btn-sm px-4">
+                            <i class="fas fa-sign-out-alt me-2"></i>{{ __('Logout') }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </x-qf::navigation-layout>
