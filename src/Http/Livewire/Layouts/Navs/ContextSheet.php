@@ -38,8 +38,8 @@ class ContextSheet extends Component
 
     public function mount(
         ?string $contextKey = null,
-        string $contextLabel = '',
-        string $contextIcon = '',
+        ?string $contextLabel = '',
+        ?string $contextIcon = '',
         array $items = []
     ): void {
         $this->contextKey = $contextKey;
