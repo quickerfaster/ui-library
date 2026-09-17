@@ -1,3 +1,13 @@
+<style>
+    .sidebar-filter-clear-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+</style>
 <div
     class="sidebar-container bg-light border-end d-none d-md-flex flex-column align-items-stretch
             @if ($state === 'full') sidebar-full
@@ -36,8 +46,8 @@
                    aria-label="{{ __('qf::nav.filter_modules') }}"
                    title="{{ __('qf::nav.filter_modules') }}"
                    data-sidebar-filter>
-            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 d-flex align-items-center justify-content-center px-1"
-                    data-sidebar-filter-clear style="display:none; width: 26px;">
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 sidebar-filter-clear-btn"
+                    data-sidebar-filter-clear style="display:none;">
                 <i class="fas fa-times"></i>
             </button>
         </div>
