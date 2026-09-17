@@ -149,14 +149,53 @@
 
             {{-- Notifications (always visible) --}}
             @if ($notificationsEnabled)
-            <a href="#" class="px-2 py-1 my-0 position-relative" wire:click.prevent="openNotificationsDrawer" title="{{ $notificationsTitle }}">
-                <i class="{{ $notificationsIcon }}"></i>
-                @if ($this->unreadCount > 0)
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
-                    {{ $this->unreadCount > 99 ? '99+' : $this->unreadCount }}
-                </span>
-                @endif
-            </a>
+            <div class="dropdown" wire:key="notifications-dropdown">
+                <a href="#" class="px-2 py-1 my-0 position-relative dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" title="{{ $notificationsTitle }}">
+                    <i class="{{ $notificationsIcon }}"></i>
+                    @if ($this->unreadCount > 0)
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
+                        {{ $this->unreadCount > 99 ? '99+' : $this->unreadCount }}
+                    </span>
+                    @endif
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-0" style="min-width: 320px; max-width: 360px; max-height: 400px; overflow-y: auto;">
+                    <li><h6 class="dropdown-header pt-3 px-3 text-uppercase text-xs font-weight-bolder opacity-6">
+                        <i class="{{ $notificationsIcon }} me-1"></i>{{ $notificationsTitle }}
+                        @if ($this->unreadCount > 0)
+                            <span class="badge bg-danger ms-1">{{ $this->unreadCount }}</span>
+                        @endif
+                    </h6></li>
+                    @forelse ($this->unreadNotifications->take(10) as $notification)
+                        <li wire:key="notif-{{ $notification->id }}">
+                            <a href="#" class="dropdown-item d-flex align-items-start py-2 px-3 border-bottom"
+                               wire:click.prevent="navigateToNotification({{ $notification->id }})">
+                                <span class="flex-shrink-0 me-2 mt-1">
+                                    @if (!empty($notification->data['icon']))
+                                        <i class="{{ $notification->data['icon'] }} text-primary"></i>
+                                    @else
+                                        <i class="fas fa-bell text-muted"></i>
+                                    @endif
+                                </span>
+                                <span class="flex-grow-1 min-width-0">
+                                    <span class="d-block text-sm fw-medium text-dark text-truncate">{{ $notification->data['title'] ?? $notification->data['message'] ?? 'Notification' }}</span>
+                                    @if (!empty($notification->data['message']) && !empty($notification->data['title']))
+                                        <span class="d-block text-xs text-muted text-truncate">{{ $notification->data['message'] }}</span>
+                                    @endif
+                                    <span class="d-block text-xs text-muted mt-1">{{ $notification->created_at->diffForHumans() }}</span>
+                                </span>
+                                @if (!$notification->read_at)
+                                    <span class="flex-shrink-0 ms-2 mt-1"><span class="bg-primary rounded-circle d-inline-block" style="width: 8px; height: 8px;"></span></span>
+                                @endif
+                            </a>
+                        </li>
+                    @empty
+                        <li><span class="dropdown-item-text text-muted text-sm py-3 text-center">No notifications yet.</span></li>
+                    @endforelse
+                    <li><hr class="dropdown-divider my-0"></li>
+                    <li><a href="{{ url('/notifications') }}" class="dropdown-item text-sm text-primary fw-semibold py-2 text-center">
+                        View all notifications <i class="fas fa-arrow-right ms-1"></i></a></li>
+                </ul>
+            </div>
             @endif
 
             {{-- Quick Actions Cmd+K (always visible) --}}
