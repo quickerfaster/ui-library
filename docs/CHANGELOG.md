@@ -1,8 +1,45 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-16
-> **Status**: Current — ContextSheet & BottomBar Overflow Active State Highlighting Fix
+> **Date**: 2026-09-17
+> **Status**: Current — Notification Drawer Animation, Settings Drawer Fix, Sidebar Search UX
+
+---
+
+## Notification Drawer Animation & Settings Drawer Fix — 2026-09-17
+
+### Notification Bell — Restored + Animated
+
+The notification offcanvas drawer was removed during the TopNav refactor ([`416d40a`](https://github.com/quickerfaster/ui-library/commit/416d40a)). After restoring it, the drawer opened/closed instantly (no slide animation) because it used Livewire conditional rendering (`@if ($showNotificationsDrawer)`) which adds/removes elements from DOM instantly.
+
+**Fix**: Changed to Bootstrap Offcanvas JS pattern (matching the global Drawer):
+- Offcanvas always in DOM, hidden by Bootstrap
+- `openNotificationsDrawer()` dispatches `open-notifications-drawer` JS event
+- JS initializes `bootstrap.Offcanvas` with `{ backdrop: true, scroll: true }`
+- Close button uses `data-bs-dismiss="offcanvas"` (Bootstrap native)
+
+### People Settings Drawer — Not Opening
+
+The "People Settings" link at the bottom of the sidebar dispatched `openDrawer` with **named parameters** (`component:`, `params:`, `title:`), which conflicted with Livewire's internal `dispatch()` signature. Additionally, the sidebar template had **two root elements** (`<style>` + `<div>`) preventing Livewire from binding `wire:click` events.
+
+**Fix**:
+- Changed `dispatch()` to **positional parameters**: `$this->dispatch('openDrawer', 'qf.settings-panel', [...], $title)`
+- Wrapped sidebar template in single root `<div>`
+- Removed `wire:ignore.self` from settings link
+
+### Sidebar Search Box — Overflow & Clear Button
+
+The search input + clear button overflowed the 220px sidebar. Bootstrap's `input-group` has intrinsic min-widths that resist flex shrinking. The clear button used `d-flex` class which has `display: flex !important`, overriding inline `display: none`.
+
+**Fix**:
+- Replaced `input-group` with `d-flex` + `min-width: 0` on input
+- Created `.sidebar-filter-clear-btn` CSS class without `!important`
+- Added `width: 1%` flex hack, then simplified to `d-flex` container
+- Joined search icon to input with border-radius manipulation
+
+### Debug Checklist
+
+Created [`docs/debug-checklist.md`](docs/debug-checklist.md) documenting 8 common bug categories with symptoms, causes, and fixes — including a quick diagnostic flow chart.
 
 ---
 

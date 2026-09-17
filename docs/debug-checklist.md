@@ -1,6 +1,7 @@
 # Debug Checklist — Navigation & UI Bugs
 
 > **Purpose**: Quick-reference guide for diagnosing common navigation, event, and UI bugs in the QuickerFaster UI Library. Each entry maps symptoms → likely causes → fix.
+> **Last Updated**: 2026-09-17 (added: notification drawer animation, named params dispatch, multiple root elements)
 
 ---
 
@@ -180,6 +181,25 @@ php artisan optimize:clear
 rm -rf storage/framework/views/*
 composer dump-autoload  # if PHP classes changed
 ```
+
+---
+
+## 9. Offcanvas/Drawer Opens Without Animation (Instant)
+
+### Symptoms
+- Drawer/offcanvas appears instantly with no slide transition
+- Other drawers on the same page animate correctly
+- Drawer uses `@if ($showDrawer)` conditional rendering
+
+### Root Cause
+Livewire conditional rendering (`@if`) adds/removes elements from DOM instantly. Bootstrap Offcanvas CSS transitions only work when the element stays in the DOM and its visibility is toggled via JS.
+
+### Fix
+Use Bootstrap Offcanvas JS pattern (same as global Drawer):
+1. Always render the offcanvas in DOM (remove `@if`)
+2. Initialize with `new bootstrap.Offcanvas(el, { backdrop: true })`
+3. Use `Livewire.on('event-name', () => bsOffcanvas.show())` to trigger
+4. Use `data-bs-dismiss="offcanvas"` on close button
 
 ---
 
