@@ -596,19 +596,19 @@ class TopNav extends Component
     }
 
     /**
-     * Open the notifications drawer.
+     * Open the notifications drawer via Bootstrap Offcanvas JS.
      */
     public function openNotificationsDrawer(): void
     {
-        $this->showNotificationsDrawer = true;
+        $this->dispatch('open-notifications-drawer');
     }
 
     /**
-     * Close the notifications drawer.
+     * Close the notifications drawer via Bootstrap Offcanvas JS.
      */
     public function closeNotificationsDrawer(): void
     {
-        $this->showNotificationsDrawer = false;
+        $this->dispatch('close-notifications-drawer');
     }
 
     /**

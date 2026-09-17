@@ -296,9 +296,9 @@
     </div>
 
     {{-- Notifications Offcanvas Drawer --}}
-    @if ($notificationsEnabled && $showNotificationsDrawer)
-    <div class="offcanvas offcanvas-end show" tabindex="-1" id="notificationsDrawer"
-         style="visibility: visible; width: 380px; z-index: 1045;"
+    @if ($notificationsEnabled)
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="notificationsDrawer"
+         style="width: 380px;" data-bs-backdrop="true" data-bs-scroll="true"
          wire:key="notifications-drawer">
         <div class="offcanvas-header border-bottom">
             <h5 class="offcanvas-title fw-bold">
@@ -307,7 +307,7 @@
                 <span class="badge rounded-pill bg-danger ms-2">{{ $this->unreadCount }}</span>
                 @endif
             </h5>
-            <button type="button" class="btn-close" wire:click="closeNotificationsDrawer" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body p-0">
             @php $unreadNotifications = $this->unreadNotifications; @endphp
@@ -375,8 +375,6 @@
             </div>
         </div>
     </div>
-    {{-- Backdrop --}}
-    <div class="offcanvas-backdrop fade show" wire:click="closeNotificationsDrawer" style="z-index: 1040;"></div>
     @endif
 
 </nav>

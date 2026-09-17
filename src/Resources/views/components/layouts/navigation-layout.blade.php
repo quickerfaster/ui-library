@@ -380,6 +380,26 @@
                     }
                 }, 100);
             });
+
+            // Notification offcanvas initialization
+            function initNotificationsDrawer() {
+                const el = document.getElementById('notificationsDrawer');
+                if (!el) return;
+                let bsOffcanvas = bootstrap.Offcanvas.getInstance(el);
+                if (!bsOffcanvas) {
+                    bsOffcanvas = new bootstrap.Offcanvas(el, { backdrop: true, scroll: true });
+                }
+                Livewire.on('open-notifications-drawer', () => bsOffcanvas.show());
+                Livewire.on('close-notifications-drawer', () => bsOffcanvas.hide());
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initNotificationsDrawer);
+            } else {
+                initNotificationsDrawer();
+            }
+            document.addEventListener('livewire:navigated', () => {
+                setTimeout(initNotificationsDrawer, 100);
+            });
         </script>
 
 
