@@ -1,5 +1,6 @@
 <nav class="navbar navbar-light bg-white shadow-sm d-md-none fixed-bottom"
-     style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);">
+     style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);"
+     x-data="{}">
 
     {{-- Handle Bar — context label + optional sub-menu trigger --}}
     @php
@@ -11,9 +12,9 @@
         <div class="w-100 py-1 border-top border-light"
              style="cursor: pointer; background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.04); display: block; text-align: center;"
              @if ($activeHasItems)
-                 wire:click="openContext"
+                 @click="Livewire.dispatch('openContextSheet')"
              @else
-                 wire:click="goTo('{{ $activeUrl }}')"
+                 @click="Livewire.navigate('{{ $activeUrl }}')"
              @endif>
             <span class="text-primary fw-medium" style="font-size: 0.75rem; pointer-events: none;">
                 {{ $activeGroup['label'] ?? $activeContext }}

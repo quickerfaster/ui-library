@@ -692,6 +692,19 @@
     // already registered and keep working with the new elements.
     document.addEventListener('livewire:navigated', function () {
         initSidebarFilter();
+
+        // Re-initialize Bootstrap 5 dropdowns after SPA navigation.
+        // wire:navigate morphs the DOM without a full page load, which
+        // can leave dropdown toggle buttons without Bootstrap listeners
+        // if they were replaced during the morph.
+        if (typeof bootstrap !== 'undefined') {
+            document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(function (el) {
+                // Skip elements that already have a Bootstrap Dropdown instance.
+                if (!bootstrap.Dropdown.getInstance(el)) {
+                    new bootstrap.Dropdown(el);
+                }
+            });
+        }
     });
 
     // ------------------------------------------------------------------
