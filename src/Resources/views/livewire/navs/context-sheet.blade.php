@@ -10,8 +10,9 @@
     }
 </style>
 <div class="d-md-none"
-     x-data="{ open: @entangle('isOpen') }"
+     x-data="{ open: @entangle('isOpen').live }"
      x-show="open"
+     wire:ignore
      x-transition:enter="transition ease-out duration-200"
      x-transition:enter-start="translate-y-full"
      x-transition:enter-end="translate-y-0"

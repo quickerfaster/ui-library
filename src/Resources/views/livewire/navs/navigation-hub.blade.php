@@ -1,6 +1,7 @@
-<div x-data="{ open: @entangle('isOpen'), scrollTo: @entangle('scrollTo') }"
+<div x-data="{ open: @entangle('isOpen').live, scrollTo: @entangle('scrollTo') }"
      x-show="open"
      class="d-md-none"
+     wire:ignore
      x-transition:enter="transition ease-out duration-200"
      x-transition:enter-start="translate-y-full"
      x-transition:enter-end="translate-y-0"

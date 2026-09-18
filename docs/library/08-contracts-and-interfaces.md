@@ -108,6 +108,8 @@ interface NavigationProvider
 }
 ```
 
+> **⚠️ Status: Dead code.** This contract is defined but has **zero implementations and zero consumers** in the current codebase. Navigation resolution is handled directly by [`NavigationLayout`](../../src/Components/NavigationLayout.php) (reading `navigation.php` config files) and [`NavigationManager`](../../src/Services/Navigation/NavigationManager.php) (building sidebar sections from config). The `NavigationProvider` abstraction was designed as an extension point but was never wired in. See [`16-navigation-contract-implementation-map.md`](./16-navigation-contract-implementation-map.md) §1.1 for the full contract-to-implementation audit.
+
 ### SettingsProvider Contract
 
 **Location**: [`src/Contracts/Settings/SettingsProvider.php`](../../src/Contracts/Settings/SettingsProvider.php:5)

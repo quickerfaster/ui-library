@@ -4,7 +4,7 @@
 > **Namespace**: `QuickerFaster\UILibrary\`
 > **Last Updated**: 2026-08-17
 
-**Related files**: [`03-module-pattern.md`](./03-module-pattern.md) · [`07-component-catalog.md`](./07-component-catalog.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`10-settings-and-config.md`](./10-settings-and-config.md) · [`11-extension-guide.md`](./11-extension-guide.md) · [`13-adr.md`](./13-adr.md) · [`phase-5-navigation-ux.md`](./phase-5-navigation-ux.md)
+**Related files**: [`03-module-pattern.md`](./03-module-pattern.md) · [`07-component-catalog.md`](./07-component-catalog.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`10-settings-and-config.md`](./10-settings-and-config.md) · [`11-extension-guide.md`](./11-extension-guide.md) · [`13-adr.md`](./13-adr.md) · [`16-navigation-contract-implementation-map.md`](./16-navigation-contract-implementation-map.md) · [`phase-5-navigation-ux.md`](./phase-5-navigation-ux.md) · [`sidebar-active-state-pitfalls.md`](./sidebar-active-state-pitfalls.md)
 
 > **Consuming-app developers**: For the per-module `navigation.php` config schema, context groups, sidebar section configuration, and how-to recipes, see [../consuming-app/module-structure.md](../consuming-app/module-structure.md) §"Config/navigation.php".
 
@@ -44,8 +44,7 @@ Navigation is a **cross-cutting concern** owned by the library. Per **ADR-005** 
 
 ### Source Locations (§2.1 Directory Map)
 
-- [`src/Components/NavigationLayout.php`](../../src/Components/NavigationLayout.php) — main app shell (Blade component)
-- [`src/Http/Livewire/Layouts/NavigationLayout.php`](../../src/Http/Livewire/Layouts/NavigationLayout.php) — Livewire layout shell
+- [`src/Components/NavigationLayout.php`](../../src/Components/NavigationLayout.php) — main app shell (Blade component; the former Livewire layout shell at `src/Http/Livewire/Layouts/NavigationLayout.php` was collapsed into this Blade component)
 - [`src/Http/Livewire/Layouts/Navs/TopNav.php`](../../src/Http/Livewire/Layouts/Navs/TopNav.php)
 - [`src/Http/Livewire/Layouts/Navs/Sidebar.php`](../../src/Http/Livewire/Layouts/Navs/Sidebar.php)
 - [`src/Http/Livewire/Layouts/Navs/BottomBar.php`](../../src/Http/Livewire/Layouts/Navs/BottomBar.php)
@@ -68,15 +67,15 @@ Related service contracts (full signatures in [`08-contracts-and-interfaces.md`]
 
 ## Per-Module `navigation.php` Config Schema
 
-Each business module defines its navigation structure in `app/Modules/{Module}/Config/navigation.php`. The file returns an array with two top-level keys:
+Each business module defines its navigation structure in `app/Modules/{Module}/Config/navigation.php`. The file returns an array with these top-level keys:
 
-### `contexts` — Context Group Definitions
+### `context_groups` — Context Group Definitions (TopNav Tabs)
 
 Context groups appear as **tabs in the TopNav bar**. Selecting a tab filters the sidebar to show only that group's items. Each context group is keyed by a unique slug:
 
 ```php
 return [
-    'contexts' => [
+    'context_groups' => [
         'my-portal' => [
             'label'      => 'My Portal',           // Display label in TopNav tab
             'icon'       => 'fas fa-home',          // Font Awesome icon class
@@ -114,6 +113,13 @@ return [
         'hr' => [ /* ... another context group ... */ ],
     ],
 
+    // `contexts` — Sidebar items keyed by context group slug
+    'contexts' => [
+        'my-portal' => [
+            ['label' => 'Dashboard', 'icon' => 'fas fa-tachometer-alt', 'route' => 'hr.dashboard-my-portal-overview'],
+        ],
+    ],
+
     // Legacy flat items (pre-context-groups, still supported)
     'items' => [
         ['label' => 'Dashboard', 'icon' => 'fas fa-home', 'route' => 'hr.dashboard'],
@@ -121,7 +127,9 @@ return [
 ];
 ```
 
-#### Context Group Keys
+> **⚠️ Naming note**: The top-level key for tab definitions is `context_groups` (plural, with underscore). The top-level key for sidebar item arrays is `contexts` (plural, no `_groups` suffix). These are separate keys with different purposes — `context_groups` defines the tabs, `contexts` defines the items shown when each tab is active. They are linked purely by matching array key (slug).
+
+#### Context Group Keys (`context_groups` entries)
 
 | Key | Type | Required | Purpose |
 |-----|------|----------|---------|
@@ -158,11 +166,15 @@ return [
 | `workspace` | `array` | — | Key-value constraints matched against workspace context |
 | `badge` | `array` | — | Badge config: `{ 'text' => 'New', 'color' => 'danger' }` |
 
+### `contexts` — Sidebar Items by Context Group
+
+The `contexts` key maps context group slugs to arrays of sidebar navigation items. Each entry's key must match a key in `context_groups`. Items use the same keys as context group `items` (label, icon, route, url, permission, roles, workspace, badge, target, order).
+
 ### `items` — Legacy Flat Items (Pre-Context-Groups)
 
-When a module predates the context group system, it may define a flat `items` array at the top level. These items appear in the sidebar regardless of which context group is active. New modules should use `contexts` instead.
+When a module predates the context group system, it may define a flat `items` array at the top level. These items appear in the sidebar regardless of which context group is active. New modules should use `context_groups` + `contexts` instead.
 
-> **⚠️ Critical Contract**: The `context` prop in `<x-qf::navigation-layout context="my-portal">` MUST match a context group key in `navigation.php`. A mismatch causes the wrong sidebar links to appear or the sidebar to fall back to `NavigationManager`/legacy mode.
+> **⚠️ Critical Contract**: The `context` prop in `<x-qf::navigation-layout context="my-portal">` MUST match a key in the `context_groups` array of `navigation.php`. A mismatch causes the wrong sidebar links to appear or the sidebar to fall back to `NavigationManager`/legacy mode. See [`16-navigation-contract-implementation-map.md`](./16-navigation-contract-implementation-map.md) for the complete config-to-UI mapping.
 
 ---
 

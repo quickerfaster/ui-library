@@ -56,10 +56,10 @@ Controls the convention-based auto-discovery of business-module assets under `ap
 
 ```php
 'navigation' => [
-    'company_provider'      => \QuickerFaster\UILibrary\Services\Navigation\DefaultCompanyProvider::class,
+    'company_provider'      => \QuickerFaster\UILibrary\Services\Navigation\NullCompanyProvider::class,
     'workspace_resolver'    => \QuickerFaster\UILibrary\Services\Navigation\NullWorkspaceResolver::class,
-    'show_company_switcher' => false,
-    'top_bar' => ['enabled' => true, 'show_module_switcher' => true, 'show_company_switcher' => false],
+    'show_company_switcher' => true,
+    'top_bar' => ['enabled' => true, 'show_module_switcher' => true, 'show_company_switcher' => true],
     'sidebar' => ['initial_state' => 'full'],
     'bottom_bar' => ['enabled' => true],
     // Sidebar grouping customization (per navigation.php):
@@ -77,7 +77,7 @@ Controls the convention-based auto-discovery of business-module assets under `ap
 
 ```php
 'approvals' => [
-    'approver_resolver'       => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverResolver::class,
+    'approver_resolver'       => \QuickerFaster\UILibrary\Services\Approvals\WorkspaceScopedApproverResolver::class,
     'approver_label_resolver' => \QuickerFaster\UILibrary\Services\Approvals\DefaultApproverLabelResolver::class,
     'models' => [
         'request'       => \QuickerFaster\UILibrary\Models\ApprovalRequest::class,

@@ -142,7 +142,6 @@ src/
 │       ├── Imports/                       # Import UI
 │       │   └── RecentImports.php          # Recent imports list
 │       ├── Layouts/                       # Layout components
-│       │   ├── NavigationLayout.php       # Main navigation layout shell
 │       │   └── Navs/
 │       │       ├── TopNav.php             # Top navigation bar
 │       │       ├── Sidebar.php            # Collapsible sidebar
