@@ -159,24 +159,24 @@
             </a>
             @endif
 
-            {{-- Quick Actions Cmd+K (always visible) --}}
+            {{-- Quick Actions Cmd+K (desktop only — mobile: in overflow ⋯) --}}
             @if ($quickActionsEnabled)
-            <a href="#" class="px-2 py-1 my-0" wire:click.prevent="openQuickActions" title="{{ $quickActionsTitle }}">
+            <a href="#" class="px-2 py-1 my-0 d-none d-md-inline" wire:click.prevent="openQuickActions" title="{{ $quickActionsTitle }}">
                 <i class="{{ $quickActionsIcon }}"></i>
             </a>
             @endif
 
-            {{-- Mobile overflow: Background Jobs + Quick Actions ⚡ --}}
-            @if ($backgroundJobsEnabled || $quickActionsButtonEnabled)
+            {{-- Mobile overflow: Quick Actions + Background Jobs + Language --}}
+            @if ($quickActionsEnabled || $backgroundJobsEnabled || $quickActionsButtonEnabled)
             <div class="dropdown d-md-none" wire:key="mobile-actions-overflow">
                 <a href="#" class="px-2 py-1 my-0 dropdown-toggle" data-bs-toggle="dropdown" title="More actions">
                     <i class="fas fa-ellipsis-h"></i>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                    @if ($backgroundJobsEnabled)
+                    @if ($quickActionsEnabled)
                     <li>
-                        <a href="#" class="dropdown-item" wire:click.prevent="openBackgroundJobsDrawer">
-                            <i class="{{ $backgroundJobsIcon }} me-2"></i> {{ $backgroundJobsTitle }}
+                        <a href="#" class="dropdown-item" wire:click.prevent="openQuickActions">
+                            <i class="{{ $quickActionsIcon }} me-2"></i> {{ $quickActionsTitle }}
                         </a>
                     </li>
                     @endif
@@ -187,6 +187,20 @@
                         </a>
                     </li>
                     @endif
+                    @if ($backgroundJobsEnabled)
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a href="#" class="dropdown-item" wire:click.prevent="openBackgroundJobsDrawer">
+                            <i class="{{ $backgroundJobsIcon }} me-2"></i> {{ $backgroundJobsTitle }}
+                        </a>
+                    </li>
+                    @endif
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a href="#" class="dropdown-item" wire:click.prevent="openQuickActions">
+                            <i class="fas fa-globe me-2"></i> {{ strtoupper(app()->getLocale()) }}
+                        </a>
+                    </li>
                 </ul>
             </div>
             @endif
@@ -243,8 +257,8 @@
             </div>
             @endif
 
-            {{-- Locale switcher --}}
-            <div class="dropdown" id="language-switcher" wire:ignore>
+            {{-- Locale switcher (desktop only — mobile: in overflow ⋯) --}}
+            <div class="dropdown d-none d-md-block" id="language-switcher" wire:ignore>
                 <a href="#" class="dropdown-toggle px-2 py-1 my-0" data-bs-toggle="dropdown" title="{{ strtoupper(app()->getLocale()) }}">
                     <i class="fas fa-globe"></i>
                 </a>

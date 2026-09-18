@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-17
+> **Last Updated**: 2026-09-18
 
 **Related files**: [`03-module-pattern.md`](./03-module-pattern.md) · [`07-component-catalog.md`](./07-component-catalog.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`10-settings-and-config.md`](./10-settings-and-config.md) · [`11-extension-guide.md`](./11-extension-guide.md) · [`13-adr.md`](./13-adr.md) · [`16-navigation-contract-implementation-map.md`](./16-navigation-contract-implementation-map.md) · [`phase-5-navigation-ux.md`](./phase-5-navigation-ux.md) · [`sidebar-active-state-pitfalls.md`](./sidebar-active-state-pitfalls.md)
 
@@ -24,6 +24,18 @@ Navigation is a **cross-cutting concern** owned by the library. Per **ADR-005** 
 | **Sub-items** | Sidebar (left panel) | ContextSheet (slide-up, tap handle bar) |
 | **Module/Company switch** | TopNav dropdowns | NavigationHub (slide-up, tap ⌘ button) |
 | **Overflow contexts** | "More…" dropdown in TopNav | "More" tab → Overflow Sheet in BottomBar |
+
+---
+
+### ⚠️ `wire:navigate` + Bootstrap 5 Dropdown Incompatibility
+
+**BottomBar tabs do NOT use `wire:navigate`.** This is an intentional design decision.
+
+`wire:navigate` SPA navigation destroys and recreates the TopNav Livewire component on every navigation (confirmed via `mount()` logging — new `component_id` each time). Bootstrap 5's dropdown implementation stores instances in an internal `Map` keyed by element reference; when the TopNav is recreated, all Bootstrap dropdown state is lost. Five different re-initialization strategies were tested (dispose+recreate, `cloneNode`, `setTimeout`, double `requestAnimationFrame`, Livewire `@script` directive) — none could reliably restore dropdown functionality after SPA navigation. The alternating work/broken pattern was deterministic: every `wire:navigate` toggled the dropdown state.
+
+**BottomBar links use standard `<a href>` with full page loads.** This guarantees Bootstrap dropdowns in the TopNav work consistently. The SPA smoothness trade-off is acceptable for mobile bottom navigation; dropdown reliability is the higher priority.
+
+See [`sidebar-active-state-pitfalls.md`](./sidebar-active-state-pitfalls.md) §7 for the full diagnostic history and prevention rules.
 
 ---
 

@@ -38,19 +38,21 @@
 
     {{-- NORMAL TOOLBAR (no selection) --}}
     @if (empty($bulkSelection['ids']))
-        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
-            <div class="d-flex align-items-center">
+        {{-- Mobile: two-row stacked; Desktop: single flex row --}}
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+            {{-- Left group: search + view + tools (full-width on mobile) --}}
+            <div class="d-flex flex-wrap flex-md-nowrap align-items-center flex-grow-1 flex-md-grow-0">
                 {{-- Search + Filter group --}}
                 @if ($controls['search'] ?? true)
-                <div class="input-group input-group-sm" style="min-width: 250px;">
+                <div class="input-group input-group-sm flex-grow-1 flex-md-grow-0" style="min-width: 0;">
                     <input type="text" wire:model.live.debounce.300ms="search" class="form-control"
                         placeholder="Search..." />
-                    <button class="btn btn-outline-secondary" type="button" wire:click="openSearchDrawer"
+                    <button class="btn btn-outline-secondary flex-shrink-0" type="button" wire:click="openSearchDrawer"
                         title="Advanced search">
                         <i class="fas fa-sliders-h"></i>
                     </button>
                     @if ($controls['filterColumns'] ?? true)
-                    <button class="btn btn-outline-secondary" type="button" wire:click="openFilterDrawer"
+                    <button class="btn btn-outline-secondary flex-shrink-0" type="button" wire:click="openFilterDrawer"
                         title="Filter">
                         <i class="fas fa-filter"></i>
                         @if (count($activeFilters) > 0)
@@ -62,12 +64,10 @@
                 @endif
 
                 {{-- View Menu --}}
-
-                {{-- View Menu --}}
-                <div class="dropdown ms-2">
+                <div class="dropdown ms-2 flex-shrink-0">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                        data-bs-toggle="dropdown">
-                        <i class="fas fa-eye"></i> View
+                        data-bs-toggle="dropdown" title="View">
+                        <i class="fas fa-eye"></i> <span class="d-none d-sm-inline">View</span>
                     </button>
                     <ul class="dropdown-menu shadow-sm">
                         {{-- Display section --}}
@@ -189,10 +189,10 @@
 
 
                 {{-- Tools Menu --}}
-                <div class="dropdown ms-2">
+                <div class="dropdown ms-2 flex-shrink-0">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                        data-bs-toggle="dropdown">
-                        <i class="fas fa-tools"></i> Tools
+                        data-bs-toggle="dropdown" title="Tools">
+                        <i class="fas fa-tools"></i> <span class="d-none d-sm-inline">Tools</span>
                     </button>
                     <ul class="dropdown-menu">
                         @php $files = $controls['files'] ?? ['export' => ['csv', 'xls', 'pdf'], 'import' => ['csv', 'xls'], 'print' => true]; @endphp
@@ -245,19 +245,7 @@
                             </a></li>
                     </ul>
                 </div>
-            </div>
-
-            <div class="d-flex align-items-center">
-                {{-- Status filter (renamed) --}}
-                {{-- @if ($this->usesSoftDeletes() && ($controls['trashView'] ?? false))
-                    <select wire:model.live="trashedFilter" class="form-select form-select-sm me-2">
-                        <option value="without">Active</option>
-                        <option value="with">With archived</option>
-                        <option value="only">Archived only</option>
-                    </select>
-                @endif --}}
-
-                {{-- Add button --}}
+                {{-- Add button (ms-auto pushes right on desktop, stays inline on mobile) --}}
                 @if (in_array('create', $simpleActions))
                     @php
                         $canCreate = $this->authService->canCreate(
@@ -266,7 +254,7 @@
                         );
                     @endphp
                     @if ($canCreate)
-                        <button wire:click="add" class="btn btn-sm btn-primary">
+                        <button wire:click="add" class="btn btn-sm btn-primary ms-auto ms-md-2 flex-shrink-0">
                             <i class="fas fa-plus"></i> Add
                         </button>
                     @endif

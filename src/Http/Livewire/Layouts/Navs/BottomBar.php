@@ -70,16 +70,22 @@ class BottomBar extends Component
 
     public function isItemActive(array $item): bool
     {
+        // Use url()->previous() instead of request()->url() because
+        // this method is called during Livewire re-renders (when the
+        // user opens the overflow sheet), and request()->url() returns
+        // /livewire/update — never the actual page URL.
+        $currentUrl = url()->previous();
+
         if (!empty($item['route'])) {
             if (!str_contains($item['route'], '/')) {
                 return request()->routeIs($item['route']);
             }
             $routePath = parse_url($item['route'], PHP_URL_PATH) ?? $item['route'];
-            return request()->url() === url($routePath);
+            return $currentUrl === url($routePath);
         }
         if (!empty($item['url'])) {
             $urlPath = parse_url($item['url'], PHP_URL_PATH) ?? $item['url'];
-            return request()->url() === url($urlPath);
+            return $currentUrl === url($urlPath);
         }
         return false;
     }

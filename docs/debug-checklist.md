@@ -1,7 +1,7 @@
 # Debug Checklist — Navigation & UI Bugs
 
 > **Purpose**: Quick-reference guide for diagnosing common navigation, event, and UI bugs in the QuickerFaster UI Library. Each entry maps symptoms → likely causes → fix.
-> **Last Updated**: 2026-09-17 (added: notification drawer animation, named params dispatch, multiple root elements)
+> **Last Updated**: 2026-09-18 (added: request()->url() during Livewire updates, wire:navigate + Bootstrap conflict, <style> in Livewire components, renderVersion bump)
 
 ---
 
@@ -200,6 +200,82 @@ Use Bootstrap Offcanvas JS pattern (same as global Drawer):
 2. Initialize with `new bootstrap.Offcanvas(el, { backdrop: true })`
 3. Use `Livewire.on('event-name', () => bsOffcanvas.show())` to trigger
 4. Use `data-bs-dismiss="offcanvas"` on close button
+
+---
+
+## 10. `request()->url()` Returns `/livewire/update` During Livewire Re-renders
+
+### Symptoms
+- `isItemActive()` always returns `false` for all items
+- Active link highlighting never works in ContextSheet or BottomBar overflow
+- Sidebar highlighting works fine (renders during initial page load)
+- Log shows `currentUrl: "https://app.test/livewire/update"` instead of the page URL
+
+### Root Cause
+When a Livewire component re-renders (e.g., `open()` on ContextSheet, `openOverflow()` on BottomBar), the HTTP request goes to `/livewire/update`. `request()->url()` returns this endpoint URL, which will **never** match any page URL.
+
+### Fix
+Use `url()->previous()` instead of `request()->url()`:
+```php
+// Before (broken — returns /livewire/update during re-renders)
+$currentUrl = request()->url();
+
+// After (fixed — returns the actual page URL)
+$currentUrl = url()->previous();
+```
+
+### Affected Files
+[`ContextSheet::isItemActive()`](src/Http/Livewire/Layouts/Navs/ContextSheet.php:83), [`BottomBar::isItemActive()`](src/Http/Livewire/Layouts/Navs/BottomBar.php:71)
+
+---
+
+## 11. `wire:navigate` + Bootstrap 5 Dropdown Incompatibility
+
+### Symptoms
+- TopNav dropdowns alternately work and stop working after clicking BottomBar tabs
+- Pattern is deterministic: work → broken → work → broken on each navigation
+- `[TopNav] mount()` log shows new `component_id` on every navigation
+
+### Root Cause
+`wire:navigate` destroys and recreates the TopNav component. Bootstrap 5 stores dropdown instances in an internal `Map` — all state is lost. Five re-init strategies failed.
+
+### Fix
+Remove `wire:navigate` from links that coexist with Bootstrap dropdowns. Use standard `<a href>` with full page loads. See [`sidebar-active-state-pitfalls.md`](./sidebar-active-state-pitfalls.md) §7.
+
+---
+
+## 12. CSS in `<style>` Tags Lost During Livewire Morphing
+
+### Symptoms
+- Hover effects or custom styles stop working after a Livewire component re-renders
+- Styles were defined in a `<style>` tag inside the Blade template
+- Styles work on initial page load but disappear after component update
+
+### Root Cause
+`<style>` tags inside Livewire component templates are removed and re-injected during DOM morphing. The browser loses the CSS rules during the transition.
+
+### Fix
+Move all styles to the static CSS file ([`quicker-faster.css`](public/assets/css/quicker-faster.css)). Never put `<style>` tags inside Livewire Blade templates.
+
+---
+
+## 13. `renderVersion` Must Be Bumped After Blade Structural Changes
+
+### Symptoms
+- Changes to a Livewire component's Blade template have no effect
+- Old DOM structure persists despite clearing views
+- Component seems "stuck" on an old version
+
+### Root Cause
+Livewire caches component snapshots. Structural Blade changes (adding/removing elements, changing root structure) require a snapshot regeneration.
+
+### Fix
+Increment the `$renderVersion` property on the component:
+```php
+/** @var int Bump to force Livewire snapshot regeneration. */
+public int $renderVersion = 4;  // was 3
+```
+This is used in [`ContextSheet`](src/Http/Livewire/Layouts/Navs/ContextSheet.php:36). Other components can add this property if needed.
 
 ---
 

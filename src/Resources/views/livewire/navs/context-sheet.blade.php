@@ -1,18 +1,8 @@
-<style>
-    .context-sheet-item:hover {
-        background-color: #f8f9fa;
-    }
-    .context-sheet-item:hover .text-muted {
-        color: #6c757d !important;
-    }
-    .context-sheet-item:hover .opacity-25 {
-        opacity: 0.5 !important;
-    }
-</style>
 <div>
     @if ($isOpen)
     <div class="d-md-none"
          style="position: fixed; inset: 0; z-index: 1050;"
+         wire:key="context-sheet-overlay-{{ $renderVersion }}"
          @click.self="$wire.close()">
 
     {{-- Backdrop --}}

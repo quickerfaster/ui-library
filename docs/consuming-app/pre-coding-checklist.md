@@ -195,6 +195,24 @@
 
 ---
 
+## I. Before Writing `isItemActive()` or Active-State Logic
+
+- [ ] **Use `url()->previous()`, not `request()->url()`.** During Livewire component re-renders (ContextSheet opening, BottomBar overflow opening), `request()->url()` returns `/livewire/update` — it will never match any page URL. Always use `url()->previous()` for URL comparison in Livewire component methods.
+  ```php
+  // Correct
+  $currentUrl = url()->previous();
+  return $currentUrl === url($routePath);
+
+  // Wrong — returns /livewire/update during re-renders
+  $currentUrl = request()->url();
+  ```
+- [ ] **Single root element.** Livewire components must have exactly one root HTML element. Multiple root elements (e.g., `<style>` + `<div>`) cause `wire:click` failures and DOM morphing issues. Wrap everything in a single `<div>`.
+- [ ] **No `<style>` tags in Livewire Blade templates.** Styles inside `<style>` tags are lost during Livewire DOM morphing. Put all styles in [`quicker-faster.css`](../library/../public/assets/css/quicker-faster.css).
+- [ ] **Bump `$renderVersion` after structural Blade changes.** If a Livewire component's Blade template structure changes (elements added/removed, root restructured), increment the `$renderVersion` property to force snapshot regeneration.
+- [ ] **No `wire:navigate` on links coexisting with Bootstrap dropdowns.** `wire:navigate` destroys and recreates Livewire components; Bootstrap 5 dropdown state cannot survive this. Use standard `<a href>` links for navigation that shares a page with Bootstrap dropdowns. See [Debug Checklist §11](../library/debug-checklist.md).
+
+---
+
 ## Quick Reference: Common Violations & Fixes
 
 | Violation | Symptom | Fix |
@@ -206,3 +224,8 @@
 | Nav item missing permission | All users see the link | Add `permission` key |
 | Blade not using navigation-layout | No sidebar/topbar on page | Wrap in `<x-qf::navigation-layout>` |
 | Inverted `boolradio` for a boolean flag | Value saved opposite of what the user selected | Use `field_type => 'checkbox'` |
+| `request()->url()` in Livewire `isItemActive()` | Active highlighting never works in ContextSheet/overflow | Use `url()->previous()` instead |
+| `<style>` tag in Livewire Blade template | Hover effects lost after component re-render | Move styles to `quicker-faster.css` |
+| Multiple root elements in Livewire component | `wire:click` does nothing | Wrap everything in single root `<div>` |
+| `wire:navigate` on links near Bootstrap dropdowns | Dropdowns alternately work/break | Remove `wire:navigate`, use standard `<a href>` |
+| Blade structural change not taking effect | Old DOM persists after changes | Bump `$renderVersion` on the component |

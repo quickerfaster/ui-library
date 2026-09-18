@@ -637,3 +637,16 @@ body {
     background-color: #f8f9fa !important;
     cursor: not-allowed;
 }
+
+/* ------------------------------------------------------------------
+   Context Sheet (mobile slide-up sub-item panel)
+   ------------------------------------------------------------------ */
+.context-sheet-item:hover {
+    background-color: #f8f9fa;
+}
+.context-sheet-item:hover .text-muted {
+    color: #6c757d !important;
+}
+.context-sheet-item:hover .opacity-25 {
+    opacity: 0.5 !important;
+}

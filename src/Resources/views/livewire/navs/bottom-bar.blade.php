@@ -32,7 +32,6 @@
                 $url = $this->resolveUrl($group);
             @endphp
             <a href="{{ $url }}"
-               wire:navigate
                class="btn btn-sm d-flex align-items-center justify-content-center flex-shrink-0 border-0
                       {{ $isActive ? 'text-primary' : 'text-muted' }}"
                style="width: 56px; height: 44px;"
@@ -119,7 +118,6 @@
                                 $itemActive = $this->isItemActive($item);
                             @endphp
                             <a href="{{ $itemUrl }}"
-                               wire:navigate
                                onclick="if(window.Livewire) Livewire.dispatch('bb-close-overflow')"
                                class="d-flex align-items-center py-2 pe-3 text-decoration-none
                                       {{ $itemActive ? 'fw-bold' : 'text-muted' }}"

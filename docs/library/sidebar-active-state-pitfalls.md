@@ -1,6 +1,8 @@
-# Sidebar Active State & Context Switching Pitfalls
+# Sidebar Active State, Context Switching & Navigation Pitfalls
 
-A concise reference for future developers troubleshooting sidebar highlighting and context switching issues. These bugs are interconnected and share common patterns—understanding one helps diagnose the others.
+A concise reference for future developers troubleshooting sidebar highlighting, context switching, and navigation issues. These bugs are interconnected and share common patterns—understanding one helps diagnose the others.
+
+> **Last Updated**: 2026-09-18
 
 ---
 
@@ -25,6 +27,8 @@ When sidebar highlighting or context switching is wrong, check these in order:
 | 3 | Stale Published Views Override Library Fixes | Changes to library blade files have no effect in the consuming app | Laravel prioritizes published views in `resources/views/vendor/` over the vendor package's own views | Delete stale published copies or re-publish with `--force`, then `php artisan view:clear` | Any blade template under `src/Resources/views/` |
 | 4 | `configKey` Causes model-name Fallback Dual-Highlight | Clicking one sidebar item highlights both it and another item | [`configKey`](src/Components/NavigationLayout.php:62) sets [`$currentModelName`](src/Components/NavigationLayout.php:75), which triggers the model-name fallback in [`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php:34). Two pages sharing the same `configKey` both match. | Remove [`configKey`](src/Components/NavigationLayout.php:57) from pages that don't need a data table config, or ensure each standalone page uses its own unique config key | [`NavigationLayout.php`](src/Components/NavigationLayout.php), [`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php) |
 | 5 | Context Value Must Match navigation.php Group Key | Passing `context="leave"` when navigation config defines `requests` and `configuration` groups causes fallback to buggy URL-based resolution | The [`context`](src/Components/NavigationLayout.php:208) prop is checked against [`$this->contextGroups`](src/Components/NavigationLayout.php:208) keys via `isset()`. A mismatch skips the explicit context and falls through to URL-based matching. | The `context` prop in the blade view MUST match a context group key defined in `Config/navigation.php` | [`NavigationLayout.php`](src/Components/NavigationLayout.php), consuming app blade views |
+| 6 | ContextSheet Not Opening on Mobile | Tapping the BottomBar handle bar dispatches `openContextSheet` but the slide-up panel never appears | The [`context-sheet.blade.php`](src/Resources/views/livewire/navs/context-sheet.blade.php) had two root-level elements (`<style>` + `<div>`), violating Livewire's single-root-element requirement. When `$isOpen` changed from `false` to `true`, DOM morphing failed to inject the overlay. | Move `<style>` inside the root `<div>` to ensure a single root element. Add `wire:key` on the overlay for stable morphing identity. | [`context-sheet.blade.php`](src/Resources/views/livewire/navs/context-sheet.blade.php) |
+| 7 | `wire:navigate` Breaks Bootstrap 5 Dropdowns (Alternating Freeze/Unfreeze) | TopNav dropdowns (module switcher, company switcher, language, profile) alternately work and stop working after clicking BottomBar tabs | `wire:navigate` destroys and recreates the TopNav component on every SPA navigation (new `component_id` each `mount()`). Bootstrap 5 stores dropdown instances in an internal `Map` keyed by element reference — all state is lost. Five re-init strategies failed. | **Remove `wire:navigate` from BottomBar links.** Use standard `<a href>` with full page loads. The SPA trade-off is acceptable for mobile navigation; dropdown reliability is the priority. | [`bottom-bar.blade.php`](src/Resources/views/livewire/navs/bottom-bar.blade.php), [`06-navigation-system.md`](./06-navigation-system.md) |
 
 ---
 
@@ -194,6 +198,87 @@ When adding new navigation items or pages, verify:
 - [ ] **`configKey` is only set when needed.** Ask: "Does this page render a data table that needs a config?" If not, omit it.
 - [ ] **No stale published views.** After any blade template change, run `php artisan view:clear` and verify no published copies exist.
 - [ ] **Test with both named routes and URL paths.** The code paths differ (see [`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php:8-17)).
+
+---
+
+---
+
+### 6. ContextSheet Not Opening + Active Items Not Highlighting
+
+**Problem A — Multi-Root Element:** The [`context-sheet.blade.php`](src/Resources/views/livewire/navs/context-sheet.blade.php) had two root-level elements (`<style>` + `<div>`). DOM morphing failed to inject the overlay when `$isOpen` changed.
+
+**Problem B — `request()->url()` Returns `/livewire/update`:** During Livewire component re-renders (when the user opens the ContextSheet or BottomBar overflow), `request()->url()` returns `https://app.test/livewire/update` — the Livewire AJAX endpoint. This will **never** match any page URL, so `isItemActive()` always returns `false`.
+
+**Symptom:** Active items in the ContextSheet and BottomBar "More..." overflow never show the blue left border, tinted background, or checkmark. The server confirms `render()` with correct data, but `isItemActive()` compares against the wrong URL.
+
+**Fix A — Single root element:**
+```blade
+{{-- Before (broken) --}}
+<style>...</style>
+<div>...</div>
+
+{{-- After (fixed) --}}
+<div>
+    @if ($isOpen) ... @endif
+</div>
+```
+
+**Fix B — Use `url()->previous()`:**
+```php
+// Before (broken — returns /livewire/update during re-renders)
+$currentUrl = request()->url();
+
+// After (fixed — returns the actual page URL)
+$currentUrl = url()->previous();
+```
+
+**Also required:** Bump `$renderVersion` after structural Blade changes to force Livewire snapshot regeneration. Move `<style>` tags to [`quicker-faster.css`](public/assets/css/quicker-faster.css) — they are lost during DOM morphing.
+
+**Rule:** Never use `request()->url()` in Livewire component methods that are called during re-renders. Always use `url()->previous()`. See [Debug Checklist §10](../debug-checklist.md).
+
+---
+
+### 7. `wire:navigate` + Bootstrap 5 Dropdown Incompatibility
+
+**Problem:** `wire:navigate` on BottomBar tabs destroys and recreates the TopNav Livewire component on every SPA navigation. Bootstrap 5 stores dropdown instances in an internal `Map` keyed by element reference — when the TopNav is recreated, all dropdown state is lost.
+
+**Symptom:** TopNav dropdowns (module switcher, company switcher, language switcher, profile menu) exhibit a deterministic alternating pattern: work → broken → work → broken after each BottomBar tab click.
+
+**Diagnostic confirmation:**
+1. Add `\Log::info('[TopNav] mount()', ['component_id' => $this->getId()])` to [`TopNav::mount()`](src/Http/Livewire/Layouts/Navs/TopNav.php:135)
+2. Click a BottomBar tab → check `storage/logs/laravel.log`
+3. A new `component_id` on every click confirms the TopNav is being destroyed and recreated
+
+**Failed approaches (all tested, none worked):**
+| Approach | Why It Failed |
+|----------|---------------|
+| `dispose()` + `new bootstrap.Dropdown(el)` | `getInstance()` returns `null` after morphing, so `dispose()` is never called; stale listeners remain |
+| `cloneNode(true)` + `replaceChild` + `new Dropdown(clone)` | Clone strips listeners but the new TopNav component re-renders after the handler runs, replacing clones |
+| `setTimeout(fn, 50)` | Insufficient delay; TopNav re-render completes asynchronously |
+| Double `requestAnimationFrame` | Still races with Livewire component lifecycle |
+| Livewire `@script` directive in TopNav blade | `@script` runs during component render, but Bootstrap's document-level delegation conflicts with the fresh instances |
+
+**Fix:** Remove `wire:navigate` from BottomBar links. Use standard `<a href>` with full page loads.
+
+**Before (broken):**
+```blade
+{{-- bottom-bar.blade.php --}}
+<a href="{{ $url }}" wire:navigate class="btn btn-sm ...">
+```
+
+**After (fixed):**
+```blade
+{{-- bottom-bar.blade.php --}}
+<a href="{{ $url }}" class="btn btn-sm ...">
+```
+
+**Rule:** Do NOT use `wire:navigate` on navigation links that coexist on the same page with Bootstrap 5 dropdowns. The SPA navigation destroys and recreates Livewire components, and Bootstrap 5's internal state cannot be reliably restored. Full page loads are the only reliable option when Bootstrap dropdowns and Livewire navigation share the same page.
+
+**Prevention:**
+- [ ] **Any link with `wire:navigate` must be audited** for coexistence with Bootstrap dropdowns on the same page
+- [ ] **Prefer full page loads for primary navigation** (BottomBar tabs, sidebar links that change context)
+- [ ] **Reserve `wire:navigate` for in-page navigation** where no Bootstrap dropdowns exist in the preserved shell
+- [ ] **If SPA navigation is essential**, consider replacing Bootstrap dropdowns with a pure-CSS or Alpine-based alternative that doesn't maintain internal JavaScript state
 
 ---
 

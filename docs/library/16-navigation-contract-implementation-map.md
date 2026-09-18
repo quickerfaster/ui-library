@@ -103,15 +103,17 @@ NavigationLayout (Blade Component — src/Components/NavigationLayout.php, 508 l
 │       │
 │       └── horizontal-context-menu.blade.php
 │
-├── BottomBar (Livewire — src/Http/Livewire/Layouts/Navs/BottomBar.php, 148 lines)
+├── BottomBar (Livewire — src/Http/Livewire/Layouts/Navs/BottomBar.php, 120 lines)
 │   │  Mobile bottom tab bar with overflow "More" sheet
+│   │  ⚠️ Does NOT use wire:navigate — full page loads only (see §8)
 │   │
-│   └── bottom-bar.blade.php
+│   └── bottom-bar.blade.php (146 lines)
 │
-├── ContextSheet (Livewire — src/Http/Livewire/Layouts/Navs/ContextSheet.php, 105 lines)
-│   │  Mobile slide-up sub-item panel
+├── ContextSheet (Livewire — src/Http/Livewire/Layouts/Navs/ContextSheet.php, 122 lines)
+│   │  Mobile slide-up sub-item panel (Livewire-native @if rendering, Alpine-free)
+│   │  Single root element required — <style> moved inside root <div>
 │   │
-│   └── context-sheet.blade.php
+│   └── context-sheet.blade.php (79 lines)
 │
 ├── NavigationHub (Livewire — src/Http/Livewire/Layouts/Navs/NavigationHub.php, 167 lines)
 │   │  Mobile module + company switching sheet (self-sufficient, loads own data)
@@ -354,7 +356,19 @@ This is a maintainability risk — changes must be made in three places.
 
 ---
 
-## 12. Quick Diagnostic Reference
+## 12. Design Decision: No `wire:navigate` on BottomBar
+
+**Decision:** BottomBar tab links and overflow sub-item links use standard `<a href>` with full page loads. `wire:navigate` is intentionally absent.
+
+**Rationale:** `wire:navigate` SPA navigation destroys and recreates the TopNav Livewire component on every navigation. Bootstrap 5 dropdowns (module switcher, company switcher, language switcher, profile menu) store instances in an internal `Map` keyed by element reference — all state is lost when the TopNav is recreated. Five different re-initialization strategies were tested and all failed against the deterministic alternating work/broken pattern.
+
+**Trade-off:** Full page loads are slightly slower than SPA navigation, but Bootstrap dropdown reliability is the higher priority for mobile users. The SPA experience is preserved for desktop interactions (sidebar links, in-page navigation) where Bootstrap dropdowns are not affected.
+
+**Prevention:** Any future link with `wire:navigate` must be audited for coexistence with Bootstrap dropdowns on the same page. See [`sidebar-active-state-pitfalls.md`](./sidebar-active-state-pitfalls.md) §7 for the full diagnostic history.
+
+---
+
+## 13. Quick Diagnostic Reference
 
 When investigating navigation bugs, check these files in order:
 
