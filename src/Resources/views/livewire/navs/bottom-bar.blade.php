@@ -12,9 +12,9 @@
         <div class="w-100 py-1 border-top border-light"
              style="cursor: pointer; background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.04); display: block; text-align: center;"
              @if ($activeHasItems)
-                 @click="Livewire.dispatch('openContextSheet')"
+                 onclick="if(window.Livewire) Livewire.dispatch('openContextSheet')"
              @else
-                 @click="Livewire.navigate('{{ $activeUrl }}')"
+                 onclick="if(window.Livewire) Livewire.navigate('{{ $activeUrl }}')"
              @endif>
             <span class="text-primary fw-medium" style="font-size: 0.75rem; pointer-events: none;">
                 {{ $activeGroup['label'] ?? $activeContext }}
