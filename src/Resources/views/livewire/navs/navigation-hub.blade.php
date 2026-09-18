@@ -2,11 +2,11 @@
     @if ($isOpen)
     <div class="d-md-none"
          style="position: fixed; inset: 0; z-index: 1060;"
-         wire:click.self="close">
+         @click.self="$wire.close()">
 
     {{-- Backdrop --}}
     <div class="position-absolute bg-dark opacity-25" style="inset: 0;"
-         wire:click="close"></div>
+         @click="$wire.close()"></div>
 
     {{-- Sheet --}}
     <div class="position-absolute bottom-0 start-0 end-0 bg-white shadow-lg"
@@ -21,7 +21,7 @@
         <div class="d-flex align-items-center px-3 py-2 border-bottom">
             <h6 class="mb-0 fw-bold flex-grow-1">Navigation</h6>
             <button class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
-                    wire:click="close" style="width: 32px; height: 32px; min-width: 32px;">
+                    @click="$wire.close()" style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>
@@ -93,9 +93,8 @@
                     </button>
                 @endforeach
             </div>
-            </div>
-            @endif
         </div>
+        @endif
 
         {{-- Empty state (single module, single company) --}}
         @if (!$this->showModuleSection && !$this->showCompanySection)
@@ -106,5 +105,5 @@
         @endif
 
     </div>
+    @endif
 </div>
-@endif

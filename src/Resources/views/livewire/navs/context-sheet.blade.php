@@ -13,11 +13,11 @@
     @if ($isOpen)
     <div class="d-md-none"
          style="position: fixed; inset: 0; z-index: 1050;"
-         wire:click.self="close">
+         @click.self="$wire.close()">
 
     {{-- Backdrop --}}
     <div class="position-absolute bg-dark opacity-25" style="inset: 0;"
-         wire:click="close"></div>
+         @click="$wire.close()"></div>
 
     {{-- Sheet --}}
     <div class="position-absolute bottom-0 start-0 end-0 bg-white shadow-lg"
@@ -35,7 +35,7 @@
             @endif
             <h6 class="mb-0 fw-bold flex-grow-1">{{ $contextLabel }}</h6>
             <button class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
-                    wire:click="close" style="width: 32px; height: 32px; min-width: 32px;">
+                    @click="$wire.close()" style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>
@@ -74,7 +74,6 @@
             @endforelse
         </div>
 
-    </div>
     </div>
     @endif
 </div>

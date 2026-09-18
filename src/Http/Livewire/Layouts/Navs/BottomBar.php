@@ -13,7 +13,9 @@ use Livewire\Component;
  * indicating sub-items are available via the ContextSheet.
  *
  * Overflow groups (beyond $maxVisible) are accessible via a "More"
- * tab that opens the OverflowSheet.
+ * tab that opens the OverflowSheet. Overflow visibility is controlled
+ * via Livewire-native @if (\$overflowOpen) — no Alpine x-show, eliminating
+ * FOUC flicker and DOM-morphing interference.
  */
 class BottomBar extends Component
 {
@@ -28,6 +30,9 @@ class BottomBar extends Component
 
     /** @var string Current module name (for wire:key scoping). */
     public string $moduleName = '';
+
+    /** @var bool Whether the overflow "More" sheet is open. */
+    public bool $overflowOpen = false;
 
     public function mount(
         array $contextGroups = [],
@@ -87,8 +92,6 @@ class BottomBar extends Component
 
     /**
      * Determine if a sub-item is the currently active page.
-     * Uses full URL comparison for robustness (same approach as
-     * ContextSheet and sidebar-item.blade.php).
      */
     public function isItemActive(array $item): bool
     {
@@ -134,11 +137,35 @@ class BottomBar extends Component
     }
 
     /**
-     * Open the overflow sheet via Alpine/Bootstrap offcanvas.
+     * Open the overflow "More" sheet.
      */
-    public function openOverflowSheet(): void
+    public function openOverflow(): void
     {
-        $this->dispatch('open-overflow-sheet');
+        $this->overflowOpen = true;
+    }
+
+    /**
+     * Close the overflow "More" sheet.
+     */
+    public function closeOverflow(): void
+    {
+        $this->overflowOpen = false;
+    }
+
+    /**
+     * Dispatch the openContextSheet event for the handle bar.
+     */
+    public function openContext(): void
+    {
+        $this->dispatch('openContextSheet');
+    }
+
+    /**
+     * Navigate to a URL via SPA (used by handle bar when context has no items).
+     */
+    public function goTo(string $url): void
+    {
+        $this->redirect($url, navigate: true);
     }
 
     public function render()

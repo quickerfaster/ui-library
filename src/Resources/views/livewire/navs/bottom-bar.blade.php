@@ -1,11 +1,5 @@
 <nav class="navbar navbar-light bg-white shadow-sm d-md-none fixed-bottom"
-     style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);"
-     x-data="bottomBarData({
-         activeContext: '{{ $activeContext }}',
-         contextGroups: {{ json_encode($this->contextGroups) }},
-         visibleGroups: {{ json_encode($this->visibleGroups) }},
-         hasOverflow: {{ $this->hasOverflow ? 'true' : 'false' }}
-     })">
+     style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);">
 
     {{-- Handle Bar — context label + optional sub-menu trigger --}}
     @php
@@ -17,9 +11,9 @@
         <div class="w-100 py-1 border-top border-light"
              style="cursor: pointer; background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.04); display: block; text-align: center;"
              @if ($activeHasItems)
-                 @click="Livewire.dispatch('openContextSheet')"
+                 wire:click="openContext"
              @else
-                 @click="Livewire.navigate('{{ $activeUrl }}')"
+                 wire:click="goTo('{{ $activeUrl }}')"
              @endif>
             <span class="text-primary fw-medium" style="font-size: 0.75rem; pointer-events: none;">
                 {{ $activeGroup['label'] ?? $activeContext }}
@@ -59,7 +53,7 @@
             <button class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0
                            {{ $activeInOverflow ? 'text-primary' : 'text-muted' }}"
                     style="width: 56px; height: 44px; gap: 1px;"
-                    @click="overflowOpen = true"
+                    wire:click="openOverflow"
                     wire:key="bb-tab-more">
                 <i class="fas fa-ellipsis-h {{ $activeInOverflow ? 'opacity-100' : 'opacity-50' }}" style="font-size: 0.9rem;"></i>
                 <span style="font-size: 0.55rem; line-height: 1;">More</span>
@@ -68,33 +62,22 @@
     </div>
 
     {{-- Overflow Sheet --}}
-    @if ($this->hasOverflow)
-    <div x-show="overflowOpen"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="position-fixed start-0 top-0 w-100 h-100 bg-dark opacity-50"
+    @if ($this->hasOverflow && $overflowOpen)
+    {{-- Backdrop --}}
+    <div class="position-fixed start-0 top-0 w-100 h-100 bg-dark opacity-50"
          style="z-index: 1040;"
-         @click="overflowOpen = false"></div>
+         @click="$wire.closeOverflow()"></div>
 
-    <div x-show="overflowOpen"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="translate-y-full"
-         x-transition:enter-end="translate-y-0"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="translate-y-0"
-         x-transition:leave-end="translate-y-full"
-         class="position-fixed bottom-0 start-0 end-0 bg-white shadow-lg"
+    {{-- Sheet --}}
+    <div class="position-fixed bottom-0 start-0 end-0 bg-white shadow-lg"
          style="z-index: 1045; max-height: 70vh; border-radius: 16px 16px 0 0; overflow-y: auto;">
         <div class="d-flex justify-content-center pt-2 pb-1">
             <div class="bg-secondary rounded-pill opacity-50" style="width: 36px; height: 4px;"></div>
         </div>
         <div class="d-flex align-items-center px-3 py-2 border-bottom">
             <h6 class="mb-0 fw-bold flex-grow-1">More Contexts</h6>
-            <button type="button" class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center" @click="overflowOpen = false" style="width: 32px; height: 32px; min-width: 32px;">
+            <button type="button" class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
+                    @click="$wire.closeOverflow()" style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>
@@ -138,7 +121,7 @@
                             @endphp
                             <a href="{{ $itemUrl }}"
                                wire:navigate
-                               @click="overflowOpen = false"
+                               @click="$wire.closeOverflow()"
                                class="d-flex align-items-center py-2 pe-3 text-decoration-none
                                       {{ $itemActive ? 'fw-bold' : 'text-muted' }}"
                                @if ($itemActive)
@@ -162,11 +145,3 @@
     @endif
 
 </nav>
-
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('bottomBarData', (config) => ({
-        overflowOpen: false,
-    }));
-});
-</script>
