@@ -1,7 +1,8 @@
-@if ($isOpen)
-<div class="d-md-none"
-     style="position: fixed; inset: 0; z-index: 1060;"
-     wire:click.self="close">
+<div>
+    @if ($isOpen)
+    <div class="d-md-none"
+         style="position: fixed; inset: 0; z-index: 1060;"
+         wire:click.self="close">
 
     {{-- Backdrop --}}
     <div class="position-absolute bg-dark opacity-25" style="inset: 0;"
@@ -92,8 +93,9 @@
                     </button>
                 @endforeach
             </div>
+            </div>
+            @endif
         </div>
-        @endif
 
         {{-- Empty state (single module, single company) --}}
         @if (!$this->showModuleSection && !$this->showCompanySection)

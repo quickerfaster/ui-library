@@ -9,10 +9,11 @@
         opacity: 0.5 !important;
     }
 </style>
-@if ($isOpen)
-<div class="d-md-none"
-     style="position: fixed; inset: 0; z-index: 1050;"
-     wire:click.self="close">
+<div>
+    @if ($isOpen)
+    <div class="d-md-none"
+         style="position: fixed; inset: 0; z-index: 1050;"
+         wire:click.self="close">
 
     {{-- Backdrop --}}
     <div class="position-absolute bg-dark opacity-25" style="inset: 0;"
@@ -74,5 +75,6 @@
         </div>
 
     </div>
+    </div>
+    @endif
 </div>
-@endif
