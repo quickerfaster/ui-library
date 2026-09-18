@@ -9,24 +9,14 @@
         opacity: 0.5 !important;
     }
 </style>
+@if ($isOpen)
 <div class="d-md-none"
-     x-data="{ open: @entangle('isOpen').live }"
-     x-show="open"
-     wire:ignore
-     x-transition:enter="transition ease-out duration-200"
-     x-transition:enter-start="translate-y-full"
-     x-transition:enter-end="translate-y-0"
-     x-transition:leave="transition ease-in duration-150"
-     x-transition:leave-start="translate-y-0"
-     x-transition:leave-end="translate-y-full"
-     @open-context-sheet.window="open = true"
-     @close-context-sheet.window="open = false"
      style="position: fixed; inset: 0; z-index: 1050;"
-     @click.self="open = false">
+     wire:click.self="close">
 
     {{-- Backdrop --}}
     <div class="position-absolute bg-dark opacity-25" style="inset: 0;"
-         @click="open = false"></div>
+         wire:click="close"></div>
 
     {{-- Sheet --}}
     <div class="position-absolute bottom-0 start-0 end-0 bg-white shadow-lg"
@@ -43,7 +33,8 @@
                 <i class="{{ $contextIcon }} me-2 text-primary fs-5"></i>
             @endif
             <h6 class="mb-0 fw-bold flex-grow-1">{{ $contextLabel }}</h6>
-            <button class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center" @click="open = false" style="width: 32px; height: 32px; min-width: 32px;">
+            <button class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
+                    wire:click="close" style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>
@@ -56,8 +47,7 @@
                     $isActive = $this->isItemActive($item);
                 @endphp
                 <a href="{{ $itemUrl }}"
-                   wire:navigate
-                   @click="open = false"
+                   wire:click="navigateToItem('{{ $itemUrl }}')"
                    class="d-flex align-items-center px-3 py-3 text-decoration-none context-sheet-item
                           {{ $isActive ? 'fw-bold' : 'text-dark' }}"
                    @if ($isActive)
@@ -85,3 +75,4 @@
 
     </div>
 </div>
+@endif

@@ -10,6 +10,10 @@ use Livewire\Component;
  *
  * Items are received as props from NavigationLayout (same data source
  * as the desktop sidebar). The sheet simply toggles open/close.
+ *
+ * Visibility is controlled via Livewire-native @if ($isOpen) conditional
+ * rendering — no Alpine.js x-show or @entangle, eliminating FOUC flicker
+ * and DOM-morphing interference with Bootstrap dropdowns.
  */
 class ContextSheet extends Component
 {
@@ -56,6 +60,19 @@ class ContextSheet extends Component
     public function close(): void
     {
         $this->isOpen = false;
+    }
+
+    /**
+     * Close the sheet and navigate to the given URL via SPA navigation.
+     *
+     * Replaces the previous Alpine @click="open = false" + wire:navigate
+     * pattern with a single Livewire action that closes the sheet before
+     * navigating, eliminating Alpine from the visibility control path.
+     */
+    public function navigateToItem(string $url): void
+    {
+        $this->isOpen = false;
+        $this->redirect($url, navigate: true);
     }
 
     /**

@@ -1,22 +1,11 @@
-<div x-data="{ open: @entangle('isOpen').live, scrollTo: @entangle('scrollTo') }"
-     x-show="open"
-     class="d-md-none"
-     wire:ignore
-     x-transition:enter="transition ease-out duration-200"
-     x-transition:enter-start="translate-y-full"
-     x-transition:enter-end="translate-y-0"
-     x-transition:leave="transition ease-in duration-150"
-     x-transition:leave-start="translate-y-0"
-     x-transition:leave-end="translate-y-full"
-     @open-navigation-hub.window="open = true"
-     @close-navigation-hub.window="open = false"
-     x-init="$watch('open', v => { if (v && scrollTo) { setTimeout(() => document.getElementById('hub-section-' + scrollTo)?.scrollIntoView({ behavior: 'smooth' }), 100); scrollTo = ''; } })"
+@if ($isOpen)
+<div class="d-md-none"
      style="position: fixed; inset: 0; z-index: 1060;"
-     @click.self="open = false">
+     wire:click.self="close">
 
     {{-- Backdrop --}}
     <div class="position-absolute bg-dark opacity-25" style="inset: 0;"
-         @click="open = false"></div>
+         wire:click="close"></div>
 
     {{-- Sheet --}}
     <div class="position-absolute bottom-0 start-0 end-0 bg-white shadow-lg"
@@ -30,7 +19,8 @@
         {{-- Header --}}
         <div class="d-flex align-items-center px-3 py-2 border-bottom">
             <h6 class="mb-0 fw-bold flex-grow-1">Navigation</h6>
-            <button class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center" @click="open = false" style="width: 32px; height: 32px; min-width: 32px;">
+            <button class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
+                    wire:click="close" style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>
@@ -115,3 +105,4 @@
 
     </div>
 </div>
+@endif
