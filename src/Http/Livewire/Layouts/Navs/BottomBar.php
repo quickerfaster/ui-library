@@ -7,32 +7,22 @@ use Livewire\Component;
 /**
  * Mobile bottom tab bar — renders context group tabs.
  *
- * Replaces the old sidebar-item-duplicating BottomBar with a proper
- * mobile navigation surface. Context groups from navigation.php
- * appear as labeled icon tabs. The active tab shows a chevron (▲)
- * indicating sub-items are available via the ContextSheet.
- *
- * Overflow groups (beyond $maxVisible) are accessible via a "More"
- * tab that opens the OverflowSheet. Overflow visibility is controlled
- * via Livewire-native @if (\$overflowOpen) — no Alpine x-show, eliminating
- * FOUC flicker and DOM-morphing interference.
+ * Alpine-free: all interactivity uses native onclick handlers with
+ * window.Livewire.dispatch() or wire:click. No x-data, x-show, or
+ * @click directives — eliminates Alpine initialization quirks on
+ * Livewire-morphed DOM elements.
  */
 class BottomBar extends Component
 {
-    /** @var array Context group definitions keyed by group slug. */
     public array $contextGroups = [];
-
-    /** @var string|null The currently active context group key. */
     public ?string $activeContext = null;
-
-    /** @var int Maximum visible tabs before overflow. */
     public int $maxVisible = 4;
-
-    /** @var string Current module name (for wire:key scoping). */
     public string $moduleName = '';
-
-    /** @var bool Whether the overflow "More" sheet is open. */
     public bool $overflowOpen = false;
+
+    protected $listeners = [
+        'bb-close-overflow' => 'closeOverflow',
+    ];
 
     public function mount(
         array $contextGroups = [],
@@ -46,17 +36,11 @@ class BottomBar extends Component
         $this->moduleName = $moduleName;
     }
 
-    /**
-     * Context groups that fit in the visible tab bar.
-     */
     public function getVisibleGroupsProperty(): array
     {
         return array_slice($this->contextGroups, 0, $this->maxVisible, true);
     }
 
-    /**
-     * Context groups that overflow into the "More" sheet.
-     */
     public function getOverflowGroupsProperty(): array
     {
         if (count($this->contextGroups) <= $this->maxVisible) {
@@ -65,17 +49,11 @@ class BottomBar extends Component
         return array_slice($this->contextGroups, $this->maxVisible, null, true);
     }
 
-    /**
-     * Whether the overflow "More" tab should be shown.
-     */
     public function getHasOverflowProperty(): bool
     {
         return count($this->contextGroups) > $this->maxVisible;
     }
 
-    /**
-     * Resolve a URL from a context group definition.
-     */
     public function resolveUrl(array $group): string
     {
         if (!empty($group['route']) && !str_contains($group['route'], '/')) {
@@ -90,9 +68,6 @@ class BottomBar extends Component
         return '#';
     }
 
-    /**
-     * Determine if a sub-item is the currently active page.
-     */
     public function isItemActive(array $item): bool
     {
         if (!empty($item['route'])) {
@@ -102,18 +77,13 @@ class BottomBar extends Component
             $routePath = parse_url($item['route'], PHP_URL_PATH) ?? $item['route'];
             return request()->url() === url($routePath);
         }
-
         if (!empty($item['url'])) {
             $urlPath = parse_url($item['url'], PHP_URL_PATH) ?? $item['url'];
             return request()->url() === url($urlPath);
         }
-
         return false;
     }
 
-    /**
-     * Resolve a sub-item URL (for overflow sub-items).
-     */
     public function resolveItemUrl(array $item): string
     {
         if (!empty($item['route']) && !str_contains($item['route'], '/')) {
@@ -128,44 +98,19 @@ class BottomBar extends Component
         return '#';
     }
 
-    /**
-     * Whether the active context is in the overflow group.
-     */
     public function getIsActiveInOverflowProperty(): bool
     {
         return isset($this->overflowGroups[$this->activeContext]);
     }
 
-    /**
-     * Open the overflow "More" sheet.
-     */
     public function openOverflow(): void
     {
         $this->overflowOpen = true;
     }
 
-    /**
-     * Close the overflow "More" sheet.
-     */
     public function closeOverflow(): void
     {
         $this->overflowOpen = false;
-    }
-
-    /**
-     * Dispatch the openContextSheet event for the handle bar.
-     */
-    public function openContext(): void
-    {
-        $this->dispatch('openContextSheet');
-    }
-
-    /**
-     * Navigate to a URL via SPA (used by handle bar when context has no items).
-     */
-    public function goTo(string $url): void
-    {
-        $this->redirect($url, navigate: true);
     }
 
     public function render()

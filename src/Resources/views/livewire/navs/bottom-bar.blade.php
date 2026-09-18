@@ -1,6 +1,5 @@
 <nav class="navbar navbar-light bg-white shadow-sm d-md-none fixed-bottom"
-     style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);"
-     x-data="{}">
+     style="z-index: 1030; padding-bottom: env(safe-area-inset-bottom);">
 
     {{-- Handle Bar — context label + optional sub-menu trigger --}}
     @php
@@ -67,7 +66,7 @@
     {{-- Backdrop --}}
     <div class="position-fixed start-0 top-0 w-100 h-100 bg-dark opacity-50"
          style="z-index: 1040;"
-         @click="$wire.closeOverflow()"></div>
+         onclick="if(window.Livewire) Livewire.dispatch('bb-close-overflow')"></div>
 
     {{-- Sheet --}}
     <div class="position-fixed bottom-0 start-0 end-0 bg-white shadow-lg"
@@ -78,7 +77,8 @@
         <div class="d-flex align-items-center px-3 py-2 border-bottom">
             <h6 class="mb-0 fw-bold flex-grow-1">More Contexts</h6>
             <button type="button" class="btn btn-sm btn-light rounded-circle p-0 d-flex align-items-center justify-content-center"
-                    @click="$wire.closeOverflow()" style="width: 32px; height: 32px; min-width: 32px;">
+                    onclick="if(window.Livewire) Livewire.dispatch('bb-close-overflow')"
+                    style="width: 32px; height: 32px; min-width: 32px;">
                 <i class="fas fa-times opacity-50"></i>
             </button>
         </div>
@@ -88,13 +88,12 @@
                     $isActive = $key === $activeContext;
                     $url = $this->resolveUrl($group);
                     $hasItems = !empty($group['items']);
+                    $groupId = 'bb-overflow-' . $key;
                 @endphp
-                <div class="px-0 py-0"
-                     x-data="{ expanded: {{ $isActive ? 'true' : 'false' }} }"
-                     wire:key="bb-overflow-{{ $key }}">
+                <div class="px-0 py-0" wire:key="bb-overflow-{{ $key }}">
                     {{-- Group header --}}
                     <div role="button"
-                       @click="expanded = !expanded"
+                       onclick="var el=document.getElementById('{{ $groupId }}-items');if(el)el.classList.toggle('d-none');var icon=this.querySelector('.bb-chevron');if(icon)icon.classList.toggle('fa-chevron-down');icon.classList.toggle('fa-chevron-up');"
                        class="d-flex align-items-center text-decoration-none px-3 py-3
                               {{ $isActive ? 'fw-bold' : 'text-dark' }}"
                        @if ($isActive)
@@ -107,14 +106,13 @@
                         @endif
                         <span class="flex-grow-1">{{ $group['label'] ?? $key }}</span>
                         @if ($hasItems)
-                            <i class="fas fa-chevron-down ms-2 {{ $isActive ? 'text-primary' : 'text-muted' }} opacity-50"
-                               :class="{ 'fa-chevron-down': !expanded, 'fa-chevron-up': expanded }"
+                            <i class="fas fa-chevron-{{ $isActive ? 'up' : 'down' }} ms-2 bb-chevron {{ $isActive ? 'text-primary' : 'text-muted' }} opacity-50"
                                style="pointer-events: none;"></i>
                         @endif
                     </div>
                     {{-- Sub-items --}}
                     @if ($hasItems)
-                    <div class="ms-4 border-start ps-2" x-show="expanded" x-collapse>
+                    <div class="ms-4 border-start ps-2{{ $isActive ? '' : ' d-none' }}" id="{{ $groupId }}-items">
                         @foreach ($group['items'] as $item)
                             @php
                                 $itemUrl = $this->resolveItemUrl($item);
@@ -122,7 +120,7 @@
                             @endphp
                             <a href="{{ $itemUrl }}"
                                wire:navigate
-                               @click="$wire.closeOverflow()"
+                               onclick="if(window.Livewire) Livewire.dispatch('bb-close-overflow')"
                                class="d-flex align-items-center py-2 pe-3 text-decoration-none
                                       {{ $itemActive ? 'fw-bold' : 'text-muted' }}"
                                @if ($itemActive)
