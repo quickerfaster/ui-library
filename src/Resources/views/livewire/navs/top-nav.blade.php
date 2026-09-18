@@ -16,7 +16,7 @@
         {{-- Module Switcher --}}
         @if ($moduleSwitcherEnabled && !empty($this->modules))
             {{-- Desktop: Bootstrap dropdown --}}
-            <div class="dropdown me-2 d-none d-md-block" id="module-switcher">
+            <div class="dropdown me-2 d-none d-md-block" id="module-switcher" wire:ignore>
                 <button class="btn btn-sm btn-outline-primary dropdown-toggle px-3 py-1 my-0 fw-medium flex-shrink-0" type="button"
                     data-bs-toggle="dropdown" aria-label="Switch Module">
                     <i class="fas fa-th-large me-1"></i>
@@ -117,7 +117,7 @@
                 @php $isAllCompanies = $currentCompanyId === 0; @endphp
 
                 {{-- Desktop: Bootstrap dropdown --}}
-                <div class="dropdown d-none d-md-block" id="company-switcher">
+                <div class="dropdown d-none d-md-block" id="company-switcher" wire:ignore>
                     <button class="btn btn-sm {{ $isAllCompanies ? 'btn-outline-info' : 'btn-outline-primary' }} dropdown-toggle px-2 py-1 my-0 fw-medium" type="button"
                         data-bs-toggle="dropdown" aria-label="Switch Company">
                         <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
@@ -199,7 +199,7 @@
             @endif
 
             @if ($quickActionsButtonEnabled)
-            <div class="dropdown d-none d-md-block" id="quick-actions-dropdown" wire:key="quick-actions-dropdown">
+            <div class="dropdown d-none d-md-block" id="quick-actions-dropdown" wire:key="quick-actions-dropdown" wire:ignore>
                 <a href="#" class="px-2 py-1 my-0 position-relative dropdown-toggle {{ $showQuickActionsPulse ? 'qa-pulse' : '' }}"
                     data-bs-toggle="dropdown" aria-label="Quick Actions" title="{{ $quickActionsButtonTitle }}">
                     <i class="{{ $quickActionsButtonIcon }}"></i>
@@ -244,7 +244,7 @@
             @endif
 
             {{-- Locale switcher --}}
-            <div class="dropdown" id="language-switcher">
+            <div class="dropdown" id="language-switcher" wire:ignore>
                 <a href="#" class="dropdown-toggle px-2 py-1 my-0" data-bs-toggle="dropdown" title="{{ strtoupper(app()->getLocale()) }}">
                     <i class="fas fa-globe"></i>
                 </a>
