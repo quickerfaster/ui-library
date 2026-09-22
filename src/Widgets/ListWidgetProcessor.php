@@ -17,6 +17,8 @@ class ListWidgetProcessor
         $sort = $definition['sort'] ?? ['created_at', 'desc'];
         $columns = $definition['columns'] ?? [];
         $conditions = $this->resolveConditions($definition['conditions'] ?? []);
+        $idField = $definition['id_field'] ?? null;
+        $rowActions = $definition['row_actions'] ?? [];
 
         $items = [];
 
@@ -34,8 +36,12 @@ class ListWidgetProcessor
 
             // Load records with relationships if needed for dot notation fields
             $relations = $this->extractRelationsFromColumns($columns);
+            // Also extract relations from row action {{ field }} placeholders
+            if (!empty($rowActions)) {
+                $relations = array_merge($relations, $this->extractRelationsFromRowActions($rowActions));
+            }
             if (!empty($relations)) {
-                $query->with($relations);
+                $query->with(array_unique($relations));
             }
 
             $records = $query->limit($limit)->get();
@@ -55,6 +61,15 @@ class ListWidgetProcessor
 
                     $item[$label] = $value;
                 }
+
+                // Resolve row actions with per-record {{ field }} placeholders
+                if (!empty($rowActions)) {
+                    $item['actions'] = $this->resolveRowActions($rowActions, $record);
+                    if ($idField) {
+                        $item['id'] = data_get($record, $idField);
+                    }
+                }
+
                 $items[] = $item;
             }
         }
@@ -71,6 +86,8 @@ class ListWidgetProcessor
             'showViewAll' => $definition['show_view_all'] ?? false,
             'viewAllLink' => $definition['view_all_link'] ?? null,
             'viewAllLinkTarget' => $definition['view_all_link_target'] ?? '_self',
+            'id_field' => $idField,
+            'row_actions' => $rowActions,
         ];
     }
 
@@ -86,6 +103,39 @@ class ListWidgetProcessor
             }
         }
         return array_unique($relations);
+    }
+
+    /**
+     * Extract relationship names from row action {{ field }} placeholders.
+     */
+    protected function extractRelationsFromRowActions(array $actions): array
+    {
+        $relations = [];
+        foreach ($actions as $action) {
+            $this->collectRelationsFromValue($action['params'] ?? [], $relations);
+        }
+        return array_unique($relations);
+    }
+
+    /**
+     * Recursively collect dot-notation relation names from a value.
+     */
+    protected function collectRelationsFromValue($value, array &$relations): void
+    {
+        if (is_array($value)) {
+            foreach ($value as $v) {
+                $this->collectRelationsFromValue($v, $relations);
+            }
+        } elseif (is_string($value)) {
+            preg_match_all('/\{\{\s*(.+?)\s*\}\}/', $value, $matches);
+            foreach ($matches[1] as $field) {
+                $field = trim($field);
+                $parts = explode('.', $field);
+                if (count($parts) > 1) {
+                    $relations[] = $parts[0];
+                }
+            }
+        }
     }
 
     /**
@@ -122,10 +172,81 @@ class ListWidgetProcessor
                 return (string) $value;
         }
     }
+
+    /**
+     * Resolve {{ field }} placeholders in row action params against a record.
+     *
+     * @param array $actions
+     * @param object $record
+     * @return array
+     */
+    protected function resolveRowActions(array $actions, $record): array
+    {
+        $resolved = [];
+        foreach ($actions as $action) {
+            // Skip actions that don't match their condition (if any)
+            if (!empty($action['condition']) && !$this->evaluateCondition($record, $action['condition'])) {
+                continue;
+            }
+            $action['params'] = $this->resolveValue($action['params'] ?? [], $record);
+            $resolved[] = $action;
+        }
+        return $resolved;
+    }
+
+    /**
+     * Evaluate a simple condition tuple against a record.
+     *
+     * @param object $record
+     * @param array  $condition  [field, operator, value]
+     * @return bool
+     */
+    protected function evaluateCondition($record, array $condition): bool
+    {
+        if (count($condition) < 3) {
+            return true;
+        }
+
+        [$field, $operator, $expected] = $condition;
+        $actual = data_get($record, $field);
+
+        return match ($operator) {
+            '='  => $actual == $expected,
+            '!=' => $actual != $expected,
+            '>'  => $actual > $expected,
+            '<'  => $actual < $expected,
+            '>=' => $actual >= $expected,
+            '<=' => $actual <= $expected,
+            'in' => in_array($actual, (array) $expected),
+            'not_in' => !in_array($actual, (array) $expected),
+            default => true,
+        };
+    }
+
+    /**
+     * Recursively resolve {{ field }} placeholders in a value using data_get.
+     *
+     * @param mixed $value
+     * @param object $record
+     * @return mixed
+     */
+    protected function resolveValue($value, $record)
+    {
+        if (is_array($value)) {
+            foreach ($value as $k => $v) {
+                $value[$k] = $this->resolveValue($v, $record);
+            }
+            return $value;
+        }
+
+        if (is_string($value)) {
+            return preg_replace_callback('/\{\{\s*(.+?)\s*\}\}/', function ($matches) use ($record) {
+                $field = trim($matches[1]);
+                $resolved = data_get($record, $field);
+                return $resolved === null ? '' : (string) $resolved;
+            }, $value);
+        }
+
+        return $value;
+    }
 }
-
-
-
-
-
-

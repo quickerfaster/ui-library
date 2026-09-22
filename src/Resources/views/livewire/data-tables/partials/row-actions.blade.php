@@ -170,7 +170,7 @@
                             @php
                                 $href = $routeName
                                     ? route($routeName, $routeParams)
-                                    : ($url . '/' . $record->id);
+                                    : (str_contains($url, '{id}') ? str_replace('{id}', $record->id, $url) : $url . '/' . $record->id);
                             @endphp
                             <a class="dropdown-item d-flex align-items-center py-2" href="{{ $href }}"
                                 @if (!empty($action['newTab'])) target="_blank" rel="noopener noreferrer" @endif>

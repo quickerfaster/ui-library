@@ -78,6 +78,27 @@ return [
                 'inlineAdd' => false,
             ],
         ],
+        'company_id' => [
+            'display' => 'inline',
+            'fillable' => true,
+            'field_type' => 'select',
+            'label' => 'Company',
+            'validation' => 'nullable|integer|exists:companies,id',
+            'filterable' => true,
+            'searchable' => true,
+            'options' => [
+                'model' => \App\Modules\Hr\Models\Company::class,
+                'column' => 'name',
+                'hintField' => '',
+            ],
+            'relationship' => [
+                'model' => \App\Modules\Hr\Models\Company::class,
+                'type' => 'belongsTo',
+                'display_field' => 'name',
+                'foreign_key' => 'company_id',
+                'inlineAdd' => false,
+            ],
+        ],
         'message' => [
             'display' => 'inline',
             'fillable' => true,
@@ -261,7 +282,8 @@ return [
             'fields' => [
                 '0' => 'email',
                 '1' => 'role',
-                '2' => 'message',
+                '2' => 'company_id',
+                '3' => 'message',
             ],
         ],
     ],

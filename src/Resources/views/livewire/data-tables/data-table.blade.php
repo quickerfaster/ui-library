@@ -325,7 +325,7 @@
 
     {{-- Table View --}}
     @if ($viewMode === 'table')
-        <div class="table-responsive" style="min-height: 500px">
+        <div class="table-responsive" style="min-height: 500px; overflow: visible;">
             <table class="table align-items-center mb-0 table-striped {{ $density === 'compact' ? 'table-sm' : '' }}">
 
                 <thead>

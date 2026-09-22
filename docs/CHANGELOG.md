@@ -1,8 +1,167 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-17
-> **Status**: Current — Notification Drawer Animation, Settings Drawer Fix, Sidebar Search UX
+> **Date**: 2026-09-20
+> **Status**: Current — Advanced Search Relationship Field Support
+
+---
+
+## Export Migration & Admin Bypass Fix — 2026-09-20
+
+### Bug Fix: Export Fails with Missing `company_id` Column
+
+The `exports` table migration never created the `company_id` column, but [`ExportController::queueExport()`](src/Http/Controllers/Exports/ExportController.php:197) and the [`Export` model](src/Models/Export.php:12) both reference it. New migration [`2026_09_20_000001_add_company_id_to_exports_table.php`](Database/Migrations/2026_09_20_000001_add_company_id_to_exports_table.php) adds the column.
+
+### Bug Fix: `company_admin` Bypass Missing in simpleActions Filter
+
+[`filterSimpleActionsByPermission()`](src/Http/Livewire/DataTables/DataTable.php:1459) used `$user->can()` directly for edit/delete/restore/forceDelete, bypassing [`AuthorizationService::isBypassAllowed()`](src/Services/AccessControl/AuthorizationService.php:66). `company_admin` users lost access to row action buttons. Fixed by adding `isBypassAllowed()` check before each `$user->can()` call. `bulkActions` and `moreActions` were unaffected — they already use auth service methods that include the bypass.
+
+---
+
+## Row Action Permission Filtering — 2026-09-20
+
+### Security Fix: simpleActions Now Globally Filtered by Permission
+
+Row action buttons (show, edit, delete, restore, forceDelete) were configured via `simpleActions` in the data config and passed to every row. While [`row-actions.blade.php`](src/Resources/views/livewire/data-tables/partials/row-actions.blade.php) did check permissions per-record, the `simpleActions` array itself was never filtered globally — if the config included `'delete'`, every row rendered the delete button (subject to per-record checks).
+
+**Fix**: New [`filterSimpleActionsByPermission()`](src/Http/Livewire/DataTables/DataTable.php:1428) removes actions the user can never perform on this entity type. Called in `render()` right after resolving `simpleActions` from config.
+
+Permission mapping:
+| Action | Check |
+|--------|-------|
+| `show` | `canAccessView()` → `view_{entity}` |
+| `edit` | `can('edit_{entity}')` |
+| `delete` | `can('delete_{entity}')` |
+| `restore` | `can('restore_{entity}')` |
+| `forceDelete` | `can('force_delete_{entity}')` |
+
+This is a **coarse-grained pre-filter** — per-record checks in `row-actions.blade.php` remain as the fine-grained enforcement layer (e.g., record ownership). `moreActions` already had per-record filtering in the Blade view.
+
+### Documentation
+- [`docs/debug-checklist.md`](docs/debug-checklist.md): Updated §16 with simpleActions filtering
+
+---
+
+## Bulk Action Permission Filtering — 2026-09-20
+
+### Security Fix: Bulk Actions Now Filtered by Permission Before Rendering
+
+Bulk action buttons (Delete, Restore Selected, Permanently Delete) were rendered in the DataTable toolbar without checking the current user's permissions. Unauthorized users could see and click these buttons on embedded datatables (e.g., ESS profile payslip/attendance tabs). While `executeBulkAction()` did check permissions at execution time, the buttons were visible to everyone.
+
+**Fix**: New [`filterBulkActionsByPermission()`](src/Http/Livewire/DataTables/DataTable.php:1393) method removes bulk actions the user isn't authorized to perform **before** they reach the Blade view. Called in `initializeFromConfig()` right after `parseBulkActions()`.
+
+Permission mapping:
+| Action Type | Check |
+|------------|-------|
+| `delete` | `canBulkDelete()` |
+| `restore` | `canBulkRestore()` |
+| `forceDelete` | `canBulkForceDelete()` |
+| `export` | `canBulkExport()` |
+| `updateField` | `canBulkUpdate()` |
+
+### Documentation
+- [`docs/debug-checklist.md`](docs/debug-checklist.md): Added §16 with root cause and fix guide
+
+---
+
+## Column Visibility Persistence Fix — 2026-09-20
+
+### Bug Fix: Column Visibility Now Survives Page Refresh
+
+User-selected columns in the "View → Columns..." drawer were lost on page refresh. The drawer showed checkboxes as checked but columns were missing from the table.
+
+**Root cause**: [`HasColumnPreferences::loadVisibleColumns()`](src/Traits/DataTables/HasColumnPreferences.php:14) intersected saved columns with `$defaultColumns` (first 6) instead of all available columns, stripping any user-added columns beyond the default set.
+
+**Secondary issue**: [`ColumnManager`](src/Http/Livewire/ColumnManager.php:38) used a different session key (`visible_columns_*`) than DataTable (`datatable.columns.*`), causing drawer checkbox state to mismatch the table.
+
+### Changes
+- [`HasColumnPreferences`](src/Traits/DataTables/HasColumnPreferences.php): Added optional `$fallback` parameter — session data now intersects with all columns; fallback used only when no session data exists
+- [`DataTable`](src/Http/Livewire/DataTables/DataTable.php): Both call sites updated to pass `array_keys($this->columns)` for intersection + `$defaultColumns` as fallback
+- [`ColumnManager`](src/Http/Livewire/ColumnManager.php): Session key aligned to `datatable.columns.{configKey}`
+
+### Documentation
+- [`docs/debug-checklist.md`](docs/debug-checklist.md): Added §15 with root cause analysis and fix guide
+
+---
+
+## Advanced Search — Relationship Field Support — 2026-09-20
+
+### Feature: Search Related Model Data via Advanced Search Panel
+
+The DataTable advanced search panel now supports searching across relationship fields (e.g., searching employees by name/email from the employee positions table). Previously, only direct string columns appeared in the search checkboxes.
+
+### Changes
+
+**`SearchPanel`** ([`src/Http/Livewire/SearchPanel.php`](src/Http/Livewire/SearchPanel.php)):
+- `loadColumns()` now includes relationship fields with `searchable: true`, using descriptive labels like `"Employee (employee_number, first_name, last_name, email)"`
+- New `$directColumnNames` and `$relationColumns` properties track field types separately
+- Default selected columns now exclude relationships (opt-in only) — `mount()` and `resetSearch()` use `$directColumnNames`
+- Relationship fields require **explicit** `searchable: true`; direct fields default to `true` (backward compatible)
+
+**`DataTable`** ([`src/Http/Livewire/DataTables/DataTable.php`](src/Http/Livewire/DataTables/DataTable.php)):
+- `getRecordsProperty()` search loop now has a `whereHas` branch for relationship fields, using `orWhereHas()` with chained `orWhere` across all `searchable_fields`
+- `initializeFromConfig()` now includes `searchable_fields` in the `searchableRelations` array
+
+**`SearchEngine`** ([`src/Services/Search/SearchEngine.php`](src/Services/Search/SearchEngine.php)):
+- `apply()` now accepts optional `$fieldDefs` parameter for relationship resolution via `whereHas`
+
+**Search Panel Blade View** ([`src/Resources/views/livewire/search-panel.blade.php`](src/Resources/views/livewire/search-panel.blade.php)):
+- Direct columns render first, then a `<hr>` divider with a link icon and italic note: *"Related records — selecting these may slow down search"*, followed by relationship checkboxes
+- Published vendor copy in consuming app also updated
+
+**New Config Key: `searchable_fields`**:
+- Added to relationship definitions in data configs: `'searchable_fields' => ['employee_number', 'first_name', 'last_name', 'email']`
+- Controls which columns on the related model are searched via `orWhere` chaining within `whereHas`
+- Falls back to `[display_field]` if not specified
+
+### Performance Design
+
+| Search Mode | Columns Searched | Relationship Support |
+|-------------|-----------------|---------------------|
+| Quick search (inline bar) | First 2 `searchableFields` (direct only) | ❌ No — `whereHas` too heavy for default |
+| Advanced search (drawer) | User-selected columns | ✅ Yes — explicit opt-in |
+
+### Documentation
+- [`docs/debug-checklist.md`](docs/debug-checklist.md): Added §14 with root cause analysis, fix guide, and verification steps
+- [`docs/consuming-app/data-configs.md`](docs/consuming-app/data-configs.md): Added §2.2b documenting the full relationship field definition schema including `searchable_fields`
+
+---
+
+## Mobile Navigation Bug Fixes & UX Improvements — 2026-09-18
+
+### Bug Fixes
+
+**ContextSheet Not Opening (Multi-Root Element):** [`context-sheet.blade.php`](src/Resources/views/livewire/navs/context-sheet.blade.php) had two root-level elements (`<style>` + `<div>`), violating Livewire's single-root requirement. DOM morphing failed to inject the overlay when `$isOpen` changed. Fixed by moving `<style>` inside root `<div>` and adding `wire:key` on the overlay.
+
+**`isItemActive()` Returns `false` for All Items:** `request()->url()` returns `/livewire/update` during Livewire component re-renders — never matches any page URL. Fixed in both [`ContextSheet`](src/Http/Livewire/Layouts/Navs/ContextSheet.php:89) and [`BottomBar`](src/Http/Livewire/Layouts/Navs/BottomBar.php:77) by using `url()->previous()` instead.
+
+**`wire:navigate` + Bootstrap 5 Dropdown Incompatibility:** `wire:navigate` destroys and recreates the TopNav component on every SPA navigation. Bootstrap 5 dropdown state cannot survive this. Five re-init strategies failed. Fixed by removing `wire:navigate` from all BottomBar links — full page loads guarantee dropdown reliability.
+
+**CSS Lost During Livewire Morphing:** `<style>` tags inside Livewire Blade templates are removed/re-injected during DOM morphing. Fixed by moving `.context-sheet-item` styles to [`quicker-faster.css`](public/assets/css/quicker-faster.css).
+
+**Stale Livewire Snapshot:** Bumped `renderVersion` 3→4 in [`ContextSheet`](src/Http/Livewire/Layouts/Navs/ContextSheet.php:36) to force snapshot regeneration after structural Blade changes.
+
+**TopNav Module Switcher Stale After Direct Navigation:** [`TopNav::loadModules()`](src/Http/Livewire/Layouts/Navs/TopNav.php:1064) determined active module solely from `session('active_module')`. When navigating via direct link (e.g., "View All" on dashboard card), the session held the old module. Fixed by also detecting module from URL first path segment.
+
+### Mobile UX Improvements
+
+**TopNav Right-Side Icons (5→2):** Reduced mobile icons from 5 to 2 (🔔 Notifications + 👤 Profile). Moved Quick Actions, Language Switcher, and Background Jobs into the existing ⋯ overflow menu. Follows the 2-3 icon pattern of every major app.
+
+**DataTable Toolbar Responsive Layout:** Search input now uses `flex-grow-1` with `min-width: 0` on mobile (was fixed 250px). View/Tools buttons are icon-only on mobile (`d-none d-sm-inline` labels). Add button shares the same flex-wrap group. Desktop layout unchanged via `flex-md-nowrap` + `flex-md-grow-0`.
+
+### Documentation
+
+- [`debug-checklist.md`](docs/debug-checklist.md): Added §10-§13 (request()->url(), wire:navigate+Bootstrap, `<style>` morphing, renderVersion)
+- [`pre-coding-checklist.md`](docs/consuming-app/pre-coding-checklist.md): Added §I (isItemActive patterns, root element, `<style>` rules, renderVersion, wire:navigate) + 6 quick-reference rows
+- [`sidebar-active-state-pitfalls.md`](docs/library/sidebar-active-state-pitfalls.md): Expanded §6 (ContextSheet + url()->previous()), added §7 (wire:navigate+Bootstrap)
+- [`06-navigation-system.md`](docs/library/06-navigation-system.md): Documented wire:navigate+Bootstrap incompatibility
+- [`16-navigation-contract-implementation-map.md`](docs/library/16-navigation-contract-implementation-map.md): Updated line counts, added §12 design decision
+
+### Consuming App
+
+**Clock-Out Reverse Geocoding:** [`ClockEventRecorderService`](app/Modules/Attendance/Services/ClockEventRecorderService.php) now reverse-geocodes GPS coordinates via OpenStreetMap Nominatim API when clock-out occurs outside the geofence. Falls back to `"lat, lng"` format on API failure. Within geofence, uses company location name as before.
+
+**Quick Actions ESS Config:** [`quick-actions.php`](app/Modules/Hr/Config/quick-actions.php) expanded from 7 to 14 ESS actions. All duplicate URLs resolved using `?tab=` query parameters (e.g., `/hr/my-profile?tab=payslips`). Added: My Overview, Leave Overview, My Leaves, Team Calendar, My Attendance, My Employment, My Contact Info.
 
 ---
 

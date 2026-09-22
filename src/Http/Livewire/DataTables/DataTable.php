@@ -223,8 +223,9 @@ class DataTable extends Component
         $defaultColumns = $this->getDefaultVisibleColumns();
 
         if ($this->showHideColumnsEnabled()) {
-            // Load from session; if none, use $defaultColumns
-            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, $defaultColumns);
+            // Load from session; intersect with ALL columns (preserves user-added columns).
+            // If no session data, fall back to config-defined defaults.
+            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, array_keys($this->columns), $defaultColumns);
         } else {
             $this->visibleColumns = $this->allColumns;
         }
@@ -934,8 +935,9 @@ class DataTable extends Component
         $defaultColumns = $this->getDefaultVisibleColumns();
 
         if ($this->showHideColumnsEnabled()) {
-            // Load from session; if none, use $defaultColumns
-            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, $defaultColumns);
+            // Load from session; intersect with ALL columns (preserves user-added columns).
+            // If no session data, fall back to config-defined defaults.
+            $this->visibleColumns = $this->loadVisibleColumns($this->configKey, array_keys($this->columns), $defaultColumns);
         } else {
             $this->visibleColumns = $this->allColumns;
         }
@@ -1114,6 +1116,7 @@ class DataTable extends Component
                             'field' => $field,
                             'relation' => $relationMethod,
                             'column' => $displayColumn,
+                            'searchable_fields' => $def['relationship']['searchable_fields'] ?? [$displayColumn],
                         ];
                     }
                 }
@@ -1166,8 +1169,9 @@ class DataTable extends Component
             $this->moreActions = $this->filterMoreActions($resolver->getMoreActions());
         }
 
-        $controls = $resolver->getControls();
+        $controls = $this->controlsOverride ?? $resolver->getControls();
         $this->bulkActions = $this->parseBulkActions($controls['bulkActions'] ?? []);
+        $this->bulkActions = $this->filterBulkActionsByPermission($this->bulkActions);
         $this->filesActions = $controls['files'] ?? [];
     }
 
@@ -1386,6 +1390,83 @@ class DataTable extends Component
         return $actions;
     }
 
+    /**
+     * Remove bulk actions the current user is not authorized to perform.
+     * This prevents unauthorized action buttons from rendering in the Blade view.
+     *
+     * @param array $actions  Parsed bulk actions from parseBulkActions()
+     * @return array  Filtered actions (only those the user can perform)
+     */
+    protected function filterBulkActionsByPermission(array $actions): array
+    {
+        if (empty($actions)) {
+            return [];
+        }
+
+        $user = auth()->user();
+        if (!$user) {
+            return [];
+        }
+
+        $modelClass = $this->getConfigResolver()->getModel();
+
+        $filtered = [];
+        foreach ($actions as $key => $action) {
+            $permitted = match ($action['type']) {
+                'delete'      => $this->authService->canBulkDelete($user, $modelClass),
+                'restore'     => $this->authService->canBulkRestore($user, $modelClass),
+                'forceDelete' => $this->authService->canBulkForceDelete($user, $modelClass),
+                'export'      => $this->authService->canBulkExport($user, $modelClass),
+                'updateField' => $this->authService->canBulkUpdate($user, $modelClass),
+                default       => true, // Unknown action types pass through (defensive)
+            };
+
+            if ($permitted) {
+                $filtered[$key] = $action;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Remove simpleActions the current user is not authorized to perform globally.
+     * This is a coarse-grained pre-filter; per-record checks in row-actions.blade.php
+     * provide the fine-grained enforcement (e.g., record ownership).
+     *
+     * @param array $actions  Simple actions from config (e.g., ['show', 'edit', 'delete'])
+     * @return array  Filtered actions (only those the user can perform on this entity)
+     */
+    protected function filterSimpleActionsByPermission(array $actions): array
+    {
+        if (empty($actions)) {
+            return [];
+        }
+
+        $user = auth()->user();
+        if (!$user) {
+            return [];
+        }
+
+        $viewName = \Str::snake($this->getConfigResolver()->getModelName());
+
+        return array_values(array_filter($actions, function ($action) use ($user, $viewName) {
+            // Non-string actions (e.g., 'expand' => [...]) pass through
+            if (!is_string($action)) {
+                return true;
+            }
+
+            return match ($action) {
+                'show'        => $this->authService->canAccessView($user, $viewName),
+                'edit'        => \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed($user) || $user->can('edit_' . $viewName),
+                'delete'      => \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed($user) || $user->can('delete_' . $viewName),
+                'restore'     => \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed($user) || $user->can('restore_' . $viewName),
+                'forceDelete' => \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed($user) || $user->can('force_delete_' . $viewName),
+                default       => true, // Unknown actions (e.g., 'expand') pass through
+            };
+        }));
+    }
+
     protected function getExportIcon(string $format): string
     {
         return match ($format) {
@@ -1591,6 +1672,30 @@ class DataTable extends Component
 
                 foreach ($columns as $field) {
                     $fieldDef = $this->columns[$field] ?? [];
+
+                    // Handle relationship fields via whereHas
+                    if (isset($fieldDef['relationship'])) {
+                        $relationMethod = $this->getRelationMethodFromField($field, $fieldDef);
+                        $searchableFields = $fieldDef['relationship']['searchable_fields']
+                            ?? [$this->getRelationDisplayColumn($fieldDef)];
+
+                        if ($relationMethod && !empty($searchableFields)) {
+                            $searchTerm = $this->search;
+                            $exact = $this->exactMatch;
+                            $q->orWhereHas($relationMethod, function ($subQ) use ($searchableFields, $searchTerm, $exact) {
+                                $subQ->where(function ($innerQ) use ($searchableFields, $searchTerm, $exact) {
+                                    foreach ($searchableFields as $sf) {
+                                        if ($exact) {
+                                            $innerQ->orWhere($sf, '=', $searchTerm);
+                                        } else {
+                                            $innerQ->orWhere($sf, 'like', $searchTerm . '%');
+                                        }
+                                    }
+                                });
+                            });
+                        }
+                        continue;
+                    }
 
                     // Handle select fields with options (fuzzy match on label/key)
                     if (isset($fieldDef['options']) && is_array($fieldDef['options'])) {
@@ -2648,6 +2753,7 @@ protected function checkConditions(array $action, $record): bool
 
         $controls = $this->controlsOverride ?? $resolver->getControls();
         $simpleActions = $this->simpleActions ?? ($resolver->getConfig()['simpleActions'] ?? []);
+        $simpleActions = $this->filterSimpleActionsByPermission($simpleActions);
         $crudType = $this->crudType ?? ($resolver->getConfig()['crudType'] ?? false);
         $moreActions = $this->moreActions ?? $this->filterMoreActions($resolver->getMoreActions());
         $detailComponent = $resolver->getConfig()['detailComponent'] ?? '';

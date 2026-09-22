@@ -100,6 +100,63 @@ Each field drives form rendering, table column display, detail view display, inl
 
 All three boolean types are auto-cast on save; unchecked/absent fields are written as `false`. See also the FieldFactory mapping in [`07-component-catalog.md`](docs/library/07-component-catalog.md).
 
+### 2.2b Relationship Field Definitions
+
+When a field references another model via a `belongsTo` relationship, define it with the `relationship` key. This drives the advanced search panel's `whereHas` queries and the form's relationship-aware select fields.
+
+```php
+'employee_id' => [
+    'field_type'  => 'livewire-searchable-select',  // or 'select'
+    'label'       => 'Employee',
+    'searchable'  => true,                           // Required: opt-in for relationship search
+    'filterable'  => true,
+    'relationship' => [
+        'model'            => 'App\\Modules\\Hr\\Models\\Employee',  // Related model FQCN
+        'type'             => 'belongsTo',                           // Relationship type
+        'display_field'    => 'employee_number',                     // Column shown in table/detail
+        'dynamic_property' => 'employee',                            // Method name on the model (e.g., $position->employee)
+        'foreign_key'      => 'employee_id',                         // FK column on this table
+        'inlineAdd'        => false,                                 // Allow inline creation from select
+        'searchable_fields' => ['employee_number', 'first_name', 'last_name', 'email'],  // Columns searched in advanced search
+    ],
+    'options' => [
+        'model'     => 'App\\Modules\\Hr\\Models\\Employee',
+        'column'    => 'employee_number',
+        'hintField' => 'first_name,last_name',
+    ],
+],
+```
+
+| Key | Required | Default | Purpose |
+|-----|----------|---------|---------|
+| `model` | Yes | — | FQCN of the related model |
+| `type` | Yes | — | `belongsTo` (currently the only supported type for search) |
+| `display_field` | Yes | — | Column on the related model shown in table cells and detail views |
+| `dynamic_property` | Yes | — | Method name on the parent model (e.g., `$position->employee`) |
+| `foreign_key` | Yes | — | Foreign key column on this table |
+| `inlineAdd` | No | `false` | Whether to show an "Add New" option in the select dropdown |
+| `searchable_fields` | No | `[display_field]` | Columns on the related model searched by the advanced search panel. Supports multiple columns with `orWhere` chaining. |
+
+> **Performance note**: Relationship search uses `whereHas` with subqueries — heavier than direct column `orWhere`. Relationship fields require **explicit** `'searchable' => true` (opt-in) and appear below a divider in the advanced search panel with a performance warning. Direct fields default to `searchable: true`.
+
+### 2.2c Future: Cascade Field Support (Planned)
+
+A generic `cascade_from` field definition key is planned for the library to handle parent-child field dependencies without hardcoding domain knowledge:
+
+```php
+'company_id' => [
+    'cascade_from' => [
+        'field'         => 'employee_id',       // Trigger field — when this changes
+        'source_column' => 'company_id',         // Column on the related model to copy
+        'relationship'  => 'employee',           // (optional) relationship method name
+    ],
+],
+```
+
+When `employee_id` changes, the library looks up the related employee and copies its `company_id` into this field. The library never knows about "Employee" or "company_id" specifically — it follows the cascade configuration generically.
+
+Until this is implemented, consuming apps should use **model observers** (see `EmployeePosition::booted()` for the reference pattern) to auto-set dependent fields.
+
 ### 2.3 fieldGroups
 
 Organizes form fields into tabs/sections:

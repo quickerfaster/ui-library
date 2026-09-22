@@ -19,13 +19,14 @@ class InvitationService
     /**
      * Create a new invitation and dispatch the email.
      */
-    public function create(string $email, string $role, ?string $message = null, $invitable = null, ?int $createdBy = null): Invitation
+    public function create(string $email, string $role, ?string $message = null, $invitable = null, ?int $createdBy = null, ?int $companyId = null): Invitation
     {
         $invitation = Invitation::create([
             'email' => $email,
             'token' => Str::random(64),
             'status' => Invitation::STATUS_PENDING,
             'role' => $role,
+            'company_id' => $companyId,
             'invitable_type' => $invitable ? $invitable->getInvitableType() : null,
             'invitable_id' => $invitable ? $invitable->getInvitableId() : null,
             'message' => $message,
@@ -80,6 +81,24 @@ class InvitationService
 
             if ($roleName) {
                 $user->assignRole($roleName);
+            }
+        }
+
+        // Assign company from invitation to the user, so the employee
+        // created during onboarding inherits the correct company.
+        if ($invitation->company_id) {
+            // If the user model has a direct company_id attribute
+            if (array_key_exists('company_id', $user->getAttributes()) || $user->isFillable('company_id')) {
+                $user->company_id = $invitation->company_id;
+                $user->save();
+            }
+
+            // Also create a UserCompanyAssignment if the pivot table exists
+            if (class_exists(\QuickerFaster\UILibrary\Models\UserCompanyAssignment::class)) {
+                \QuickerFaster\UILibrary\Models\UserCompanyAssignment::firstOrCreate([
+                    'user_id'    => $user->id,
+                    'company_id' => $invitation->company_id,
+                ]);
             }
         }
 

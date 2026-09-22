@@ -11,6 +11,8 @@ class SearchPanel extends Component
     public string $searchTerm = '';
     public array $selectedColumns = [];
     public array $allColumns = [];
+    public array $directColumnNames = [];
+    public array $relationColumns = [];
     public bool $exactMatch = false;
 
     protected ?ConfigResolver $configResolver = null;
@@ -33,7 +35,10 @@ class SearchPanel extends Component
         } elseif (!empty($initialColumns)) {
             $this->selectedColumns = array_intersect($initialColumns, array_keys($this->allColumns));
         } else {
-            $this->selectedColumns = array_slice(array_keys($this->allColumns), 0, 2);  // 2 is also the datatble
+            // Default: first 2 direct (non-relationship) columns only.
+            // Relationship fields are opt-in — they require explicit user selection
+            // because whereHas queries are heavier than direct column searches.
+            $this->selectedColumns = array_slice($this->directColumnNames, 0, 2);
         }
 
         if ($savedTerm !== null) {
@@ -50,18 +55,35 @@ class SearchPanel extends Component
         $hiddenOnTable = $resolver->getHiddenFields()['onTable'] ?? [];
         $fieldDefs = $resolver->getFieldDefinitions();
 
+        $this->directColumnNames = [];
+        $this->relationColumns = [];
+
         foreach ($fieldDefs as $field => $def) {
             if (in_array($field, $hiddenOnTable)) {
                 continue;
             }
+
+            // Relationship fields: include with descriptive label showing searchable columns
             if (isset($def['relationship'])) {
+                // Only include if explicitly marked searchable
+                if (($def['searchable'] ?? false) !== true) {
+                    continue;
+                }
+                $label = $def['label'] ?? ucfirst($field);
+                $searchableFields = $def['relationship']['searchable_fields']
+                    ?? [$def['relationship']['display_field'] ?? 'name'];
+                $this->allColumns[$field] = $label . ' (' . implode(', ', $searchableFields) . ')';
+                $this->relationColumns[$field] = $this->allColumns[$field];
                 continue;
             }
-            // Respect searchable flag (suggestion #1)
+
+            // Respect searchable flag for direct fields (default: true for backward compatibility)
             if (($def['searchable'] ?? true) === false) {
                 continue;
             }
+
             $this->allColumns[$field] = $def['label'] ?? ucfirst($field);
+            $this->directColumnNames[] = $field;
         }
     }
 
@@ -104,7 +126,7 @@ class SearchPanel extends Component
     public function resetSearch(): void
     {
         $this->searchTerm = '';
-        $this->selectedColumns = array_slice(array_keys($this->allColumns), 0, 2); // 2 is also the datatble selection
+        $this->selectedColumns = array_slice($this->directColumnNames, 0, 2);
         $this->exactMatch = false;
 
         // Clear session
@@ -128,6 +150,7 @@ class SearchPanel extends Component
     {
         return view('qf::livewire.search-panel', [
             'allColumns' => $this->allColumns,
+            'relationColumns' => $this->relationColumns,
             'selectedColumns' => $this->selectedColumns,
             'searchTerm' => $this->searchTerm,
             'exactMatch' => $this->exactMatch,

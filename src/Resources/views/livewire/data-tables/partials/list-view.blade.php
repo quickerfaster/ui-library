@@ -28,7 +28,7 @@
 
             <div class="d-flex align-items-center">
                 {{-- 1. Selection: Add .stop-propagation so checking doesn't open the record --}}
-                @if ($bulkSelection)
+                @if (!empty($controls['bulkActions']))
                     <div class="me-3 stop-propagation">
                         <div class="form-check custom-card-checkbox">
                             <input type="checkbox" class="form-check-input" wire:model.live="bulkSelection.ids"

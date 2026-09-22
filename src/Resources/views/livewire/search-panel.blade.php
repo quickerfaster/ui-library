@@ -28,20 +28,49 @@
             {{-- Column selection --}}
             <div class="mb-4">
                 <label class="form-label fw-semibold">Search in columns</label>
-                <div class="row">
-                    @foreach($allColumns as $field => $label)
-                        <div class="col-md-6">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox"
-                                       wire:model.live="selectedColumns" value="{{ $field }}"
-                                       id="col_{{ $field }}">
-                                <label class="form-check-label" for="col_{{ $field }}">
-                                    {{ $label }}
-                                </label>
+
+                {{-- Direct columns (fast, no joins) --}}
+                @php $directColumns = array_diff_key($allColumns, $relationColumns); @endphp
+                @if(count($directColumns) > 0)
+                    <div class="row">
+                        @foreach($directColumns as $field => $label)
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           wire:model.live="selectedColumns" value="{{ $field }}"
+                                           id="col_{{ $field }}">
+                                    <label class="form-check-label" for="col_{{ $field }}">
+                                        {{ $label }}
+                                    </label>
+                                </div>
                             </div>
-                        </div>
-                    @endforeach
-                </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                {{-- Relationship columns (slower — uses JOINs/subqueries) --}}
+                @if(count($relationColumns) > 0)
+                    <hr class="my-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="fas fa-link text-muted"></i>
+                        <small class="text-muted fst-italic">Related records — selecting these may slow down search</small>
+                    </div>
+                    <div class="row">
+                        @foreach($relationColumns as $field => $label)
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           wire:model.live="selectedColumns" value="{{ $field }}"
+                                           id="col_{{ $field }}">
+                                    <label class="form-check-label" for="col_{{ $field }}">
+                                        {{ $label }}
+                                    </label>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
                 @if(count($allColumns) === 0)
                     <p class="text-muted">No searchable columns available.</p>
                 @endif

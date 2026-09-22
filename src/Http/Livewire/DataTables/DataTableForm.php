@@ -726,8 +726,13 @@ protected function isAllCompaniesMode(): bool
             return;
         }
 
+        \Log::debug('[DataTableForm] entering transaction', [
+            'configKey' => $this->configKey,
+            'isEditMode' => $this->isEditMode,
+        ]);
 
-        DB::transaction(function () {
+        try {
+            DB::transaction(function () {
             $record = $this->isEditMode
                 ? $this->resolveModelOrFail($this->modelClass, $this->recordId)
                 : new $this->modelClass();
@@ -920,6 +925,23 @@ protected function isAllCompaniesMode(): bool
                 $this->resetFields();
             }
         });
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Catch model-level validation (e.g., FK company checks in saving())
+            // and surface errors to the form so the user sees feedback.
+            foreach ($e->errors() as $field => $messages) {
+                foreach ($messages as $message) {
+                    $this->addError($field, $message);
+                }
+            }
+            return;
+        } catch (\Exception $e) {
+            \Log::error('[DataTableForm] save failed', [
+                'configKey' => $this->configKey,
+                'error' => $e->getMessage(),
+            ]);
+            $this->addError('general', 'An error occurred while saving. Please try again.');
+            return;
+        }
 
         // Clear cropped images after successful save
         $this->croppedImages = [];

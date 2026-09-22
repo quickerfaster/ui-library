@@ -35,7 +35,7 @@ class ColumnManager extends Component
 
     protected function loadVisibleColumnsFromSession(): array
     {
-        $sessionKey = "visible_columns_{$this->configKey}";
+        $sessionKey = 'datatable.columns.' . $this->configKey;
         $saved = session()->get($sessionKey, []);
         if (!empty($saved)) {
             // Ensure saved columns exist
@@ -47,7 +47,7 @@ class ColumnManager extends Component
 
     protected function saveVisibleColumnsToSession(array $columns): void
     {
-        session()->put("visible_columns_{$this->configKey}", $columns);
+        session()->put('datatable.columns.' . $this->configKey, $columns);
     }
 
     public function toggleColumn($column)

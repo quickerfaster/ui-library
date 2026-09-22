@@ -25,7 +25,7 @@
                 style="cursor: pointer; border-radius: 12px;">
 
                 {{-- 1. TOP-LEFT BULK SELECTION --}}
-                @if ($bulkSelection)
+                @if (!empty($controls['bulkActions']))
                     <div class="position-absolute top-0 start-0 m-3 stop-propagation" style="z-index: 10;">
                         <div class="form-check custom-card-checkbox">
                             <input type="checkbox" class="form-check-input shadow-sm" wire:model.live="bulkSelection.ids"

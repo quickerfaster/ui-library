@@ -1062,7 +1062,27 @@ class TopNav extends Component
         event(new NavigationBuilding($modules));
 
         $this->modules = $modules;
-        $this->activeModuleKey = session('active_module', array_key_first($modules) ?? 'admin');
+
+        // Prefer session (set by explicit module switcher usage), but
+        // also detect the module from the current URL path.  When a user
+        // navigates directly to a different module (e.g. clicks "View All"
+        // on a dashboard card linking to /payroll/payroll-runs), the
+        // session still holds the old module.  The URL first segment is
+        // the authoritative fallback.
+        $sessionModule = session('active_module');
+        $pathSegment = trim(request()->path(), '/');
+        $urlModule = explode('/', $pathSegment)[0] ?? null;
+
+        if ($urlModule && isset($modules[$urlModule])) {
+            $this->activeModuleKey = $urlModule;
+            if ($sessionModule !== $urlModule) {
+                session(['active_module' => $urlModule]);
+            }
+        } else {
+            $this->activeModuleKey = $sessionModule
+                ?? array_key_first($modules)
+                ?? 'admin';
+        }
     }
 
     public function render()
