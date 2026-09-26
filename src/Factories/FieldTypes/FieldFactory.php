@@ -12,6 +12,7 @@ use QuickerFaster\UILibrary\Components\FieldTypes\DatetimepickerField;
 use QuickerFaster\UILibrary\Components\FieldTypes\RadioField;
 use QuickerFaster\UILibrary\Components\FieldTypes\FileField;
 use QuickerFaster\UILibrary\Components\FieldTypes\TextareaField;
+use QuickerFaster\UILibrary\Components\FieldTypes\CurrencyField;
 use QuickerFaster\UILibrary\Components\FieldTypes\LivewireSearchableSelectField;
 use QuickerFaster\UILibrary\Components\FieldTypes\MorphToSelectField;
 use QuickerFaster\UILibrary\Components\FieldTypes\PasswordField;
@@ -42,6 +43,7 @@ class FieldFactory
         'morph_to_select' => MorphToSelectField::class,
         'password'     => PasswordField::class,
         'policy_calculation_builder' => PolicyCalculationBuilderField::class,
+        'currency'                   => CurrencyField::class,
 
 
 

@@ -4,6 +4,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Imports;
 
 use Livewire\Component;
 use QuickerFaster\UILibrary\Models\Import;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
@@ -34,22 +35,34 @@ class RecentImports extends Component
 
     public function loadImports()
     {
-        $userId = Auth::id();
+        $user = Auth::user();
+        $userId = $user->id;
         $sessionKey = "import_notified_{$userId}";
         $notifiedIds = session($sessionKey, []);
 
-        // Completed/failed imports (for dropdown list)
-        $this->recentImports = Import::where('user_id', $userId)
-            ->whereIn('status', ['completed', 'failed', 'cancelled'])
-            ->orderBy('created_at', 'desc')
-            ->limit(10)
-            ->get();
+        // Admin bypass: super_admin, admin, company_admin see all imports.
+        // Other users only see their own imports (scoped by user_id).
+        if (AuthorizationService::isBypassAllowed($user)) {
+            $this->recentImports = Import::whereIn('status', ['completed', 'failed', 'cancelled'])
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get();
 
-        // In‑progress imports (pending/processing)
-        $this->inProgressImports = Import::where('user_id', $userId)
-            ->whereIn('status', ['pending', 'processing'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+            $this->inProgressImports = Import::whereIn('status', ['pending', 'processing'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            $this->recentImports = Import::where('user_id', $userId)
+                ->whereIn('status', ['completed', 'failed', 'cancelled'])
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            $this->inProgressImports = Import::where('user_id', $userId)
+                ->whereIn('status', ['pending', 'processing'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
 
         // Notifications for newly completed imports (same as before)
         $currentIds = $this->recentImports->pluck('id')->toArray();
@@ -105,9 +118,15 @@ class RecentImports extends Component
      */
     public function cancelImport($importId)
     {
-        $import = Import::where('id', $importId)
-            ->where('user_id', auth()->id())
-            ->first();
+        $user = Auth::user();
+        $query = Import::where('id', $importId);
+
+        // Non-admin users can only cancel their own imports
+        if (! AuthorizationService::isBypassAllowed($user)) {
+            $query->where('user_id', $user->id);
+        }
+
+        $import = $query->first();
 
         if (!$import || !in_array($import->status, ['pending', 'processing'])) {
             $this->dispatch('showAlert', ['type' => 'error', 'message' => 'Cannot cancel this import.']);
@@ -156,10 +175,16 @@ class RecentImports extends Component
 
     public function performClearAll()
     {
-        $userId = Auth::id();
-        $imports = Import::where('user_id', $userId)
-            ->whereIn('status', ['completed', 'failed', 'cancelled'])
-            ->get();
+        $user = Auth::user();
+        $query = Import::whereIn('status', ['completed', 'failed', 'cancelled']);
+
+        // Non-admin users can only clear their own imports
+        if (! AuthorizationService::isBypassAllowed($user)) {
+            $query->where('user_id', $user->id);
+        }
+
+        $imports = $query->get();
+        $userId = $user->id;
 
         foreach ($imports as $import) {
             if ($import->error_file && Storage::disk('local')->exists($import->error_file)) {

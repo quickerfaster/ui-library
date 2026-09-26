@@ -93,7 +93,9 @@ class ContextSheet extends Component
                 return request()->routeIs($item['route']);
             }
             $routePath = parse_url($item['route'], PHP_URL_PATH) ?? $item['route'];
-            return $currentUrl === url($routePath);
+            $routeUrl = url($routePath);
+            // Support detail pages: /payroll-runs/25 should match /payroll/payroll-runs
+            return $currentUrl === $routeUrl || str_starts_with($currentUrl, $routeUrl . '/');
         }
 
         if (!empty($item['url'])) {

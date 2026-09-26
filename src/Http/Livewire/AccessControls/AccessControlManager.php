@@ -418,7 +418,11 @@ class AccessControlManager extends Component
      */
     protected function getFilteredRoles(array $config): Collection
     {
-        $roles = \Spatie\Permission\Models\Role::all()->pluck('name', 'id');
+        // Use the role assignment hierarchy to determine which roles
+        // the current user is allowed to manage permissions for.
+        $assignable = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::getAssignableRoles();
+
+        $roles = collect($assignable);
 
         // Admin roles bypass granular permissions, so they are never assignable.
         $roles = $roles->reject(

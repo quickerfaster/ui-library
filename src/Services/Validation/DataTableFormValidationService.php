@@ -3,10 +3,23 @@
 namespace QuickerFaster\UILibrary\Services\Validation;
 
 use Illuminate\Validation\Rule;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DataTableFormValidationService
 {
-    public function getDynamicValidationRules($fields, $fieldDefinitions, $fieldFactory, $isEditMode = false, $model = null, $recordId = null, $hiddenFields = [])
+    /**
+     * Build dynamic validation rules from field definitions.
+     *
+     * @param array       $fields           Current field values
+     * @param array       $fieldDefinitions Field configuration from the data config
+     * @param mixed       $fieldFactory     FieldFactory instance
+     * @param bool        $isEditMode       Whether we're editing an existing record
+     * @param string|null $modelClass       The fully-qualified model class name
+     * @param int|null    $recordId         The record ID when editing
+     * @param array       $hiddenFields     Hidden field configuration
+     * @return array [rules, messages]
+     */
+    public function getDynamicValidationRules($fields, $fieldDefinitions, $fieldFactory, $isEditMode = false, $modelClass = null, $recordId = null, $hiddenFields = [])
     {
         $rules = [];
         $allMessages = [];
@@ -22,7 +35,7 @@ class DataTableFormValidationService
         ]);
 
         foreach ($fieldDefinitions as $field => $definition) {
-            $shouldValidate = $this->shouldValidateField($fields, $fieldDefinitions, $field, $isEditMode, $model, $recordId, $hiddenFields);
+            $shouldValidate = $this->shouldValidateField($fields, $fieldDefinitions, $field, $isEditMode, $modelClass, $recordId, $hiddenFields);
 
             // 🔍 DIAGNOSTIC: Log every field's validation decision
             \Log::channel('single')->info('getDynamicValidationRules() field decision', [
@@ -58,17 +71,17 @@ class DataTableFormValidationService
                         $rules[$key] = $rule;
                     } else {
                         // Main field rule – adjust for unique if needed
-                        $rules[$key] = $this->adjustUniqueRule($rule, $isEditMode, $recordId);
+                        $rules[$key] = $this->adjustUniqueRule($rule, $isEditMode, $recordId, $modelClass);
                     }
                 }
 
             } elseif (isset($definition['validation'])) {
                 // Fallback to config string
-                $rules[$field] = $this->adjustUniqueRule($definition['validation'], $isEditMode, $recordId);
+                $rules[$field] = $this->adjustUniqueRule($definition['validation'], $isEditMode, $recordId, $modelClass);
             } elseif (isset($definition['field_type']) && $definition['field_type'] === 'file') {
                 $rules[$field] = $this->getDefaultFileValidationRules($definition);
             } else {
-                $rules[$field] = $this->adjustUniqueRule('sometimes', $isEditMode, $recordId);
+                $rules[$field] = $this->adjustUniqueRule('sometimes', $isEditMode, $recordId, $modelClass);
             }
         }
 
@@ -131,12 +144,57 @@ class DataTableFormValidationService
         return $result;
     }
 
-    protected function adjustUniqueRule($validation, $isEditMode, $recordId)
+    /**
+     * Adjust a unique validation rule for edit mode and soft-delete awareness.
+     *
+     * When the model uses SoftDeletes, the unique rule must explicitly exclude
+     * soft-deleted records because Laravel's table-based unique rule (e.g.
+     * "unique:employees,employee_number") does NOT automatically add the
+     * "WHERE deleted_at IS NULL" clause — only model-based rules do.
+     *
+     * This method appends ",NULL,id,deleted_at,NULL" to the unique rule when
+     * the model class is provided and uses the SoftDeletes trait.
+     *
+     * @param string      $validation The raw validation rule string
+     * @param bool        $isEditMode Whether editing an existing record
+     * @param int|null    $recordId   The record ID (for edit mode exclusion)
+     * @param string|null $modelClass The fully-qualified model class name
+     * @return string Adjusted validation rule string
+     */
+    protected function adjustUniqueRule($validation, $isEditMode, $recordId, $modelClass = null)
     {
-        if ($isEditMode && $recordId && str_contains($validation, 'unique')) {
+        if (!str_contains($validation, 'unique')) {
+            return $validation;
+        }
+
+        // Determine if the model uses SoftDeletes so we can exclude
+        // soft-deleted records from the unique check.
+        $usesSoftDeletes = $modelClass
+            && class_exists($modelClass)
+            && in_array(SoftDeletes::class, class_uses_recursive($modelClass), true);
+
+        if ($isEditMode && $recordId) {
+            // Edit mode: exclude the current record from the unique check.
+            // Also add soft-delete exclusion if applicable.
+            if ($usesSoftDeletes) {
+                return preg_replace(
+                    '/unique:([^,]+),([^,]+)/',
+                    "unique:$1,$2,{$recordId},id,deleted_at,NULL",
+                    $validation
+                );
+            }
             return preg_replace(
                 '/unique:([^,]+),([^,]+)/',
                 "unique:$1,$2,{$recordId}",
+                $validation
+            );
+        }
+
+        // Create mode: add soft-delete exclusion if the model uses SoftDeletes.
+        if ($usesSoftDeletes) {
+            return preg_replace(
+                '/unique:([^,]+),([^,]+)/',
+                "unique:$1,$2,NULL,id,deleted_at,NULL",
                 $validation
             );
         }

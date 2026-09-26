@@ -2,7 +2,7 @@
 
 A concise reference for future developers troubleshooting sidebar highlighting, context switching, and navigation issues. These bugs are interconnected and share common patterns—understanding one helps diagnose the others.
 
-> **Last Updated**: 2026-09-18
+> **Last Updated**: 2026-09-25
 
 ---
 
@@ -29,6 +29,7 @@ When sidebar highlighting or context switching is wrong, check these in order:
 | 5 | Context Value Must Match navigation.php Group Key | Passing `context="leave"` when navigation config defines `requests` and `configuration` groups causes fallback to buggy URL-based resolution | The [`context`](src/Components/NavigationLayout.php:208) prop is checked against [`$this->contextGroups`](src/Components/NavigationLayout.php:208) keys via `isset()`. A mismatch skips the explicit context and falls through to URL-based matching. | The `context` prop in the blade view MUST match a context group key defined in `Config/navigation.php` | [`NavigationLayout.php`](src/Components/NavigationLayout.php), consuming app blade views |
 | 6 | ContextSheet Not Opening on Mobile | Tapping the BottomBar handle bar dispatches `openContextSheet` but the slide-up panel never appears | The [`context-sheet.blade.php`](src/Resources/views/livewire/navs/context-sheet.blade.php) had two root-level elements (`<style>` + `<div>`), violating Livewire's single-root-element requirement. When `$isOpen` changed from `false` to `true`, DOM morphing failed to inject the overlay. | Move `<style>` inside the root `<div>` to ensure a single root element. Add `wire:key` on the overlay for stable morphing identity. | [`context-sheet.blade.php`](src/Resources/views/livewire/navs/context-sheet.blade.php) |
 | 7 | `wire:navigate` Breaks Bootstrap 5 Dropdowns (Alternating Freeze/Unfreeze) | TopNav dropdowns (module switcher, company switcher, language, profile) alternately work and stop working after clicking BottomBar tabs | `wire:navigate` destroys and recreates the TopNav component on every SPA navigation (new `component_id` each `mount()`). Bootstrap 5 stores dropdown instances in an internal `Map` keyed by element reference — all state is lost. Five re-init strategies failed. | **Remove `wire:navigate` from BottomBar links.** Use standard `<a href>` with full page loads. The SPA trade-off is acceptable for mobile navigation; dropdown reliability is the priority. | [`bottom-bar.blade.php`](src/Resources/views/livewire/navs/bottom-bar.blade.php), [`06-navigation-system.md`](./06-navigation-system.md) |
+| 8 | Detail Page Loses Sidebar Highlight | Sidebar item (e.g., "Payroll Runs") highlights on list page but loses highlight on detail page (e.g., `/payroll-runs/25`) | Exact URL comparison (`===`) fails because detail page URL differs from list page URL. `modelName` fallback only works when `configKey` is set on the detail page. | Use `str_starts_with()` prefix matching: `$isActive = request()->url() === $routeUrl \|\| str_starts_with(request()->url(), $routeUrl . '/')`. Also ensure navigation route matches actual route prefix. | [`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php), [`ContextSheet.php`](src/Http/Livewire/Layouts/Navs/ContextSheet.php) |
 
 ---
 

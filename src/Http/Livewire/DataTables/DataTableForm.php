@@ -167,6 +167,10 @@ class DataTableForm extends Component
         $this->fieldGroups = $resolver->getFieldGroups();
         $this->hiddenFields = $resolver->getHiddenFields();
 
+        // Resolve role dropdown options through the assignment hierarchy
+        // so users only see roles they are allowed to assign.
+        $this->resolveRoleOptions();
+
         // Company field visibility: show when All Companies (0), hide when specific company selected
         if ($this->isAllCompaniesMode()) {
             // Remove company_id from hidden so it appears on forms
@@ -187,6 +191,36 @@ class DataTableForm extends Component
         $this->relations = $resolver->getRelations();
         $this->columns = array_keys($this->fieldDefinitions);
 
+    }
+
+    /**
+     * Resolve role dropdown options through the assignment hierarchy.
+     *
+     * When a field definition uses 'options' => ['model' => Role::class, ...],
+     * replace the model reference with the filtered list from
+     * AuthorizationService::getAssignableRoles(). This ensures users only
+     * see roles they are allowed to assign, preventing privilege escalation
+     * in invitation forms, employee creation, and any other form with a
+     * role selector.
+     */
+    protected function resolveRoleOptions(): void
+    {
+        foreach ($this->fieldDefinitions as $field => &$definition) {
+            $options = $definition['options'] ?? [];
+
+            // Check if options is a model reference to Spatie Role
+            if (is_array($options) && isset($options['model'])) {
+                $model = $options['model'];
+
+                if (is_string($model) && (
+                    $model === \Spatie\Permission\Models\Role::class ||
+                    ltrim($model, '\\') === 'Spatie\\Permission\\Models\\Role'
+                )) {
+                    $definition['options'] = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::getAssignableRoles();
+                }
+            }
+        }
+        unset($definition);
     }
 
     protected function initializeFields(): void
@@ -233,8 +267,6 @@ class DataTableForm extends Component
             }*/
 
         }
-
-
 
     }
 
@@ -1065,8 +1097,29 @@ protected function isAllCompaniesMode(): bool
 
 
 
+    /**
+     * Trim all string values in $this->fields to prevent leading/trailing
+     * whitespace from causing spurious validation failures.
+     *
+     * PHP's filter_var(FILTER_VALIDATE_EMAIL) rejects emails with leading
+     * or trailing whitespace, and unique checks may also be affected.
+     */
+    protected function trimFields(): void
+    {
+        foreach ($this->fields as $key => $value) {
+            if (is_string($value)) {
+                $this->fields[$key] = trim($value);
+            }
+        }
+    }
+
     protected function validateFields(): void
     {
+        // Trim all string values before validation to prevent leading/trailing
+        // whitespace from causing spurious validation failures (e.g. email
+        // addresses with leading spaces fail filter_var/FILTER_VALIDATE_EMAIL).
+        $this->trimFields();
+
         // Merge top-level file uploads into $fields so the validator can see them.
         // Livewire's WithFileUploads properly persists TemporaryUploadedFile objects
         // in top-level properties but loses them inside nested arrays like $fields.
@@ -1109,7 +1162,7 @@ protected function isAllCompaniesMode(): bool
             $fieldDefs,
             $this->getFieldFactory(),
             $this->isEditMode,
-            null,
+            $this->modelClass,
             $this->recordId,
             $this->hiddenFields,
         );

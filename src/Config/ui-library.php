@@ -686,6 +686,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Role Assignment Hierarchy
+    |--------------------------------------------------------------------------
+    | Controls which roles each role is allowed to assign to other users.
+    | Used by AuthorizationService::getAssignableRoles() to filter role
+    | dropdowns in invitation forms, employee creation, and the access
+    | control manager.
+    |
+    | Each key is a role name. The value is an array of role names that
+    | role can assign. Use ['*'] to allow assigning any role.
+    |
+    | Roles NOT listed in the hierarchy default to 'default_assignable'.
+    */
+    'role_assignment' => [
+        'hierarchy' => [
+            'super_admin'    => ['*'],
+            'admin'          => ['admin', 'company_admin', 'hr_manager', 'hr_officer',
+                                 'payroll_officer', 'accountant', 'manager', 'supervisor',
+                                 'recruiter', 'employee'],
+            'company_admin'  => ['company_admin', 'hr_manager', 'hr_officer', 'payroll_officer',
+                                 'accountant', 'manager', 'supervisor', 'recruiter', 'employee'],
+            'hr_manager'     => ['hr_officer', 'manager', 'supervisor', 'recruiter', 'employee'],
+            'hr_officer'     => ['manager', 'supervisor', 'employee'],
+            'recruiter'      => ['employee'],
+        ],
+        'default_assignable' => ['employee'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Background Jobs Configuration
     |--------------------------------------------------------------------------
     | Controls the background jobs launcher button in the top navigation bar.

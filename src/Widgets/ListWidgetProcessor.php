@@ -4,11 +4,12 @@ namespace QuickerFaster\UILibrary\Widgets;
 
 use Illuminate\Support\Facades\DB;
 use QuickerFaster\UILibrary\Services\Filters\FilterService;
+use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
 
 class ListWidgetProcessor
 {
-    use ResolvesDateStrings;
+    use ResolvesDateStrings, HasCurrencySymbol;
 
     public function process(array $definition): array
     {
@@ -56,7 +57,8 @@ class ListWidgetProcessor
 
                     // Optional formatting (e.g., date, number, expiry_warning)
                     if (isset($col['format'])) {
-                        $value = $this->formatValue($value, $col['format'], $record, $field);
+                        $currencyCode = $col['currency_code'] ?? $definition['currency_code'] ?? null;
+                        $value = $this->formatValue($value, $col['format'], $record, $field, $currencyCode);
                     }
 
                     $item[$label] = $value;
@@ -147,7 +149,7 @@ class ListWidgetProcessor
      * @param string|null $field The field name (for formats that need the field name)
      * @return string
      */
-    protected function formatValue($value, string $format, $record = null, $field = null): string
+    protected function formatValue($value, string $format, $record = null, $field = null, ?string $currencyCode = null): string
     {
         switch ($format) {
             case 'date':
@@ -155,7 +157,9 @@ class ListWidgetProcessor
             case 'datetime':
                 return $value ? date('Y-m-d H:i', strtotime($value)) : '';
             case 'currency':
-                return number_format((float) $value, 2);
+                $code = $currencyCode ?: 'USD';
+                $symbol = $this->getCurrencySymbol($code);
+                return $symbol . number_format((float) $value, 2);
             case 'number':
                 return number_format((float) $value);
             case 'expiry_warning':
@@ -240,6 +244,15 @@ class ListWidgetProcessor
         }
 
         if (is_string($value)) {
+            // If the entire value is a single {{ placeholder }}, preserve the
+            // resolved type (null, int, etc.) so downstream components that
+            // expect typed parameters (e.g. ?int $recordId) receive the
+            // correct type instead of an empty string.
+            if (preg_match('/^\{\{\s*(.+?)\s*\}\}$/', $value, $m)) {
+                return data_get($record, trim($m[1]));
+            }
+
+            // Mixed text + placeholders: replace inline, convert null to ''
             return preg_replace_callback('/\{\{\s*(.+?)\s*\}\}/', function ($matches) use ($record) {
                 $field = trim($matches[1]);
                 $resolved = data_get($record, $field);

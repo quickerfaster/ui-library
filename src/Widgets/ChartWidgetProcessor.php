@@ -4,12 +4,13 @@ namespace QuickerFaster\UILibrary\Widgets;
 
 
 use Illuminate\Support\Facades\DB;
+use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
 use QuickerFaster\UILibrary\Traits\Widgets\HandlesRelationshipGroupBy;
 
 class ChartWidgetProcessor
 {
-    use HandlesRelationshipGroupBy, ResolvesDateStrings;
+    use HandlesRelationshipGroupBy, ResolvesDateStrings, HasCurrencySymbol;
 
     public function process(array $definition): array
     {
@@ -93,7 +94,8 @@ class ChartWidgetProcessor
             ];
         }
 
-        return [
+        // Resolve currency symbol for axis/tooltip formatting (only when explicitly requested)
+        $result = [
             'type' => 'chart',
             'title' => $definition['title'] ?? 'Chart',
             'icon' => $definition['icon'] ?? null,
@@ -103,6 +105,12 @@ class ChartWidgetProcessor
             'chart_type' => $definition['chart_type'] ?? 'bar',
             'width' => $definition['width'] ?? 6,
         ];
+
+        if (!empty($definition['currency_code'])) {
+            $result['currency_symbol'] = $this->getCurrencySymbol($definition['currency_code']);
+        }
+
+        return $result;
     }
 
     protected function getColors(int $count): array

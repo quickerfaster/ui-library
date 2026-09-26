@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-17
+> **Last Updated**: 2026-09-25 — CurrencyField now implemented (was previously a hypothetical example)
 
 **Related files**: [`03-module-pattern.md`](./03-module-pattern.md) · [`06-navigation-system.md`](./06-navigation-system.md) · [`07-component-catalog.md`](./07-component-catalog.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`14-integration-map.md`](./14-integration-map.md) · [`26-module-auto-discovery.md`](./26-module-auto-discovery.md)
 

@@ -59,7 +59,7 @@ class BulkInvite extends Component
 
     public function mount(): void
     {
-        $this->availableRoles = Role::pluck('name', 'id')->toArray();
+        $this->availableRoles = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::getAssignableRoles();
     }
 
     /**

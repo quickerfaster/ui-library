@@ -4,6 +4,7 @@ namespace QuickerFaster\UILibrary\Http\Livewire\Exports;
 
 use Livewire\Component;
 use QuickerFaster\UILibrary\Models\Export;
+use QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
@@ -31,17 +32,32 @@ class RecentExports extends Component
 
     public function loadExports()
     {
-        $userId = Auth::id();
-        $this->completedExports = Export::where('user_id', $userId)
-            ->whereIn('status', ['completed', 'failed'])
-            ->orderBy('created_at', 'desc')
-            ->limit(10)
-            ->get();
+        $user = Auth::user();
 
-        $this->inProgressExports = Export::where('user_id', $userId)
-            ->whereIn('status', ['pending', 'processing'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        // Admin bypass: super_admin, admin, company_admin see all exports.
+        // Other users only see their own exports (scoped by user_id).
+        if (AuthorizationService::isBypassAllowed($user)) {
+            $this->completedExports = Export::whereIn('status', ['completed', 'failed'])
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get();
+
+            $this->inProgressExports = Export::whereIn('status', ['pending', 'processing'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            $userId = $user->id;
+            $this->completedExports = Export::where('user_id', $userId)
+                ->whereIn('status', ['completed', 'failed'])
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            $this->inProgressExports = Export::where('user_id', $userId)
+                ->whereIn('status', ['pending', 'processing'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
     }
 
     public function getInProgressCountProperty()
@@ -83,9 +99,15 @@ class RecentExports extends Component
      */
     public function performClearAllExports()
     {
-        $exports = Export::where('user_id', Auth::id())
-            ->whereIn('status', ['completed', 'failed'])
-            ->get();
+        $user = Auth::user();
+        $query = Export::whereIn('status', ['completed', 'failed']);
+
+        // Non-admin users can only clear their own exports
+        if (! AuthorizationService::isBypassAllowed($user)) {
+            $query->where('user_id', $user->id);
+        }
+
+        $exports = $query->get();
 
 
         foreach ($exports as $export) {
@@ -111,9 +133,15 @@ class RecentExports extends Component
 
     public function cancelExport($exportId)
     {
-        $export = Export::where('id', $exportId)
-            ->where('user_id', auth()->id())
-            ->first();
+        $user = Auth::user();
+        $query = Export::where('id', $exportId);
+
+        // Non-admin users can only cancel their own exports
+        if (! AuthorizationService::isBypassAllowed($user)) {
+            $query->where('user_id', $user->id);
+        }
+
+        $export = $query->first();
 
         if ($export && in_array($export->status, ['pending', 'processing'])) {
             $export->update(['status' => 'cancelled', 'error_message' => 'Cancelled by user']);

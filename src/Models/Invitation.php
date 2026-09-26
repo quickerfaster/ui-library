@@ -3,9 +3,12 @@
 namespace QuickerFaster\UILibrary\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use QuickerFaster\UILibrary\Traits\HasCompanyScope;
 
 class Invitation extends Model
 {
+    use HasCompanyScope;
+
     const STATUS_PENDING = 'pending';
     const STATUS_ACCEPTED = 'accepted';
     const STATUS_EXPIRED = 'expired';
@@ -89,5 +92,13 @@ class Invitation extends Model
     public function logs()
     {
         return $this->hasMany(InvitationLog::class);
+    }
+
+    /**
+     * The company this invitation is scoped to.
+     */
+    public function company()
+    {
+        return $this->belongsTo(\QuickerFaster\UILibrary\Core\Organization\Models\Company::class, 'company_id');
     }
 }

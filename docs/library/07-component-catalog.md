@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-15
+> **Last Updated**: 2026-09-25
 
 **Related files**: [`00-index.md`](../README.md) · [`05-data-configs.md`](./05-data-configs.md) · [`06-navigation-system.md`](./06-navigation-system.md) · [`08-contracts-and-interfaces.md`](./08-contracts-and-interfaces.md) · [`09-engines-and-services.md`](./09-engines-and-services.md) · [`11-extension-guide.md`](./11-extension-guide.md)
 
@@ -242,6 +242,7 @@ protected array $map = [
     'morph_to_select' => MorphToSelectField::class,
     'password'     => PasswordField::class,
     'policy_calculation_builder' => PolicyCalculationBuilderField::class,
+    'currency'                   => CurrencyField::class,
 ];
 
 public function make(string $name, array $definition): FieldType
@@ -307,7 +308,7 @@ protected array $map = [
 | `HandlesToggleState` | [`src/Traits/Buttons/HandlesToggleState.php`](../../src/Traits/Buttons/HandlesToggleState.php) | Toggle button state management |
 | `NavigationFilter` | [`src/Traits/NavigationFilter.php`](../../src/Traits/NavigationFilter.php) | Permission-based nav item filtering |
 | `AppliesFilters` | [`src/Traits/AppliesFilters.php`](../../src/Traits/AppliesFilters.php) and [`src/Traits/Filters/AppliesFilters.php`](../../src/Traits/Filters/AppliesFilters.php) | Filter application logic |
-| `HasCurrencySymbol` | [`src/Traits/HasCurrencySymbol.php`](../../src/Traits/HasCurrencySymbol.php) | Currency symbol resolution |
+| `HasCurrencySymbol` | [`src/Traits/HasCurrencySymbol.php`](../../src/Traits/HasCurrencySymbol.php) | Currency symbol resolution with 4-tier chain: instance override → config override → built-in map → raw code fallback. Static `resolveCurrencySymbol()` for route closures. |
 | `HasCacheInvalidator` | [`src/Traits/HasCacheInvalidator.php`](../../src/Traits/HasCacheInvalidator.php) | Cache invalidation helpers |
 | `ResolvesExportValues` | [`src/Traits/ResolvesExportValues.php`](../../src/Traits/ResolvesExportValues.php) | Export value resolution |
 | `HasHintField` | [`src/Traits/FieldTypes/HasHintField.php`](../../src/Traits/FieldTypes/HasHintField.php) | Hint/tooltip rendering for fields |

@@ -81,14 +81,40 @@
                 @endforeach
 
                 @if ($this->overflowDesktop->isNotEmpty())
-                    @php $isOverflowActive = $this->overflowDesktop->has($activeContext); @endphp
+                    @php
+                        // Filter overflow items through the same permission
+                        // checks used by top-nav-item partial, so the "More"
+                        // dropdown only shows items the user can actually access.
+                        $filteredOverflow = collect($this->overflowDesktop)->filter(function ($item, $key) {
+                            $hasPermission = true;
+                            if (!empty($item['permission'])) {
+                                $hasPermission = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::canAccessView($item['permission']);
+                                if (!$hasPermission && !empty($item['roles'])) {
+                                    $roles = $item['roles'];
+                                    $isWildcard = ($roles === '*' || $roles === ['*']);
+                                    $hasPermission = $isWildcard
+                                        || \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed(auth()->user())
+                                        || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                                }
+                            } elseif (!empty($item['roles'])) {
+                                $roles = $item['roles'];
+                                $isWildcard = ($roles === '*' || $roles === ['*']);
+                                $hasPermission = $isWildcard
+                                    || \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::isBypassAllowed(auth()->user())
+                                    || (auth()->check() && auth()->user()->hasAnyRole((array) $roles));
+                            }
+                            return $hasPermission;
+                        });
+                        $isOverflowActive = $this->overflowDesktop->has($activeContext);
+                    @endphp
+                    @if ($filteredOverflow->isNotEmpty())
                     <div class="dropdown" wire:key="overflow-dropdown">
                         <a class="btn btn-sm px-3 py-1 nav-link dropdown-toggle {{ $isOverflowActive ? 'active fw-bold text-primary' : '' }}"
                             href="#" data-bs-toggle="dropdown" data-bs-boundary="viewport">
                             {{ __('qf::nav.more') }}
                         </a>
                         <ul class="dropdown-menu shadow border-0">
-                            @foreach ($this->overflowDesktop as $key => $item)
+                            @foreach ($filteredOverflow as $key => $item)
                                 @php
                                     $url = isset($item['route']) && !Str::contains($item['route'], '/')
                                         ? route($item['route']) : url($item['url'] ?? Str::kebab($key));
@@ -104,6 +130,7 @@
                             @endforeach
                         </ul>
                     </div>
+                    @endif
                 @endif
                 </ul>
             @endif
@@ -292,7 +319,14 @@
                     @if ($userMenuEnabled)
                         @auth
                             @foreach ($visibleLinks as $link)
-                                @php $linkUrl = !empty($link['url']) ? url($link['url']) : (!empty($link['route']) ? route($link['route']) : '#'); @endphp
+                                @php
+                                    // Hide "My Portal" link when already in the HR module —
+                                    // the My Portal tab is already visible in the top nav.
+                                    if (($link['label'] ?? '') === 'My Portal' && $currentModule === 'hr') {
+                                        continue;
+                                    }
+                                    $linkUrl = !empty($link['url']) ? url($link['url']) : (!empty($link['route']) ? route($link['route']) : '#');
+                                @endphp
                                 <li><a class="dropdown-item border-radius-md mb-1" href="{{ $linkUrl }}">
                                     <i class="{{ $link['icon'] ?? 'fas fa-link' }} me-2 opacity-6 text-sm"></i>{{ $link['label'] ?? 'Link' }}</a></li>
                             @endforeach

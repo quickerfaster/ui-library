@@ -4,12 +4,13 @@ namespace QuickerFaster\UILibrary\Widgets;
 
 use Illuminate\Support\Facades\DB;
 use QuickerFaster\UILibrary\Services\Filters\FilterService;
+use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
 use QuickerFaster\UILibrary\Traits\Widgets\HandlesRelationshipGroupBy;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
 
 class GroupedListWidgetProcessor
 {
-    use HandlesRelationshipGroupBy, ResolvesDateStrings;
+    use HandlesRelationshipGroupBy, ResolvesDateStrings, HasCurrencySymbol;
 
     public function process(array $definition): array
     {
@@ -55,9 +56,10 @@ class GroupedListWidgetProcessor
                     $field = $col['field'] ?? '';
                     $label = $col['label'] ?? $field;
                     $format = $col['format'] ?? null;
+                    $currencyCode = $col['currency_code'] ?? $definition['currency_code'] ?? null;
                     $value = data_get($row, $field);
                     if ($format) {
-                        $value = $this->formatValue($value, $format);
+                        $value = $this->formatValue($value, $format, $currencyCode);
                     }
                     $item[$label] = $value;
                 }
@@ -79,11 +81,13 @@ class GroupedListWidgetProcessor
         ];
     }
 
-    protected function formatValue($value, string $format): string
+    protected function formatValue($value, string $format, ?string $currencyCode = null): string
     {
         switch ($format) {
             case 'currency':
-                return number_format((float) $value, 2);
+                $code = $currencyCode ?: 'USD';
+                $symbol = $this->getCurrencySymbol($code);
+                return $symbol . number_format((float) $value, 2);
             case 'number':
                 return number_format((float) $value);
             case 'date':

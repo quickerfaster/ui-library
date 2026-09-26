@@ -1,7 +1,7 @@
 # Debug Checklist — Navigation & UI Bugs
 
 > **Purpose**: Quick-reference guide for diagnosing common navigation, event, and UI bugs in the QuickerFaster UI Library. Each entry maps symptoms → likely causes → fix.
-> **Last Updated**: 2026-09-22 (added: ESS DataTable action leakage, invitation company assignment gap, cross-company data leak audit, card/list view checkbox fix, onboarding pre-linked employee handling, employee number collision retry, JobTitle title-vs-name column fix, EmployeeProfile CompanyScope fix, PayrollWizard CompanyScope relationship eager-load fix)
+> **Last Updated**: 2026-09-25 (added: §26 payroll fixes; §27 currency symbol — configurable via trait + company currency_code; §27b — PayrollRunWizard base_currency inheritance; §27c — Payslip detail page currency symbol rendering)
 
 ---
 
@@ -662,3 +662,458 @@ When using `withoutCompanyScope()` on a query, audit all relationships accessed 
 1. Check the Blade view for `$model->relationship->attribute` accesses
 2. Check the component for lazy-loaded relationship accesses
 3. If the related model uses `HasCompanyScope`, eager-load with `withoutGlobalScopes()`
+
+---
+
+## 19. Validation Errors: Unique Rule Fails & Email Rejected with Whitespace
+
+### Symptoms
+- Creating a new record with an auto-generated field (e.g. `employee_number`) fails with "The [field] has already been taken." — **verify the value doesn't actually exist in the DB first** (in one case, EMPLOYEE-2026-00008 DID exist as a non-deleted record).
+- Email validation fails with "The email field must be a valid email address." even though the email address looks valid (e.g. `test@test.com`).
+
+### Root Causes & Fixes
+
+#### A. Leading/Trailing Whitespace in String Fields
+PHP's `filter_var($value, FILTER_VALIDATE_EMAIL)` — used by Laravel's `email` validation rule — rejects email addresses with leading or trailing whitespace. The library had **no trimming** of string values before validation.
+
+**Fix:** Added [`trimFields()`](src/Http/Livewire/DataTables/DataTableForm.php) method called at the start of [`validateFields()`](src/Http/Livewire/DataTables/DataTableForm.php). It iterates all `$this->fields` and trims any string value.
+
+#### B. Table-Based `unique` Rules Ignore Soft-Deletes
+Laravel's `unique:table,column` rule (string format) does **NOT** automatically add `WHERE deleted_at IS NULL` — only model-based rules do. If the model uses `SoftDeletes` and a soft-deleted record exists with the same value, the unique check fails even though the value appears "available."
+
+**Fix:** Enhanced [`adjustUniqueRule()`](src/Services/Validation/DataTableFormValidationService.php) to detect whether the model class uses the `SoftDeletes` trait (via `class_uses_recursive`). When it does, the method appends `,NULL,id,deleted_at,NULL` to the unique rule string. Also passes `$this->modelClass` from [`validateFields()`](src/Http/Livewire/DataTables/DataTableForm.php) to the validation service.
+
+#### C. Auto-Generate Button Wastes Sequence Numbers on Re-Click
+The "Generate" button in [`text-with-generate.blade.php`](src/Resources/views/components/fields/text-with-generate.blade.php) calls `generateField()` which atomically increments the sequence. Without a guard, every click consumed a new sequence number — even if the field already had a valid value.
+
+**Fix:** Added guard in [`generateField()`](src/Traits/HasAutoGenerateFields.php): if the field already has a non-empty value, return early without consuming another sequence number. Users can clear the field and click "Generate" again to get a fresh number.
+
+#### D. Design Decision: No Auto-Generate on Page Load
+Auto-generating on mount was considered but **reverted** because:
+- Every page visit would consume a sequence number (even if the user never submits)
+- Users must be able to type their own employee number manually
+- Gaps in sequence numbers are normal in business systems (identifiers, not counters)
+
+The field starts empty. The user either clicks "Generate" or types a number manually.
+
+### Verification
+1. Create a new employee → click "Generate" → submit → should succeed
+2. Click "Generate" again on same form → should NOT increment (guard)
+3. Submit with invalid data → fix and resubmit → field retains value, no double generation
+4. Soft-deleted records with the same unique value do not block new records
+5. Visit `/employees/create` → field is empty (no sequence consumed on page load)
+
+### Files Modified
+| File | Change |
+|------|--------|
+| [`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php) | Added `trimFields()`; pass `$this->modelClass` to validation service |
+| [`HasAutoGenerateFields.php`](src/Traits/HasAutoGenerateFields.php) | Guard: `!empty()` check prevents re-generation when field has value |
+| [`DataTableFormValidationService.php`](src/Services/Validation/DataTableFormValidationService.php) | Accept `$modelClass`; detect `SoftDeletes`; append `deleted_at IS NULL` |
+
+---
+
+## 19. Onboarding Wizard — Position Creation & onboarding_status
+
+### Symptoms
+- Invited employee completes onboarding wizard but `onboarding_status` is not set correctly
+- `SQLSTATE[23000]: NOT NULL constraint failed: employee_positions.job_title_id` when wizard tries to auto-create a minimal position
+- Employee has `company_id` but no `EmployeePosition` and unclear onboarding state
+
+### Root Cause
+[`autoCreatePosition()`](app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step1EmployeeRecord.php) was creating minimal `EmployeePosition` records without `job_title_id` (which had a `NOT NULL` constraint). The method tried to create placeholder positions but the database rejected them.
+
+### Fix (Two-Part)
+
+**Part 1 — Remove autoCreatePosition()**: The method was removed entirely. Position creation is now **always** the admin's responsibility — the onboarding wizard only handles the employee record. This avoids creating incomplete positions that lack `job_title_id`, `department_id`, etc.
+
+**Part 2 — Unified setOnboardingStatus()**: Replaced with a single method that checks what the admin has already done:
+
+| Condition | onboarding_status |
+|-----------|-------------------|
+| Admin already created position before invitation | `complete` |
+| Has company, no position yet | `position_pending` |
+| No company assigned | `company_pending` |
+
+This works for both pre-linked (invitation) and new employee paths.
+
+**Part 3 — Migration**: [`2026_09_23_144052_make_job_title_id_nullable_in_employee_positions.php`](database/migrations/2026_09_23_144052_make_job_title_id_nullable_in_employee_positions.php) makes `job_title_id` nullable — the admin can create positions without immediately assigning a job title.
+
+### Known Affected Files
+| File | Change |
+|------|--------|
+| [`Step1EmployeeRecord.php`](app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step1EmployeeRecord.php) | Removed `autoCreatePosition()`; added `setOnboardingStatus()` with position-existence check |
+| [`2026_09_23_144052_...`](database/migrations/2026_09_23_144052_make_job_title_id_nullable_in_employee_positions.php) | Made `job_title_id` nullable for flexible position creation |
+
+---
+
+## 20. Employee Number Generation — Race Condition & Collision
+
+### Symptoms
+- `UniqueConstraintViolationException` when creating employees, even with retry logic
+- Employee numbers skip values or collide under concurrent requests
+
+### Root Cause
+The legacy `MAX(employee_number)` approach has three flaws:
+1. **Lexicographic comparison**: `MAX()` on a string column compares character-by-character, not numerically
+2. **Read-modify-write race**: Two concurrent requests both read MAX, both generate the same number
+3. **Retry loop inefficiency**: Each retry re-queries MAX (same value), only increments by 1
+
+### Fix — Atomic Sequence Table
+Created `employee_number_sequence` table with row-level locking:
+
+```sql
+UPDATE employee_number_sequence SET current_value = current_value + 1 WHERE name = ?
+```
+
+The `UPDATE` acquires a row-level lock — no two transactions can read the same value. Each unique pattern gets its own sequence row (keyed by `md5(pattern)`), so per-company patterns have independent counters.
+
+### Known Affected Files
+| File | Change |
+|------|--------|
+| [`2026_09_23_000001_create_employee_number_sequence_table.php`](app/Modules/Hr/Database/Migrations/2026_09_23_000001_create_employee_number_sequence_table.php) | Migration: create table, seed from existing MAX |
+| [`ValueGenerator.php:41-82`](src/Services/ValueGenerator.php:41) | Use atomic UPDATE on sequence table; auto-create rows for new patterns; fallback to legacy MAX |
+| [`Step1EmployeeRecord.php:158-170`](app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step1EmployeeRecord.php:158) | Removed 5-retry collision loop — no longer needed |
+
+---
+
+## 21. Invitation Model — Missing `HasCompanyScope` & `company()` Relationship
+
+### Symptoms
+- "Recent Invitations" dashboard widget shows invitations from ALL companies in single-company mode
+- Toggling company column visibility on invitation DataTable throws `RelationNotFoundException: Call to undefined relationship [company]`
+
+### Root Cause
+The [`Invitation`](src/Models/Invitation.php) model had a `company_id` column but:
+1. Did **not** use `HasCompanyScope` — no automatic filtering by session company
+2. Did **not** have a `company()` relationship — the DataTable config referenced `dynamic_property: 'company'` but the method didn't exist
+
+### Fix
+1. Added `use HasCompanyScope` trait to `Invitation` model
+2. Added `company()` belongsTo relationship pointing to `Company` model
+
+### Known Affected Files
+| File | Change |
+|------|--------|
+| [`Invitation.php:8-10`](src/Models/Invitation.php:8) | Added `HasCompanyScope` trait |
+| [`Invitation.php:97-103`](src/Models/Invitation.php:97) | Added `company()` relationship |
+
+---
+
+## 22. List Widget `{{ placeholder }}` — Null Converted to Empty String
+
+### Symptoms
+- `TypeError: Cannot assign string to property DataTableForm::$recordId of type ?int`
+- Occurs when clicking "Add Job Info" from onboarding dashboard for employees without a position
+
+### Root Cause
+[`ListWidgetProcessor::resolveValue()`](src/Widgets/ListWidgetProcessor.php:242) converted ALL null resolutions to empty string `''`:
+```php
+return $resolved === null ? '' : (string) $resolved;
+```
+The dashboard config passes `'recordId' => '{{ employeePosition.id }}'`. For employees without a position, this resolved to `null` → became `''` → Livewire couldn't assign `''` to `?int $recordId`.
+
+### Fix
+When the entire value is a single `{{ placeholder }}`, preserve the resolved type (null, int, etc.):
+```php
+if (preg_match('/^\{\{\s*(.+?)\s*\}\}$/', $value, $m)) {
+    return data_get($record, trim($m[1]));  // preserves null
+}
+```
+
+### Known Affected Files
+| File | Change |
+|------|--------|
+| [`ListWidgetProcessor.php:242-257`](src/Widgets/ListWidgetProcessor.php:242) | Single-placeholder values preserve resolved type |
+
+---
+
+## 23. Onboarding Dashboard — Company Not Pre-Filled on "Add Job Info"
+
+### Symptoms
+- "Add Job Info" drawer opens with employee pre-filled but company dropdown empty
+- In "All Companies" mode, the `company_id` field is visible but not pre-selected
+
+### Root Cause
+The dashboard config's `prefilledData` only included `employee_id`:
+```php
+'prefilledData' => ['employee_id' => '{{ id }}'],
+```
+The `company_id` field is hidden in single-company mode (auto-injected from session) but visible in "All Companies" mode — yet it wasn't pre-filled.
+
+### Fix
+Added `'company_id' => '{{ company_id }}'` to `prefilledData`. In single-company mode the field is hidden (no visible effect). In "All Companies" mode, the employee's company is pre-selected.
+
+### Known Affected Files
+| File | Change |
+|------|--------|
+| [`onboarding_overview.php:114-116`](app/Modules/Hr/Data/dashboards/onboarding_overview.php:114) | Added `company_id` to `prefilledData` |
+
+---
+
+## 24. Employee Creation Form — Company Dropdown Shows All Companies
+
+### Symptoms
+- At `/employees/create`, the "Assign Company" dropdown in the invitation section shows ALL companies even in single-company mode
+- Admin could accidentally assign an employee to a different company
+
+### Root Cause
+[`HrEmployeeForm::render()`](app/Modules/Hr/Http/Livewire/HrEmployeeForm.php:63) loaded all companies without session scoping:
+```php
+$companies = \App\Modules\Hr\Models\Company::orderBy('name')->pluck('name', 'id')->toArray();
+```
+
+### Fix
+- **PHP**: Scope companies by session — in single-company mode, only show the current company
+- **Blade**: Hide the entire company dropdown in single-company mode (`@if ($sessionCompanyId === 0)`)
+
+### Known Affected Files
+| File | Change |
+|------|--------|
+| [`HrEmployeeForm.php:63-71`](app/Modules/Hr/Http/Livewire/HrEmployeeForm.php:63) | Scope companies by `session('current_company_id')` |
+| [`hr-employee-form.blade.php:138`](app/Modules/Hr/Resources/views/livewire/hr-employee-form.blade.php:138) | Hide dropdown when `$sessionCompanyId !== 0` |
+
+---
+
+## 25. Invitation Role Column — Shows ID Instead of Name
+
+### Symptoms
+- "Recent Invitations" dashboard widgets show role as integer (e.g. "13") instead of role name (e.g. "Employee")
+
+### Root Cause
+The dashboard config used `'field' => 'role'` which returns the raw column value (role ID). The `roleRelation` relationship exists on the Invitation model but wasn't used.
+
+### Fix
+Changed `'field' => 'role'` to `'field' => 'roleRelation.name'` in both dashboard configs. The `ListWidgetProcessor` auto-detects `roleRelation` from the dot-notation and eager-loads it.
+
+### Known Affected Files
+| File | Change |
+|------|--------|
+| [`onboarding_overview.php:149`](app/Modules/Hr/Data/dashboards/onboarding_overview.php:149) | `'role'` → `'roleRelation.name'` |
+| [`invitation_analytics.php:106`](app/Modules/Hr/Data/dashboards/invitation_analytics.php:106) | `'role'` → `'roleRelation.name'` |
+
+---
+
+## 26. Payroll Module — `pay_schedule_id` on Wrong Table
+
+### Symptoms
+- Payroll wizard step 1: "The selected company has no active employees on the chosen pay schedule" despite employees being assigned
+- Step 3 (Review & Preview): shows 0 payslips / "No payslips found"
+- One-time adjustment values lost when navigating between wizard steps
+- `UNIQUE constraint failed: payroll_payslips.payslip_number` on second payroll run
+- Payslip detail page 500 error: `Configuration not found for key: payroll._payslip`
+
+### Root Cause
+
+**Primary**: `pay_schedule_id` was queried from `employee_positions` (dropped column) instead of `employee_payroll_profiles` (canonical link). This affected 5 files across the Payroll module.
+
+**Secondary**: [`PayrollWizardAdjustments::save()`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollWizardAdjustments.php) was resetting `calculation_status` to `pending` and deleting all payslips on every "Continue" click, causing empty preview when queue worker wasn't running.
+
+**Tertiary**: Two `generatePayslipNumber()` methods had collision-prone formats — one used the SAME number for all employees in a run.
+
+### Fixes
+
+#### A. Migrate `pay_schedule_id` to `employee_payroll_profiles`
+
+All queries now join `employee_payroll_profiles` with `is_active = 1`. Column dropped from `employee_positions`.
+
+| File | Fix |
+|------|-----|
+| [`PayrollRunWizard.php`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunWizard.php) | `computeEligibleCompanies()` — joined `employee_payroll_profiles` |
+| [`PayrollCalculator.php`](app/Modules/Payroll/Services/Payroll/PayrollCalculator.php) | 2 references — joined `employee_payroll_profiles` |
+| [`PayrollWizardAdjustments.php`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollWizardAdjustments.php) | `getEmployeesProperty()` + `initializeAllTempAdjustments()` |
+| [`ProcessPayrollRun.php`](app/Modules/Payroll/Jobs/Payrolls/ProcessPayrollRun.php) | `handle()` — used `employeePayrollProfile` relationship |
+| [`employee_position.php`](app/Modules/Hr/Data/employee_position.php) | Removed `pay_schedule_id` field |
+| [`EmployeePosition.php`](app/Modules/Hr/Models/EmployeePosition.php) | Removed from `$fillable` |
+| Migration | [`2026_09_24_053733_drop_pay_schedule_id_from_employee_positions.php`](database/migrations/2026_09_24_053733_drop_pay_schedule_id_from_employee_positions.php) |
+
+#### B. Synchronous Dispatch + Queued Batches
+
+[`save()`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollWizardAdjustments.php) dispatches `ProcessPayrollRun` **synchronously** (`dispatchSync`). Main job runs immediately (count, delete old, dispatch batches). Batch processing stays queued. Preview polls without re-dispatching.
+
+#### C. Atomic Payslip Number Sequence
+
+Created [`payslip_number_sequence`](database/migrations/2026_09_24_133639_create_payslip_number_sequence_table.php) table: `PAYSLIP-{year}-{month}-{sequence:6}`. Both generators use atomic `UPDATE ... SET current_value = current_value + 1`.
+
+#### D. Mark Paid Cascades
+
+[`markPaid()`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunDetail.php) updates all payslips: `payment_status = 'paid'`, `paid_at = now()`.
+
+#### E. Config Key
+
+[`show.blade.php`](app/Modules/Payroll/Resources/views/payroll-payslips/show.blade.php) fixed corrupted `payroll._payslip` → `payroll.payroll_payslip`.
+
+### Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| `employee_payroll_profiles` is source of truth | `employee_positions.pay_schedule_id` was always NULL |
+| Generate on click, not page load | Prevents wasting sequences; users can type manually |
+| Only cascade "Paid" to payslips | Matches QuickBooks — approval ≠ payment |
+| Global payslip sequence | Simpler; per-company addable later |
+
+---
+
+## §27 Payroll — Currency Symbol Configuration
+
+### Symptoms
+- Currency symbol hardcoded as `"N"` (Naira) in print/summary routes
+- [`HasCurrencySymbol`](src/Traits/HasCurrencySymbol.php) trait has fixed 16-currency map — cannot add custom currencies without modifying library
+- Different companies using different currencies (NGN, USD, EUR) all show same symbol
+- No admin UI to change the default currency
+
+### Root Cause
+1. **Hardcoded symbol in routes**: [`web.php:76`](app/Modules/Payroll/Routes/web.php:76) and `:134` had `$currencySymbol = "N"` — ignored the already-resolved `$currencyCode` on the line above
+2. **Non-extensible trait**: [`HasCurrencySymbol`](src/Traits/HasCurrencySymbol.php) had a private hardcoded array with no extension point
+3. **Missing company fallback**: Currency resolution chain stopped at `pay_schedule.currency_code` or `base_currency` — never fell back to `company.currency_code`
+
+### Fix (2026-09-25)
+
+#### A. Library Trait — Extensible Resolution Chain
+
+[`HasCurrencySymbol`](src/Traits/HasCurrencySymbol.php) now supports a 4-tier resolution chain:
+1. **Instance override** — `getCurrencySymbolOverrides()` method on the using class
+2. **Config override** — `config('payroll.currency_symbols')` array (consuming app can publish)
+3. **Built-in map** — 16 common currencies (USD, EUR, GBP, NGN, etc.)
+4. **Raw code fallback** — returns the currency code itself if no symbol found
+
+Also added `HasCurrencySymbol::resolveCurrencySymbol(string $code)` static method for use in route closures and service classes.
+
+#### B. Route Closures — Replace Hardcoded "N"
+
+[`web.php:76`](app/Modules/Payroll/Routes/web.php:76) and `:134`: replaced `$currencySymbol = "N"` with `HasCurrencySymbol::resolveCurrencySymbol($currencyCode)`. Also added `$run->company?->currency_code` to the resolution chain.
+
+#### C. Currency Resolution Chain (All Locations)
+
+Every currency resolution now follows this priority:
+```
+pay_schedule.currency_code → payroll_run.base_currency → company.currency_code → 'USD'
+```
+
+**Files updated**:
+File | Change |
+|------|--------|
+[`web.php`](app/Modules/Payroll/Routes/web.php) | Lines 74-76, 132-134 — static resolver + company fallback |
+[`payroll-run-detail.blade.php`](app/Modules/Payroll/Resources/views/livewire/payroll/payroll-run-detail.blade.php) | Line 174 — added `$run->company?->currency_code` |
+[`wizard-adjustments.blade.php`](app/Modules/Payroll/Resources/views/livewire/payroll/wizard-adjustments.blade.php) | Line 137 — added `$emp->employee?->company?->currency_code` |
+[`wizard-preview.blade.php`](app/Modules/Payroll/Resources/views/livewire/payroll/wizard-preview.blade.php) | Lines 86, 222 — replaced hardcoded `'$'` fallback, added company chain |
+[`PayslipItems.php`](app/Modules/Payroll/Http/Livewire/Payroll/PayslipItems.php) | Line 22 — added `employee.company` eager load + fallback |
+[`PayrollRunDetail.php`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunDetail.php) | Lines 336, 341 — added `$this->run->company?->currency_code` |
+
+#### D. How to Add Custom Currencies
+
+**Option 1 — Config file** (recommended): Publish a `config/payroll.php` in the consuming app:
+```php
+return [
+    'currency_symbols' => [
+        'GHS' => 'GH₵',
+        'KES' => 'KSh',
+        'ZMW' => 'ZK',
+    ],
+];
+```
+
+**Option 2 — Per-component override**: Define `getCurrencySymbolOverrides()` on any component using the trait:
+```php
+protected function getCurrencySymbolOverrides(): array
+{
+    return ['GHS' => 'GH₵'];
+}
+```
+
+### Verification
+1. Set `companies.currency_code = 'NGN'` → all payroll views show ₦
+2. Set `companies.currency_code = 'EUR'` → all payroll views show €
+3. Add custom currency via `config('payroll.currency_symbols')` → symbol appears
+4. Print summary PDF → correct symbol (no more hardcoded "N")
+5. Multi-company run → each company's payslips show correct symbol
+
+---
+
+## §27b Payroll — `base_currency` Not Inheriting from Company
+
+### Symptoms
+- Payroll run detail page "Base Currency" always shows **USD** even when the company has `currency_code = 'NGN'`
+- `payroll_runs.base_currency` defaults to `'USD'` ([`PayrollRun.php:82`](app/Modules/Payroll/Models/PayrollRun.php:82)) and is never populated from the company
+
+### Root Cause
+[`PayrollRunWizard::goToStep2()`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunWizard.php) created/updated payroll runs without setting `base_currency`. The model default `'USD'` was always used.
+
+### Fix (2026-09-25)
+
+#### A. Wizard — Resolve Currency at Creation Time
+
+Added [`resolveBaseCurrency()`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunWizard.php:490) helper with priority chain:
+```
+pay_schedule.currency_code → company.currency_code → 'USD'
+```
+
+All three create/update paths in `goToStep2()` now include `'base_currency' => $baseCurrency`.
+
+#### B. Detail Page — Dynamic Display
+
+[`payroll-run-detail.blade.php:148-155`](app/Modules/Payroll/Resources/views/livewire/payroll/payroll-run-detail.blade.php) now resolves the display currency dynamically instead of showing the raw stored value. Removed the `@if ($run->base_currency)` guard — Base Currency is always shown.
+
+### Verification
+1. Create a company with `currency_code = 'NGN'`
+2. Create a payroll run for that company → `base_currency` stored as `'NGN'`
+3. View payroll run detail → "Base Currency" shows `NGN`
+4. Financial Totals card → amounts prefixed with ₦
+5. Existing payroll runs with `base_currency = 'USD'` still work (dynamic fallback reads company currency)
+
+---
+
+## §27c Payslip Detail — Monetary Values Missing Currency Symbols
+
+### Symptoms
+- Payslip detail page (e.g., `/payroll-payslips/77`) shows monetary values as raw numbers: `1000.00`, `1005.00`, `0.00`
+- No currency symbol (₦, $, €) prepended to any financial field
+- "Currency" field shows `USD` even when the company uses `NGN`
+
+### Root Cause
+The payslip detail page used the library's generic [`DataTableDetail`](src/Http/Livewire/DataTables/DataTableDetail.php) component, which renders all field values through `$fieldObj->renderDetail()` — a method that has no concept of currency. Number fields are displayed as plain numbers.
+
+### Fix (2026-09-25)
+
+#### A. Custom Detail Component
+
+Created [`PayslipDetail`](app/Modules/Payroll/Http/Livewire/Payroll/PayslipDetail.php) — extends `DataTableDetail`, adds `HasCurrencySymbol` trait. Resolves currency symbol from:
+
+```
+payslip.currency_code → employee.company.currency_code → employee.employeePosition.salary_currency → 'USD'
+```
+
+Monetary fields (base_salary, gross_pay, net_pay, total_deductions, etc.) are flagged via `$monetaryFields` array.
+
+#### B. Custom Blade View
+
+Created [`payslip-detail.blade.php`](app/Modules/Payroll/Resources/views/livewire/payroll/payslip-detail.blade.php) — identical to the library's `data-table-detail.blade.php` but wraps monetary field values with `{{ $currencySymbol }}` prefix.
+
+#### C. Registration
+
+- [`PayrollServiceProvider`](app/Modules/Payroll/Providers/PayrollServiceProvider.php:53): registered as `payroll.payslip-detail`
+- [`payroll_payslip.php`](app/Modules/Payroll/Data/payroll_payslip.php:5): set `'detailComponent' => 'payroll.payslip-detail'`
+
+The existing [`show.blade.php`](app/Modules/Payroll/Resources/views/payroll-payslips/show.blade.php:5) already reads `detailComponent` from config — no changes needed.
+
+### Verification
+1. View any payslip detail page → monetary values show with currency symbol (₦, $, €)
+2. Company with `currency_code = 'NGN'` → payslip shows `₦1,000.00`
+3. Company with `currency_code = 'USD'` → payslip shows `$1,000.00`
+4. Print view also shows currency symbols (same Blade template)
+5. Run `php artisan optimize:clear` after deploying
+
+#### D. Critical Gotchas
+
+1. **Duplicate `detailComponent` key**: The payslip data config had `'detailComponent' => ''` later in the file (line 327) which overwrote the new value at line 5. PHP arrays use the last value for duplicate keys — the second entry silently wins.
+2. **ModelConfigRepository 24h cache**: [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php:16) caches configs for 86400 seconds. After changing a data config file, run `php artisan optimize:clear` or `Cache::forget('model_config_payroll_payroll_payslip')`.
+3. **Livewire naming convention**: All detail components use `qf.` prefix (e.g., `qf.employee-detail`, `qf.payroll-run-detail`). The new component is registered as `qf.payslip-detail`.
+
+#### D. Critical Gotchas
+
+1. **Duplicate `detailComponent` key**: The payslip data config had `'detailComponent' => ''` later in the file (line 327) which overwrote the new value at line 5. PHP arrays use the last value for duplicate keys — the second entry silently wins.
+2. **ModelConfigRepository 24h cache**: [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php:16) caches configs for 86400 seconds. After changing a data config file, run `php artisan optimize:clear` or `Cache::forget('model_config_payroll_payroll_payslip')`.
+3. **Livewire naming convention**: All detail components use `qf.` prefix (e.g., `qf.employee-detail`, `qf.payroll-run-detail`). The new component is registered as `qf.payslip-detail`.</think>
+
+<｜DSML｜tool_calls>
+<｜DSML｜invoke name="apply_diff">
+<｜DSML｜parameter name="diff" string="true">

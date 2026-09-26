@@ -79,6 +79,27 @@ class InvitationService
                 $roleName = $role ? $role->name : null;
             }
 
+            // Security: validate that the invited role is within the
+            // hierarchy of roles the inviting user is allowed to assign.
+            // This prevents privilege escalation (e.g., an HR Officer
+            // inviting someone with the super_admin role).
+            if ($roleName) {
+                $userModel = config('auth.providers.users.model');
+                $inviter = $invitation->createdBy ? $userModel::find($invitation->createdBy) : null;
+                $inviterAssignable = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::getAssignableRoles($inviter);
+
+                $assignableNames = array_values($inviterAssignable);
+
+                if (!empty($assignableNames) && !in_array($roleName, $assignableNames, true)) {
+                    \Log::warning('[InvitationService] Role assignment blocked — role not in inviter hierarchy', [
+                        'invitation_id' => $invitation->id,
+                        'role' => $roleName,
+                        'created_by' => $invitation->createdBy,
+                    ]);
+                    $roleName = config('ui-library.role_assignment.default_assignable.0', 'employee');
+                }
+            }
+
             if ($roleName) {
                 $user->assignRole($roleName);
             }
@@ -93,11 +114,16 @@ class InvitationService
                 $user->save();
             }
 
-            // Also create a UserCompanyAssignment if the pivot table exists
-            if (class_exists(\QuickerFaster\UILibrary\Models\UserCompanyAssignment::class)) {
-                \QuickerFaster\UILibrary\Models\UserCompanyAssignment::firstOrCreate([
+            // Also create a row in the company_user pivot table so the
+            // UserCompanyAssignment component can pre-check the company.
+            // Use a direct DB insert because the UserCompanyAssignment
+            // model class may not exist in all consuming apps.
+            if (\Schema::hasTable('company_user')) {
+                \DB::table('company_user')->insertOrIgnore([
                     'user_id'    => $user->id,
                     'company_id' => $invitation->company_id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
             }
         }

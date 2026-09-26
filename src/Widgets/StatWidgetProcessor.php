@@ -2,16 +2,13 @@
 
 namespace QuickerFaster\UILibrary\Widgets;
 
-use QuickerFaster\UILibrary\Contracts\Widgets\Widget;
-use Illuminate\Support\Facades\DB;
+use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
 use QuickerFaster\UILibrary\Services\Filters\FilterService;
 
 class StatWidgetProcessor
 {
-    use ResolvesDateStrings;
-
-
+    use ResolvesDateStrings, HasCurrencySymbol;
 
     public function process(array $definition): array
     {
@@ -36,12 +33,19 @@ class StatWidgetProcessor
                     });
                 }
 
-                // ✅ Reuse the filter logic – dot notation works automatically
                 $filterService = new FilterService();
                 $filterService->applySimpleFilters($query, $conditions);
 
                 $value = $query->{$aggregate}($field);
             }
+        }
+
+        // Format: apply currency symbol if configured
+        $format = $definition['format'] ?? null;
+        if ($format === 'currency' && is_numeric($value)) {
+            $currencyCode = $definition['currency_code'] ?? 'USD';
+            $symbol = $this->getCurrencySymbol($currencyCode);
+            $value = $symbol . number_format((float) $value, 2);
         }
 
         return [

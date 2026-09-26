@@ -61,16 +61,36 @@ The `module_access` configuration in `config/ui-library.php` controls which role
 
 ```php
 'module_access' => [
-    'hr'           => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
-    'organization' => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
+    // Fine-grained HR prefixes — must come BEFORE the broad 'hr' prefix
+    // because the middleware uses first-match-wins (str_starts_with).
+    'hr/my-'       => ['employee', 'manager', 'hr_manager', 'hr_officer', 'admin', 'super_admin', 'company_admin'],
+    'hr/leave-hub' => ['employee', 'manager', 'hr_manager', 'hr_officer', 'admin', 'super_admin', 'company_admin'],
+    'hr/team-'     => ['employee', 'manager', 'hr_manager', 'hr_officer', 'admin', 'super_admin', 'company_admin'],
+
+    'hr'           => ['hr_manager', 'hr_officer', 'admin', 'super_admin', 'company_admin'],
+    'organization' => ['hr_manager', 'hr_officer', 'admin', 'super_admin', 'company_admin'],
     'admin'        => ['admin', 'super_admin', 'company_admin'],
-    'leave'        => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
-    'holiday'      => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
-    'attendance'   => ['hr_manager', 'admin', 'super_admin', 'company_admin'],
-    'payroll'      => ['payroll_officer', 'hr_manager', 'admin', 'super_admin', 'company_admin'],
+
+    // Employees do NOT get direct module access — all self-service
+    // functionality is available through hr/my-* ESS wrapper routes.
+    'leave'        => ['hr_manager', 'hr_officer', 'manager', 'supervisor', 'admin', 'super_admin', 'company_admin'],
+    'holiday'      => ['hr_manager', 'hr_officer', 'admin', 'super_admin', 'company_admin'],
+    'attendance'   => ['hr_manager', 'hr_officer', 'manager', 'supervisor', 'admin', 'super_admin', 'company_admin'],
+
+    'payroll'      => ['payroll_officer', 'hr_manager', 'accountant', 'admin', 'super_admin', 'company_admin'],
     'system'       => ['admin', 'super_admin', 'company_admin'],
 ],
 ```
+
+**Fine-grained prefix pattern**: When a module serves both admin and self-service users under the same URL namespace (e.g., `/hr/`), use more specific prefixes BEFORE the broad prefix. The [`EnsureModuleDashboardAccess`](../../app/Http/Middleware/EnsureModuleDashboardAccess.php) middleware uses `str_starts_with` with **first-match-wins** semantics. In the example above:
+
+- `/hr/my-portal` matches `hr/my-` → allows employees ✅
+- `/hr/leave-hub` matches `hr/leave-hub` → allows employees ✅
+- `/hr/employees` matches `hr` → only HR/admin roles ✅
+
+Without the fine-grained prefixes, `/hr/my-portal` would match the broad `hr` prefix and block employees, causing a redirect loop (the middleware redirects employees to `/hr/my-portal`, which then gets blocked again).
+
+**Employee module access**: Employees do not appear in `leave`, `holiday`, or `attendance` module access. They access all self-service functionality through `hr/my-*` ESS wrapper routes. This keeps the module switcher clean — employees never see it.
 
 The `EnsureModuleDashboardAccess` middleware checks this config on every request. Users without the required role are redirected to their appropriate dashboard. `super_admin`, `admin`, and `company_admin` bypass all checks.
 
@@ -90,6 +110,51 @@ The middleware must be registered in the consuming app's `bootstrap/app.php`:
 ```
 
 [`ResolveCompanyContext`](../../src/Http/Middleware/ResolveCompanyContext.php) (alias `qf.resolve-company-context`) reads the `current_company_id` from the session and binds it into the service container. This middleware is **required** for multi-tenant scoping — without it, [`CompanyScope`](../../src/Scopes/CompanyScope.php) cannot resolve the current tenant.
+
+### 1.6 Module Switcher Visibility (`module_switcher.roles`)
+
+The module switcher dropdown in the top navigation bar is controlled by `module_switcher.roles`:
+
+```php
+'module_switcher' => [
+    'enabled' => true,
+    'roles' => ['super_admin', 'admin', 'company_admin', 'hr_manager', 'hr_officer', 'payroll_officer', 'manager', 'supervisor', 'recruiter', 'accountant'],
+    'links' => [
+        // Cross-module links (e.g., "Admin Panel" button)
+    ],
+],
+```
+
+Users not in the configured roles do not see the module switcher at all. Employees are excluded — all self-service functionality is available through the HR module sidebar.
+
+### 1.7 Background Jobs Visibility (`background_jobs.roles`)
+
+The background jobs history icon (🕐) in the top navigation bar is controlled by `background_jobs.roles`:
+
+```php
+'background_jobs' => [
+    'enabled' => true,
+    'roles' => '*',  // All authenticated users
+    'icon' => 'fas fa-history',
+    'title' => 'Background Jobs',
+],
+```
+
+**User-scoped filtering**: The [`RecentExports`](../../src/Http/Livewire/Exports/RecentExports.php) and [`RecentImports`](../../src/Http/Livewire/Imports/RecentImports.php) components scope queries to `Auth::id()` by default. Non-admin users only see their own exports and imports.
+
+**Admin bypass**: When [`AuthorizationService::isBypassAllowed()`](../../src/Services/AccessControl/AuthorizationService.php) returns true (super_admin, admin, company_admin), the components show all users' jobs. This allows administrators to monitor and troubleshoot all export/import activity.
+
+### 1.8 Top Navigation Context Group Visibility
+
+Context groups (the tabs in the top navigation bar) are rendered through the [`top-nav-item`](../../src/Resources/views/livewire/navs/partials/top-nav-item.blade.php) partial, which applies permission-based filtering:
+
+1. **Explicit `permission` key**: Checked via `AuthorizationService::canAccessView()`
+2. **Explicit `roles` key**: Checked via `$user->hasAnyRole()`. `['*']` is a wildcard that passes for all authenticated users.
+3. **URL derivation**: If neither `permission` nor `roles` is set, derives `view_{resource}` from the URL path.
+
+**Best practice**: Use explicit `permission` keys on context groups. Avoid `'roles' => ['*']` unless the tab should be visible to every authenticated user (e.g., "My Portal"). The `roles` wildcard acts as a fallback that overrides the permission check — if a user lacks the permission but the group has `roles: ['*']`, the tab remains visible.
+
+**Overflow "More" dropdown**: The overflow dropdown in [`top-nav.blade.php`](../../src/Resources/views/livewire/navs/top-nav.blade.php) applies the same permission filtering as visible tabs. Items the user cannot access are excluded, and the "More" button hides entirely when no accessible overflow items remain.
 
 ---
 
@@ -407,6 +472,88 @@ public function test_notification_is_dispatched(): void
 ```
 
 ---
+
+### 1.9 Role Assignment Hierarchy (`role_assignment`)
+
+The `role_assignment` configuration controls which roles each role is allowed to assign to other users. This prevents privilege escalation in invitation forms, employee creation, and the access control manager.
+
+```php
+// config/ui-library.php
+'role_assignment' => [
+    'hierarchy' => [
+        'super_admin'    => ['*'],  // can assign any role
+        'admin'          => ['admin', 'company_admin', 'hr_manager', 'hr_officer',
+                             'payroll_officer', 'accountant', 'manager', 'supervisor',
+                             'recruiter', 'employee'],
+        'company_admin'  => ['company_admin', 'hr_manager', 'hr_officer', 'payroll_officer',
+                             'accountant', 'manager', 'supervisor', 'recruiter', 'employee'],
+        'hr_manager'     => ['hr_officer', 'manager', 'supervisor', 'recruiter', 'employee'],
+        'hr_officer'     => ['manager', 'supervisor', 'employee'],
+        'recruiter'      => ['employee'],
+    ],
+    'default_assignable' => ['employee'],
+],
+```
+
+**How it works**:
+
+1. [`AuthorizationService::getAssignableRoles()`](../../src/Services/AccessControl/AuthorizationService.php) reads the hierarchy config
+2. It finds all roles the current user has that appear in the hierarchy
+3. It collects the union of assignable roles from all matching entries
+4. If the user has no matching hierarchy entry, it returns `default_assignable`
+5. The `['*']` wildcard means "all roles" (for super_admin)
+
+**UI integration**: All role dropdown components call `getAssignableRoles()` instead of `Role::all()`:
+- [`BulkInvite`](../../src/Http/Livewire/Invitations/BulkInvite.php) — bulk invitation form
+- [`AccessControlManager`](../../src/Http/Livewire/AccessControls/AccessControlManager.php) — permission assignment panel
+- [`ModuleSelector`](../../src/Http/Livewire/AccessControls/ModuleSelector.php) — access control scope selector
+- [`RoleAssignmentManager`](../../src/Http/Livewire/AccessControls/RoleAssignmentManager.php) — user role assignment
+- `HrEmployeeForm` (consuming app) — employee creation with invitation
+
+**Backend validation**: [`InvitationService::accept()`](../../src/Services/Invitations/InvitationService.php) validates the invited role against the inviter's hierarchy. If the role is outside the inviter's allowed set, it falls back to `default_assignable` (typically `employee`) and logs a warning. This provides defense-in-depth even if the UI filtering is bypassed.
+
+### 1.10 SelectField Role Filtering
+
+Data table forms render role selectors through [`SelectField::getOptions()`](../../src/Components/FieldTypes/SelectField.php). This method resolves options from either `relationship.model` or `options.model` in the field config.
+
+**Security check**: `SelectField::getOptions()` now detects when either source references `Spatie\Permission\Models\Role` and returns [`getAssignableRoles()`](../../src/Services/AccessControl/AuthorizationService.php) directly. This is the single source of truth for role dropdown filtering:
+
+```php
+public function getOptions(): array
+{
+    $roleModel = \Spatie\Permission\Models\Role::class;
+    $relationshipModel = $this->definition['relationship']['model'] ?? null;
+    $optionsModel = $this->definition['options']['model'] ?? null;
+
+    if (
+        $relationshipModel === $roleModel
+        || $optionsModel === $roleModel
+    ) {
+        return AuthorizationService::getAssignableRoles();
+    }
+
+    // ... normal relationship/options resolution
+}
+```
+
+**Why this location matters**: `getOptions()` is called by every rendering path (form, table, detail), so any role selector anywhere in the system is filtered without requiring per-form overrides. The invitation config defines BOTH `relationship.model` and `options.model` — this check catches both.
+
+### 1.11 Admin Gate Bypass
+
+Laravel's native `can:` middleware and `Gate::allows()` check Spatie permissions directly. They do NOT know about [`AuthorizationService::isBypassAllowed()`](../../src/Services/AccessControl/AuthorizationService.php) — so admin roles (`super_admin`, `admin`, `company_admin`) get 403 errors on `can:permission` routes because those permissions aren't explicitly assigned to admin roles in the database.
+
+The consuming app registers a `Gate::before` callback in `AppServiceProvider::boot()`:
+
+```php
+Gate::before(function ($user, $ability) {
+    if (AuthorizationService::isBypassAllowed($user)) {
+        return true;  // admins pass all checks
+    }
+    return null;     // fall through to normal Spatie checks
+});
+```
+
+This makes all `can:` middleware, `Gate::allows()`, `$user->can()`, and `@can` directives respect the admin bypass universally.
 
 ## Cross-References
 

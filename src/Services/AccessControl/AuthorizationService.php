@@ -345,4 +345,57 @@ class AuthorizationService
 
         return \Str::snake(class_basename($class));
     }
+
+    /**
+     * Get the list of roles the given user is allowed to assign to other users.
+     *
+     * Used to filter role dropdowns in invitation forms, employee creation,
+     * and the access control manager. Prevents privilege escalation by
+     * ensuring users can only assign roles at or below their own level.
+     *
+     * The hierarchy is defined in config('ui-library.role_assignment.hierarchy').
+     * Roles not listed in the hierarchy default to config('ui-library.role_assignment.default_assignable').
+     *
+     * @param Authenticatable|null $user
+     * @return array  Associative array of role names (id => name or name => name)
+     */
+    public static function getAssignableRoles(?Authenticatable $user = null): array
+    {
+        $user = $user ?? auth()->user();
+
+        if (! $user) {
+            return [];
+        }
+
+        // Super admins and admins can assign any role
+        if (static::isBypassAllowed($user)) {
+            return \Spatie\Permission\Models\Role::pluck('name', 'id')->toArray();
+        }
+
+        $hierarchy = config('ui-library.role_assignment.hierarchy', []);
+        $defaultAssignable = config('ui-library.role_assignment.default_assignable', ['employee']);
+
+        // Collect assignable roles from all roles the user has
+        $assignableNames = [];
+        foreach ($hierarchy as $roleName => $allowedRoles) {
+            if ($user->hasRole($roleName)) {
+                if ($allowedRoles === ['*']) {
+                    return \Spatie\Permission\Models\Role::pluck('name', 'id')->toArray();
+                }
+                $assignableNames = array_merge($assignableNames, (array) $allowedRoles);
+            }
+        }
+
+        // If the user has no matching hierarchy entry, use the default
+        if (empty($assignableNames)) {
+            $assignableNames = (array) $defaultAssignable;
+        }
+
+        // Deduplicate and resolve to actual role records
+        $assignableNames = array_unique($assignableNames);
+
+        return \Spatie\Permission\Models\Role::whereIn('name', $assignableNames)
+            ->pluck('name', 'id')
+            ->toArray();
+    }
 }

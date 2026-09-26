@@ -40,6 +40,38 @@ class ValueGenerator
 
     protected function getNextSequence($modelClass, $fieldName, $generatorDef)
     {
+        // Derive a pattern-specific sequence name so each unique pattern
+        // (e.g. per-company employee number formats) gets its own
+        // independent counter starting from 1.
+        $pattern = $generatorDef['pattern'] ?? $this->defaultPattern($modelClass, $fieldName);
+        $sequenceName = $fieldName . '_' . md5($pattern);
+
+        // Use the atomic sequence table if it exists (guarantees no collisions).
+        // The UPDATE acquires a row-level lock, preventing concurrent reads
+        // from getting the same value.
+        if (\Schema::hasTable('employee_number_sequence')) {
+            // Auto-create the row for new patterns on first use
+            if (\DB::table('employee_number_sequence')->where('name', $sequenceName)->doesntExist()) {
+                \DB::table('employee_number_sequence')->insert([
+                    'name'          => $sequenceName,
+                    'current_value' => 1,
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ]);
+            }
+
+            \DB::update(
+                'UPDATE employee_number_sequence SET current_value = current_value + 1, updated_at = ? WHERE name = ?',
+                [now(), $sequenceName]
+            );
+
+            return (int) \DB::table('employee_number_sequence')
+                ->where('name', $sequenceName)
+                ->value('current_value');
+        }
+
+        // Fallback: legacy MAX-based approach (kept for backward compatibility
+        // if the sequence table hasn't been migrated yet).
         $sequenceModel = $generatorDef['sequenceModel'] ?? $modelClass;
         $sequenceField = $generatorDef['sequenceField'] ?? $fieldName;
 

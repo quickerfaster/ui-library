@@ -1,8 +1,56 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-20
-> **Status**: Current — Advanced Search Relationship Field Support
+> **Date**: 2026-09-25
+> **Status**: Current — Payroll Currency Symbol Configuration, CurrencyField Type, Widget Currency Enhancements, Sidebar Active State Fix
+
+---
+
+## 2026-09-25 — Payroll Currency Symbol Configuration
+
+### Added
+- **`CurrencyField`**: New library field type for monetary values. Renders with currency symbol prefix in tables, detail views, and print pages. Supports static `currency_code` in config or dynamic resolution from `$record->company->currency_code`. ([`CurrencyField.php`](src/Components/FieldTypes/CurrencyField.php))
+- **`HasCurrencySymbol` extensibility**: Trait now supports 4-tier resolution chain: instance override (`getCurrencySymbolOverrides()`) → config override (`payroll.currency_symbols`) → built-in map → raw code fallback. Added `resolveCurrencySymbol()` static method for route closures. ([`HasCurrencySymbol.php`](src/Traits/HasCurrencySymbol.php))
+- **Widget currency formatting**: `StatWidgetProcessor`, `GroupedListWidgetProcessor`, `ListWidgetProcessor`, and `ChartWidgetProcessor` now support `'format' => 'currency'` and `'currency_code'` options. Chart axes and tooltips show currency symbols. ([`StatWidgetProcessor.php`](src/Widgets/StatWidgetProcessor.php), [`GroupedListWidgetProcessor.php`](src/Widgets/GroupedListWidgetProcessor.php), [`ListWidgetProcessor.php`](src/Widgets/ListWidgetProcessor.php), [`ChartWidgetProcessor.php`](src/Widgets/ChartWidgetProcessor.php), [`chart.blade.php`](src/Resources/views/widgets/chart.blade.php))
+- **Sidebar detail page highlighting**: `sidebar-item.blade.php` and `ContextSheet` now use `str_starts_with()` prefix matching so detail pages (e.g., `/payroll-runs/25`) keep the parent list item highlighted. ([`sidebar-item.blade.php`](src/Resources/views/livewire/navs/partials/sidebar-item.blade.php), [`ContextSheet.php`](src/Http/Livewire/Layouts/Navs/ContextSheet.php))
+
+### Fixed
+- **Hardcoded Naira symbol**: Removed `$currencySymbol = "N"` from print/summary routes. Now uses `HasCurrencySymbol::resolveCurrencySymbol()`. ([`web.php`](app/Modules/Payroll/Routes/web.php))
+- **`base_currency` not inherited**: `PayrollRunWizard` now resolves `base_currency` from company at creation time. ([`PayrollRunWizard.php`](app/Modules/Payroll/Http/Livewire/Payroll/PayrollRunWizard.php))
+- **Payslip `currency_code` default**: Removed model default `'USD'` from `PayrollPayslip`. Payslips now inherit from payroll run. ([`PayrollPayslip.php`](app/Modules/Payroll/Models/PayrollPayslip.php))
+- **Payslip PDF**: Itemized breakdown (earnings/deductions/employer contributions), dynamic company header, real signatory names, payroll run context. ([`PayslipService.php`](app/Modules/Payroll/Services/PayslipService.php), [`payslip-pdf.blade.php`](app/Modules/Payroll/Resources/views/components/livewire/bootstrap/payroll/payslips/payslip-pdf.blade.php))
+- **Policy calculation builder**: Currency symbol now dynamic from company context. ([`PolicyCalculationBuilder.php`](app/Modules/Payroll/Http/Livewire/Payroll/PolicyCalculationBuilder.php), [`policy-calculation-builder.blade.php`](app/Modules/Payroll/Resources/views/livewire/payroll/policy-calculation-builder.blade.php))
+- **Sidebar double-highlight**: Fixed `configKey` conflict between Approvals and Payroll Runs pages. Navigation route aligned with actual route prefix. ([`navigation.php`](app/Modules/Payroll/Config/navigation.php), [`approvals.blade.php`](app/Modules/Payroll/Resources/views/approvals.blade.php))
+
+### Changed
+- **Data configs**: 30+ monetary fields across 5 configs changed from `'number'` to `'currency'` field type. 3 dashboard configs updated with `'currency_code' => 'NGN'`.
+- **Currency resolution chain** (standardized): `pay_schedule.currency_code → payroll_run.base_currency → company.currency_code → 'USD'`
+
+### Documentation
+- [`debug-checklist.md`](docs/debug-checklist.md): Added §§27, 27b, 27c (currency symbol configuration, base_currency inheritance, payslip detail rendering)
+
+---
+
+## 2026-09-23
+
+### Added
+- **Atomic Employee Number Sequence**: Created `employee_number_sequence` table with row-level locking for collision-free employee number generation. Each unique pattern gets its own counter via `md5(pattern)`. ([`ValueGenerator.php`](src/Services/ValueGenerator.php), migration)
+- **`company()` relationship on Invitation**: Added `belongsTo` relationship to `Company` model. ([`Invitation.php`](src/Models/Invitation.php))
+- **`HasCompanyScope` on Invitation**: Invitation model now respects company switcher — filters by `current_company_id` in single-company mode. ([`Invitation.php`](src/Models/Invitation.php))
+- **Debug Checklist Sections 19-25**: Documented onboarding position gap, employee number sequence, invitation model fixes, list widget null preservation, dashboard company pre-fill, employee form scoping, and role column display.
+
+### Fixed
+- **Onboarding Pre-Linked Employee Gap**: Pre-linked employees (from invitations) now get `onboarding_status` set even without a position, so they appear in the "Incomplete Onboarding" dashboard. ([`EmployeeOnboardingWizard.php`](app/Modules/Hr/Http/Livewire/Onboarding/EmployeeOnboardingWizard.php), [`Step1EmployeeRecord.php`](app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step1EmployeeRecord.php))
+- **Onboarding `onboarding_status` Logic**: Changed from binary (`complete`/`position_pending`) to ternary (`complete`/`position_pending`/`company_pending`) based on whether the position has job details. ([`EmployeePosition.php`](app/Modules/Hr/Models/EmployeePosition.php))
+- **List Widget Null Placeholder**: Single `{{ placeholder }}` values now preserve their resolved type (null, int) instead of converting to empty string. Fixes `TypeError` when passing null `recordId` to `DataTableForm`. ([`ListWidgetProcessor.php`](src/Widgets/ListWidgetProcessor.php))
+- **Invitation Pivot Table Gap**: `InvitationService::accept()` now writes directly to `company_user` pivot table instead of relying on missing `UserCompanyAssignment` model class. ([`InvitationService.php`](src/Services/Invitations/InvitationService.php))
+- **`UserCompanyAssignment` Fallback**: Component now checks direct `company_id` on user model when pivot table is empty. ([`UserCompanyAssignment.php`](app/Modules/Organization/Http/Livewire/UserCompanyAssignment.php))
+- **Employee Form Company Scoping**: Company dropdown in invitation section now hidden in single-company mode, shows only current company. ([`HrEmployeeForm.php`](app/Modules/Hr/Http/Livewire/HrEmployeeForm.php), [`hr-employee-form.blade.php`](app/Modules/Hr/Resources/views/livewire/hr-employee-form.blade.php))
+- **Dashboard Role Column**: "Recent Invitations" widgets now show role name via `roleRelation.name` instead of raw role ID. ([`onboarding_overview.php`](app/Modules/Hr/Data/dashboards/onboarding_overview.php), [`invitation_analytics.php`](app/Modules/Hr/Data/dashboards/invitation_analytics.php))
+- **Onboarding Dashboard Company Pre-fill**: "Add Job Info" action now pre-fills `company_id` from employee record. ([`onboarding_overview.php`](app/Modules/Hr/Data/dashboards/onboarding_overview.php))
+- **Onboarding Step 3 Pay Schedule**: Fixed `CompanyScope` issue when resolving default pay schedule; handles missing schedule gracefully. ([`Step3PayrollBanking.php`](app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step3PayrollBanking.php))
+- **Attendance Actions Audit**: Removed `edit`/`delete` from auto-calculated records (Attendance, AttendanceSession); added cross-navigation actions (View Clock Events, View Attendance, View Sessions). ([`clock_event.php`](app/Modules/Attendance/Data/clock_event.php), [`attendance.php`](app/Modules/Attendance/Data/attendance.php), [`attendance_session.php`](app/Modules/Attendance/Data/attendance_session.php))
+- **Vendor Copy Sync**: Multiple fixes synced to `vendor/quicker-faster/ui-library/` (ListWidgetProcessor, InvitationService, ValueGenerator, Invitation model, row-actions.blade.php)
 
 ---
 

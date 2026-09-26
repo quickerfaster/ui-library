@@ -57,20 +57,18 @@ class RoleAssignmentManager extends Component
 
     /**
      * Roles that the current admin is allowed to assign.
+     *
+     * Delegates to AuthorizationService::getAssignableRoles() which uses
+     * the config-driven role_assignment.hierarchy for consistent filtering
+     * across all role-assignment UIs.
      */
     protected function getAssignableRoles(): Collection
     {
-        $currentUser = auth()->user();
-        $allRoles = Role::orderBy('name')->get();
+        $assignable = AuthorizationService::getAssignableRoles();
 
-        if ($currentUser->hasRole('super_admin')) {
-            return $allRoles;
-        }
-
-        // Company admin cannot assign super_admin or company_admin roles
-        $forbiddenRoles = AuthorizationService::COMPANY_ADMIN_ROLES_ARRAY;
-
-        return $allRoles->reject(fn($role) => in_array($role->name, $forbiddenRoles));
+        return Role::whereIn('id', array_keys($assignable))
+            ->orderBy('name')
+            ->get();
     }
 
     public function updatedSelectedUserId($userId)

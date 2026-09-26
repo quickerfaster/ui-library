@@ -2,7 +2,7 @@
 
 > **Package**: `quicker-faster/ui-library`
 > **Namespace**: `QuickerFaster\UILibrary\`
-> **Last Updated**: 2026-08-14
+> **Last Updated**: 2026-09-25
 
 **Related files**: [`00-index.md`](../README.md) · [`09-engines-and-services.md`](./09-engines-and-services.md) · [`15-gaps-and-recommendations.md`](./15-gaps-and-recommendations.md) · [`17-view-config-routing-interplay.md`](./17-view-config-routing-interplay.md) · [`../implementation-plan.md`](../implementation-plan.md)
 
@@ -32,6 +32,7 @@ This file records **what has been built and when** across the decoupling and fea
 | **4.4** | ✅ | Dropdown Application Switcher — replaced `ModuleSwitcher` Livewire component with inline Bootstrap 5 dropdown in `TopNav` | [`06-navigation-system.md`](./06-navigation-system.md) |
 | **4.5** | ✅ | Config-Driven Navigation Metadata — `NavigationManager::getSections()` 5-tier priority chain, `SidebarComposer`, `WorkspaceResolver` + `WorkspaceFilter` | [`06-navigation-system.md`](./06-navigation-system.md) |
 | **4.6** | 🔄 | Architecture Blueprint Restructure — topic-file split (this file set) | [`00-index.md`](../README.md) |
+| **5.0** | ✅ | Payroll Currency Symbol Configuration — `CurrencyField` type, `HasCurrencySymbol` extensibility, widget currency formatting, sidebar detail page highlighting | [`CHANGELOG.md`](../CHANGELOG.md), [`debug-checklist.md`](../debug-checklist.md) §§27-27c |
 
 > The full engine sections (§12–§16) are **not duplicated here**. Read [`09-engines-and-services.md`](./09-engines-and-services.md) for the complete architecture, schemas, and usage examples.
 

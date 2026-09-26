@@ -18,7 +18,8 @@ class ModuleSelector extends Component
     public function mount()
     {
         // Define or fetch roles and modules dynamically
-        $this->roles = Role::all()->pluck("id", "name");
+        // Use the role assignment hierarchy to filter assignable roles
+        $this->roles = \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::getAssignableRoles();
         $this->modules = $this->getModuleNames();
 
         // ["Role", "User", "Team"];

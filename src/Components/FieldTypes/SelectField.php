@@ -91,6 +91,20 @@ class SelectField implements FieldType
 
     public function getOptions(): array
     {
+        // Security: if this select references the Role model (either via
+        // relationship or options.model), resolve options through the
+        // assignment hierarchy so users only see roles they can assign.
+        $roleModel = \Spatie\Permission\Models\Role::class;
+        $relationshipModel = $this->definition['relationship']['model'] ?? null;
+        $optionsModel = $this->definition['options']['model'] ?? null;
+
+        if (
+            (is_string($relationshipModel) && ($relationshipModel === $roleModel || ltrim($relationshipModel, '\\') === 'Spatie\\Permission\\Models\\Role'))
+            || (is_string($optionsModel) && ($optionsModel === $roleModel || ltrim($optionsModel, '\\') === 'Spatie\\Permission\\Models\\Role'))
+        ) {
+            return \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::getAssignableRoles();
+        }
+
         // If relationship is defined, load options from related model.
         if (isset($this->definition['relationship'])) {
             $rel = $this->definition['relationship'];

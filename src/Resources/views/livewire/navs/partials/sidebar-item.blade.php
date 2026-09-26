@@ -24,7 +24,9 @@
         } else {
             // Direct URL comparison
             $routePath = parse_url($item['route'], PHP_URL_PATH) ?? $item['route'];
-            $isActive = request()->url() === url($routePath);
+            $routeUrl = url($routePath);
+            // Support detail pages: /payroll-runs/25 should match /payroll/payroll-runs
+            $isActive = request()->url() === $routeUrl || str_starts_with(request()->url(), $routeUrl . '/');
         }
     } elseif (isset($item['url'])) {
         $isActive = request()->url() === url($item['url']);

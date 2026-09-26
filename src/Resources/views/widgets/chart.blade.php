@@ -28,13 +28,38 @@
 <script>
     document.addEventListener('livewire:initialized', function () {
         const ctx = document.getElementById('{{ $data['chart_id'] }}').getContext('2d');
+        const currencySymbol = @json($data['currency_symbol'] ?? null);
+
+        const options = {
+            responsive: true,
+            maintainAspectRatio: true,
+        };
+
+        if (currencySymbol) {
+            options.scales = {
+                y: {
+                    ticks: {
+                        callback: function(value) {
+                            return currencySymbol + value.toLocaleString();
+                        }
+                    }
+                }
+            };
+            options.plugins = {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + currencySymbol + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            };
+        }
+
         new Chart(ctx, {
             type: '{{ $data['chart_type'] }}',
             data: @json($data['chart_data']),
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-            }
+            options: options,
         });
     });
 </script>
