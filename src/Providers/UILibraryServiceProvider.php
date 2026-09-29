@@ -366,7 +366,6 @@ class UILibraryServiceProvider extends ServiceProvider
 
         // Quick Actions
         Livewire::component('qf.quick-actions-panel', \QuickerFaster\UILibrary\Http\Livewire\QuickActions\QuickActionsPanel::class);
-        Livewire::component('qf.clock-in-out', \QuickerFaster\UILibrary\Http\Livewire\QuickActions\ClockInOut::class);
         Livewire::component('qf.import-form', \QuickerFaster\UILibrary\Http\Livewire\DataTables\ImportForm::class);
         Livewire::component('qf.recent-exports', \QuickerFaster\UILibrary\Http\Livewire\Exports\RecentExports::class);
         Livewire::component('qf.recent-imports', \QuickerFaster\UILibrary\Http\Livewire\Imports\RecentImports::class);

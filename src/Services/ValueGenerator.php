@@ -49,10 +49,14 @@ class ValueGenerator
         // Use the atomic sequence table if it exists (guarantees no collisions).
         // The UPDATE acquires a row-level lock, preventing concurrent reads
         // from getting the same value.
-        if (\Schema::hasTable('employee_number_sequence')) {
+        // Table name is configurable so consuming apps can use their own
+        // sequence table (e.g. 'employee_number_sequence' for HR apps).
+        $sequenceTable = config('ui-library.sequence.table', 'value_sequences');
+
+        if (\Schema::hasTable($sequenceTable)) {
             // Auto-create the row for new patterns on first use
-            if (\DB::table('employee_number_sequence')->where('name', $sequenceName)->doesntExist()) {
-                \DB::table('employee_number_sequence')->insert([
+            if (\DB::table($sequenceTable)->where('name', $sequenceName)->doesntExist()) {
+                \DB::table($sequenceTable)->insert([
                     'name'          => $sequenceName,
                     'current_value' => 1,
                     'created_at'    => now(),
@@ -61,11 +65,11 @@ class ValueGenerator
             }
 
             \DB::update(
-                'UPDATE employee_number_sequence SET current_value = current_value + 1, updated_at = ? WHERE name = ?',
+                "UPDATE {$sequenceTable} SET current_value = current_value + 1, updated_at = ? WHERE name = ?",
                 [now(), $sequenceName]
             );
 
-            return (int) \DB::table('employee_number_sequence')
+            return (int) \DB::table($sequenceTable)
                 ->where('name', $sequenceName)
                 ->value('current_value');
         }

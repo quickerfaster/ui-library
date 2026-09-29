@@ -1,8 +1,27 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-25
-> **Status**: Current — Payroll Currency Symbol Configuration, CurrencyField Type, Widget Currency Enhancements, Sidebar Active State Fix
+> **Date**: 2026-09-28
+> **Status**: Current — Library Boundary Cleanup (HR/attendance components moved to consuming app)
+
+---
+
+## 2026-09-28 — Library Boundary Cleanup
+
+### Removed (moved to consuming app)
+- **`ClockEventRecorder` contract**: Removed `src/Contracts/Attendance/ClockEventRecorder.php` and the `Contracts/Attendance/` namespace. The consuming app's `ClockEventRecorderService` is now a standalone service (no longer implements a library contract). ([`ClockEventRecorderService.php`](hr-consuming-app:app/Modules/Attendance/Services/ClockEventRecorderService.php))
+- **`ClockInOut` Livewire component**: Removed `src/Http/Livewire/QuickActions/ClockInOut.php` and `src/Resources/views/livewire/quick-actions/clock-in-out.blade.php`. Now lives in the consuming app as `app/Modules/Attendance/Http/Livewire/ClockInOut.php` and is registered as `attendance.clock-in-out`. ([`ClockInOut.php`](hr-consuming-app:app/Modules/Attendance/Http/Livewire/ClockInOut.php))
+- **`TeamWhoIsOutWidgetProcessor`**: Removed `src/Widgets/TeamWhoIsOutWidgetProcessor.php`. Now lives in the consuming app as `app/Modules/Leave/Widgets/TeamWhoIsOutWidgetProcessor.php`. ([`TeamWhoIsOutWidgetProcessor.php`](hr-consuming-app:app/Modules/Leave/Widgets/TeamWhoIsOutWidgetProcessor.php))
+- **`WorkflowDefinitionList`**: Removed the deprecated component and view (replaced by the generic `qf.data-table` with `admin.workflow_definition` config). Its Livewire registration was already commented out. ([`WorkflowDefinitionList.php`](src/Http/Livewire/Workflows/WorkflowDefinitionList.php))
+
+### Changed
+- **`ValueGenerator`**: Sequence table name is now configurable via `config('ui-library.sequence.table', 'value_sequences')` instead of hardcoding `employee_number_sequence`. ([`ValueGenerator.php`](src/Services/ValueGenerator.php))
+- **`AuthorizationService`**: Renamed `$resolveUserEmployeeId` → `$resolveUserSubjectId` and `recordBelongsToEmployee()` → `recordBelongsToSubject()` to remove HR-specific naming from the library's record-ownership mechanism. ([`AuthorizationService.php`](src/Services/AccessControl/AuthorizationService.php))
+- **`WidgetProcessor`**: Removed the `team_whos_out` entry from the widget map. ([`WidgetProcessor.php`](src/Services/Widgets/WidgetProcessor.php))
+- **`UILibraryServiceProvider`**: Removed the `qf.clock-in-out` Livewire component registration. ([`UILibraryServiceProvider.php`](src/Providers/UILibraryServiceProvider.php))
+
+### Rationale
+These components were HR/attendance-specific and failed the library's two-domain test (see [`25-library-independence-safeguards.md`](docs/library/25-library-independence-safeguards.md)). Moving them to the consuming app restores the library's domain-agnostic boundary.
 
 ---
 

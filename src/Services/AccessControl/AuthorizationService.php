@@ -14,23 +14,23 @@ class AuthorizationService
     ) {}
 
     /**
-     * Callback that resolves the employee ID for a given user.
+     * Callback that resolves the subject ID for a given user.
      *
      * Set by the consuming application in a service provider to enable
      * record-ownership bypass in {@see authorizeView()}. When set, users
-     * who own a record (i.e. the record's `employee_id` matches their
-     * resolved employee ID) are allowed to view it without needing the
+     * who own a record (i.e. the record's subject/owner ID matches their
+     * resolved subject ID) are allowed to view it without needing the
      * `view_{resource}` Spatie permission.
      *
      * Example (in AppServiceProvider::boot):
-     *   \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::\$resolveUserEmployeeId =
+     *   \QuickerFaster\UILibrary\Services\AccessControl\AuthorizationService::\$resolveUserSubjectId =
      *       function (\Illuminate\Contracts\Auth\Authenticatable \$user): ?int {
      *           return \App\Modules\Hr\Models\Employee::where('user_id', \$user->id)->value('id');
      *       };
      *
      * @var callable|null
      */
-    public static $resolveUserEmployeeId = null;
+    public static $resolveUserSubjectId = null;
 
     /**
      * Pipe-separated string of admin role names for use with
@@ -152,14 +152,13 @@ class AuthorizationService
         }
 
         // Ownership bypass: users can always view records they own.
-        // This covers ESS (Employee Self-Service) pages where an employee
-        // views their own leave requests, payslips, attendance records, etc.
-        // The consuming app registers a callback via $resolveUserEmployeeId
-        // that maps a User to their Employee ID.
-        if (static::$resolveUserEmployeeId !== null) {
-            $employeeId = call_user_func(static::$resolveUserEmployeeId, $user);
+        // This covers self-service pages where a subject (e.g. employee)
+        // views their own records. The consuming app registers a callback
+        // via $resolveUserSubjectId that maps a User to their subject ID.
+        if (static::$resolveUserSubjectId !== null) {
+            $subjectId = call_user_func(static::$resolveUserSubjectId, $user);
 
-            if ($employeeId !== null && $this->recordBelongsToEmployee($record, $employeeId)) {
+            if ($subjectId !== null && $this->recordBelongsToSubject($record, $subjectId)) {
                 return;
             }
         }
@@ -219,11 +218,11 @@ class AuthorizationService
             return;
         }
 
-        // Employee ownership bypass: employees can create records
-        // scoped to their own employee_id
-        if (static::$resolveUserEmployeeId !== null) {
-            $employeeId = call_user_func(static::$resolveUserEmployeeId, $user);
-            if ($employeeId !== null) {
+        // Subject ownership bypass: subjects can create records
+        // scoped to their own identity.
+        if (static::$resolveUserSubjectId !== null) {
+            $subjectId = call_user_func(static::$resolveUserSubjectId, $user);
+            if ($subjectId !== null) {
                 return;
             }
         }
@@ -261,10 +260,10 @@ class AuthorizationService
             return;
         }
 
-        // Employee ownership bypass
-        if (static::$resolveUserEmployeeId !== null) {
-            $employeeId = call_user_func(static::$resolveUserEmployeeId, $user);
-            if ($employeeId !== null) {
+        // Subject ownership bypass
+        if (static::$resolveUserSubjectId !== null) {
+            $subjectId = call_user_func(static::$resolveUserSubjectId, $user);
+            if ($subjectId !== null) {
                 return;
             }
         }
@@ -290,26 +289,26 @@ class AuthorizationService
     }
 
     /**
-     * Check whether a record belongs to a given employee.
+     * Check whether a record belongs to a given subject.
      *
      * Supports two patterns:
-     *  1. Direct `employee_id` property/column on the record.
-     *  2. `employee()` relationship that returns an Employee model with an `id`.
+     *  1. Direct `employee_id` / `subject_id` property/column on the record.
+     *  2. `employee()` / `subject()` relationship that returns a model with an `id`.
      *
-     * @param object $record      The resolved model instance
-     * @param int    $employeeId  The employee's primary key
+     * @param object $record     The resolved model instance
+     * @param int    $subjectId  The subject's primary key
      * @return bool
      */
-    protected function recordBelongsToEmployee(object $record, int $employeeId): bool
+    protected function recordBelongsToSubject(object $record, int $subjectId): bool
     {
-        // Pattern 1: Direct employee_id column (most HR records)
+        // Pattern 1: Direct employee_id / subject_id column
         if (method_exists($record, 'getAttribute') || property_exists($record, 'employee_id')) {
             try {
-                $recordEmployeeId = $record->getAttribute('employee_id')
+                $recordSubjectId = $record->getAttribute('employee_id')
                     ?? $record->employee_id
                     ?? null;
 
-                if ($recordEmployeeId !== null && (int) $recordEmployeeId === $employeeId) {
+                if ($recordSubjectId !== null && (int) $recordSubjectId === $subjectId) {
                     return true;
                 }
             } catch (\Throwable $e) {
@@ -317,12 +316,12 @@ class AuthorizationService
             }
         }
 
-        // Pattern 2: employee() relationship
+        // Pattern 2: employee() / subject() relationship
         if (method_exists($record, 'employee')) {
             try {
-                $employee = $record->employee()->first();
+                $subject = $record->employee()->first();
 
-                if ($employee && method_exists($employee, 'getKey') && (int) $employee->getKey() === $employeeId) {
+                if ($subject && method_exists($subject, 'getKey') && (int) $subject->getKey() === $subjectId) {
                     return true;
                 }
             } catch (\Throwable $e) {

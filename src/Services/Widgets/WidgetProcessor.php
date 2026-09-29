@@ -14,7 +14,6 @@ use QuickerFaster\UILibrary\Widgets\ProgressWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\TrendWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\GroupedListWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\QuickActionsWidgetProcessor;
-use QuickerFaster\UILibrary\Widgets\TeamWhoIsOutWidgetProcessor;
 
 class WidgetProcessor
 {
@@ -32,9 +31,10 @@ class WidgetProcessor
         'activity_log' => ActivityLogWidgetProcessor::class,
         'profile_header' => ProfileHeaderWidgetProcessor::class,
         'quick_actions' => QuickActionsWidgetProcessor::class,
-        'team_whos_out' => TeamWhoIsOutWidgetProcessor::class,
 
-
+        // 'team_whos_out' removed — moved to consuming app's Leave module
+        // as part of library boundary cleanup (2026-09-28). The consuming
+        // app should register its own widget processor for this type.
 
     ];
 
