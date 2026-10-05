@@ -125,7 +125,7 @@ class WorkflowEngine
         $this->notifyTransition(
             $workflow,
             'submitted',
-            $this->resolveStepRecipientIds($workflow->currentStep, $workspaceId),
+            $this->resolveStepRecipientIdsWithContext($workflow, $workflow->currentStep, $workspaceId),
             ['workflowable_type' => $workflow->workflowable_type],
         );
 
@@ -169,8 +169,16 @@ class WorkflowEngine
         $user = Auth::user();
         $workspaceId = $this->resolveWorkspaceId($workflow);
 
-        if (!$this->guard->canApprove($user, $currentStep->roles ?? [], $workspaceId)) {
-            throw new AuthorizationException('You are not authorized to approve this workflow step.');
+        // Set workflow context so the ApproverResolver can resolve
+        // contextual roles like 'employee_manager'.
+        $this->setWorkflowContext($workflow);
+
+        try {
+            if (!$this->guard->canApprove($user, $currentStep->roles ?? [], $workspaceId)) {
+                throw new AuthorizationException('You are not authorized to approve this workflow step.');
+            }
+        } finally {
+            $this->clearWorkflowContext();
         }
 
         $mode = $currentStep->approval_mode ?? 'any';
@@ -199,7 +207,7 @@ class WorkflowEngine
         // Notify the next step's approvers, or every approver once the
         // workflow has fully completed.
         $recipientIds = $nextStep
-            ? $this->resolveStepRecipientIds($nextStep, $workspaceId)
+            ? $this->resolveStepRecipientIdsWithContext($workflow, $nextStep, $workspaceId)
             : $this->resolveAllApproverIds($workflow, $workspaceId);
 
         $this->notifyTransition($workflow, 'approved', $recipientIds, [
@@ -315,7 +323,7 @@ class WorkflowEngine
         event(new WorkflowApproved($workflow, $currentStep, $userId, $nextStep === null));
 
         $recipientIds = $nextStep
-            ? $this->resolveStepRecipientIds($nextStep, $workspaceId)
+            ? $this->resolveStepRecipientIdsWithContext($workflow, $nextStep, $workspaceId)
             : $this->resolveAllApproverIds($workflow, $workspaceId);
 
         $this->notifyTransition($workflow, 'approved', $recipientIds, [
@@ -359,8 +367,16 @@ class WorkflowEngine
         $user = Auth::user();
         $workspaceId = $this->resolveWorkspaceId($workflow);
 
-        if (!$this->guard->canApprove($user, $currentStep->roles ?? [], $workspaceId)) {
-            throw new AuthorizationException('You are not authorized to reject this workflow step.');
+        // Set workflow context so the ApproverResolver can resolve
+        // contextual roles like 'employee_manager'.
+        $this->setWorkflowContext($workflow);
+
+        try {
+            if (!$this->guard->canApprove($user, $currentStep->roles ?? [], $workspaceId)) {
+                throw new AuthorizationException('You are not authorized to reject this workflow step.');
+            }
+        } finally {
+            $this->clearWorkflowContext();
         }
 
         DB::transaction(function () use ($workflow, $currentStep, $comments) {
@@ -605,6 +621,25 @@ class WorkflowEngine
     }
 
     /**
+     * Set the workflow context on the WorkflowContext singleton so the
+     * ApproverResolver can resolve contextual roles like 'employee_manager'.
+     */
+    protected function setWorkflowContext(Workflow $workflow): void
+    {
+        $ctx = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowContext::class);
+        $ctx->set($workflow->context);
+    }
+
+    /**
+     * Clear the workflow context after resolution is complete.
+     */
+    protected function clearWorkflowContext(): void
+    {
+        $ctx = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowContext::class);
+        $ctx->clear();
+    }
+
+    /**
      * Resolve the workspace identifier from the workflow context.
      */
     protected function resolveWorkspaceId(Workflow $workflow): ?string
@@ -633,6 +668,37 @@ class WorkflowEngine
 
         if (is_array($roles) && $roles !== []) {
             return $this->approvers->resolve($roles, $workspaceId);
+        }
+
+        return $step->assigned_to ? [$step->assigned_to] : [];
+    }
+
+    /**
+     * Resolve step recipient IDs with workflow context available for
+     * contextual role resolution (e.g. "employee_manager").
+     */
+    protected function resolveStepRecipientIdsWithContext(
+        Workflow $workflow,
+        ?WorkflowStep $step,
+        ?string $workspaceId = null
+    ): array {
+        if (!$step) {
+            return [];
+        }
+
+        $roles = $step->roles ?? [];
+
+        if (is_array($roles) && $roles !== []) {
+            // Set the workflow context so the ApproverResolver can access
+            // the submitting employee's ID for contextual roles.
+            $ctx = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowContext::class);
+            $ctx->set($workflow->context);
+
+            try {
+                return $this->approvers->resolve($roles, $workspaceId);
+            } finally {
+                $ctx->clear();
+            }
         }
 
         return $step->assigned_to ? [$step->assigned_to] : [];

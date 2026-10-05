@@ -1,8 +1,55 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-09-28
-> **Status**: Current — Library Boundary Cleanup (HR/attendance components moved to consuming app)
+> **Date**: 2026-10-05
+> **Status**: Current — Workflow Approval System + Entity Registry + Employee Manager Resolution
+
+---
+
+## 2026-10-05 — Workflow Approval System + Entity Registry + Employee Manager Resolution
+
+### Added
+- **Workflow entity type registry**: [`WorkflowEntityRegistry`](src/Services/Workflow/WorkflowEntityRegistry.php) service reads from `config('ui-library.workflows.entity_types')`. The Workflow Definition Wizard now shows a validated dropdown of known entity types instead of a free-text field. Key auto-populates from the selected entity type and is locked for known entities. ([`WorkflowDefinitionWizard.php`](src/Http/Livewire/Workflows/WorkflowDefinitionWizard.php:60), [`workflow-definition-wizard.blade.php`](src/Resources/views/livewire/workflows/workflow-definition-wizard.blade.php:58))
+- **`employee_manager` contextual role**: Special virtual role that resolves to the submitting employee's specific line manager (from `employee_positions.manager_id`). Configurable fallback via `config('ui-library.workflows.employee_manager_fallback')`. ([`HrsApproverResolver.php`](app/Modules/Hr/Providers/HrsApproverResolver.php:84))
+- **`WorkflowContext` singleton**: Request-level singleton carrying workflow context data so the `ApproverResolver` can resolve contextual roles. Set by `WorkflowEngine` before authorization and notification resolution. ([`WorkflowContext.php`](src/Services/Workflow/WorkflowContext.php:1))
+- **Workflow definition detail drawer**: Custom [`WorkflowDefinitionDetail`](src/Http/Livewire/DataTables/WorkflowDefinitionDetail.php) component shows approval steps (initiators, reviewers, authorizers) with tier icons, resolution modes, and assignee badges. ([`workflow-definition-detail.blade.php`](src/Resources/views/livewire/data-tables/partials/workflow-definition-detail.blade.php:1))
+- **BottomBar text labels**: Mobile bottom navigation tabs now show truncated text labels below icons (YouTube-style). ([`bottom-bar.blade.php`](src/Resources/views/livewire/navs/bottom-bar.blade.php:27))
+- **Geolocation accuracy tracking**: Clock-in/out uses `enableHighAccuracy: true, timeout: 10000, maximumAge: 0`. Accuracy stored in `clock_events.accuracy`. ([`clock-in-out.blade.php`](app/Modules/Attendance/Resources/views/livewire/clock-in-out.blade.php:55))
+
+### Fixed
+- **DataTable horizontal overflow**: Reverted `overflow: visible` on `table-responsive` — table width integrity now takes priority over dropdown visibility. ([`data-table.blade.php`](src/Resources/views/livewire/data-tables/data-table.blade.php:328))
+- **SQLite → MySQL migration**: `DB_CONNECTION` was commented out in `.env`, defaulting to SQLite. Uncommented `DB_CONNECTION=mysql` and ran pending migrations.
+- **`full_name` → `name`**: [`payroll_run.php`](app/Modules/Payroll/Data/payroll_run.php:287) referenced non-existent `full_name` column on `users` table.
+- **Employee number sequence**: Old SQLite `ESS-0007` employee poisoned the MAX-based sequence generator. Deleted orphaned record.
+- **Workflow notification resolution**: `WorkflowEngine::start()`, `approve()`, and `approveAllMode()` now use context-aware `resolveStepRecipientIdsWithContext()`. `ApprovalPanel` and `ApprovalActions` set `WorkflowContext` before `canApprove()` checks.
+- **Authorizer scoping**: `HrsApproverResolver::resolveScoped()` no longer filters out pre-resolved integer user IDs — explicit user IDs pass through without requiring an Employee record.
+- **Notification type mappings**: DB workflow definition was missing `submitted_initiator`, `stage_advanced`, `workflow_completed`, and `cancelled` type mappings — emails showed raw type names as subjects.
+- **Workflow definition list**: Removed empty detail modal, added `crudType: 'drawers'`, `fieldGroups`, card view, and richer list view. ([`workflow_definition.php`](src/Core/Admin/Data/workflow_definition.php:58))
+
+### Documentation
+- [`debug-checklist.md`](docs/debug-checklist.md): Rewrote §8 (stale vendor files), §14 (table overflow priority), added §28 (geolocation accuracy).
+- [`pre-coding-checklist.md`](docs/consuming-app/pre-coding-checklist.md): Added stale vendor files warning in §C.
+- [`CHANGELOG.md`](docs/CHANGELOG.md): Comprehensive session summary.
+
+### Rationale
+The consuming app loads the library via Composer from `vendor/quicker-faster/ui-library/`, NOT from the workspace. Any library edit must be synced to the vendor directory (and to `resources/views/vendor/qf/` if a published view exists). See Debug Checklist §8.
+
+### Added
+- **BottomBar text labels**: Mobile bottom navigation tabs now show a truncated text label below each icon (YouTube-style). Tabs use `flex-fill` for equal-width distribution with `min-width: 56px`, `height: 52px`, and dual truncation (`Str::limit(12, '…')` + CSS `text-overflow: ellipsis`). The "More" overflow button height was aligned to 52px for consistency. ([`bottom-bar.blade.php`](src/Resources/views/livewire/navs/bottom-bar.blade.php:27))
+- **Geolocation accuracy tracking**: Clock-in/out now uses `enableHighAccuracy: true, timeout: 10000, maximumAge: 0` for browser geolocation. Accuracy (in meters) is passed from the browser to the backend, logged in geofence validation, and stored in the new `clock_events.accuracy` column for debugging. ([`clock-in-out.blade.php`](app/Modules/Attendance/Resources/views/livewire/clock-in-out.blade.php:55), [`ClockInOut.php`](app/Modules/Attendance/Http/Livewire/ClockInOut.php:87), [`ClockEventRecorderService.php`](app/Modules/Attendance/Services/ClockEventRecorderService.php:99))
+
+### Fixed
+- **DataTable horizontal overflow**: Reverted `overflow: visible` on the `table-responsive` div in [`data-table.blade.php`](src/Resources/views/livewire/data-tables/data-table.blade.php:328). The `overflow: visible` (added to fix dropdown clipping) disabled horizontal scrolling, causing tables to extend beyond the browser viewport. Table width integrity now takes priority over dropdown visibility (dropdown clipping is an accepted trade-off — see Debug Checklist §14).
+- **Stale vendor/published view sync**: The data-table fix had to be applied in **three** locations — workspace, `vendor/quicker-faster/ui-library/`, and the published view `resources/views/vendor/qf/livewire/data-tables/data-table.blade.php`. The published view was the actual culprit overriding both the workspace and vendor copies.
+- **SQLite → MySQL migration**: `DB_CONNECTION` was commented out in `.env`, causing Laravel to default to SQLite. SQLite's database-level locking caused `database is locked` errors during concurrent payroll batch processing. Uncommented `DB_CONNECTION=mysql` and ran pending migrations.
+- **`full_name` → `name` on users table**: [`payroll_run.php`](app/Modules/Payroll/Data/payroll_run.php:287) referenced `full_name` which doesn't exist on the MySQL `users` table (only `name`). Changed `display_field` and `column` to `name`.
+
+### Documentation
+- [`debug-checklist.md`](docs/debug-checklist.md): Rewrote §8 as "Library Changes Not Reflecting in Consuming App — Stale Files" with a three-location diagnostic (vendor → published → compiled cache) and the `ENDPATH` grep technique. Rewrote §14 to document the priority decision (table width > dropdown visibility) and mark the `overflow: visible` fix as reverted. Added §28 (geolocation accuracy debugging).
+- [`pre-coding-checklist.md`](docs/consuming-app/pre-coding-checklist.md): Added "⚠️ Stale vendor files — PRIME SUSPECT" as the first item in §C, linking to Debug Checklist §8.
+
+### Rationale
+The consuming app loads the library via Composer from `vendor/quicker-faster/ui-library/`, NOT from the workspace. Any library edit must be synced to the vendor directory (and to `resources/views/vendor/qf/` if a published view exists). See Debug Checklist §8 for the full diagnostic and symlink prevention strategy.
 
 ---
 

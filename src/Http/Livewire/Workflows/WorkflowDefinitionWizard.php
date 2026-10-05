@@ -69,6 +69,12 @@ class WorkflowDefinitionWizard extends Wizard
     public bool $isActive = true;
     public bool $keyManuallyEdited = false;
 
+    /** @var array<string, string> Known entity types (key => label) from WorkflowEntityRegistry. */
+    public array $entityTypes = [];
+
+    /** @var bool When true, the entity type is custom (not in the registry). */
+    public bool $isCustomEntity = false;
+
     // Step 1 — Initiators
     // $initiatorMode is a UI-only filter gating which picker renders. The
     // persisted "mode" is always derived from items via detectMode().
@@ -134,6 +140,9 @@ class WorkflowDefinitionWizard extends Wizard
 
         $this->reviewSteps = [['name' => '', 'resolution_mode' => 'any', 'assignees' => []]];
 
+        // Populate known entity types from the registry
+        $this->entityTypes = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEntityRegistry::class)->all();
+
         if ($definitionId) {
             $this->definitionId = (int) $definitionId;
             // Editing an existing definition: discard any stale in-progress
@@ -148,6 +157,30 @@ class WorkflowDefinitionWizard extends Wizard
         }
     }
 
+    /**
+     * When the entity type changes, auto-populate the workflow key
+     * from the registry unless the user has manually edited the key.
+     */
+    public function updatedEntityType(string $value): void
+    {
+        $registry = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowEntityRegistry::class);
+
+        if ($value === '__custom__') {
+            $this->isCustomEntity = true;
+            if (! $this->keyManuallyEdited) {
+                $this->workflowKey = '';
+            }
+            return;
+        }
+
+        $this->isCustomEntity = false;
+
+        if (! $this->keyManuallyEdited) {
+            $suggestedKey = $registry->suggestedKey($value);
+            $this->workflowKey = $suggestedKey;
+        }
+    }
+
     public function render()
     {
         return view('qf::livewire.workflows.workflow-definition-wizard', [
@@ -155,6 +188,8 @@ class WorkflowDefinitionWizard extends Wizard
             'showCompletion' => $this->currentStep === count($this->steps),
             'userModel' => config('ui-library.user.model', \App\Models\User::class),
             'roleModel' => config('permission.models.role', \Spatie\Permission\Models\Role::class),
+            'entityTypes' => $this->entityTypes,
+            'isCustomEntity' => $this->isCustomEntity,
         ]);
     }
 
@@ -365,6 +400,13 @@ class WorkflowDefinitionWizard extends Wizard
 
     public function updatedWorkflowName($value): void
     {
+        // When a known entity type is selected, the key is locked to the
+        // entity's getWorkflowDefinitionKey() value — do NOT override it
+        // with a slug derived from the workflow name.
+        if (! $this->isCustomEntity && $this->entityType && $this->entityType !== '__custom__') {
+            return;
+        }
+
         if (! $this->keyManuallyEdited) {
             $this->workflowKey = Str::slug($value, '_');
         }

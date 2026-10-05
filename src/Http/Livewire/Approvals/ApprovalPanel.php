@@ -202,11 +202,20 @@ class ApprovalPanel extends Component
                 $currentStep = $workflow->currentStep;
 
                 if ($currentStep && $currentStep->isPending()) {
-                    $canAct = $this->guard->canApprove(
-                        $user,
-                        $currentStep->roles ?? [],
-                        $this->resolveWorkspaceId($workflow)
-                    );
+                    // Set workflow context so the ApproverResolver can resolve
+                    // contextual roles like 'employee_manager'.
+                    $ctx = app(\QuickerFaster\UILibrary\Services\Workflow\WorkflowContext::class);
+                    $ctx->set($workflow->context);
+
+                    try {
+                        $canAct = $this->guard->canApprove(
+                            $user,
+                            $currentStep->roles ?? [],
+                            $this->resolveWorkspaceId($workflow)
+                        );
+                    } finally {
+                        $ctx->clear();
+                    }
 
                     $canApprove = $canAct;
                     $canReject = $canAct;

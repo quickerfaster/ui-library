@@ -1,7 +1,7 @@
 # Debug Checklist — Navigation & UI Bugs
 
 > **Purpose**: Quick-reference guide for diagnosing common navigation, event, and UI bugs in the QuickerFaster UI Library. Each entry maps symptoms → likely causes → fix.
-> **Last Updated**: 2026-09-25 (added: §26 payroll fixes; §27 currency symbol — configurable via trait + company currency_code; §27b — PayrollRunWizard base_currency inheritance; §27c — Payslip detail page currency symbol rendering)
+> **Last Updated**: 2026-10-05 (rewrote: §8 stale vendor files; rewrote: §14 table overflow; added: §28 geolocation accuracy; added: workflow entity registry; added: employee_manager role; added: WorkflowContext; added: notification type mappings; added: employee number sequence)
 
 ---
 
@@ -166,29 +166,94 @@ A "simplify/refactor" commit removed UI elements (offcanvas, drawer, modal) whil
 
 ---
 
-## 8. Stale Published Views Override Library Fixes
+## 8. Library Changes Not Reflecting in Consuming App — Stale Files
+
+> **⚠️ PRIME SUSPECT**: When you edit a file in the library workspace and the consuming app doesn't show the change, the problem is almost always a **stale copy** in one of three locations. Do NOT waste time debugging the code — check these locations first.
 
 ### Symptoms
-- Fix applied to library but not visible in consuming app
+- Fix applied to library workspace (`/Users/mac/Projects/Libraries/ui-library/`) but not visible in consuming app
 - Page source shows old HTML despite library changes
+- `php artisan view:clear` alone doesn't fix it
 
-### Check
+### The Three Stale-File Locations (check in order)
+
+| # | Location | Why It Happens | Priority |
+|---|----------|---------------|----------|
+| **1** | **`vendor/quicker-faster/ui-library/`** | The consuming app loads the library via Composer from `vendor/`. The workspace and vendor are **different directories** — editing one does not update the other. | **🔴 PRIME SUSPECT** |
+| 2 | `resources/views/vendor/qf/` | Published views (via `php artisan vendor:publish`) override the library's originals. | 🟡 Check second |
+| 3 | `storage/framework/views/` | Laravel's compiled Blade cache. `php artisan view:clear` clears this. | 🟢 Check last |
+
+### Diagnostic: Find Where the View Is Actually Loading From
+
+The fastest way to identify the stale source is to inspect a **compiled view** in `storage/framework/views/`. Every compiled Blade file ends with an `ENDPATH` comment showing the exact source path:
+
 ```bash
-# Find published views that override library
+# Find which compiled view corresponds to your component
+grep -r "ENDPATH.*bottom-bar" storage/framework/views/
+
+# Example output:
+# storage/framework/views/f142ea114855736092856ec285bb688c.php:
+#   /**PATH /Users/mac/Projects/LaravelProjects/hr-consuming-app/vendor/quicker-faster/ui-library/src/Resources/views/livewire/navs/bottom-bar.blade.php ENDPATH**/
+```
+
+The `ENDPATH` tells you exactly which file Laravel compiled from. If it points to `vendor/quicker-faster/...` (location #1), that's your stale copy.
+
+### Fix by Location
+
+#### Location #1 — Stale Vendor Copy (MOST COMMON)
+
+```bash
+# Copy the updated file from workspace to vendor
+cp /Users/mac/Projects/Libraries/ui-library/src/Resources/views/livewire/navs/bottom-bar.blade.php \
+   /Users/mac/Projects/LaravelProjects/hr-consuming-app/vendor/quicker-faster/ui-library/src/Resources/views/livewire/navs/bottom-bar.blade.php
+
+# Verify they match
+diff \
+  /Users/mac/Projects/Libraries/ui-library/src/Resources/views/livewire/navs/bottom-bar.blade.php \
+  /Users/mac/Projects/LaravelProjects/hr-consuming-app/vendor/quicker-faster/ui-library/src/Resources/views/livewire/navs/bottom-bar.blade.php \
+  && echo "FILES MATCH"
+
+# Clear compiled views
+cd /Users/mac/Projects/LaravelProjects/hr-consuming-app && php artisan view:clear
+```
+
+#### Location #2 — Published View Override
+
+```bash
+# Find published views that override the library
 find resources/views/vendor/qf -name "*.blade.php" | grep -i "component-name"
 
 # If found, either:
 # 1. Apply the same fix to the published copy
-# 2. Delete the published copy if it's no longer needed
+# 2. Delete the published copy if it's no longer needed (Laravel falls back to vendor)
 ```
 
-### Fix Commands
+#### Location #3 — Compiled View Cache
+
 ```bash
-# Always clear after changes
-php artisan optimize:clear
+php artisan view:clear
+# or more aggressively:
 rm -rf storage/framework/views/*
-composer dump-autoload  # if PHP classes changed
 ```
+
+### Why `php artisan view:clear` Alone Doesn't Fix #1 or #2
+
+`view:clear` only clears the **compiled cache** (location #3). It does NOT update stale source files in `vendor/` (location #1) or `resources/views/vendor/` (location #2). If the source file itself is stale, clearing the cache just recompiles the same stale source.
+
+### Prevention: Symlink the Vendor Directory
+
+To avoid this recurring issue, replace the Composer-installed vendor copy with a symlink to the workspace:
+
+```bash
+# Remove the Composer-installed copy
+rm -rf /Users/mac/Projects/LaravelProjects/hr-consuming-app/vendor/quicker-faster/ui-library
+
+# Symlink to the workspace
+ln -s /Users/mac/Projects/Libraries/ui-library \
+      /Users/mac/Projects/LaravelProjects/hr-consuming-app/vendor/quicker-faster/ui-library
+```
+
+After this, any edit to the workspace is immediately visible in the consuming app (after `view:clear`).
 
 ---
 
@@ -297,16 +362,34 @@ This is used in [`ContextSheet`](src/Http/Livewire/Layouts/Navs/ContextSheet.php
 ### Root Cause
 Bootstrap's `table-responsive` class applies `overflow-x: auto` (or `overflow: hidden`), creating a clipping context. Popper.js cannot escape a parent with `overflow: hidden`, even with `data-bs-boundary="viewport"`.
 
-### Fix
-Add `overflow: visible` to the `table-responsive` div:
+### ⚠️ Priority Decision (2026-10-05)
+
+**Table width within browser viewport > dropdown not being clipped.** The `overflow: visible` fix (see "Historical Fix Attempt" below) was **reverted** because it caused the table to overflow horizontally beyond the browser width — a worse UX problem than a clipped dropdown.
+
+### Current Approach — Accept Clipping, Preserve Horizontal Scroll
+
+Keep Bootstrap's default `overflow-x: auto` on `table-responsive`. This ensures the table stays within the viewport with horizontal scrollbars when needed. Dropdowns near the bottom of the table **will be clipped** — this is an accepted trade-off.
+
 ```html
-<div class="table-responsive" style="overflow: visible;">
+<!-- Correct — let Bootstrap handle overflow -->
+<div class="table-responsive" style="min-height: 500px;">
 ```
 
-**Trade-off:** This disables horizontal scrolling on very narrow screens. For dashboard widgets with few columns this is acceptable. For data tables with many columns, consider using list/card view modes instead.
-
 ### Affected Files
-[`list.blade.php`](src/Resources/views/widgets/list.blade.php:8), [`data-table.blade.php`](src/Resources/views/livewire/data-tables/data-table.blade.php:328)
+[`data-table.blade.php`](src/Resources/views/livewire/data-tables/data-table.blade.php:328)
+
+### Historical Fix Attempt (REVERTED)
+
+Previously, `overflow: visible` was applied to fix dropdown clipping:
+```html
+<!-- REVERTED — caused horizontal overflow -->
+<div class="table-responsive" style="overflow: visible;">
+```
+This disabled horizontal scrolling, causing wide tables to extend beyond the browser viewport. Reverted in favor of table width integrity.
+
+### For Widget Lists (few columns)
+
+The `.list-view, .card { overflow: visible !important; }` CSS in [`data-table.blade.php`](src/Resources/views/livewire/data-tables/data-table.blade.php:680) is still active for list/card views where horizontal overflow is not an issue.
 
 ---
 
@@ -1107,6 +1190,61 @@ The existing [`show.blade.php`](app/Modules/Payroll/Resources/views/payroll-pays
 1. **Duplicate `detailComponent` key**: The payslip data config had `'detailComponent' => ''` later in the file (line 327) which overwrote the new value at line 5. PHP arrays use the last value for duplicate keys — the second entry silently wins.
 2. **ModelConfigRepository 24h cache**: [`ModelConfigRepository`](src/Services/Config/ModelConfigRepository.php:16) caches configs for 86400 seconds. After changing a data config file, run `php artisan optimize:clear` or `Cache::forget('model_config_payroll_payroll_payslip')`.
 3. **Livewire naming convention**: All detail components use `qf.` prefix (e.g., `qf.employee-detail`, `qf.payroll-run-detail`). The new component is registered as `qf.payslip-detail`.
+
+---
+
+## 28. Clock-In Geofence Rejection — Browser Accuracy Issues
+
+### Symptoms
+- Employee attempts clock-in but gets "Outside allowed geofence area" error
+- Same browser sometimes accepts, sometimes rejects from the same location
+- Issue occurs primarily on **desktop browsers** (Chrome, Firefox, Safari on macOS/Windows)
+- Mobile browsers (iOS/Android) are generally reliable
+
+### Root Cause
+Desktop browsers lack GPS hardware. They rely on **WiFi triangulation** (20-50m typical, can be 200m+ off) and **IP geolocation** (1-50km). With a default geofence radius of 100m, WiFi jitter alone can push coordinates outside the boundary. The old `getCurrentPosition()` call used `maximumAge: 60000` (allowed 60s stale cache) and no `enableHighAccuracy`, making the browser return quick-but-inaccurate results.
+
+### Current Implementation (2026-10-05)
+
+| Layer | Detail |
+|-------|--------|
+| **Frontend** | [`clock-in-out.blade.php`](app/Modules/Attendance/Resources/views/livewire/clock-in-out.blade.php:55) — `enableHighAccuracy: true, timeout: 10000, maximumAge: 0` |
+| **Accuracy passed** | `pos.coords.accuracy` (meters) sent to `$wire.toggle(lat, lng, accuracy)` |
+| **Backend** | [`ClockEventRecorderService.php`](app/Modules/Attendance/Services/ClockEventRecorderService.php:99) — logs accuracy in geofence validation |
+| **Storage** | `clock_events.accuracy` column (DECIMAL 8,2, nullable) — query to correlate failures with poor accuracy |
+
+### Diagnostic Queries
+
+```sql
+-- Find clock-ins with poor accuracy (>50m) that were rejected
+SELECT employee_id, latitude, longitude, accuracy, location_name, created_at
+FROM clock_events
+WHERE event_type = 'clock_in' AND accuracy > 50
+ORDER BY accuracy DESC;
+
+-- Compare accepted vs rejected accuracy distribution
+SELECT
+    CASE
+        WHEN accuracy IS NULL THEN 'no_gps'
+        WHEN accuracy <= 20 THEN 'excellent'
+        WHEN accuracy <= 50 THEN 'good'
+        WHEN accuracy <= 100 THEN 'fair'
+        ELSE 'poor'
+    END as accuracy_tier,
+    COUNT(*) as count
+FROM clock_events
+WHERE event_type = 'clock_in'
+GROUP BY accuracy_tier;
+```
+
+### Fix Options (if problem persists)
+
+1. **Increase geofence radius**: Update `locations.geofence_radius` from 100m to 200-300m for offices where desktop clock-in is common
+2. **Relaxed desktop policy**: Consider geofence as warning (not hard block) for desktop user-agents, while keeping strict enforcement for mobile
+3. **Trusted WiFi**: If employee is on office WiFi (detectable via IP range), skip or relax geofence
+
+### Affected Files
+[`clock-in-out.blade.php`](app/Modules/Attendance/Resources/views/livewire/clock-in-out.blade.php:55), [`ClockInOut.php`](app/Modules/Attendance/Http/Livewire/ClockInOut.php:87), [`ClockEventRecorderService.php`](app/Modules/Attendance/Services/ClockEventRecorderService.php:99), [`GeofenceValidator.php`](app/Modules/Attendance/Services/GeofenceValidator.php:37), [`ClockEvent.php`](app/Modules/Attendance/Models/ClockEvent.php:32)
 
 #### D. Critical Gotchas
 

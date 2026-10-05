@@ -55,6 +55,10 @@ return [
         'onTable' => ['description', 'notifications', 'created_at', 'updated_at'],
     ],
 
+    'crudType' => 'drawers',
+
+    'detailComponent' => 'qf.workflow-definition-detail',
+
     'simpleActions' => ['show'],
 
     'moreActions' => [
@@ -82,10 +86,36 @@ return [
             'enabled' => true,
             'titleFields' => ['name'],
             'subtitleFields' => ['entity_type'],
+            'contentFields' => ['description'],
+            'badgeField' => 'is_active',
+            'badgeColors' => [1 => 'success', 0 => 'secondary'],
+        ],
+        'card' => [
+            'enabled' => true,
+            'titleFields' => ['name'],
+            'contentFields' => ['key', 'entity_type', 'description'],
             'badgeField' => 'is_active',
             'badgeColors' => [1 => 'success', 0 => 'secondary'],
         ],
     ],
 
     'tableDefaultFields' => ['name', 'key', 'entity_type', 'is_active'],
+
+    'fieldGroups' => [
+        [
+            'title' => 'Workflow Details',
+            'icon' => 'fas fa-info-circle',
+            'fields' => ['name', 'key', 'entity_type', 'is_active', 'description'],
+        ],
+        [
+            'title' => 'Notifications',
+            'icon' => 'fas fa-bell',
+            'fields' => ['notifications'],
+        ],
+        [
+            'title' => 'Timestamps',
+            'icon' => 'fas fa-clock',
+            'fields' => ['created_at', 'updated_at'],
+        ],
+    ],
 ];

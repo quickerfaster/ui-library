@@ -114,6 +114,10 @@ class UILibraryServiceProvider extends ServiceProvider
         // Phase 4.5: NavigationManager singleton for config-driven sidebar
         $this->app->singleton(\QuickerFaster\UILibrary\Services\Navigation\NavigationManager::class);
 
+        // WorkflowContext — request-level singleton for contextual role
+        // resolution (e.g. "employee_manager" → the submitter's manager).
+        $this->app->singleton(\QuickerFaster\UILibrary\Services\Workflow\WorkflowContext::class);
+
         // Quick Actions: ActionRegistry singleton for config-driven action discovery
         $this->app->singleton(\QuickerFaster\UILibrary\Services\QuickActions\ActionRegistry::class);
 
@@ -309,6 +313,7 @@ class UILibraryServiceProvider extends ServiceProvider
         Livewire::component('qf.data-table', \QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTable::class);
         Livewire::component('qf.data-table-form', \QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTableForm::class);
         Livewire::component('qf.data-table-detail', \QuickerFaster\UILibrary\Http\Livewire\DataTables\DataTableDetail::class);
+        Livewire::component('qf.workflow-definition-detail', \QuickerFaster\UILibrary\Http\Livewire\DataTables\WorkflowDefinitionDetail::class);
 
         // Modals
         Livewire::component('qf.form-modal', \QuickerFaster\UILibrary\Http\Livewire\Modals\FormModal::class);

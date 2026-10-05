@@ -421,6 +421,40 @@ return [
             //     ],
             // ],
         ],
+
+        /*
+        |------------------------------------------------------------------
+        | Entity Types
+        |------------------------------------------------------------------
+        |
+        | Maps workflow definition keys to human-readable entity labels.
+        | Consuming-app modules register their Workflowable entities here
+        | so the Workflow Definition Wizard can offer a validated dropdown
+        | instead of a free-text field.
+        |
+        | The key MUST match the value returned by the entity's
+        | getWorkflowDefinitionKey() method.
+        |
+        | Example:
+        |   'leave_request' => 'Leave Request',
+        |   'payroll_run'   => 'Payroll Run',
+        |
+        */
+        'entity_types' => [],
+
+        /*
+        |------------------------------------------------------------------
+        | Employee Manager Fallback
+        |------------------------------------------------------------------
+        |
+        | When the 'employee_manager' virtual role is used in a workflow
+        | step but the submitting employee has no manager assigned (no
+        | employee_positions.manager_id), these fallback roles are used
+        | instead. Prevents workflows from getting stuck with zero
+        | approvers.
+        |
+        */
+        'employee_manager_fallback' => ['hr_manager'],
     ],
 
     /*

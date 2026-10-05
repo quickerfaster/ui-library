@@ -59,7 +59,22 @@
                 @if ($stepIndex === 0)
                     <h4 class="fw-bold mb-4">Workflow Details</h4>
                     <div class="row g-3">
-                        <div class="col-md-8">
+                        <div class="col-md-6">
+                            <label class="form-label">Entity Type</label>
+                            <select class="form-select @error('entityType') is-invalid @enderror"
+                                wire:model.live="entityType">
+                                <option value="">— Select an entity type —</option>
+                                @foreach ($entityTypes as $key => $label)
+                                    <option value="{{ $label }}">{{ $label }} ({{ $key }})</option>
+                                @endforeach
+                                <option value="__custom__">Custom / New Entity…</option>
+                            </select>
+                            @error('entityType')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Choose a known entity or select "Custom" to define a new one.</div>
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label">Name</label>
                             <input type="text" class="form-control @error('workflowName') is-invalid @enderror"
                                 wire:model.live.debounce.500ms="workflowName" placeholder="e.g. Purchase Order Approval" />
@@ -70,19 +85,21 @@
                         <div class="col-md-4">
                             <label class="form-label">Key</label>
                             <input type="text" class="form-control @error('workflowKey') is-invalid @enderror"
-                                wire:model="workflowKey" placeholder="purchase_order" />
+                                wire:model="workflowKey"
+                                @if (!$isCustomEntity && $entityType)
+                                    readonly
+                                @endif
+                                placeholder="{{ $isCustomEntity ? 'custom_key' : 'auto-populated from entity type' }}" />
                             @error('workflowKey')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror
-                            <div class="form-text">Unique machine name (a-z, 0-9, _).</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Entity Type</label>
-                            <input type="text" class="form-control @error('entityType') is-invalid @enderror"
-                                wire:model="entityType" placeholder="e.g. Purchase Order" />
-                            @error('entityType')
-                                <div class="text-danger small mt-1">{{ $message }}</div>
-                            @enderror
+                            <div class="form-text">
+                                @if (!$isCustomEntity && $entityType)
+                                    Auto-populated from the selected entity type.
+                                @else
+                                    Unique machine name (a-z, 0-9, _).
+                                @endif
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status</label>

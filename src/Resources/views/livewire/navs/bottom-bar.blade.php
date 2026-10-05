@@ -24,26 +24,29 @@
         </div>
     @endif
 
-    {{-- Tab Bar — icons only --}}
+    {{-- Tab Bar — icons with text labels below (YouTube-style) --}}
     <div class="d-flex justify-content-around w-100 px-1 pt-1 pb-1" style="border-top: 1px solid rgba(0,0,0,0.04);">
         @foreach ($this->visibleGroups as $key => $group)
             @php
                 $isActive = $key === $activeContext;
                 $url = $this->resolveUrl($group);
+                $label = $group['label'] ?? $key;
             @endphp
             <a href="{{ $url }}"
-               class="btn btn-sm d-flex align-items-center justify-content-center flex-shrink-0 border-0
+               class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-fill border-0
                       {{ $isActive ? 'text-primary' : 'text-muted' }}"
-               style="width: 56px; height: 44px;"
-               wire:key="bb-tab-{{ $key }}"
-               title="{{ $group['label'] ?? $key }}">
+               style="min-width: 56px; height: 52px; gap: 1px; padding: 2px 4px;"
+               wire:key="bb-tab-{{ $key }}">
                 @if (!empty($group['icon']))
-                    <i class="{{ $group['icon'] }} fs-5 {{ $isActive ? 'opacity-100' : 'opacity-50' }}"></i>
+                    <i class="{{ $group['icon'] }} {{ $isActive ? 'opacity-100' : 'opacity-50' }}" style="font-size: 1.1rem;"></i>
                 @else
                     <span class="fw-bold {{ $isActive ? 'opacity-100' : 'opacity-50' }}" style="font-size: 0.7rem;">
-                        {{ \Illuminate\Support\Str::limit($group['label'] ?? $key, 3, '') }}
+                        {{ \Illuminate\Support\Str::limit($label, 3, '') }}
                     </span>
                 @endif
+                <span style="font-size: 0.55rem; line-height: 1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ \Illuminate\Support\Str::limit($label, 12, '…') }}
+                </span>
             </a>
         @endforeach
 
@@ -51,7 +54,7 @@
             @php $activeInOverflow = $this->isActiveInOverflow; @endphp
             <button class="btn btn-sm d-flex flex-column align-items-center justify-content-center flex-shrink-0 border-0
                            {{ $activeInOverflow ? 'text-primary' : 'text-muted' }}"
-                    style="width: 56px; height: 44px; gap: 1px;"
+                    style="width: 56px; height: 52px; gap: 1px;"
                     wire:click="openOverflow"
                     wire:key="bb-tab-more">
                 <i class="fas fa-ellipsis-h {{ $activeInOverflow ? 'opacity-100' : 'opacity-50' }}" style="font-size: 0.9rem;"></i>

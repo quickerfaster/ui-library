@@ -53,6 +53,7 @@
 
 ## C. Before Modifying Library Code (`src/`)
 
+- [ ] **⚠️ Stale vendor files — PRIME SUSPECT**: The consuming app loads the library from `vendor/quicker-faster/ui-library/`, NOT from this workspace. After making changes, you MUST copy updated files to the vendor directory. See [Debug Checklist §8](../debug-checklist.md#8-library-changes-not-reflecting-in-consuming-app--stale-files) for the full diagnostic and fix procedure.
 - [ ] **No consuming app references**: Search for `App\Modules` in the file. If found, STOP. Use one of:
   - **Contract pattern**: Define an interface in `src/Contracts/`, bind implementation in consuming app's service provider.
   - **Subclass pattern**: Make the method a stub in the library, override in consuming app subclass.
