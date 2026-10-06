@@ -134,11 +134,11 @@ class TopNav extends Component
 
     public function mount(
         array $items,
-        ?string $activeContext = null,
         string $moduleName,
+        ?string $activeContext = null,
         array $leftShared = [],
         array $rightShared = [],
-        CompanyProvider $companyProvider = null,
+        ?CompanyProvider $companyProvider = null,
         bool $hideTopnavContexts = false,
     ): void {
         $this->items = $items;
