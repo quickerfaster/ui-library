@@ -1,4 +1,4 @@
-<div>
+<div wire:key="approval-actions-{{ $workflow?->id }}-step-{{ $workflow?->currentStep?->id }}">
     @if(!$workflow)
         <div class="text-muted">No workflow found.</div>
     @elseif($displayMode === 'card')
