@@ -1,4 +1,14 @@
-<div class="bulk-invite-container">
+<div class="bulk-invite-container"
+    x-data="{
+        showExistingWarning: false,
+        existingEmails: [],
+        init() {
+            Livewire.on('existing-emails-detected', (data) => {
+                this.existingEmails = data.emails || [];
+                this.showExistingWarning = true;
+            });
+        }
+    }">
     @if ($submitted)
         {{-- Success State --}}
         <div class="text-center py-4">
@@ -13,7 +23,41 @@
                 <i class="fas fa-plus me-1"></i> Send More Invitations
             </button>
         </div>
+    @elseif (false)
+        {{-- Placeholder for conditional --}}
     @else
+        {{-- Existing Email Warning --}}
+        <div x-show="showExistingWarning" x-cloak class="mb-4">
+            <div class="alert alert-warning border-warning">
+                <div class="d-flex align-items-start gap-3">
+                    <i class="fas fa-exclamation-triangle fa-2x text-warning mt-1"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="fw-bold mb-2">Existing User{{ count($existingEmails ?? []) !== 1 ? 's' : '' }} Detected</h6>
+                        <p class="mb-2">
+                            The following email{{ count($existingEmails ?? []) !== 1 ? 's are' : ' is' }} already registered:
+                        </p>
+                        <ul class="mb-3 small">
+                            <template x-for="email in existingEmails" :key="email">
+                                <li x-text="email" class="text-muted"></li>
+                            </template>
+                        </ul>
+                        <p class="mb-3 small">
+                            <strong>Use "Invite Employee" instead</strong> to link this person to their existing record.
+                            "New Invitation" is for people who have never been recorded in the system.
+                        </p>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @click="showExistingWarning = false">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </button>
+                            <a href="{{ url()->previous() }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-user-check me-1"></i> Go to Invite Employee
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         {{-- Tab Switcher --}}
         <ul class="nav nav-tabs mb-3" role="tablist">
             <li class="nav-item" role="presentation">

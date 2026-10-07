@@ -245,6 +245,19 @@ class BulkInvite extends Component
             return;
         }
 
+        // Check for existing users before sending invitations.
+        // Warns the admin when "New Invitation" is used for an email
+        // that already has a user account — they should use
+        // "Invite Employee" instead to link to the existing record.
+        $existingEmails = $this->findExistingUserEmails($emails);
+
+        if (! empty($existingEmails)) {
+            $this->dispatch('existing-emails-detected', [
+                'emails' => $existingEmails,
+            ]);
+            return;
+        }
+
         /** @var InvitationService $service */
         $service = app(InvitationService::class);
 
@@ -265,6 +278,21 @@ class BulkInvite extends Component
         $this->dispatch('invitations-sent', [
             'count' => $count,
         ]);
+    }
+
+    /**
+     * Find which of the given emails already have user accounts.
+     *
+     * @param string[] $emails
+     * @return string[] Emails that already exist in the users table.
+     */
+    protected function findExistingUserEmails(array $emails): array
+    {
+        $userModel = config('ui-library.user.model', \App\Models\User::class);
+
+        return $userModel::whereIn('email', $emails)
+            ->pluck('email')
+            ->toArray();
     }
 
     /**
