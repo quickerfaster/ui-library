@@ -276,6 +276,66 @@
                 window.location.reload();
             });
 
+            // Delegate clicks on [data-file-preview] links to open the
+            // document preview modal. This is more reliable than inline
+            // onclick handlers which can be stripped or blocked.
+            document.addEventListener('click', function (e) {
+                var link = e.target.closest('[data-file-preview]');
+                if (!link) return;
+                e.preventDefault();
+                e.stopPropagation();
+                var url = link.getAttribute('data-file-preview');
+                var name = link.getAttribute('data-file-name') || '';
+                if (url) {
+                    window.Livewire.dispatch('openDocumentPreview', {
+                        payload: { fileUrl: url, fileName: name }
+                    });
+                }
+            });
+
+            // File upload handler for leave wizard (and any other
+            // wizard using #file-input). Defined here (navigation
+            // layout) because child component <script> tags may not
+            // execute when rendered via tab switch in nested components.
+            window.__qfProcessLeaveFile = function (input) {
+                var zone = document.getElementById('upload-zone');
+                var wireId = zone ? zone.dataset.wireId : null;
+                var component = wireId ? window.Livewire.find(wireId) : null;
+                if (component && typeof component.upload === 'function' && input.files && input.files[0]) {
+                    var info = document.getElementById('selected-file-info');
+                    var nameEl = document.getElementById('selected-file-name');
+                    var file = input.files[0];
+                    if (nameEl) nameEl.textContent = file.name;
+                    if (info) info.style.display = 'block';
+                    component.upload('newFile', file,
+                        function () { input.value = ''; if (info) info.style.display = 'none'; },
+                        function (err) { console.error('Upload failed:', err); if (info) info.style.display = 'none'; }
+                    );
+                }
+            };
+
+            // Hide drawer visually when document preview modal opens.
+            // The offcanvas transform creates a stacking context that
+            // traps the modal behind the drawer regardless of z-index.
+            var drawerEl = document.getElementById('globalDrawer');
+            var modalEl = document.getElementById('document-preview-modal');
+            if (drawerEl && modalEl) {
+                var hideDrawer = function () { drawerEl.style.visibility = 'hidden'; };
+                var showDrawer = function () { drawerEl.style.visibility = ''; };
+
+                // Livewire events (PHP-driven open/close)
+                Livewire.on('open-bs-modal', function (event) {
+                    if (event[0].modalId === 'document-preview-modal') hideDrawer();
+                });
+                Livewire.on('close-bs-modal', function (event) {
+                    if (event[0].modalId === 'document-preview-modal') showDrawer();
+                });
+
+                // Bootstrap events (user clicks Close/X/backdrop)
+                modalEl.addEventListener('show.bs.modal', hideDrawer);
+                modalEl.addEventListener('hidden.bs.modal', showDrawer);
+            }
+
         </script>
 
 

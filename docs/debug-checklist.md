@@ -236,9 +236,44 @@ php artisan view:clear
 rm -rf storage/framework/views/*
 ```
 
+### ⚠️ Location #4 — Child Component `<script>` Tags Not Executing
+
+**Critical discovery (2026-10-08)**: `<script>` tags inside a Livewire child component's blade may **not execute** when the component is first rendered through a parent re-render (e.g., tab switch). This is different from full-page components where scripts always execute on page load.
+
+**Symptoms**:
+- JS-dependent features work after a full page refresh but not on first visit
+- `console.log` statements in the child component's `<script>` tag never fire
+- The feature works perfectly in a full-page component (e.g., onboarding wizard) but fails in a nested component (e.g., leave wizard inside AdminLeaveHub)
+
+**Root Cause**: Livewire does not execute `<script>` tags in child component blades when the child is created through a parent re-render (e.g., switching tabs that conditionally render `@livewire`). The scripts only execute on full page loads.
+
+**Fix**: Move critical JS to a **parent layout** that loads on every page (e.g., `navigation-layout.blade.php`). Use globally-exposed functions (`window.__myFunction`) that child component inline handlers can call.
+
+**Real example**: The leave wizard's file upload JS was in the wizard blade. It executed on page refresh but not when the wizard first appeared via tab switch. Moving `window.__qfProcessLeaveFile` to `navigation-layout.blade.php` fixed it. The file input uses `onchange="if(window.__qfProcessLeaveFile) window.__qfProcessLeaveFile(this)"` which works regardless of how the component was loaded.
+
 ### Why `php artisan view:clear` Alone Doesn't Fix #1 or #2
 
 `view:clear` only clears the **compiled cache** (location #3). It does NOT update stale source files in `vendor/` (location #1) or `resources/views/vendor/` (location #2). If the source file itself is stale, clearing the cache just recompiles the same stale source.
+
+### ⚠️ Location #3b — Stale Compiled Views Surviving `view:clear`
+
+**Critical discovery (2026-10-07)**: `php artisan view:clear` may NOT remove all compiled views. If a Blade file is renamed, moved, or its content changes significantly, Laravel can create a **new** compiled view under a different hash while leaving the **old** compiled view intact. The old view continues to be served because Livewire may reference it by its original component name.
+
+**Symptoms**:
+- You've verified all three locations (vendor, published, compiled) are correct
+- Changes still don't appear
+- `grep -r "old-code" storage/framework/views/` finds matches even after `view:clear`
+
+**Fix**:
+```bash
+# Aggressively delete ALL compiled views
+rm -rf storage/framework/views/*
+
+# Then re-clear properly
+php artisan view:clear && php artisan optimize:clear
+```
+
+**Real example**: After removing `@livewire('qf.document-preview-modal')` from a component blade, the old compiled view (`5748de...php`) still contained the modal directive. `view:clear` didn't remove it because it was keyed under a different hash than the new compiled view. The stale view was served when the component rendered inside a drawer, creating a duplicate modal trapped in the drawer's stacking context.
 
 ### Prevention: Symlink the Vendor Directory
 

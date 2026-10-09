@@ -36,41 +36,64 @@ class FileField implements FieldType
 
 
     public function renderTable($value, $record): string
-{
-    if (!$value) {
-        return '<span class="text-muted small italic">None</span>';
-    }
+    {
+        \Log::info('FileField.renderTable called', [
+            'value' => $value,
+            'record_class' => get_class($record),
+            'record_id' => $record->id ?? 'none',
+        ]);
 
-    // Detect if this record has a related owner via common relationship names
-    $isDocument = (method_exists($record, 'subject') && $record->subject)
-        || (method_exists($record, 'owner') && $record->owner)
-        || (method_exists($record, 'user') && $record->user);
-    
-    if ($isDocument && $record->id) {
-        $url = route('documents.download', $record->id);
-        $filename = $record->name ?? basename($value);
+        if (!$value) {
+            return '<span class="text-muted small italic">None</span>';
+        }
+
+        // Detect if this record has a related owner via common relationship names
+        $isDocument = (method_exists($record, 'subject') && $record->subject)
+            || (method_exists($record, 'owner') && $record->owner)
+            || (method_exists($record, 'user') && $record->user);
+
+        if ($isDocument && $record->id) {
+            $url = route('documents.download', $record->id);
+            $filename = $record->name ?? basename($value);
+        } else {
+            // Fallback for public files (profile images, etc.)
+            $url = asset('storage/' . $value);
+            $filename = basename($value);
+        }
+
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        
-        $icon = match($extension) {
+
+        // Truncate long filenames for display: "Very long document name...pdf"
+        $displayName = $filename;
+        $maxLen = 30;
+        if (mb_strlen($displayName) > $maxLen) {
+            $namePart = pathinfo($filename, PATHINFO_FILENAME);
+            if (mb_strlen($namePart) > 20) {
+                $displayName = mb_substr($namePart, 0, 17) . '...' . ($extension ? '.' . $extension : '');
+            }
+        }
+
+        $icon = match ($extension) {
             'pdf' => 'fa-file-pdf',
             'xls', 'xlsx' => 'fa-file-excel',
             'doc', 'docx' => 'fa-file-word',
             'jpg', 'jpeg', 'png', 'gif' => 'fa-file-image',
             default => 'fa-file-alt',
         };
-        
-        return '<a href="' . $url . '" target="_blank" class="d-inline-flex align-items-center gap-1 text-decoration-none">
+
+        // Use the preview modal (same pattern as ImageField) instead of
+        // target="_blank" download links. The DocumentPreviewModal is
+        // globally available in navigation-layout.blade.php.
+        // Use e() for HTML attribute safety. The document-level
+        // click delegation in navigation-layout reads these
+        // attributes and dispatches the preview event.
+        return '<a href="#" data-file-preview="' . e($url) . '" data-file-name="' . e($filename) . '"
+                    class="d-inline-flex align-items-center gap-1 text-decoration-none stop-propagation"
+                    style="cursor: pointer;">
                     <i class="fas ' . $icon . '"></i>
-                    <span>' . e($filename) . '</span>
-                    <i class="fas fa-download ms-1 small"></i>
+                    <span title="' . e($filename) . '">' . e($displayName) . '</span>
                 </a>';
     }
-    
-    // Fallback for public files (profile images, etc.)
-    $url = asset('storage/' . $value);
-    $filename = basename($value);
-    return '<a href="' . $url . '" target="_blank">' . e($filename) . '</a>';
-}
 
 
 

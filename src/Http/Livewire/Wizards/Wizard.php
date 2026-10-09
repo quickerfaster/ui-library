@@ -15,6 +15,7 @@ class Wizard extends Component
     public int $primaryModelId;
     public array $completion = [];
     public int $currentStep = 0;
+    public int $stepEnterCount = 0;      // incremented on each step navigation; used in :key to force fresh child component instances
     public array $stepData = [];         // stores record IDs per step index
     public array $createdRecordIds = []; // track all IDs created in this session
     public array $createdRecords = []; // each entry: ['model' => ModelClass, 'id' => id]
@@ -75,7 +76,8 @@ class Wizard extends Component
             $data = session()->get($this->wizardId);
             $this->stepData = $data['stepData'] ?? [];
             $this->currentStep = $data['currentStep'] ?? 0;
-            $this->createdRecords = $data['createdRecords'] ?? []; // Fixed name
+            $this->stepEnterCount = $data['stepEnterCount'] ?? 0;
+            $this->createdRecords = $data['createdRecords'] ?? [];
             $this->primaryModelId = $data['primaryModelId'];
         }
 
@@ -85,6 +87,7 @@ class Wizard extends Component
     {
         if ($index >= 0 && $index < count($this->steps)) {
             $this->currentStep = $index;
+            $this->stepEnterCount++;
             $this->saveToSession();
         }
     }
@@ -107,6 +110,7 @@ class Wizard extends Component
     {
         if ($this->currentStep > 0) {
             $this->currentStep--;
+            $this->stepEnterCount++;
             $this->saveToSession();
         }
     }
@@ -311,6 +315,7 @@ class Wizard extends Component
     {
         if ($this->currentStep + 1 < count($this->steps)) {
             $this->currentStep++;
+            $this->stepEnterCount++;
         } else {
             $this->finish();
         }
@@ -377,7 +382,8 @@ class Wizard extends Component
         session()->put($this->wizardId, [
             'stepData' => $this->stepData,
             'currentStep' => $this->currentStep,
-            'createdRecords' => $this->createdRecords, // Fixed name
+            'stepEnterCount' => $this->stepEnterCount,
+            'createdRecords' => $this->createdRecords,
             'primaryModelId' => $this->primaryModelId,
         ]);
     }

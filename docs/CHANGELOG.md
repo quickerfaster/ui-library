@@ -1,8 +1,30 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-10-05
-> **Status**: Current — Workflow Approval System + Entity Registry + Employee Manager Resolution
+> **Date**: 2026-10-07
+> **Status**: Current — Document Upload Wizard Step + Preview Modal z-index Fix
+
+---
+
+## 2026-10-07 — Document Upload Wizard Step + Auto-Upload Pattern
+
+### Added
+- **Leave request document upload wizard step**: Optional 3rd step ("Supporting Documents") between Request Details and Review in the leave wizard. Uses `customComponent: 'leave-document-upload'` in [`employee_self_service.php`](app/Modules/Leave/Data/wizards/employee_self_service.php:52). ([`LeaveDocumentUpload.php`](app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:1), [`leave-document-upload.blade.php`](app/Modules/Leave/Resources/views/livewire/leave-document-upload.blade.php:1))
+- **Auto-upload via `updatedNewFile()` hook**: File upload triggers automatically on selection — no "Upload" button needed. Livewire's `updatedNewFile()` hook processes the file in the same request. Applied to both [`LeaveDocumentUpload`](app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:140) and [`Step4Documents`](app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step4Documents.php:96).
+- **Server-side duplicate detection**: Before creating a Document record, checks file name + size + MIME type against ALL existing documents for the parent entity. Prevents double-upload from rapid-fire browser `change` events. ([`LeaveDocumentUpload.php:222`](app/Modules/Leave/Http/Livewire/LeaveDocumentUpload.php:222), [`Step4Documents.php:152`](app/Modules/Hr/Http/Livewire/Onboarding/Steps/Step4Documents.php:152))
+- **Uploaded documents in Review step**: [`wizard-review.blade.php`](src/Resources/views/livewire/wizards/partials/wizard-review.blade.php:86) now displays uploaded documents (file name, type, size) when the primary model implements `Documentable`.
+- **Preview modal for document files**: File names in document lists now open the `DocumentPreviewModal` instead of `target="_blank"` download links. Consistent with `ImageField` pattern. ([`leave-document-upload.blade.php:124`](app/Modules/Leave/Resources/views/livewire/leave-document-upload.blade.php:124), [`step4-documents.blade.php:139`](app/Modules/Hr/Resources/views/onboarding/steps/step4-documents.blade.php:139))
+- **View mode vs edit mode**: `LeaveDocumentUpload` blade hides upload form and delete buttons when `$stepIndex === null` (detail page/drawer), shows them only in wizard mode. ([`leave-document-upload.blade.php:4`](app/Modules/Leave/Resources/views/livewire/leave-document-upload.blade.php:4))
+- **`$stepEnterCount` in Wizard**: Library [`Wizard.php`](src/Http/Livewire/Wizards/Wizard.php:18) now increments a counter on each step navigation, used in `:key` to force fresh child component instances. Persisted in session.
+
+### Fixed
+- **Upload freezing after wizard navigation**: JS moved from child component blade to parent wizard blade with document-level event delegation. Child component scripts don't re-execute after Livewire destroys/recreates the component during step navigation. ([`wizard.blade.php`](src/Resources/views/livewire/wizards/wizard.blade.php:158), [`onboarding/wizard.blade.php`](app/Modules/Hr/Resources/views/onboarding/wizard.blade.php:264))
+- **Preview modal below drawer**: Removed duplicate `@livewire('qf.document-preview-modal')` from component blades (trapped in drawer stacking context). Only the global instance in [`navigation-layout.blade.php:236`](src/Resources/views/components/layouts/navigation-layout.blade.php:236) (body level) is used. Added drawer-hiding JS on modal open/close via both Livewire and Bootstrap events. ([`navigation-layout.blade.php:278`](src/Resources/views/components/layouts/navigation-layout.blade.php:278))
+- **Stale compiled view persistence**: Discovered that `php artisan view:clear` may not remove all compiled views — old hashes can persist. Added aggressive `rm -rf storage/framework/views/*` to fix procedure.
+
+### Documentation
+- [`debug-checklist.md`](docs/debug-checklist.md): Added §8 Location #3b — "Stale Compiled Views Surviving `view:clear`" with real example and aggressive fix procedure.
+- [`pre-coding-checklist.md`](docs/consuming-app/pre-coding-checklist.md): Added §J "Before Adding Document Upload to a Wizard Step" with 6-item checklist, correct pattern code examples, and 5 new Quick Reference entries.
 
 ---
 

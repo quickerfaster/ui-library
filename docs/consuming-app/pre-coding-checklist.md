@@ -214,6 +214,64 @@
 
 ---
 
+## J. Before Adding Document Upload to a Wizard Step
+
+- [ ] **Use `updatedNewFile()` hook for auto-upload.** Instead of a two-step "Select File → Click Upload" flow, use Livewire's `updatedNewFile()` hook which fires automatically when a file is uploaded to a property via `component.upload()`. This eliminates `wire:click` binding issues after component morphing.
+- [ ] **Server-side duplicate detection.** Compare file name + size + MIME type against ALL existing documents for the parent entity before creating a new Document record. JS debounce alone is not sufficient — the browser may fire `change` events sequentially.
+- [ ] **JS in parent blade, not child component.** Put file upload event delegation JS in the parent wizard/layout blade, not the child component blade. Child component scripts may not re-execute after wizard navigation destroys/recreates the component. Use document-level event delegation (`document.addEventListener('change', ...)`) with ID filtering.
+- [ ] **No `wire:ignore` on file input (when using auto-upload).** Since the file is uploaded immediately on selection and the input is cleared after each upload, there's no file selection to preserve across re-renders. Removing `wire:ignore` eliminates stale DOM reference issues.
+- [ ] **Single global `document-preview-modal` instance.** Use only the instance in `navigation-layout.blade.php` (at `<body>` level). Do NOT add `@livewire('qf.document-preview-modal')` inside drawer components — it creates a duplicate trapped in the drawer's stacking context.
+- [ ] **Hide drawer when preview modal opens.** The Bootstrap offcanvas `transform` creates a stacking context that traps modals behind the drawer regardless of z-index. Use `visibility: hidden` on `#globalDrawer` when the preview modal opens, and restore on close (both `close-bs-modal` Livewire event AND `hidden.bs.modal` Bootstrap event).
+
+### Correct Pattern (Auto-Upload Document Step)
+
+```php
+// In your Livewire component
+public function updatedNewFile(): void
+{
+    $this->uploadDocument();
+}
+
+public function uploadDocument(): void
+{
+    // Duplicate check
+    $existing = $this->parent->documents()
+        ->where('file_name', $this->newFile->getClientOriginalName())
+        ->where('size', $this->newFile->getSize())
+        ->where('mime_type', $this->newFile->getMimeType())
+        ->exists();
+    if ($existing) { $this->newFile = null; return; }
+
+    // Proceed with upload via HasDocuments trait or direct Document::create()
+}
+```
+
+```blade
+{{-- In child component blade: NO upload button, NO wire:ignore, NO JS --}}
+<input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+{{-- JS is in parent wizard blade with document-level delegation --}}
+```
+
+```javascript
+// In parent wizard/layout blade
+var _changeTimer = null;
+document.addEventListener('change', function (e) {
+    if (e.target.id !== 'file-input') return;
+    if (_changeTimer) clearTimeout(_changeTimer);
+    _changeTimer = setTimeout(function () {
+        _changeTimer = null;
+        var wireId = document.getElementById('upload-zone')?.dataset.wireId;
+        var component = wireId ? window.Livewire.find(wireId) : null;
+        if (component) component.upload('newFile', e.target.files[0],
+            function () { e.target.value = ''; },
+            function (err) { console.error(err); }
+        );
+    }, 300);
+});
+```
+
+---
+
 ## Quick Reference: Common Violations & Fixes
 
 | Violation | Symptom | Fix |
@@ -227,6 +285,10 @@
 | Inverted `boolradio` for a boolean flag | Value saved opposite of what the user selected | Use `field_type => 'checkbox'` |
 | `request()->url()` in Livewire `isItemActive()` | Active highlighting never works in ContextSheet/overflow | Use `url()->previous()` instead |
 | `<style>` tag in Livewire Blade template | Hover effects lost after component re-render | Move styles to `quicker-faster.css` |
+| File upload JS in child component blade | Upload breaks after wizard navigation | Move JS to parent wizard blade with document-level event delegation |
+| `wire:ignore` on file input in nested component | Stale DOM references after re-render | Remove `wire:ignore`; use auto-upload via `updatedNewFile()` hook so input is cleared after each upload |
+| `@livewire('qf.document-preview-modal')` inside drawer | Modal appears below drawer | Use only the global instance in `navigation-layout.blade.php` (body level) |
+| Duplicate file uploads | Same file uploaded twice | Add server-side duplicate check (name + size + MIME against existing documents) |
 | Multiple root elements in Livewire component | `wire:click` does nothing | Wrap everything in single root `<div>` |
 | `wire:navigate` on links near Bootstrap dropdowns | Dropdowns alternately work/break | Remove `wire:navigate`, use standard `<a href>` |
 | Blade structural change not taking effect | Old DOM persists after changes | Bump `$renderVersion` on the component |

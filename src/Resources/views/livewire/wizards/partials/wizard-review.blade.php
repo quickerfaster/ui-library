@@ -51,7 +51,7 @@
                                                     $dynamicProp = $rel['dynamic_property'] ?? $fieldName;
                                                     //if ($record->relationLoaded($dynamicProp)) {
                                                         $related = $record->$dynamicProp;
-                                                        
+
                                                         if ($related) {
                                                             if ($related instanceof \Illuminate\Database\Eloquent\Collection) {
                                                                 $displayField = $rel['display_field'] ?? 'name';
@@ -82,6 +82,74 @@
             </div>
         @endif
     @endforeach
+
+    {{-- Uploaded Documents (from customComponent steps) --}}
+    @php
+        $primaryModel = $models['primary'] ?? null;
+        $primaryRecord = null;
+        if ($primaryModel && isset($primaryModelId)) {
+            $primaryRecord = $primaryModel::find($primaryModelId);
+        }
+        $uploadedDocuments = null;
+        if ($primaryRecord && $primaryRecord instanceof \QuickerFaster\UILibrary\Contracts\Documents\Documentable) {
+            $uploadedDocuments = $primaryRecord->getDocuments();
+        }
+    @endphp
+
+    @if($uploadedDocuments && $uploadedDocuments->isNotEmpty())
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Supporting Documents</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-flush align-items-center">
+                        <thead class="thead-light">
+                            <tr>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">File Name</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Type</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($uploadedDocuments as $doc)
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="icon icon-shape bg-light rounded-circle shadow text-center me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                                <i class="fas fa-file text-secondary text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-weight-bold mb-0">{{ $doc->file_name }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-sm bg-light text-secondary">
+                                            {{ ucfirst(str_replace('_', ' ', $doc->document_type)) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @php
+                                            $size = $doc->size;
+                                            if ($size >= 1048576) {
+                                                $displaySize = round($size / 1048576, 2) . ' MB';
+                                            } elseif ($size >= 1024) {
+                                                $displaySize = round($size / 1024, 2) . ' KB';
+                                            } else {
+                                                $displaySize = $size . ' B';
+                                            }
+                                        @endphp
+                                        <span class="text-sm">{{ $displaySize }}</span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Preview sections: Balance, Approval Path, Team Calendar --}}
     @if($showBalance || $showApprovalPath || $showTeamCalendar)

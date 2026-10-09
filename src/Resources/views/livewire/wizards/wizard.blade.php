@@ -79,14 +79,18 @@
                             $recordId = $stepData[$currentStep] ?? null;
                             $presetData = $this->getPresetDataForCurrentStep();
                         @endphp
-                        <livewire:dynamic-component
-                            :component="$steps[$currentStep]['customComponent']"
-                            :configKey="$configKey"
-                            :stepIndex="$currentStep"
-                            :recordId="$recordId"
-                            :presetData="$presetData"
-                            :wizardId="$wizardId"
-                            :key="'custom-step-'.$currentStep" />
+                        @livewire(
+                            $steps[$currentStep]['customComponent'],
+                            [
+                                'configKey' => $configKey,
+                                'stepIndex' => $currentStep,
+                                'recordId' => $recordId,
+                                'primaryModelId' => $primaryModelId,
+                                'presetData' => $presetData,
+                                'wizardId' => $wizardId,
+                            ],
+                            key('custom-step-'.$currentStep.'-'.$stepEnterCount)
+                        )
                     @else
                         @php
                             $step = $steps[$currentStep];
@@ -150,3 +154,79 @@
         @endif
     </div>
 </div>
+
+{{-- Document upload event delegation.
+     Attached here (wizard blade, loaded once) rather than in the
+     leave-document-upload component blade because component scripts
+     may not re-execute after wizard navigation destroys/recreates
+     the child component. Document-level delegation is immune to
+     DOM replacement. --}}
+<script>
+(function () {
+    if (window.__qfWizardUploadDelegation) return;
+    window.__qfWizardUploadDelegation = true;
+
+    var _changeTimer = null;
+
+    // Delegate change on #file-input with debounce (fallback —
+    // primary handler is window.__qfProcessLeaveFile in navigation
+    // layout, called via inline onchange).
+    document.addEventListener('change', function (e) {
+        if (!e.target || e.target.id !== 'file-input') return;
+        var input = e.target;
+        if (_changeTimer) clearTimeout(_changeTimer);
+        _changeTimer = setTimeout(function () {
+            _changeTimer = null;
+            if (window.__qfProcessLeaveFile) window.__qfProcessLeaveFile(input);
+        }, 300);
+    });
+
+    // Delegate click on #upload-zone → open file dialog
+    document.addEventListener('click', function (e) {
+        var zone = e.target.closest('#upload-zone');
+        if (!zone) return;
+        var input = document.getElementById('file-input');
+        if (input && e.target !== input) input.click();
+    });
+
+    // Delegate drag-and-drop on #upload-zone
+    document.addEventListener('dragover', function (e) {
+        var zone = e.target.closest('#upload-zone');
+        if (!zone) return;
+        e.preventDefault();
+        zone.style.borderColor = '#0d6efd';
+        zone.style.background = 'rgba(13, 110, 253, 0.05)';
+    });
+
+    document.addEventListener('dragleave', function (e) {
+        var zone = e.target.closest('#upload-zone');
+        if (!zone) return;
+        e.preventDefault();
+        zone.style.borderColor = '#ccc';
+        zone.style.background = '#fafbfc';
+    });
+
+    document.addEventListener('drop', function (e) {
+        var zone = e.target.closest('#upload-zone');
+        if (!zone) return;
+        e.preventDefault();
+        zone.style.borderColor = '#ccc';
+        zone.style.background = '#fafbfc';
+
+        var input = document.getElementById('file-input');
+        if (e.dataTransfer.files && e.dataTransfer.files[0] && input) {
+            var dt = new DataTransfer();
+            dt.items.add(e.dataTransfer.files[0]);
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change'));
+        }
+    });
+
+    window.clearLeaveFile = function () {
+        var input = document.getElementById('file-input');
+        var info = document.getElementById('selected-file-info');
+        if (input) input.value = '';
+        if (info) info.style.display = 'none';
+    };
+})();
+</script>
