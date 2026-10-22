@@ -2,6 +2,8 @@
 
 namespace QuickerFaster\UILibrary\Traits;
 
+use QuickerFaster\UILibrary\Contracts\Navigation\CompanyProvider;
+
 trait HasCurrencySymbol
 {
     /**
@@ -43,6 +45,53 @@ trait HasCurrencySymbol
     protected function getCurrencySymbol(string $currencyCode): string
     {
         return static::resolveCurrencySymbol($currencyCode, $this);
+    }
+
+    /**
+     * Resolve the current company's currency code using the library's
+     * CompanyProvider contract and session context.
+     *
+     * Resolution order:
+     *  1. Session 'current_company_id' (set by ResolveCompanyContext middleware)
+     *  2. CompanyProvider::getCurrentCompanyId()
+     *  3. Company object's currency_code attribute (if available)
+     *  4. null (caller falls back to 'USD')
+     *
+     * This keeps the library independent of App\Modules\* — the consuming
+     * app binds a CompanyProvider implementation that returns company objects.
+     */
+    protected function getCurrentCompanyCurrencyCode(): ?string
+    {
+        $sessionKey = (string) config('ui-library.tenancy.session_key', 'current_company_id');
+        $companyId = session($sessionKey);
+
+        // "All Companies" (0) has no single currency
+        if ($companyId === 0) {
+            return null;
+        }
+
+        try {
+            $provider = app(CompanyProvider::class);
+
+            if ($companyId === null) {
+                $companyId = $provider->getCurrentCompanyId(auth()->user());
+            }
+
+            if (!$companyId) {
+                return null;
+            }
+
+            $company = $provider->getCompanies(auth()->user())
+                ->firstWhere('id', $companyId);
+
+            if ($company && isset($company->currency_code) && $company->currency_code) {
+                return (string) $company->currency_code;
+            }
+        } catch (\Throwable $e) {
+            // CompanyProvider may not be bound or may throw — fall through
+        }
+
+        return null;
     }
 
     /**

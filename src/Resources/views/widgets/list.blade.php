@@ -5,7 +5,7 @@
 @endphp
 
 <div class="card-body p-3 p-lg-4">
-    <div class="table-responsive" style="overflow: visible;">
+    <div class="table-responsive">
         <table class="table table-sm table-hover align-middle mb-0">
             <thead>
                 <tr>

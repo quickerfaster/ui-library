@@ -3,10 +3,12 @@
 namespace QuickerFaster\UILibrary\Widgets;
 
 use Illuminate\Support\Facades\DB;
+use QuickerFaster\UILibrary\Traits\HasCurrencySymbol;
 use QuickerFaster\UILibrary\Traits\Widgets\ResolvesDateStrings;
 
 class MetricWidgetProcessor
 {
+    use HasCurrencySymbol;
     use ResolvesDateStrings;
     public function process(array $definition): array
     {
@@ -46,8 +48,8 @@ class MetricWidgetProcessor
         return [
             'type'              => 'metric',
             'title'             => $definition['title'] ?? 'Metric',
-            'value'             => $this->formatValue($value, $definition['format'] ?? null),
-            'previous_value'    => $previousValue !== null ? $this->formatValue($previousValue, $definition['format'] ?? null) : null,
+            'value'             => $this->formatValue($value, $definition['format'] ?? null, $definition['currency_code'] ?? $this->getCurrentCompanyCurrencyCode()),
+            'previous_value'    => $previousValue !== null ? $this->formatValue($previousValue, $definition['format'] ?? null, $definition['currency_code'] ?? $this->getCurrentCompanyCurrencyCode()) : null,
             'change_percentage' => $changePercentage !== null ? round(abs($changePercentage), 1) : null,
             'trend'             => $trend,
             'icon'              => $definition['icon'] ?? null,
@@ -87,7 +89,7 @@ class MetricWidgetProcessor
         return $modified; // For simplicity, returning same conditions; in real usage you'd adjust date filters.
     }
 
-    protected function formatValue($value, ?string $format = null): string
+    protected function formatValue($value, ?string $format = null, ?string $currencyCode = null): string
     {
         if ($value === null) {
             return 'N/A';
@@ -95,7 +97,8 @@ class MetricWidgetProcessor
 
         switch ($format) {
             case 'currency':
-                return '$' . number_format((float) $value, 2);
+                $symbol = $this->getCurrencySymbol($currencyCode ?: 'USD');
+                return $symbol . number_format((float) $value, 2);
             case 'number':
                 return number_format((float) $value);
             case 'percent':

@@ -106,8 +106,9 @@ class ChartWidgetProcessor
             'width' => $definition['width'] ?? 6,
         ];
 
-        if (!empty($definition['currency_code'])) {
-            $result['currency_symbol'] = $this->getCurrencySymbol($definition['currency_code']);
+        $currencyCode = $definition['currency_code'] ?? $this->getCurrentCompanyCurrencyCode();
+        if (!empty($currencyCode)) {
+            $result['currency_symbol'] = $this->getCurrencySymbol($currencyCode);
         }
 
         return $result;

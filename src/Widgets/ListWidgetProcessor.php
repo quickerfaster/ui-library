@@ -57,7 +57,9 @@ class ListWidgetProcessor
 
                     // Optional formatting (e.g., date, number, expiry_warning)
                     if (isset($col['format'])) {
-                        $currencyCode = $col['currency_code'] ?? $definition['currency_code'] ?? null;
+                        $currencyCode = $col['currency_code']
+                            ?? $definition['currency_code']
+                            ?? $this->getCurrentCompanyCurrencyCode();
                         $value = $this->formatValue($value, $col['format'], $record, $field, $currencyCode);
                     }
 

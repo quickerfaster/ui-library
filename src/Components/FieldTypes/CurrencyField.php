@@ -88,23 +88,23 @@ class CurrencyField implements FieldType
 
         // Resolve currency code:
         // 1. Static from field definition
-        // 2. Model's company's currency_code (most authoritative — company-level setting)
-        // 3. Model's own currency_code (stored at creation time, may be stale)
+        // 2. Model's own currency_code accessor (most reliable — can bypass
+        //    relationship scoping with a direct DB query)
+        // 3. Model's company's currency_code (relationship-based fallback)
         // 4. Fallback
         $currencyCode = $this->definition['currency_code'] ?? null;
 
         if (!$currencyCode && is_object($record) && method_exists($record, 'getAttribute')) {
-            // Company currency takes priority over stored value
-            if (method_exists($record, 'company')) {
+            // Model's own currency_code takes priority — accessors can use
+            // direct DB queries to avoid relationship scoping issues
+            $currencyCode = $record->currency_code ?? null;
+
+            // Fall back to company relationship
+            if (!$currencyCode && method_exists($record, 'company')) {
                 $company = $record->company;
                 if ($company && method_exists($company, 'getAttribute')) {
                     $currencyCode = $company->currency_code ?? null;
                 }
-            }
-
-            // Fall back to model's own currency_code
-            if (!$currencyCode) {
-                $currencyCode = $record->currency_code ?? null;
             }
         }
 

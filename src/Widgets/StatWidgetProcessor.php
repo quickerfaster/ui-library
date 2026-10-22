@@ -43,7 +43,9 @@ class StatWidgetProcessor
         // Format: apply currency symbol if configured
         $format = $definition['format'] ?? null;
         if ($format === 'currency' && is_numeric($value)) {
-            $currencyCode = $definition['currency_code'] ?? 'USD';
+            $currencyCode = $definition['currency_code']
+                ?? $this->getCurrentCompanyCurrencyCode()
+                ?? 'USD';
             $symbol = $this->getCurrencySymbol($currencyCode);
             $value = $symbol . number_format((float) $value, 2);
         }
