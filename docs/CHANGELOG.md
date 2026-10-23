@@ -1,8 +1,37 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-10-07
-> **Status**: Current — Document Upload Wizard Step + Preview Modal z-index Fix
+> **Date**: 2026-10-23
+> **Status**: Current — Holiday Module Batch Wizard + FieldFactory Extensibility + Wizard Fixes
+
+---
+
+## 2026-10-23 — Holiday Batch Creation Wizard + Library Extensibility
+
+### Added
+- **`FieldFactory::registerType()`** — Static method allowing consuming app modules to register custom field types without modifying the library's field map. Used by Holiday module's `recurrence_rule_builder` type. ([`FieldFactory.php`](src/Factories/FieldTypes/FieldFactory.php:54))
+- **`DataTableForm::updateRecurrenceRule()`** — Listener and handler for `recurrenceRuleUpdated` event from custom field components. Mirrors existing `updateCalculationLogic()` pattern. ([`DataTableForm.php`](src/Http/Livewire/DataTables/DataTableForm.php:88,140))
+- **`Wizard::cancelDelete()` prefix cleanup** — Now cleares ALL session keys matching `{wizardId}-*` prefix, not just the main key. Prevents orphaned custom-component session data from leaking across wizard runs. ([`Wizard.php`](src/Http/Livewire/Wizards/Wizard.php:309))
+- **`Wizard::cancelDelete()` dispatches `wizardCancelled`** — Custom child components can listen for this event to clean up persisted state (e.g., DB drafts). ([`Wizard.php`](src/Http/Livewire/Wizards/Wizard.php:318))
+- **`Wizard::finish()` prefix cleanup** — Same prefix-based session clearing as `cancelDelete()`. Ensures `{wizardId}-step-one` and similar keys are removed on successful completion. ([`Wizard.php`](src/Http/Livewire/Wizards/Wizard.php:146))
+
+### Fixed
+- **`Wizard::$primaryModelId` typed property error** — Added `= 0` default value. Previously uninitialized for wizards using only `customComponent` steps (no model-backed primary record). ([`Wizard.php`](src/Http/Livewire/Wizards/Wizard.php:15))
+- **`Wizard::advance()` re-saving session after `finish()`** — `saveToSession()` was called unconditionally, re-persisting the session after `finish()` had cleareed it. Now `saveToSession()` only runs in the normal-advance branch. Fixes "Create Another Set" resuming the completed wizard. ([`Wizard.php`](src/Http/Livewire/Wizards/Wizard.php:335))
+- **Session restore defensiveness** — `primaryModelId` session restore now uses `?? 0` null coalescing for backward compatibility. ([`Wizard.php`](src/Http/Livewire/Wizards/Wizard.php:81))
+
+---
+
+## 2026-10-14 — RichtextField Component + Trix Editor + ResolvesModels Fix
+
+### Added
+- **`RichtextField` component**: New FieldType at [`src/Components/FieldTypes/RichtextField.php`](src/Components/FieldTypes/RichtextField.php) implementing `FieldType` contract. Renders a Trix WYSIWYG editor in forms, strips HTML for table display, passes HTML through for detail view. Registered in [`FieldFactory.php`](src/Factories/FieldTypes/FieldFactory.php:42) as `'richtext' => RichtextField::class`.
+- **Trix CDN in navigation layout**: Trix CSS/JS loaded from jsDelivr CDN in [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php:38-40). Available globally on all pages.
+- **Fullscreen overlay for richtext**: Alpine.js-powered expand button that teleports the Trix editor to a full-viewport overlay (`x-teleport="body"`). Includes Done button, Escape key close, and bidirectional content sync between drawer and overlay editors.
+- **`richtext` Blade view**: [`src/Resources/views/components/fields/richtext.blade.php`](src/Resources/views/components/fields/richtext.blade.php) — hidden input + Trix editor with `wire:ignore` + Alpine.js bridge syncing Trix changes to Livewire via `$wire.set()`.
+
+### Fixed
+- **`ResolvesModels::resolveModel()` bypasses global scopes**: Changed from `method_exists($modelClass, 'withoutCompanyScope')` (which fails for Builder macros) to `$modelClass::query()->withoutGlobalScopes()`. Fixes `RecordNotAccessibleException` when viewing records from a different session company. ([`src/Concerns/ResolvesModels.php`](src/Concerns/ResolvesModels.php:62-68))
 
 ---
 

@@ -85,6 +85,7 @@ class DataTableForm extends Component
         'refreshFields' => 'refreshFields',
         'resetForm' => 'resetFields',
         'calculationLogicUpdated' => 'updateCalculationLogic',
+        'recurrenceRuleUpdated' => 'updateRecurrenceRule',
 
     ];
 
@@ -132,6 +133,15 @@ class DataTableForm extends Component
     public function updateCalculationLogic($json)
     {
         $this->fields['calculation_logic'] = $json;
+    }
+
+    /**
+     * Receive recurrence_rule JSON from the RecurrenceRuleBuilder
+     * Livewire component (Holiday module).
+     */
+    public function updateRecurrenceRule($json)
+    {
+        $this->fields['recurrence_rule'] = $json;
     }
 
 

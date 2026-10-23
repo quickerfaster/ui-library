@@ -12,7 +12,7 @@ class Wizard extends Component
     public string $wizardId;             // unique per user/session
     public array $steps = [];
     public array $models = [];
-    public int $primaryModelId;
+    public int $primaryModelId = 0;
     public array $completion = [];
     public int $currentStep = 0;
     public int $stepEnterCount = 0;      // incremented on each step navigation; used in :key to force fresh child component instances
@@ -78,7 +78,7 @@ class Wizard extends Component
             $this->currentStep = $data['currentStep'] ?? 0;
             $this->stepEnterCount = $data['stepEnterCount'] ?? 0;
             $this->createdRecords = $data['createdRecords'] ?? [];
-            $this->primaryModelId = $data['primaryModelId'];
+            $this->primaryModelId = $data['primaryModelId'] ?? 0;
         }
 
     }
@@ -141,6 +141,16 @@ class Wizard extends Component
         $this->completeWizard();
 
         session()->forget($this->wizardId);
+
+        // Also clear any custom component session keys that use
+        // the wizardId as a prefix (e.g. {wizardId}-step-one).
+        $prefix = $this->wizardId . '-';
+        foreach (session()->all() as $key => $value) {
+            if (str_starts_with($key, $prefix)) {
+                session()->forget($key);
+            }
+        }
+
         $this->currentStep = count($this->steps); // special index for completion
     }
 
@@ -304,6 +314,19 @@ class Wizard extends Component
 
         });
         session()->forget($this->wizardId);
+
+        // Also clear any custom component session keys that use
+        // the wizardId as a prefix (e.g. {wizardId}-step-one).
+        $prefix = $this->wizardId . '-';
+        foreach (session()->all() as $key => $value) {
+            if (str_starts_with($key, $prefix)) {
+                session()->forget($key);
+            }
+        }
+
+        // Notify child components so they can clean up (e.g. delete DB drafts)
+        $this->dispatch('wizardCancelled', wizardId: $this->wizardId);
+
         $this->redirect($this->returnPath ?: '/');
     }
 
@@ -316,10 +339,14 @@ class Wizard extends Component
         if ($this->currentStep + 1 < count($this->steps)) {
             $this->currentStep++;
             $this->stepEnterCount++;
+            $this->saveToSession();
         } else {
+            // finish() clears the session and moves to the completion
+            // screen. Do NOT re-save the session afterward, otherwise
+            // the wizard would resume at the completion step on the
+            // next visit instead of starting fresh.
             $this->finish();
         }
-        $this->saveToSession();
     }
 
     protected function isFormStep(array $step): bool
