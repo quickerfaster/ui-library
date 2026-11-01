@@ -277,8 +277,21 @@
 
                 {{-- Primary bulk actions as separate buttons --}}
                 @php
-                    $primaryBulkActions = ['export', 'delete', 'restore'];
-                    $moreBulkActions = array_diff(array_keys($bulkActions), $primaryBulkActions);
+                    // Primary actions (toolbar buttons):
+                    //   export, delete, restore, updateField
+                    // Everything else goes to the "More" dropdown
+                    $primaryActionTypes = ['export', 'delete', 'restore', 'updateField'];
+                    $primaryBulkActions = [];
+                    $moreBulkActions = [];
+
+                    foreach ($bulkActions as $key => $action) {
+                        $type = $action['type'] ?? '';
+                        if (in_array($type, $primaryActionTypes)) {
+                            $primaryBulkActions[] = $key;
+                        } else {
+                            $moreBulkActions[] = $key;
+                        }
+                    }
                 @endphp
 
                 @foreach ($primaryBulkActions as $actionKey)

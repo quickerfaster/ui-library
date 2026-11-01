@@ -138,6 +138,9 @@
                                                             'results' => $this->searchResults[$field] ?? [],
                                                         ]) !!}
                                                     @endif
+                                                    @if (!empty($def['hint']))
+                                                        <small class="text-muted d-block mt-1">{{ $def['hint'] }}</small>
+                                                    @endif
                                                 @endif
                                             </div>
                                         @endif

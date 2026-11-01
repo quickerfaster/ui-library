@@ -168,9 +168,34 @@
                     <li>
                         @if ($isDirectLink)
                             @php
-                                $href = $routeName
-                                    ? route($routeName, $routeParams)
-                                    : (str_contains($url, '{id}') ? str_replace('{id}', $record->id, $url) : $url . '/' . $record->id);
+                                if ($routeName) {
+                                    $href = route($routeName, $routeParams);
+                                } elseif (str_contains($url, '{id}')) {
+                                    $href = str_replace('{id}', $record->id, $url);
+                                } else {
+                                    // Build query string from params, replacing {id} and other
+                                    // {field} placeholders with actual record values.
+                                    $queryParams = [];
+                                    if (!empty($action['params'])) {
+                                        foreach ($action['params'] as $key => $value) {
+                                            $resolved = $value;
+                                            // Replace {id} placeholder
+                                            $resolved = str_replace('{id}', $record->id, $resolved);
+                                            // Replace other {field} placeholders from the record
+                                            if (preg_match_all('/\{(\w+)\}/', $resolved, $matches)) {
+                                                foreach ($matches[1] as $field) {
+                                                    $fieldValue = data_get($record, $field, '');
+                                                    $resolved = str_replace('{' . $field . '}', $fieldValue, $resolved);
+                                                }
+                                            }
+                                            $queryParams[$key] = $resolved;
+                                        }
+                                    }
+                                    $href = $url;
+                                    if (!empty($queryParams)) {
+                                        $href .= '?' . http_build_query($queryParams);
+                                    }
+                                }
                             @endphp
                             <a class="dropdown-item d-flex align-items-center py-2" href="{{ $href }}"
                                 @if (!empty($action['newTab'])) target="_blank" rel="noopener noreferrer" @endif>
