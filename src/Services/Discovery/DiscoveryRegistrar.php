@@ -24,6 +24,46 @@ use QuickerFaster\UILibrary\Contracts\Reports\Reportable;
 class DiscoveryRegistrar
 {
     /**
+     * Safely check if a cache key exists, returning false if the cache
+     * store is unavailable (e.g. database cache table missing on a fresh
+     * deploy before migrations have run).
+     */
+    protected function cacheHas(string $key): bool
+    {
+        try {
+            return cache()->has($key);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Safely read from cache, returning the default if the cache store
+     * is unavailable.
+     */
+    protected function cacheGet(string $key, mixed $default = null): mixed
+    {
+        try {
+            return cache()->get($key, $default);
+        } catch (\Throwable) {
+            return $default;
+        }
+    }
+
+    /**
+     * Safely write to cache, silently ignoring errors when the cache
+     * store is unavailable (discovery will re-scan on next boot).
+     */
+    protected function cachePut(string $key, mixed $value, int $ttl): void
+    {
+        try {
+            cache()->put($key, $value, $ttl);
+        } catch (\Throwable) {
+            // Cache store unavailable, skip
+        }
+    }
+
+    /**
      * Register all discoverable business-module assets and return a summary.
      *
      * @return array<string, mixed>
@@ -125,8 +165,8 @@ class DiscoveryRegistrar
 
         $cacheKey = $this->cacheKey('listeners', 2, $moduleNamespace, $files);
 
-        if ($this->inProduction() && cache()->has($cacheKey)) {
-            $listenersMap = cache()->get($cacheKey, []);
+        if ($this->inProduction() && $this->cacheHas($cacheKey)) {
+            $listenersMap = $this->cacheGet($cacheKey, []);
             $this->applyListeners($listenersMap);
 
             return $listenersMap;
@@ -136,7 +176,7 @@ class DiscoveryRegistrar
         $this->applyListeners($listenersMap);
 
         if ($this->inProduction() && $listenersMap !== []) {
-            cache()->put($cacheKey, $listenersMap, $this->cacheTtl());
+            $this->cachePut($cacheKey, $listenersMap, $this->cacheTtl());
         }
 
         return $listenersMap;
@@ -227,8 +267,8 @@ class DiscoveryRegistrar
 
         $cacheKey = $this->cacheKey('reports', 1, $moduleNamespace, $files);
 
-        if ($this->inProduction() && cache()->has($cacheKey)) {
-            $discovered = cache()->get($cacheKey, []);
+        if ($this->inProduction() && $this->cacheHas($cacheKey)) {
+            $discovered = $this->cacheGet($cacheKey, []);
             $this->mergeReportTypes($discovered);
 
             return $discovered;
@@ -238,7 +278,7 @@ class DiscoveryRegistrar
         $this->mergeReportTypes($discovered);
 
         if ($this->inProduction() && $discovered !== []) {
-            cache()->put($cacheKey, $discovered, $this->cacheTtl());
+            $this->cachePut($cacheKey, $discovered, $this->cacheTtl());
         }
 
         return $discovered;
@@ -373,8 +413,8 @@ class DiscoveryRegistrar
 
         $cacheKey = $this->cacheKey('workflows', 1, $moduleKey, $files);
 
-        if ($this->inProduction() && cache()->has($cacheKey)) {
-            $discovered = cache()->get($cacheKey, []);
+        if ($this->inProduction() && $this->cacheHas($cacheKey)) {
+            $discovered = $this->cacheGet($cacheKey, []);
             $this->mergeWorkflows($discovered);
 
             return $discovered;
@@ -384,7 +424,7 @@ class DiscoveryRegistrar
         $this->mergeWorkflows($discovered);
 
         if ($this->inProduction() && $discovered !== []) {
-            cache()->put($cacheKey, $discovered, $this->cacheTtl());
+            $this->cachePut($cacheKey, $discovered, $this->cacheTtl());
         }
 
         return $discovered;
