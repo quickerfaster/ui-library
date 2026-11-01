@@ -70,8 +70,16 @@ class ModuleServiceProvider extends ServiceProvider
                 true
             );
 
-            // Register module in config
-            config()->set("ui-library.modules.{$moduleName}", [
+            // Register module in config. Any values the consuming app has
+            // pre-published under ui-library.modules.{module} (e.g. 'enabled',
+            // 'label', 'icon', 'route', 'order', 'roles', 'user_facing',
+            // 'depends_on') take precedence over the auto-discovered defaults.
+            // This powers progressive module rollout: a module can be
+            // pre-registered with 'enabled' => false to hide it from the UI
+            // while its routes, migrations, and service provider still boot.
+            $existing = config("ui-library.modules.{$moduleName}", []);
+
+            config()->set("ui-library.modules.{$moduleName}", array_merge([
                 'enabled' => true,
                 'label' => ucfirst($moduleName),
                 'icon' => 'fa-cube',
@@ -86,7 +94,7 @@ class ModuleServiceProvider extends ServiceProvider
                 'auto_register_workflows' => $autoRegisterWorkflows,
                 'auto_register_permissions' => $autoRegisterPermissions,
                 'auto_register_notifications' => $autoRegisterNotifications,
-            ]);
+            ], $existing));
 
             // Read user_facing and depends_on from config
             $userFacing = config("ui-library.modules.{$moduleName}.user_facing", true);
