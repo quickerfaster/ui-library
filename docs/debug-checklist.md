@@ -1,7 +1,7 @@
 # Debug Checklist — Navigation & UI Bugs
 
 > **Purpose**: Quick-reference guide for diagnosing common navigation, event, and UI bugs in the QuickerFaster UI Library. Each entry maps symptoms → likely causes → fix.
-> **Last Updated**: 2026-10-05 (rewrote: §8 stale vendor files; rewrote: §14 table overflow; added: §28 geolocation accuracy; added: workflow entity registry; added: employee_manager role; added: WorkflowContext; added: notification type mappings; added: employee number sequence)
+> **Last Updated**: 2026-10-14 (added: §29 — RichtextField + Trix; §30 — ResolvesModels with Builder macros)
 
 ---
 
@@ -1290,3 +1290,62 @@ GROUP BY accuracy_tier;
 <｜DSML｜tool_calls>
 <｜DSML｜invoke name="apply_diff">
 <｜DSML｜parameter name="diff" string="true">
+---
+
+## 29. RichtextField — Trix Editor Not Saving / Not Editable
+
+### Symptoms
+- Trix editor renders but is not editable (clicking does nothing)
+- Trix editor is editable but changes are not saved to the database
+- "Fullscreen" button doesn't open the overlay
+
+### Likely Causes
+
+| # | Cause | Fix |
+|---|-------|-----|
+| 1 | `wire:model` inside `wire:ignore` silently ignored | Use `$wire.set('fields.name', html)` from Alpine.js |
+| 2 | Trix CDN not loaded | Add CDN links to [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php) |
+| 3 | `display: 'detail'` excludes field from forms | Change to `'display' => 'inline'` in data config |
+| 4 | `x-teleport` timing — overlay editor not ready | Use `setTimeout(fn, 50)` retry loop |
+| 5 | Missing `input` attribute on overlay `<trix-editor>` | Add hidden `<input>` + `input="..."` on editor |
+| 6 | `x-on:click.self` catches Trix toolbar clicks | Use explicit Done button + Escape key |
+
+### Correct Pattern
+```blade
+<div wire:ignore x-data="{ fieldName: 'content', init() {
+    const editor = document.getElementById('content_trix');
+    const hidden = document.getElementById('content');
+    if (hidden.value) editor.editor.loadHTML(hidden.value);
+    editor.addEventListener('trix-change', () => {
+        hidden.value = editor.value;
+        $wire.set('fields.' + this.fieldName, editor.value);
+    });
+}}">
+    <input id="content" type="hidden" value="{{ $value }}">
+    <trix-editor id="content_trix" input="content" style="min-height: 200px;"></trix-editor>
+</div>
+```
+
+---
+
+## 30. ResolvesModels — RecordNotAccessibleException for Existing Records
+
+### Symptoms
+- Record exists in DB but detail/edit page throws `RecordNotAccessibleException`
+- Only when record's `company_id` differs from session `current_company_id`
+
+### Root Cause
+`withoutCompanyScope()` is a **Builder macro** ([`CompanyScope.php`](src/Scopes/CompanyScope.php:49)), not a Model method. `method_exists($modelClass, 'withoutCompanyScope')` returns `false`. Falls through to `$modelClass::query()` which applies global scope.
+
+### Fix
+```php
+// ❌ Broken
+$query = method_exists($modelClass, 'withoutCompanyScope')
+    ? $modelClass::withoutCompanyScope()
+    : $modelClass::query();
+
+// ✅ Fixed
+$query = $modelClass::query()->withoutGlobalScopes();
+```
+
+Affected: [`ResolvesModels.php`](src/Concerns/ResolvesModels.php:62-68)

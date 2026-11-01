@@ -59,12 +59,14 @@ trait ResolvesModels
             return null;
         }
 
-        // Build the query
-        // Use withoutCompanyScope() if available (multi-tenant apps),
-        // otherwise fall back to a plain query (standard models).
-        $query = method_exists($modelClass, 'withoutCompanyScope')
-            ? $modelClass::withoutCompanyScope()
-            : $modelClass::query();
+        // Build the query.
+        // Remove all global scopes so the record can be found regardless
+        // of the user's current session company. Company access checks are
+        // handled separately by authorization gates.
+        // Note: withoutCompanyScope() is a Builder macro (CompanyScope),
+        // not a Model method, so method_exists() returns false. Use
+        // withoutGlobalScopes() on the query builder instead.
+        $query = $modelClass::query()->withoutGlobalScopes();
 
         // Apply additional scopes
         foreach ($scopes as $scope) {
