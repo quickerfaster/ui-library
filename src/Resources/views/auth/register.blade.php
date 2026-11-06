@@ -26,7 +26,14 @@
 
                     <div class="mb-3">
                         <label for="password" class="form-label">{{ __('Password') }}</label>
-                        <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" name="password" required>
+                        <div class="position-relative">
+                            <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" name="password" required>
+                            <button type="button" class="btn btn-sm position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent px-2"
+                                    onclick="var i=this.parentElement.querySelector('input');var e=this.querySelector('i');i.type=i.type==='password'?'text':'password';e.className=i.type==='password'?'fas fa-eye':'fas fa-eye-slash';"
+                                    tabindex="-1">
+                                <i class="fas fa-eye text-muted"></i>
+                            </button>
+                        </div>
                         @error('password')
                             <div class="invalid-feedback" role="alert">{{ $message }}</div>
                         @enderror
@@ -34,7 +41,14 @@
 
                     <div class="mb-3">
                         <label for="password-confirm" class="form-label">{{ __('Confirm Password') }}</label>
-                        <input id="password-confirm" type="password" class="form-control" name="password_confirmation" required>
+                        <div class="position-relative">
+                            <input id="password-confirm" type="password" class="form-control" name="password_confirmation" required>
+                            <button type="button" class="btn btn-sm position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent px-2"
+                                    onclick="var i=this.parentElement.querySelector('input');var e=this.querySelector('i');i.type=i.type==='password'?'text':'password';e.className=i.type==='password'?'fas fa-eye':'fas fa-eye-slash';"
+                                    tabindex="-1">
+                                <i class="fas fa-eye text-muted"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="d-grid">

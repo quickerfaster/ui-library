@@ -62,8 +62,15 @@
 
                             <div class="mb-3">
                                 <label for="password" class="form-label">Password</label>
-                                <input type="password" id="password" class="form-control @error('password') is-invalid @enderror"
-                                    wire:model.lazy="password" placeholder="Create a password (min. 8 characters)">
+                                <div class="position-relative">
+                                    <input type="password" id="password" class="form-control @error('password') is-invalid @enderror"
+                                        wire:model.lazy="password" placeholder="Create a password (min. 8 characters)">
+                                    <button type="button" class="btn btn-sm position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent px-2"
+                                            onclick="var i=this.parentElement.querySelector('input');var e=this.querySelector('i');i.type=i.type==='password'?'text':'password';e.className=i.type==='password'?'fas fa-eye':'fas fa-eye-slash';"
+                                            tabindex="-1">
+                                        <i class="fas fa-eye text-muted"></i>
+                                    </button>
+                                </div>
                                 @error('password')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -71,8 +78,15 @@
 
                             <div class="mb-4">
                                 <label for="password_confirmation" class="form-label">Confirm Password</label>
-                                <input type="password" id="password_confirmation" class="form-control"
-                                    wire:model.lazy="password_confirmation" placeholder="Re-enter your password">
+                                <div class="position-relative">
+                                    <input type="password" id="password_confirmation" class="form-control"
+                                        wire:model.lazy="password_confirmation" placeholder="Re-enter your password">
+                                    <button type="button" class="btn btn-sm position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent px-2"
+                                            onclick="var i=this.parentElement.querySelector('input');var e=this.querySelector('i');i.type=i.type==='password'?'text':'password';e.className=i.type==='password'?'fas fa-eye':'fas fa-eye-slash';"
+                                            tabindex="-1">
+                                        <i class="fas fa-eye text-muted"></i>
+                                    </button>
+                                </div>
                             </div>
 
                             <button type="submit" class="btn btn-primary w-100">
