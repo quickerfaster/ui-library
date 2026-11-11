@@ -150,7 +150,7 @@
                         <i class="fas {{ $isAllCompanies ? 'fa-globe' : 'fa-building' }} me-1"></i>
                         <span>{{ \Illuminate\Support\Str::limit($currentCompanyName, 12) }}</span>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="max-height: 320px; overflow-y: auto;">
                         @if ($this->userCanAccessAllCompanies(auth()->user()))
                             <li>
                                 <a class="dropdown-item d-flex align-items-center {{ $currentCompanyId === 0 ? 'active fw-bold text-info' : '' }}"
