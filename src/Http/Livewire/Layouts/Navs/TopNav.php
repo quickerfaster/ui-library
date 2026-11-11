@@ -815,8 +815,22 @@ class TopNav extends Component
      */
     public function userCanAccessAllCompanies($user): bool
     {
+        if (!$user) {
+            return false;
+        }
+
+        // Role-based access (configurable)
         $allCompaniesRoles = config('ui-library.all_companies_roles', ['super_admin', 'admin', 'company_admin']);
-        return $user && $user->hasAnyRole($allCompaniesRoles);
+        if ($user->hasAnyRole($allCompaniesRoles)) {
+            return true;
+        }
+
+        // Permission-based access (granted via Access Control Management)
+        if ($user->can('view_all_companies')) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -1028,7 +1042,7 @@ class TopNav extends Component
                     continue;
                 }
             }
-    
+
             // ------------------------------------------------------------------
             //  module_access filtering
             // ------------------------------------------------------------------
@@ -1039,21 +1053,21 @@ class TopNav extends Component
             $moduleAccess = config('ui-library.module_access', []);
             if (isset($moduleAccess[$key])) {
                 $user = auth()->user();
-    
+
                 if (! $user) {
                     continue;
                 }
-    
+
                 // Admin bypass: super_admin, admin, company_admin see all modules.
                 if (! AuthorizationService::isBypassAllowed($user)) {
                     $allowedRoles = (array) $moduleAccess[$key];
-    
+
                     if (! $user->hasAnyRole(...$allowedRoles)) {
                         continue;
                     }
                 }
             }
-    
+
             $modules[$key] = array_merge($config, ['key' => $key]);
         }
 

@@ -95,10 +95,12 @@ class NavigationHub extends Component
             $this->companies = collect();
         }
 
-        // Check all-companies access
+        // Check all-companies access (role-based + permission-based)
         $allCompaniesRoles = config('ui-library.all_companies_roles', ['super_admin', 'admin', 'company_admin']);
         $user = auth()->user();
-        $this->canAccessAllCompanies = $user && $user->hasAnyRole($allCompaniesRoles);
+        $this->canAccessAllCompanies = $user && (
+            $user->hasAnyRole($allCompaniesRoles) || $user->can('view_all_companies')
+        );
     }
 
     public function open(array $payload = []): void
