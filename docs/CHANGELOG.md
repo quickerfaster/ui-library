@@ -1,8 +1,22 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-10-23
-> **Status**: Current — Holiday Module Batch Wizard + FieldFactory Extensibility + Wizard Fixes
+> **Date**: 2026-11-12
+> **Status**: Current — File Preview/Modal Reliability + Crop Modal + Drawer Stacking Fixes
+
+---
+
+## 2026-11-12 — File Preview, Modal Reopen, Crop Modal & Drawer Stacking Fixes
+
+### Fixed
+- **Image preview second click failed** — [`file.blade.php`](src/Resources/views/components/fields/file.blade.php:16) `openPreview()` now reads `previewUrl` (image data URL) before `tempFileDataUrl`/`existingFileUrl`, and dispatches the file MIME type.
+- **PDF preview blank / payload overflow** — File uploads now use `URL.createObjectURL()` (blob URL) instead of `readAsDataURL()`, avoiding Livewire's ~2MB payload limit. Blob URLs are regenerated per preview open and revoked on re-select.
+- **Blob URL type detection** — [`DocumentPreview.php`](src/Http/Livewire/DocumentPreview.php:13) accepts `fileName`/`fileMime` and detects `blob:` URLs from MIME/name. [`preview-office.blade.php`](src/Resources/views/livewire/documents/partials/preview-office.blade.php:1) resolves docx/xlsx extension from MIME/name for blob URLs.
+- **PDF preview empty on reopen** — [`DocumentPreviewModal.php`](src/Http/Livewire/Modals/DocumentPreviewModal.php:28) assigns a fresh `$previewNonce` per open (used as the child `:key`), and [`preview-pdf.blade.php`](src/Resources/views/livewire/documents/partials/preview-pdf.blade.php:1) cache-busts non-blob/data PDF URLs.
+- **Duplicate Bootstrap modal instances / lingering backdrop** — [`quicker-faster.js`](public/assets/js/quicker-faster.js:500) uses `bootstrap.Modal.getOrCreateInstance()` instead of `new bootstrap.Modal()`. `hidden.bs.modal` now removes stale backdrops and resets body scroll.
+- **Crop modal not reopening** — [`image.blade.php`](src/Resources/views/components/fields/image.blade.php:30) dispatches via `Livewire.dispatch()` (was Alpine `$dispatch`). [`crop-image-modal.blade.php`](src/Resources/views/livewire/modals/crop-image-modal.blade.php:1) added `wire:ignore.self`, delegated Cropper lifecycle listeners, `wire:click="closeModal"` on close buttons, and backdrop cleanup.
+- **Drawer/modal stacking** — [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php:321) now hides the drawer for both `document-preview-modal` and `crop-image-modal`, with delegated `show.bs.modal`/`hidden.bs.modal` handling.
+- **DataTable column toggle "Undefined array key"** — [`DataTable.php`](src/Http/Livewire/DataTables/DataTable.php:333) `handleColumnsUpdated()` now intersects incoming columns with `array_keys($this->columns)`.
 
 ---
 

@@ -28,9 +28,9 @@
                 <img :src="previewUrl" class="img-thumbnail" style="max-height: 150px; display: block;">
                 <div class="mt-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary"
-                        @click="$dispatch('openCropModal', { 
+                        @click="Livewire.dispatch('openCropModal', {
                         payload: {
-                            imageUrl: previewUrl, 
+                            imageUrl: previewUrl,
                             fieldName: '{{ $name }}',
                             aspectRatio: '{{ $field->definition['aspect_ratio'] ?? '1/1' }}'
                         }

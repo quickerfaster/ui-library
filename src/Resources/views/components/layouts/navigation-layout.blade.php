@@ -318,39 +318,49 @@
                 }
             };
 
-            // Hide drawer visually when document preview modal opens.
-            // The offcanvas transform creates a stacking context that
-            // traps the modal behind the drawer regardless of z-index.
+            // Hide the drawer visually while a drawer-aware modal is open.
+            // The offcanvas transform creates a stacking context that traps the
+            // modal behind the drawer regardless of z-index.
             var drawerEl = document.getElementById('globalDrawer');
-            var modalEl = document.getElementById('document-preview-modal');
-            if (drawerEl && modalEl) {
+            if (drawerEl) {
                 var hideDrawer = function () { drawerEl.style.visibility = 'hidden'; };
                 var showDrawer = function () { drawerEl.style.visibility = ''; };
 
-                // Livewire events (PHP-driven open/close).
-                // The actual Bootstrap show/hide is handled centrally by
-                // quicker-faster.js (registerModalHandlers). This handler only
-                // manages drawer visibility so the modal isn't trapped behind
-                // the offcanvas transform.
-                Livewire.on('open-bs-modal', function (event) {
-                    if (event[0].modalId === 'document-preview-modal') hideDrawer();
-                });
-                Livewire.on('close-bs-modal', function (event) {
-                    if (event[0].modalId === 'document-preview-modal') showDrawer();
-                });
+                // Modal IDs that should hide the drawer while open.
+                var drawerAwareModalIds = ['document-preview-modal', 'crop-image-modal'];
 
-                // Bootstrap events (user clicks Close/X/backdrop or presses Esc)
-                modalEl.addEventListener('show.bs.modal', hideDrawer);
-                modalEl.addEventListener('hidden.bs.modal', function () {
-                    showDrawer();
-                    // Defensive cleanup so a stale backdrop / scroll lock never
-                    // lingers after the preview modal closes.
+                var isDrawerAwareModal = function (modalId) {
+                    return drawerAwareModalIds.indexOf(modalId) !== -1;
+                };
+
+                var cleanupModalState = function () {
                     document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
                     document.body.classList.remove('modal-open');
                     document.body.style.overflow = '';
-                    // Tell the Livewire modal component to reset, so the preview
-                    // child is re-mounted fresh on the next open.
-                    Livewire.dispatch('documentPreviewModalClosed');
+                };
+
+                // Livewire events (PHP-driven open/close). Bootstrap's actual
+                // show/hide is handled centrally by quicker-faster.js.
+                Livewire.on('open-bs-modal', function (event) {
+                    if (isDrawerAwareModal(event[0].modalId)) hideDrawer();
+                });
+                Livewire.on('close-bs-modal', function (event) {
+                    if (isDrawerAwareModal(event[0].modalId)) showDrawer();
+                });
+
+                // Bootstrap events also cover user-initiated close
+                // (X/backdrop/Esc). Delegated so they survive DOM morphs.
+                document.addEventListener('show.bs.modal', function (e) {
+                    if (e.target && isDrawerAwareModal(e.target.id)) hideDrawer();
+                });
+                document.addEventListener('hidden.bs.modal', function (e) {
+                    if (!e.target || !isDrawerAwareModal(e.target.id)) return;
+                    showDrawer();
+                    cleanupModalState();
+                    // Component-specific reset for the document preview child.
+                    if (e.target.id === 'document-preview-modal') {
+                        Livewire.dispatch('documentPreviewModalClosed');
+                    }
                 });
             }
 
