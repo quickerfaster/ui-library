@@ -7,28 +7,44 @@
         fileName: {{ $value && !is_object($value) ? json_encode(basename($value)) : 'null' }},
         tempFileDataUrl: null,
         tempFileName: null,
+        tempFileType: null,
+        tempFile: null,
         init() {
             if (this.existingFileUrl && {{ $isImage ? 'true' : 'false' }}) {
                 this.previewUrl = this.existingFileUrl;
             }
         },
         openPreview() {
-            // Use temporary data URL if available (new file), otherwise existing URL
-            const url = this.tempFileDataUrl || this.existingFileUrl;
+            // For a freshly selected document, regenerate the blob URL on each
+            // open. Some browsers cache a blob URL in the PDF viewer, so
+            // reusing the same URL leaves a blank/gray frame on reopen.
+            if (this.tempFile && !{{ $isImage ? 'true' : 'false' }}) {
+                if (this.tempFileDataUrl && this.tempFileDataUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(this.tempFileDataUrl);
+                }
+                this.tempFileDataUrl = URL.createObjectURL(this.tempFile);
+            }
+
+            // Prefer inline image data URL, then temporary document blob URL,
+            // then an already-saved file URL.
+            const url = this.previewUrl || this.tempFileDataUrl || this.existingFileUrl;
             const name = this.tempFileName || this.fileName;
             if (url) {
                 Livewire.dispatch('openDocumentPreview', {
                     payload: {
                         fileUrl: url,
-                        fileName: name
+                        fileName: name,
+                        mimeType: this.tempFileType || null,
                     }
                 });
             }
         },
         handleFileSelect(file) {
             if (!file) return;
+            this.tempFile = file;
             this.tempFileName = file.name;
-            
+            this.tempFileType = file.type || null;
+
             if ({{ $isImage ? 'true' : 'false' }} && file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -36,12 +52,13 @@
                 };
                 reader.readAsDataURL(file);
             } else if (!{{ $isImage ? 'true' : 'false' }}) {
-                // For documents, store data URL for preview modal (but don't show inline)
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.tempFileDataUrl = e.target.result;
-                };
-                reader.readAsDataURL(file);
+                // Revoke the previous blob URL to avoid leaking memory.
+                if (this.tempFileDataUrl && this.tempFileDataUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(this.tempFileDataUrl);
+                }
+                // Use a blob URL instead of a base64 data URL so large files
+                // (e.g. PDFs) stay under Livewire's payload size limit.
+                this.tempFileDataUrl = URL.createObjectURL(file);
             }
         }
      }"

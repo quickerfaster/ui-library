@@ -327,7 +327,11 @@
                 var hideDrawer = function () { drawerEl.style.visibility = 'hidden'; };
                 var showDrawer = function () { drawerEl.style.visibility = ''; };
 
-                // Livewire events (PHP-driven open/close)
+                // Livewire events (PHP-driven open/close).
+                // The actual Bootstrap show/hide is handled centrally by
+                // quicker-faster.js (registerModalHandlers). This handler only
+                // manages drawer visibility so the modal isn't trapped behind
+                // the offcanvas transform.
                 Livewire.on('open-bs-modal', function (event) {
                     if (event[0].modalId === 'document-preview-modal') hideDrawer();
                 });
@@ -335,9 +339,19 @@
                     if (event[0].modalId === 'document-preview-modal') showDrawer();
                 });
 
-                // Bootstrap events (user clicks Close/X/backdrop)
+                // Bootstrap events (user clicks Close/X/backdrop or presses Esc)
                 modalEl.addEventListener('show.bs.modal', hideDrawer);
-                modalEl.addEventListener('hidden.bs.modal', showDrawer);
+                modalEl.addEventListener('hidden.bs.modal', function () {
+                    showDrawer();
+                    // Defensive cleanup so a stale backdrop / scroll lock never
+                    // lingers after the preview modal closes.
+                    document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    // Tell the Livewire modal component to reset, so the preview
+                    // child is re-mounted fresh on the next open.
+                    Livewire.dispatch('documentPreviewModalClosed');
+                });
             }
 
         </script>

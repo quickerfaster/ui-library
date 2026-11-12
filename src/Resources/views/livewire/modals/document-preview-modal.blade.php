@@ -10,12 +10,12 @@
                 </div>
                 <div class="modal-body p-0" style="min-height: 500px;">
                     @if($showModal && $fileUrl)
-                        <livewire:qf.document-preview :fileUrl="$fileUrl" :key="$fileUrl" />
+                        <livewire:qf.document-preview :fileUrl="$fileUrl" :fileName="$fileName" :fileMime="$mimeType" :key="$previewNonce" />
                     @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <a href="{{ $fileUrl }}" class="btn btn-primary" download>
+                    <a href="{{ $fileUrl }}" class="btn btn-primary" download="{{ $fileName }}">
                         <i class="fas fa-download me-1"></i> Download
                     </a>
                 </div>

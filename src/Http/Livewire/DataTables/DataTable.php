@@ -332,7 +332,15 @@ class DataTable extends Component
 
     public function handleColumnsUpdated($visibleColumns)
     {
-        $this->visibleColumns = $visibleColumns;
+        // Only keep columns that actually exist in the current column set.
+        // ColumnManager may send stale/hidden keys (e.g. employee_id when it
+        // is hidden on the table), which would otherwise cause an
+        // "Undefined array key" in data-table.blade.php.
+        $this->visibleColumns = array_values(array_intersect(
+            (array) $visibleColumns,
+            array_keys($this->columns)
+        ));
+
         // Also update session in DataTable for consistency (though ColumnManager already does)
         if ($this->showHideColumnsEnabled()) {
             $this->saveVisibleColumns($this->configKey, $this->visibleColumns);

@@ -1,9 +1,11 @@
 @php
     $isDataUrl = str_starts_with($fileUrl, 'data:');
-    $extension = strtolower(pathinfo($fileUrl, PATHINFO_EXTENSION));
-    
-    // Override extension based on MIME for data URLs
+    $isBlobUrl = str_starts_with($fileUrl, 'blob:');
+
     if ($isDataUrl) {
+        $extension = 'bin';
+
+        // Override extension based on MIME for data URLs.
         if (str_contains($fileUrl, 'wordprocessingml')) {
             $extension = 'docx';
         } elseif (str_contains($fileUrl, 'spreadsheetml')) {
@@ -13,6 +15,21 @@
         } elseif (str_contains($fileUrl, 'msword')) {
             $extension = 'doc';
         }
+    } elseif ($isBlobUrl) {
+        // Blob URLs have no path/extension, so derive the extension from the
+        // original file name or MIME type supplied by the upload field.
+        $extension = strtolower(pathinfo((string) $fileName, PATHINFO_EXTENSION));
+        $mime = strtolower((string) $fileMime);
+
+        if ($extension === '' || $extension === 'bin') {
+            if (str_contains($mime, 'wordprocessingml') || $mime === 'application/msword') {
+                $extension = 'docx';
+            } elseif (str_contains($mime, 'spreadsheetml') || $mime === 'application/vnd.ms-excel') {
+                $extension = 'xlsx';
+            }
+        }
+    } else {
+        $extension = strtolower(pathinfo($fileUrl, PATHINFO_EXTENSION));
     }
 @endphp
 
