@@ -58,6 +58,13 @@ return [
             'route' => NULL,
             'url' => 'admin/dashboard-notifications-overview',
         ],
+        'Analytics' => [
+            'label' => 'Analytics',
+            'icon' => 'fas fa-chart-line',
+            'order' => 6,
+            'route' => NULL,
+            'url' => 'admin/dashboard-analytics',
+        ],
     ],
     'contexts' => [
         'dashboard' => [
@@ -392,6 +399,18 @@ return [
                 'order' => 4,
                 'page_title' => 'Notification Logs',
                 'modelName' => 'notification_log',
+            ],
+        ],
+        'Analytics' => [
+            [
+                'key' => 'analytics_overview',
+                'label' => 'Overview',
+                'icon' => 'fas fa-chart-line',
+                'route' => '/admin/dashboard-analytics',
+                'permission' => 'view_dashboard_overview',
+                'order' => 1,
+                'page_title' => NULL,
+                'modelName' => 'analytics_overview',
             ],
         ],
     ],

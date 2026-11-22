@@ -184,4 +184,11 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/admin/notification-logs', function () {
         return view('qf-core::admin.notification-logs');
     })->name('admin.notification-logs');
+
+    // -----------------------------------------------------------------
+    // Analytics
+    // -----------------------------------------------------------------
+    Route::get('/admin/dashboard-analytics', function () {
+        return view('qf-core::admin.dashboard-analytics');
+    })->name('admin.dashboard-analytics');
 });
