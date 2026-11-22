@@ -2,6 +2,7 @@
 
 namespace QuickerFaster\UILibrary\Services\Widgets;
 
+use QuickerFaster\UILibrary\Widgets\AnalyticsWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\StatWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\ChartWidgetProcessor;
 use QuickerFaster\UILibrary\Widgets\ActionCardWidgetProcessor;
@@ -31,6 +32,7 @@ class WidgetProcessor
         'activity_log' => ActivityLogWidgetProcessor::class,
         'profile_header' => ProfileHeaderWidgetProcessor::class,
         'quick_actions' => QuickActionsWidgetProcessor::class,
+        'analytics'   => AnalyticsWidgetProcessor::class,
 
         // 'team_whos_out' removed — moved to consuming app's Leave module
         // as part of library boundary cleanup (2026-09-28). The consuming

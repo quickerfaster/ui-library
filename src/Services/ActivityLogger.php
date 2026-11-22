@@ -2,79 +2,88 @@
 
 namespace QuickerFaster\UILibrary\Services;
 
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use QuickerFaster\UILibrary\Models\ActivityLog;
 
 /**
- * ActivityLogger stub for the UI Library.
+ * ActivityLogger records user actions for audit trails and analytics.
  *
- * This replaces the App\Modules\Admin\Services\ActivityLogger reference
- * that was previously coupled to the consuming application.
- *
- * Consuming applications should bind their own implementation
- * in their AppServiceProvider:
- *
- *   $this->app->singleton(
- *       \QuickerFaster\UILibrary\Services\ActivityLogger::class,
- *       \App\Services\ActivityLogger::class
- *   );
+ * Called automatically from DataTableForm and WizardForm on every
+ * create/update/delete. Consuming apps can also call log() directly
+ * for custom events (login, logout, export, etc.).
  */
 class ActivityLogger
 {
     /**
-     * Log an activity event.
-     *
-     * @param string $action
-     * @param string $model
-     * @param mixed  $modelId
-     * @param array  $data
-     * @return void
+     * Log a generic activity event.
      */
     public function log(string $action, string $model, $modelId, array $data = []): void
     {
-        // Stub implementation — consuming apps should override this.
+        if (!config('ui-library.analytics.activity_logs.enabled', true)) {
+            return;
+        }
+
+        $user = Auth::user();
+
+        ActivityLog::create([
+            'user_id'      => $user?->id,
+            'company_id'   => $user?->current_company_id ?? null,
+            'action'       => $action,
+            'subject_type' => $model,
+            'subject_id'   => $modelId,
+            'properties'   => !empty($data) ? $data : null,
+            'created_at'   => now(),
+        ]);
     }
 
     /**
      * Log a record creation event.
-     *
-     * Called from DataTableForm and WizardForm after a new record is created.
-     * If activity logging is not configured, this is a graceful no-op.
-     *
-     * @param string $logName The config key (e.g., 'module.resource').
-     * @param mixed  $record  The Eloquent model that was created.
-     * @param array  $data    The data that was saved.
-     * @return void
      */
     public static function created(string $logName, $record, array $data): void
     {
-        Log::debug('ActivityLogger: record created.', [
-            'log_name' => $logName,
-            'model'    => $record ? get_class($record) : null,
-            'model_id' => $record->id ?? null,
-            'data'     => $data,
+        if (!config('ui-library.analytics.activity_logs.enabled', true)) {
+            return;
+        }
+
+        $user = Auth::user();
+
+        ActivityLog::create([
+            'user_id'      => $user?->id,
+            'company_id'   => $user?->current_company_id ?? null,
+            'action'       => 'created',
+            'subject_type' => $record ? get_class($record) : null,
+            'subject_id'   => $record->id ?? null,
+            'properties'   => [
+                'log_name' => $logName,
+                'data'     => $data,
+            ],
+            'created_at'   => now(),
         ]);
     }
 
     /**
      * Log a record update event.
-     *
-     * Called from DataTableForm and WizardForm after an existing record is updated.
-     * If activity logging is not configured, this is a graceful no-op.
-     *
-     * @param string $logName The config key (e.g., 'module.resource').
-     * @param mixed  $record  The Eloquent model that was updated.
-     * @param array  $old     The original values for changed fields.
-     * @param array  $new     The new values for changed fields.
-     * @return void
      */
     public static function updated(string $logName, $record, array $old, array $new): void
     {
-        Log::debug('ActivityLogger: record updated.', [
-            'log_name' => $logName,
-            'model'    => $record ? get_class($record) : null,
-            'model_id' => $record->id ?? null,
-            'old'      => $old,
-            'new'      => $new,
+        if (!config('ui-library.analytics.activity_logs.enabled', true)) {
+            return;
+        }
+
+        $user = Auth::user();
+
+        ActivityLog::create([
+            'user_id'      => $user?->id,
+            'company_id'   => $user?->current_company_id ?? null,
+            'action'       => 'updated',
+            'subject_type' => $record ? get_class($record) : null,
+            'subject_id'   => $record->id ?? null,
+            'properties'   => [
+                'log_name' => $logName,
+                'old'      => $old,
+                'new'      => $new,
+            ],
+            'created_at'   => now(),
         ]);
     }
 }

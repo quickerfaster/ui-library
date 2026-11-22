@@ -1055,4 +1055,61 @@ return [
             'frequency_saturation' => 5,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Analytics
+    |--------------------------------------------------------------------------
+    | Page views, user sessions, activity logs, and optional PostHog
+    | integration for product analytics.
+    */
+    'analytics' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Page View Tracking
+        |--------------------------------------------------------------------------
+        | When enabled, the qf.track-page-view middleware records every GET
+        | request to the page_views table. Add the middleware alias to your
+        | web route group in the consuming app.
+        */
+        'page_views' => [
+            'enabled' => true,
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | User Session Tracking
+        |--------------------------------------------------------------------------
+        | When enabled, login/logout events write to the user_sessions table.
+        */
+        'user_sessions' => [
+            'enabled' => true,
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Activity Logs
+        |--------------------------------------------------------------------------
+        | When enabled, DataTableForm and WizardForm record creates/updates
+        | to the activity_logs table via the ActivityLogger service.
+        */
+        'activity_logs' => [
+            'enabled' => true,
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | PostHog Integration
+        |--------------------------------------------------------------------------
+        | Set api_key to enable the PostHog JS snippet in the navigation
+        | layout. Leave null to disable. Self-host by setting api_host.
+        |
+        | Free cloud tier: https://us.i.posthog.com
+        | Self-hosted:     https://posthog.your-domain.com
+        */
+        'posthog' => [
+            'api_key'  => env('POSTHOG_API_KEY', null),
+            'api_host' => env('POSTHOG_API_HOST', 'https://us.i.posthog.com'),
+        ],
+    ],
 ];

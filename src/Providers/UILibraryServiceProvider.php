@@ -181,6 +181,13 @@ class UILibraryServiceProvider extends ServiceProvider
         // session tenant context is resolved at request start.
         $this->app['router']->aliasMiddleware('qf.resolve-company-context', ResolveCompanyContext::class);
 
+        // Register the page-view tracking middleware. Consuming apps add
+        // 'qf.track-page-view' to their web route group.
+        $this->app['router']->aliasMiddleware(
+            'qf.track-page-view',
+            \QuickerFaster\UILibrary\Http\Middleware\TrackPageView::class
+        );
+
         // Load shared library routes (export, import, print, etc.)
         $sharedRoutesPath = __DIR__ . '/../Routes/web.php';
         if (file_exists($sharedRoutesPath)) {
@@ -473,6 +480,33 @@ class UILibraryServiceProvider extends ServiceProvider
         );
 
         Event::subscribe(\QuickerFaster\UILibrary\Listeners\NotificationEventSubscriber::class);
+
+        // Analytics: track user sessions (login / logout).
+        if (config('ui-library.analytics.user_sessions.enabled', true)) {
+            Event::listen(\Illuminate\Auth\Events\Login::class, function ($event) {
+                \QuickerFaster\UILibrary\Models\UserSession::create([
+                    'user_id'    => $event->user->id,
+                    'company_id' => $event->user->current_company_id ?? null,
+                    'action'     => 'login',
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                    'created_at' => now(),
+                ]);
+            });
+
+            Event::listen(\Illuminate\Auth\Events\Logout::class, function ($event) {
+                if ($event->user) {
+                    \QuickerFaster\UILibrary\Models\UserSession::create([
+                        'user_id'    => $event->user->id,
+                        'company_id' => $event->user->current_company_id ?? null,
+                        'action'     => 'logout',
+                        'ip_address' => request()->ip(),
+                        'user_agent' => request()->userAgent(),
+                        'created_at' => now(),
+                    ]);
+                }
+            });
+        }
     }
 
     /**
