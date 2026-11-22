@@ -1,8 +1,22 @@
 # QuickerFaster UI Library — Changelog
 
 > **Package**: `quicker-faster/ui-library`
-> **Date**: 2026-11-12
-> **Status**: Current — File Preview/Modal Reliability + Crop Modal + Drawer Stacking Fixes
+> **Date**: 2026-11-22
+> **Status**: Current — Analytics Infrastructure + PostHog Integration
+
+---
+
+## 2026-11-22 — Analytics Infrastructure + PostHog Integration
+
+### Added
+- **`activity_logs` table + [`ActivityLog`](src/Models/ActivityLog.php)** — Records user actions (`created`/`updated`/custom) with `user_id`, `company_id`, polymorphic subject, and JSON properties.
+- **`user_sessions` table + [`UserSession`](src/Models/UserSession.php)** — Records login/logout events with IP and user agent, driven by Laravel `Login`/`Logout` event listeners in [`UILibraryServiceProvider`](src/Providers/UILibraryServiceProvider.php).
+- **`page_views` table + [`PageView`](src/Models/PageView.php)** — Records every GET page request via the [`TrackPageView`](src/Http/Middleware/TrackPageView.php) terminable middleware (alias `qf.track-page-view`).
+- **Real [`ActivityLogger`](src/Services/ActivityLogger.php)** — The stub now writes to `activity_logs` from DataTableForm/WizardForm creates and updates.
+- **`analytics` dashboard widget** — [`AnalyticsWidgetProcessor`](src/Widgets/AnalyticsWidgetProcessor.php) + [`analytics.blade.php`](src/Resources/views/widgets/analytics.blade.php) show active users, page views, top actions, top pages, and daily Chart.js charts.
+- **Analytics dashboard page** — [`dashboard_analytics.php`](src/Core/Admin/Data/dashboards/dashboard_analytics.php) config, [`dashboard-analytics.blade.php`](src/Core/Admin/Resources/views/admin/dashboard-analytics.blade.php) view, `/admin/dashboard-analytics` route, and Admin navigation item.
+- **PostHog integration** — Config-driven JS snippet in [`navigation-layout.blade.php`](src/Resources/views/components/layouts/navigation-layout.blade.php) auto-identifies the logged-in user (`POSTHOG_API_KEY`/`POSTHOG_API_HOST`).
+- **`analytics` config section** — Feature toggles for page views, user sessions, activity logs, and PostHog in [`ui-library.php`](src/Config/ui-library.php).
 
 ---
 
