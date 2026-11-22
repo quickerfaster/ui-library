@@ -1,6 +1,8 @@
+@props(['data'])
+
 <div class="card mb-4">
     <div class="card-header pb-0">
-        <h6>Analytics — Last {{ $period_days }} Days</h6>
+        <h6>Analytics — Last {{ $data['period_days'] }} Days</h6>
     </div>
     <div class="card-body">
         <div class="row">
@@ -8,7 +10,7 @@
                 <div class="card bg-gradient-primary text-white">
                     <div class="card-body p-3">
                         <p class="text-sm mb-0 opacity-8">Active Users</p>
-                        <h4 class="mb-0">{{ number_format($active_users) }}</h4>
+                        <h4 class="mb-0">{{ number_format($data['active_users']) }}</h4>
                     </div>
                 </div>
             </div>
@@ -16,7 +18,7 @@
                 <div class="card bg-gradient-info text-white">
                     <div class="card-body p-3">
                         <p class="text-sm mb-0 opacity-8">Page Views</p>
-                        <h4 class="mb-0">{{ number_format($page_views) }}</h4>
+                        <h4 class="mb-0">{{ number_format($data['page_views']) }}</h4>
                     </div>
                 </div>
             </div>
@@ -24,7 +26,7 @@
                 <div class="card bg-gradient-dark text-white">
                     <div class="card-body p-3">
                         <p class="text-sm mb-0 opacity-8">Top Actions</p>
-                        @foreach(array_slice($actions, 0, 5) as $action)
+                        @foreach(array_slice($data['actions'], 0, 5) as $action)
                             <span class="badge bg-white text-dark me-1 mb-1">
                                 {{ $action['action'] }} ({{ $action['total'] }})
                             </span>
@@ -61,7 +63,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($top_pages as $page)
+                            @foreach($data['top_pages'] as $page)
                                 <tr>
                                     <td class="text-xs">{{ \Illuminate\Support\Str::limit($page['route'], 60) }}</td>
                                     <td class="text-end text-xs font-weight-bold">{{ $page['total'] }}</td>
@@ -76,10 +78,11 @@
 </div>
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     (function() {
-        var dailyViews = @json($daily_page_views);
-        var dailyLogins = @json($daily_logins);
+        var dailyViews = @json($data['daily_page_views']);
+        var dailyLogins = @json($data['daily_logins']);
 
         if (dailyViews.length && document.getElementById('analytics-page-views-chart')) {
             new Chart(document.getElementById('analytics-page-views-chart'), {
