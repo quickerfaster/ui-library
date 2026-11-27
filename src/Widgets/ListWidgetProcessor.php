@@ -174,6 +174,8 @@ class ListWidgetProcessor
                     return '<span class="badge bg-warning text-dark">Expires in ' . $daysLeft . ' days</span>';
                 }
                 return '<span class="badge bg-success">Valid</span>';
+            case 'boolean':
+                return $value ? 'Active' : 'Inactive';
             default:
                 return (string) $value;
         }

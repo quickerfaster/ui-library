@@ -24,6 +24,7 @@ class QuickActionsWidgetProcessor
     public function process(array $definition): array
     {
         $limit = (int) ($definition['limit'] ?? 8);
+        $category = $definition['category'] ?? null;
 
         $actions = [];
         $favorites = [];
@@ -36,6 +37,13 @@ class QuickActionsWidgetProcessor
             $ranking = app(RankingEngine::class);
 
             $actions = $ranking->score($registry->authorizedFor(), Auth::id());
+
+            // Filter by category if specified in the widget config
+            if ($category) {
+                $actions = array_values(array_filter($actions, function (array $action) use ($category) {
+                    return ($action['category'] ?? '') === $category;
+                }));
+            }
 
             // Phase 4: Load favorites and interleave at top.
             $favorites = UserFavoriteAction::query()

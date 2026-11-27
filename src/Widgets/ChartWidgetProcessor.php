@@ -77,7 +77,19 @@ class ChartWidgetProcessor
                 $results = $query->get();
 
                 foreach ($results as $row) {
-                    $labels[] = $row->group_label;
+                    $label = $row->group_label;
+                    // Apply custom label map if defined in widget config
+                    $labelMap = $definition['label_map'] ?? [];
+                    if (isset($labelMap[(string) $label])) {
+                        $label = $labelMap[(string) $label];
+                    } elseif ($label === null || $label === '') {
+                        $label = 'Unspecified';
+                    } elseif ($label === '0' || $label === 0) {
+                        $label = 'No';
+                    } elseif ($label === '1' || $label === 1) {
+                        $label = 'Yes';
+                    }
+                    $labels[] = $label;
                     $values[] = $row->value;
                 }
             }
@@ -106,7 +118,7 @@ class ChartWidgetProcessor
             'width' => $definition['width'] ?? 6,
         ];
 
-        $currencyCode = $definition['currency_code'] ?? $this->getCurrentCompanyCurrencyCode();
+        $currencyCode = $definition['currency_code'] ?? null;
         if (!empty($currencyCode)) {
             $result['currency_symbol'] = $this->getCurrencySymbol($currencyCode);
         }

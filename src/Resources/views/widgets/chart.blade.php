@@ -33,17 +33,22 @@
         const options = {
             responsive: true,
             maintainAspectRatio: true,
-        };
-
-        if (currencySymbol) {
-            options.scales = {
+            scales: {
                 y: {
+                    beginAtZero: true,
                     ticks: {
+                        stepSize: 1,
                         callback: function(value) {
-                            return currencySymbol + value.toLocaleString();
+                            return Math.round(value);
                         }
                     }
                 }
+            }
+        };
+
+        if (currencySymbol) {
+            options.scales.y.ticks.callback = function(value) {
+                return currencySymbol + value.toLocaleString();
             };
             options.plugins = {
                 tooltip: {
