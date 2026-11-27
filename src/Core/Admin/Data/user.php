@@ -114,9 +114,10 @@ return [
       '4' => 'deleted_at',
     ],
     'onEditForm' => [
-      '0' => 'remember_token',
-      '1' => 'email_verified_at',
-      '2' => 'deleted_at',
+      '0' => 'status',
+      '1' => 'remember_token',
+      '2' => 'email_verified_at',
+      '3' => 'deleted_at',
     ],
     'onQuery' => [
       '0' => 'password_confirmation',

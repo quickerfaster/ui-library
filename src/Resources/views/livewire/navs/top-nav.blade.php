@@ -314,7 +314,9 @@
                         $userMenu = config('ui-library.user_menu');
                         $userMenuEnabled = $userMenu['enabled'] ?? true;
                         $userMenuLinks = $userMenu['links'] ?? [];
-                        $visibleLinks = array_filter($userMenuLinks, fn($link) => !empty($link['url']) || !empty($link['route']));
+                        $visibleLinks = array_filter($userMenuLinks, fn($link) =>
+                            !empty($link['url']) || !empty($link['route']) || !empty($link['event'])
+                        );
                     @endphp
                     @if ($userMenuEnabled)
                         @auth
@@ -325,10 +327,36 @@
                                     if (($link['label'] ?? '') === 'My Portal' && $currentModule === 'hr') {
                                         continue;
                                     }
-                                    $linkUrl = !empty($link['url']) ? url($link['url']) : (!empty($link['route']) ? route($link['route']) : '#');
+
+                                    $isEventLink = !empty($link['event']);
+                                    $linkUrl = !$isEventLink
+                                        ? (!empty($link['url']) ? url($link['url']) : (!empty($link['route']) ? route($link['route']) : '#'))
+                                        : '#';
+
+                                    // Resolve placeholders in event params (e.g. {{ auth_id }})
+                                    $eventParams = $link['params'] ?? [];
+                                    $eventParamsJson = '{}';
+                                    if ($isEventLink && $eventParams) {
+                                        $eventParamsJson = json_encode($eventParams);
+                                        $eventParamsJson = str_replace(
+                                            '{{ auth_id }}',
+                                            auth()->user()?->id ?? '',
+                                            $eventParamsJson
+                                        );
+                                        // HTML-escape so double quotes in JSON don't break the onclick attribute
+                                        $eventParamsJson = htmlspecialchars($eventParamsJson, ENT_QUOTES, 'UTF-8');
+                                    }
                                 @endphp
-                                <li><a class="dropdown-item border-radius-md mb-1" href="{{ $linkUrl }}">
-                                    <i class="{{ $link['icon'] ?? 'fas fa-link' }} me-2 opacity-6 text-sm"></i>{{ $link['label'] ?? 'Link' }}</a></li>
+                                <li>
+                                    @if ($isEventLink)
+                                        <button type="button" class="dropdown-item border-radius-md mb-1"
+                                            onclick="Livewire.dispatch('{{ $link['event'] }}', {!! $eventParamsJson !!})">
+                                            <i class="{{ $link['icon'] ?? 'fas fa-link' }} me-2 opacity-6 text-sm"></i>{{ $link['label'] ?? 'Link' }}</button>
+                                    @else
+                                        <a class="dropdown-item border-radius-md mb-1" href="{{ $linkUrl }}">
+                                            <i class="{{ $link['icon'] ?? 'fas fa-link' }} me-2 opacity-6 text-sm"></i>{{ $link['label'] ?? 'Link' }}</a>
+                                    @endif
+                                </li>
                             @endforeach
                         @endauth
                     @endif
